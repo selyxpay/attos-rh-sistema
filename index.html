@@ -1,0 +1,2216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>R&amp;T Empregos — CRM de Recrutamento &amp; Seleção</title>
+    <!-- Google Fonts - Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons — SRI verificado (hash oficial cdnjs 6.4.0) -->
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+          integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
+          crossorigin="anonymous" referrerpolicy="no-referrer">
+    <!-- Chart.js — protegido via CSP no servidor (X-Frame-Options + Content-Security-Policy) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"
+            crossorigin="anonymous"></script>
+    <!-- JSZip — protegido via CSP no servidor -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- SheetJS — protegido via CSP no servidor -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- R&T Design System CSS -->
+    <link rel="stylesheet" href="css/design-system.css">
+</head>
+<body>
+
+    <!-- TELA DE LOGIN GLASSMORPHISM -->
+    <div id="login-screen" class="login-overlay-full" style="display: flex;">
+        <div class="login-glass-box">
+            <div class="login-logo-area">
+                <img src="img/logo-rt.png" class="logo-img" alt="R&amp;T Empregos">
+            </div>
+            <h2>Acesso Interno CRM</h2>
+            <p class="login-subtext">Faça login com suas credenciais de funcionário</p>
+            
+            <form id="login-form">
+                <div class="form-group" style="width: 100%; display: flex; flex-direction: column; text-align: left; margin-bottom: 16px;">
+                    <label for="login-username" style="color: #cbd5e1; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-user"></i> Usuário</label>
+                    <input type="text" id="login-username" required placeholder="Digite seu usuário..." class="form-control-login">
+                </div>
+                
+                <div class="form-group" style="width: 100%; display: flex; flex-direction: column; text-align: left; margin-bottom: 8px;">
+                    <label for="login-password" style="color: #cbd5e1; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-lock"></i> Senha</label>
+                    <input type="password" id="login-password" required placeholder="Digite sua senha..." class="form-control-login">
+                </div>
+                
+                <div id="login-error-msg" class="login-error-alert" style="display: none;">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <span>Usuário ou senha incorretos!</span>
+                </div>
+                
+                <button type="submit" class="btn-login-submit">
+                    <span>Entrar no Sistema</span> <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </form>
+            <p style="margin-top: 16px; font-size: 12px; color: #94a3b8;">É funcionário novo? <a href="?reg=funcionarios" style="color: var(--primary); text-decoration: none; font-weight: 600;">Cadastre-se por aqui</a></p>
+        </div>
+    </div>
+
+    <!-- TELA DE AUTO-CADASTRO DE FUNCIONÁRIOS (GLASSMORPHISM) -->
+    <div id="staff-registration-screen" class="login-overlay-full" style="display: none;">
+        <div class="login-glass-box">
+            <div class="login-logo-area">
+                <img src="img/logo-rt.png" class="logo-img" alt="R&amp;T Empregos">
+            </div>
+            <h2>Cadastro de Colaborador</h2>
+            <p class="login-subtext">Preencha sua ficha para liberação do administrador</p>
+            
+            <form id="staff-registration-form">
+                <div class="form-group" style="width: 100%; display: flex; flex-direction: column; text-align: left; margin-bottom: 14px;">
+                    <label for="reg-nome" style="color: #cbd5e1; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-signature"></i> Nome Completo</label>
+                    <input type="text" id="reg-nome" required placeholder="Seu nome completo..." class="form-control-login">
+                </div>
+
+                <div class="form-group" style="width: 100%; display: flex; flex-direction: column; text-align: left; margin-bottom: 14px;">
+                    <label for="reg-username" style="color: #cbd5e1; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-user-plus"></i> Nome de Usuário (Login)</label>
+                    <input type="text" id="reg-username" required placeholder="Crie seu usuário de login..." class="form-control-login">
+                </div>
+                
+                <div class="form-group" style="width: 100%; display: flex; flex-direction: column; text-align: left; margin-bottom: 8px;">
+                    <label for="reg-password" style="color: #cbd5e1; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-lock"></i> Senha</label>
+                    <input type="password" id="reg-password" required placeholder="Crie uma senha de acesso..." class="form-control-login">
+                </div>
+                
+                <div id="reg-error-msg" class="login-error-alert" style="display: none; background-color: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4);">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <span>Este usuário de login já está em uso!</span>
+                </div>
+
+                <div id="reg-success-msg" class="login-error-alert" style="display: none; background-color: rgba(34, 197, 94, 0.2); border-color: rgba(34, 197, 94, 0.4); color: #4ade80;">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>Cadastro enviado com sucesso! Aguarde liberação.</span>
+                </div>
+                
+                <button type="submit" class="btn-login-submit" style="background: linear-gradient(135deg, var(--primary), #fb7185);">
+                    <span>Solicitar Acesso</span> <i class="fa-solid fa-user-check"></i>
+                </button>
+            </form>
+            <p style="margin-top: 16px; font-size: 12px; color: #94a3b8;">Já tem uma conta? <a href="?" id="link-back-to-login" style="color: var(--primary); text-decoration: none; font-weight: 600;">Voltar ao Login</a></p>
+        </div>
+    </div>
+
+    <!-- Layout Wrapper -->
+    <div class="app-container">
+        
+        <!-- SIDEBAR LATERAL ESQUERA (Estilo Dark R&T) -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-area">
+                    <img src="img/logo-rt.png" class="logo-img" alt="R&amp;T Empregos">
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="nav-item active" data-aba="dashboard">
+                        <a href="#"><i class="fa-solid fa-table-cells-large"></i> <span>Dashboard</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="vagas">
+                        <a href="#"><i class="fa-solid fa-briefcase"></i> <span>Vagas</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="banco-talentos">
+                        <a href="#"><i class="fa-solid fa-users-viewfinder"></i> <span>Banco de Talentos</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="selecao">
+                        <a href="#"><i class="fa-solid fa-square-check"></i> <span>Seleção</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="depto-pessoal">
+                        <a href="#"><i class="fa-solid fa-building-user"></i> <span>Depto. Pessoal</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="relatorios">
+                        <a href="#"><i class="fa-solid fa-chart-line"></i> <span>Relatórios</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="comissao">
+                        <a href="#"><i class="fa-solid fa-dollar-sign"></i> <span>Comissão</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="site">
+                        <a href="#"><i class="fa-solid fa-globe"></i> <span>Site</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="funcionarios" id="nav-item-funcionarios" style="display: none;">
+                        <a href="#"><i class="fa-solid fa-user-gear"></i> <span>Funcionários</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="auditoria" id="nav-item-auditoria" style="display: none;">
+                        <a href="#"><i class="fa-solid fa-clock-rotate-left"></i> <span>Auditoria</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="inaptos" id="nav-item-inaptos" style="display: none;">
+                        <a href="#"><i class="fa-solid fa-ban"></i> <span>Inaptos</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="meu-painel">
+                        <a href="#"><i class="fa-solid fa-id-card-clip"></i> <span>Meu Painel</span></a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <p>Conectamos pessoas ao futuro.</p>
+                <span class="sidebar-version">v1.4.0</span>
+            </div>
+        </aside>
+        
+        <!-- AREA DE CONTEÚDO PRINCIPAL (Main Area) -->
+        <div class="main-layout">
+            
+            <!-- HEADER PRINCIPAL -->
+            <header class="app-header">
+                <div class="header-left">
+                    <button id="sidebar-toggle" class="header-btn"><i class="fa-solid fa-bars"></i></button>
+                    <div class="header-title-container">
+                        <img src="img/logo-rt.png" class="logo-img" alt="R&amp;T Logo" style="height: 24px; margin-right: 8px;">
+                        <span class="header-app-name">R&amp;T EMPREGOS</span>
+                    </div>
+                </div>
+                
+                <div class="header-right">
+                    <div class="user-profile-badge" id="header-user-profile" style="display: none;" title="Clique para abrir Meu Perfil">
+                        <div class="user-avatar" id="header-user-avatar">AD</div>
+                        <div class="user-info">
+                            <span class="user-name" id="header-user-name">Administrador RT</span>
+                            <span class="user-role" id="header-user-role">Gestão Executiva</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-down" style="font-size:10px; margin-left:6px; color:var(--text-secondary); opacity:0.6;"></i>
+                    </div>
+                    <button id="btn-logout" class="header-btn" title="Sair do Sistema" style="margin-left: 12px; background: none; border: none; color: var(--text-secondary); font-size: 18px; cursor: pointer; transition: var(--transition); display: none;">
+                        <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                    </button>
+                </div>
+            </header>
+            
+            <!-- VIEWPORT DE CONTEÚDO DINÂMICO (Abas) -->
+            <main class="content-viewport">
+                
+                <!-- 1. ABA: DASHBOARD (KANBAN DE CANDIDATOS) -->
+                <section id="aba-dashboard" class="aba-content active">
+                    <div class="page-title-section">
+                        <h1>Painel R&amp;T Empregos</h1>
+                        <p class="page-subtitle">Gestão de contratações, vagas e candidatos</p>
+                    </div>
+
+                    <!-- SUB-ABA: VISÃO GERAL (Métricas e Gráficos) -->
+                    <div id="dash-sub-visao-geral" style="display:block">
+                        <!-- Greeting Banner -->
+                        <div class="dashboard-greeting-banner">
+                            <div>
+                                <h2 id="dash-welcome-title">Bem-vindo(a), Colaborador!</h2>
+                                <p>Conectamos pessoas ao futuro. Confira os indicadores e contratações do dia. 🚀</p>
+                            </div>
+                            <img src="img/logo-rt.png" class="logo-img" alt="Logo R&amp;T">
+                        </div>
+
+                        <!-- 8 KPI Cards Premium -->
+                        <div class="kpi-row dashboard-kpis">
+                            <div class="kpi-card" id="kpi-cad-hoje">
+                                <div class="kpi-icon-wrapper red-theme">
+                                    <i class="fa-solid fa-user-plus"></i>
+                                </div>
+                                <div class="kpi-data">
+                                    <span class="kpi-number" id="dash-kpi-cad-hoje">0</span>
+                                    <span class="kpi-label">Cadastrados Hoje</span>
+                                </div>
+                            </div>
+                            <div class="kpi-card" id="kpi-analise-sel">
+                                <div class="kpi-icon-wrapper blue-theme">
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                </div>
+                                <div class="kpi-data">
+                                    <span class="kpi-number" id="dash-kpi-analise-sel">0</span>
+                                    <span class="kpi-label">Em Análise (Seleção)</span>
+                                </div>
+                            </div>
+                            <div class="kpi-card" id="kpi-enviadas-dp">
+                                <div class="kpi-icon-wrapper green-theme">
+                                    <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                                </div>
+                                <div class="kpi-data">
+                                    <span class="kpi-number" id="dash-kpi-enviadas-dp">0</span>
+                                    <span class="kpi-label">Enviados para DP</span>
+                                </div>
+                            </div>
+                            <div class="kpi-card" id="kpi-devolvidas-dp">
+                                <div class="kpi-icon-wrapper orange-theme">
+                                    <i class="fa-solid fa-circle-exclamation"></i>
+                                </div>
+                                <div class="kpi-data">
+                                    <span class="kpi-number" id="dash-kpi-devolvidas-dp">0</span>
+                                    <span class="kpi-label">Devolvidos pelo DP</span>
+                                </div>
+                            </div>
+                            <div class="kpi-card" id="kpi-contratos-hoje">
+                                <div class="kpi-icon-wrapper green-theme" style="background-color: #dcfce7; color: #166534;">
+                                    <i class="fa-solid fa-file-contract"></i>
+                                </div>
+                                <div class="kpi-data">
+                                    <span class="kpi-number" id="dash-kpi-contratos-hoje">0</span>
+                                    <span class="kpi-label">Contratos Hoje</span>
+                                </div>
+                            </div>
+                            <div class="kpi-card" id="kpi-vagas-disp">
+                                <div class="kpi-icon-wrapper blue-theme" style="background-color: #e0f2fe; color: #0369a1;">
+                                    <i class="fa-solid fa-briefcase"></i>
+                                </div>
+                                <div class="kpi-data">
+                                    <span class="kpi-number" id="dash-kpi-vagas-disp">0</span>
+                                    <span class="kpi-label">Vagas Disponíveis</span>
+                                </div>
+                            </div>
+                            <div class="kpi-card" id="kpi-vagas-preenchidas">
+                                <div class="kpi-icon-wrapper green-theme" style="background-color: #f0fdf4; color: #15803d;">
+                                    <i class="fa-solid fa-circle-check"></i>
+                                </div>
+                                <div class="kpi-data">
+                                    <span class="kpi-number" id="dash-kpi-vagas-preenchidas">0</span>
+                                    <span class="kpi-label">Vagas Preenchidas</span>
+                                </div>
+                            </div>
+                            <!-- Card Recrutador Destaque da Semana -->
+                            <div class="kpi-card highlight-recrutador-shimmer" id="kpi-recrutador-destaque" style="border: 2px solid #ffd700; background: linear-gradient(135deg, rgba(255, 215, 0, 0.05), rgba(255, 165, 0, 0.05));">
+                                <div class="kpi-icon-wrapper" style="background-color: rgba(255, 215, 0, 0.2); color: #b45309;">
+                                    <i class="fa-solid fa-crown"></i>
+                                </div>
+                                <div class="kpi-data">
+                                    <span class="kpi-number" id="dash-kpi-recrutador-destaque-nome" style="font-size: 16px; font-weight: 800; color: #b45309; line-height: 1.2; margin-top: 4px;">Nenhum</span>
+                                    <span class="kpi-label" style="font-size: 10px; font-weight: 700; color: #b45309;">👑 Destaque da Semana</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 6 Gráficos Analíticos Premium -->
+                        <div class="dashboard-charts-grid">
+                            <div class="dashboard-chart-card">
+                                <h3><i class="fa-solid fa-chart-line" style="color: var(--primary);"></i> Contratações por Dia</h3>
+                                <div class="dashboard-chart-canvas-wrapper">
+                                    <canvas id="chartDashContratacoesDia"></canvas>
+                                </div>
+                            </div>
+                            <div class="dashboard-chart-card">
+                                <h3><i class="fa-solid fa-chart-pie" style="color: #3b82f6;"></i> Contratações por Empresa</h3>
+                                <div class="dashboard-chart-canvas-wrapper">
+                                    <canvas id="chartDashContratacoesEmpresa"></canvas>
+                                </div>
+                            </div>
+                            <div class="dashboard-chart-card">
+                                <h3><i class="fa-solid fa-crown" style="color: #eab308;"></i> Hires por Selecionador</h3>
+                                <div class="dashboard-chart-canvas-wrapper">
+                                    <canvas id="chartDashContratacoesSelecionador"></canvas>
+                                </div>
+                            </div>
+                            <div class="dashboard-chart-card">
+                                <h3><i class="fa-solid fa-circle-nodes" style="color: #a855f7;"></i> Fichas por Status</h3>
+                                <div class="dashboard-chart-canvas-wrapper">
+                                    <canvas id="chartDashFichasStatus"></canvas>
+                                </div>
+                            </div>
+                            <div class="dashboard-chart-card">
+                                <h3><i class="fa-solid fa-layer-group" style="color: #10b981;"></i> Vagas Disponíveis por Empresa</h3>
+                                <div class="dashboard-chart-canvas-wrapper">
+                                    <canvas id="chartDashVagasEmpresa"></canvas>
+                                </div>
+                            </div>
+                            <div class="dashboard-chart-card">
+                                <h3><i class="fa-solid fa-bus" style="color: #f97316;"></i> Linhas de Fretado com mais Contratações</h3>
+                                <div class="dashboard-chart-canvas-wrapper">
+                                    <canvas id="chartDashFretadosHires"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Seção: Banco de Talentos aguardando completar ficha -->
+                        <div id="bt-pendentes-section" style="margin-top:28px; display:none;">
+                            <h3 style="font-size:14px; font-weight:700; color:#a855f7; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+                                <i class="fa-solid fa-users"></i> Banco de Talentos — Aguardando completar ficha
+                                <span id="bt-pendentes-count" style="background:rgba(168,85,247,0.15);color:#a855f7;padding:2px 10px;border-radius:20px;font-size:12px;"></span>
+                            </h3>
+                            <div id="bt-pendentes-lista" style="display:flex; flex-direction:column; gap:10px;"></div>
+                        </div>
+                    </div>
+
+                </section>
+                
+                <!-- 2. ABA: VAGAS (VITRINE & CADASTRO) -->
+                <section id="aba-vagas" class="aba-content">
+                    <div class="page-title-section title-with-btn">
+                        <div>
+                            <h1>Vagas Disponíveis</h1>
+                            <p class="page-subtitle">Gerencie e publique vagas de emprego</p>
+                        </div>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                            <button class="btn btn-primary" id="btn-nova-vaga" style="display:none;gap:7px;align-items:center;">
+                                <i class="fa-solid fa-plus"></i> Criar Nova Vaga
+                            </button>
+                            <button class="btn" id="btn-novo-cliente" style="display:none;gap:7px;align-items:center;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;font-weight:600;">
+                                <i class="fa-solid fa-building-circle-arrow-right"></i> Cadastrar Novo Cliente
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Grid de Vagas -->
+                    <div class="vagas-grid" id="vagas-cards-container">
+                        <!-- Cards dinâmicos das vagas -->
+                    </div>
+                </section>
+                
+                <!-- 3. ABA: BANCO DE TALENTOS -->
+                <section id="aba-banco-talentos" class="aba-content">
+
+                    <!-- Título + botões Import/Export -->
+                    <div class="page-title-section title-with-btn" style="flex-wrap:wrap;gap:12px;">
+                        <div>
+                            <h1>Banco de Talentos</h1>
+                            <p class="page-subtitle">Cadastros simplificados e importações em lote</p>
+                        </div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                            <button class="btn btn-secondary btn-sm" id="btn-exportar-bt" style="display:flex;align-items:center;gap:6px;">
+                                <i class="fa-solid fa-file-arrow-down"></i> Exportar CSV
+                            </button>
+                            <label class="btn btn-primary btn-sm" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                                <i class="fa-solid fa-file-arrow-up"></i> Importar Excel/CSV
+                                <input type="file" id="input-importar-bt" accept=".xlsx,.xls,.csv" style="display:none;">
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Botão para abrir o guia -->
+                    <button id="btn-bt-guia" onclick="document.getElementById('bt-guia').style.display='block';this.style.display='none';" style="margin-bottom:16px;padding:8px 16px;border-radius:8px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;">
+                        <i class="fa-solid fa-circle-info"></i> Como usar o Banco de Talentos?
+                    </button>
+
+                    <!-- Caixa Guia (oculta por padrão) -->
+                    <div id="bt-guia" style="display:none;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:10px;padding:14px 18px;margin-bottom:16px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <span style="font-size:13px;font-weight:700;color:#1d4ed8;display:flex;align-items:center;gap:7px;">
+                                <i class="fa-solid fa-circle-info"></i> Como usar o Banco de Talentos
+                            </span>
+                            <button onclick="document.getElementById('bt-guia').style.display='none';document.getElementById('btn-bt-guia').style.display='flex';" style="background:none;border:none;color:#1d4ed8;cursor:pointer;font-size:12px;padding:0;">
+                                <i class="fa-solid fa-xmark"></i> Fechar
+                            </button>
+                        </div>
+                        <div id="bt-guia-body" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                            <div style="background:#fff;border-radius:8px;padding:10px 12px;border:1px solid #dbeafe;">
+                                <div style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:5px;display:flex;align-items:center;gap:6px;">
+                                    <i class="fa-solid fa-file-arrow-up" style="color:#2563eb;"></i> Importar pessoas
+                                </div>
+                                <p style="font-size:11.5px;color:#475569;margin:0;line-height:1.6;">
+                                    Clique em <b>Importar Excel/CSV</b> e selecione uma planilha com as colunas:<br>
+                                    <code style="background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:11px;">Nome · Telefone · Email · CPF · Cidade · Estado · Sexo</code><br>
+                                    O sistema detecta automaticamente o sexo pelo nome se a coluna estiver vazia.
+                                </p>
+                            </div>
+                            <div style="background:#fff;border-radius:8px;padding:10px 12px;border:1px solid #dbeafe;">
+                                <div style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:5px;display:flex;align-items:center;gap:6px;">
+                                    <i class="fa-solid fa-filter" style="color:#2563eb;"></i> Filtrar e encontrar
+                                </div>
+                                <p style="font-size:11.5px;color:#475569;margin:0;line-height:1.6;">
+                                    Use os <b>filtros abaixo</b> para buscar por sexo, cidade ou proximidade de empresa.<br>
+                                    O ícone <span style="background:#dcfce7;color:#16a34a;padding:1px 5px;border-radius:4px;font-size:10px;">📍 ≤15km</span> indica candidatos perto de uma empresa parceira.
+                                </p>
+                            </div>
+                            <div style="background:#fff;border-radius:8px;padding:10px 12px;border:1px solid #dbeafe;">
+                                <div style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:5px;display:flex;align-items:center;gap:6px;">
+                                    <i class="fa-solid fa-arrow-right-arrow-left" style="color:#2563eb;"></i> Mover para processo
+                                </div>
+                                <p style="font-size:11.5px;color:#475569;margin:0;line-height:1.6;">
+                                    Clique em <b>Puxar para Processo</b> no card do talento para movê-lo para a aba <b>Seleção</b> e iniciar o processo de contratação.
+                                </p>
+                            </div>
+                            <div style="background:#fff;border-radius:8px;padding:10px 12px;border:1px solid #dbeafe;">
+                                <div style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:5px;display:flex;align-items:center;gap:6px;">
+                                    <i class="fa-solid fa-file-arrow-down" style="color:#2563eb;"></i> Exportar dados
+                                </div>
+                                <p style="font-size:11.5px;color:#475569;margin:0;line-height:1.6;">
+                                    Clique em <b>Exportar CSV</b> para baixar todos os talentos em planilha.<br>
+                                    Você também pode enviar o <b>link de ficha</b> para candidatos preencherem online via celular.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filtros BT — no topo -->
+                    <div id="bt-filtros" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding:14px 16px;background:var(--card-bg);border-radius:10px;border:1px solid var(--border-color);box-shadow:var(--shadow-sm);align-items:center;">
+                        <div style="display:flex;align-items:center;gap:6px;color:var(--text-secondary);font-size:12px;font-weight:600;flex-shrink:0;">
+                            <i class="fa-solid fa-filter" style="color:var(--primary);font-size:11px;"></i> Filtros:
+                        </div>
+                        <select id="bt-filter-sexo" style="flex:1;min-width:130px;padding:8px 10px;border-radius:7px;border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-primary);font-size:12px;font-family:inherit;cursor:pointer;">
+                            <option value="">♀♂ Todos os sexos</option>
+                            <option value="M">♂ Masculino</option>
+                            <option value="F">♀ Feminino</option>
+                        </select>
+                        <select id="bt-filter-cidade" style="flex:2;min-width:150px;padding:8px 10px;border-radius:7px;border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-primary);font-size:12px;font-family:inherit;cursor:pointer;">
+                            <option value="">📍 Todas as cidades</option>
+                        </select>
+                        <select id="bt-filter-empresa" style="flex:2;min-width:180px;padding:8px 10px;border-radius:7px;border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-primary);font-size:12px;font-family:inherit;cursor:pointer;">
+                            <option value="">🏭 Próx. de qualquer empresa</option>
+                        </select>
+                        <button id="bt-filter-limpar" style="padding:7px 14px;border-radius:7px;border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-secondary);font-size:12px;cursor:pointer;font-weight:600;white-space:nowrap;font-family:inherit;display:flex;align-items:center;gap:5px;transition:background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='var(--card-bg)'">
+                            <i class="fa-solid fa-rotate-left"></i> Limpar
+                        </button>
+                    </div>
+
+                    <!-- Barra de busca -->
+                    <div class="filter-search-bar">
+                        <div class="search-input-wrapper expand">
+                            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                            <input type="text" id="banco-search" placeholder="Pesquisar candidato no banco de dados...">
+                        </div>
+                    </div>
+
+                    <!-- Resultado de importação -->
+                    <div id="bt-import-result" style="display:none; margin-bottom:14px;"></div>
+
+                    <!-- Grupos por empresa (candidatos já em processo) -->
+                    <div class="banco-grupos-container" id="banco-grupos-list"></div>
+
+                    <!-- Lista de talentos do banco simples -->
+                    <div id="banco-talentos-simples-lista" style="display:flex;flex-direction:column;gap:10px;margin-top:8px;"></div>
+
+                </section>
+                
+                <!-- 4. ABA: SELEÇÃO (PRÉ-DP COM BORDAS COLORIDAS) -->
+                <section id="aba-selecao" class="aba-content">
+                    <div class="page-title-section">
+                        <h1>Seleção</h1>
+                        <p class="page-subtitle">Candidatos em análise — etapa pré Departamento Pessoal</p>
+                    </div>
+                    
+                    <!-- Grade de Seleção -->
+                    <div class="selecao-grid" id="selecao-cards-container">
+                        <!-- Cards dinâmicos com bordas coloridas por recrutador -->
+                    </div>
+                </section>
+                
+                <!-- 5. ABA: DEPTO. PESSOAL (VALIDAÇÃO DE DOCUMENTOS) -->
+                <section id="aba-depto-pessoal" class="aba-content">
+                    <div class="page-title-section">
+                        <h1>Departamento Pessoal</h1>
+                        <p class="page-subtitle">Candidatos aprovados aguardando finalização</p>
+                    </div>
+                    
+                    <!-- Grid de DP -->
+                    <div class="dp-grid" id="dp-cards-container">
+                        <!-- Cards com ações de Finalizar ou Reprovar -->
+                    </div>
+                </section>
+                
+                <!-- 6. ABA: RELATÓRIOS (METRICAS E GRAFICOS) -->
+                <section id="aba-relatorios" class="aba-content">
+                    <div class="page-title-section" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; width: 100%;">
+                        <div>
+                            <h1>Relatórios & Gráficos</h1>
+                            <p class="page-subtitle">Indicadores de desempenho, fluxo de vagas e controle de contratações</p>
+                        </div>
+                        
+                        <!-- Destaque do Funcionário da Semana no topo -->
+                        <div id="bloco-destaque-semana" class="destaque-semana-box">
+                            <div class="destaque-crown-icon">👑</div>
+                            <div class="destaque-info">
+                                <span class="destaque-title">Recrutador Destaque</span>
+                                <strong class="destaque-nome" id="destaque-recrutador-nome">Nenhum</strong>
+                                <span class="destaque-meta" id="destaque-recrutador-meta">0 contratos finalizados</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FILTROS AVANÇADOS -->
+                    <div class="filter-box bg-glass mb-4" style="background: var(--card-bg); border: 1px solid var(--border-color); padding: 20px; border-radius: var(--radius-lg); margin-bottom: 24px;">
+                        <h3 style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-filter" style="color: var(--primary);"></i> Filtros de Pesquisa</h3>
+                        <div class="filters-grid mt-3" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;">
+                            <div class="form-group">
+                                <label for="filtro-periodo">Período</label>
+                                <select id="filtro-periodo" class="form-control">
+                                    <option value="hoje">Dia Atual (Hoje)</option>
+                                    <option value="especifico">Dia Específico</option>
+                                    <option value="semana" selected>Esta Semana</option>
+                                    <option value="mes">Este Mês</option>
+                                    <option value="ano">Este Ano</option>
+                                    <option value="personalizado">Período Personalizado</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group" id="container-filtro-data-unica" style="display: none;">
+                                <label for="filtro-data-unica">Data Específica</label>
+                                <input type="date" id="filtro-data-unica" class="form-control">
+                            </div>
+                            
+                            <div class="form-group" id="container-filtro-datas" style="display: none;">
+                                <div style="display: flex; gap: 8px;">
+                                    <div style="flex: 1;">
+                                        <label for="filtro-data-de">De</label>
+                                        <input type="date" id="filtro-data-de" class="form-control">
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <label for="filtro-data-ate">Até</label>
+                                        <input type="date" id="filtro-data-ate" class="form-control">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="filtro-empresa">Empresa</label>
+                                <select id="filtro-empresa" class="form-control">
+                                    <option value="todas">Todas as Empresas</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="filtro-vaga">Vaga</label>
+                                <select id="filtro-vaga" class="form-control">
+                                    <option value="todas">Todas as Vagas</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="filtro-recrutador">Recrutador (Seleção)</label>
+                                <select id="filtro-recrutador" class="form-control">
+                                    <option value="todos">Todos</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="filtro-dp">Responsável DP</label>
+                                <select id="filtro-dp" class="form-control">
+                                    <option value="todos">Todos</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="filtro-status-ficha">Status da Ficha</label>
+                                <select id="filtro-status-ficha" class="form-control">
+                                    <option value="todos">Todos os Status</option>
+                                    <option value="pendente">Pendente</option>
+                                    <option value="em_analise">Em Análise</option>
+                                    <option value="entrevista">Entrevista</option>
+                                    <option value="aprovado">Aguardando DP</option>
+                                    <option value="reprovado">Devolvida pelo DP</option>
+                                    <option value="contratado">Contrato Feito</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
+                            <button class="btn btn-secondary btn-sm" id="btn-limpar-filtros" style="font-size: 12px;"><i class="fa-solid fa-rotate-left"></i> Limpar Filtros</button>
+                            <button class="btn btn-primary btn-sm" id="btn-aplicar-filtros" style="background-color: var(--primary); border: none; font-size: 12px; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-magnifying-glass"></i> Filtrar</button>
+                        </div>
+                    </div>
+
+                    <!-- KPI CARDS DE DESEMPENHO -->
+                    <div class="kpi-row relatorios-kpis mb-4" id="relatorios-kpi-container" style="margin-bottom: 24px;">
+                        <div class="kpi-card bg-glass">
+                            <div class="kpi-icon-wrapper green-theme"><i class="fa-solid fa-file-contract"></i></div>
+                            <div class="kpi-data">
+                                <span class="kpi-number" id="kpi-contratos-finalizados">0</span>
+                                <span class="kpi-label">Contratos Feitos</span>
+                            </div>
+                        </div>
+                        <div class="kpi-card bg-glass">
+                            <div class="kpi-icon-wrapper blue-theme"><i class="fa-solid fa-users"></i></div>
+                            <div class="kpi-data">
+                                <span class="kpi-number" id="kpi-fichas-aguardando-dp">0</span>
+                                <span class="kpi-label">Aguardando DP</span>
+                            </div>
+                        </div>
+                        <div class="kpi-card bg-glass">
+                            <div class="kpi-icon-wrapper yellow-theme"><i class="fa-solid fa-rotate-left"></i></div>
+                            <div class="kpi-data">
+                                <span class="kpi-number" id="kpi-fichas-devolvidas">0</span>
+                                <span class="kpi-label">Devolvidas pelo DP</span>
+                            </div>
+                        </div>
+                        <div class="kpi-card bg-glass">
+                            <div class="kpi-icon-wrapper red-theme"><i class="fa-solid fa-user-xmark"></i></div>
+                            <div class="kpi-data">
+                                <span class="kpi-number" id="kpi-no-shows">0</span>
+                                <span class="kpi-label">Candidatos No-Show</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CONTROLE DE DEMANDA DE VAGAS POR EMPRESA -->
+                    <div class="table-box bg-glass mb-4" style="margin-bottom: 24px;">
+                        <div class="table-header-area">
+                            <h3><i class="fa-solid fa-chart-pie" style="color: var(--primary);"></i> Painel de Vagas Disponíveis e Demandas por Empresa</h3>
+                        </div>
+                        <div class="table-scroll-container">
+                            <table class="excel-table" id="vagas-demandas-table">
+                                <thead>
+                                    <tr>
+                                        <th>Empresa</th>
+                                        <th>Vaga / Cargo</th>
+                                        <th>Solicitado</th>
+                                        <th>Disponíveis</th>
+                                        <th>Preenchidas</th>
+                                        <th>Canceladas</th>
+                                        <th>Reabertas</th>
+                                        <th>Aproveitamento</th>
+                                        <th>Status</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="vagas-demandas-body">
+                                    <!-- Injetado dinamicamente -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- GRÁFICOS DINÂMICOS -->
+                    <div class="charts-grid mb-4" style="margin-bottom: 24px;">
+                        <div class="chart-box">
+                            <h3><i class="fa-solid fa-trophy" style="color: var(--primary);"></i> Hires por Recrutador (Ranking)</h3>
+                            <div class="chart-canvas-wrapper">
+                                <canvas id="chartRecrutadores"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-box">
+                            <h3><i class="fa-solid fa-industry" style="color: var(--primary);"></i> Hires por Empresa</h3>
+                            <div class="chart-canvas-wrapper">
+                                <canvas id="chartEmpresas"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RELATÓRIO DE CONTRATAÇÃO DO DIA -->
+                    <div class="table-box bg-glass" id="relatorio-contratacao-dia-container">
+                        <div class="table-header-area">
+                            <h3><i class="fa-solid fa-calendar-check" style="color: var(--primary);"></i> Relatório Geral de Contratações</h3>
+                            <button class="btn btn-secondary btn-sm" id="btn-exportar-relatorio-excel" style="font-size: 12px; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-file-excel"></i> Exportar Relatório</button>
+                        </div>
+                        <div class="table-scroll-container">
+                            <table class="excel-table" id="tabela-contratacao-dia">
+                                <thead>
+                                    <tr>
+                                        <th>Recrutador (Seleção)</th>
+                                        <th>Candidato Contratado</th>
+                                        <th>Empresa Parceira</th>
+                                        <th>Vaga</th>
+                                        <th>Data de Contratação</th>
+                                        <th>Turno</th>
+                                        <th>Confirmado por (DP)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabela-contratacao-dia-body">
+                                    <!-- Injetado dinamicamente -->
+                                </tbody>
+                                <tfoot>
+                                    <tr style="font-weight: bold; background-color: rgba(255, 255, 255, 0.05);">
+                                        <td colspan="6" style="text-align: right; padding: 12px;">Total Geral de Contratos Finalizados no Período:</td>
+                                        <td id="tabela-contratacao-total-geral" style="padding: 12px; font-size: 14px; color: var(--primary);">0</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- 7. ABA: COMISSÃO (EXCEL STYLE) -->
+                <section id="aba-comissao" class="aba-content">
+                    <div class="page-title-section">
+                        <h1>Planilha de Comissão</h1>
+                        <p class="page-subtitle">Controle de comissões por recrutador</p>
+                    </div>
+                    
+                    <!-- KPI Cards de comissão -->
+                    <div class="kpi-row comissao-kpis" id="comissao-kpis-container">
+                        <!-- Cards de total por recrutador dinâmicos -->
+                    </div>
+                    
+                    <!-- Tabela Estilo Excel -->
+                    <div class="table-box">
+                        <div class="table-header-area">
+                            <h3>Registro de Comissões</h3>
+                            <button class="btn btn-secondary btn-sm" id="btn-export-excel"><i class="fa-solid fa-file-excel"></i> Exportar</button>
+                        </div>
+                        <div class="table-scroll-container">
+                            <table class="excel-table" id="comissao-table">
+                                <thead>
+                                    <tr>
+                                        <th>Recrutador</th>
+                                        <th>Candidato</th>
+                                        <th>Empresa</th>
+                                        <th>Data da Contratação</th>
+                                        <th>Comissão</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="comissao-table-body">
+                                    <!-- Linhas dinâmicas -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- 9. ABA: FUNCIONÁRIOS (GERENCIAMENTO DE ACESSOS) -->
+                <section id="aba-funcionarios" class="aba-content">
+                    <div class="page-title-section" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <h1>Funcionários Internos</h1>
+                            <p class="page-subtitle">Gerenciamento de contas e permissões de acesso ao CRM</p>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" id="btn-copiar-link-cadastro" style="background-color: var(--primary); border: none; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-copy"></i> Copiar Link de Auto-Cadastro
+                        </button>
+                    </div>
+
+                    <!-- CARD DE NOVOS FUNCIONÁRIOS (AGUARDANDO APROVAÇÃO) -->
+                    <div class="card bg-glass mb-4" id="func-pending-approvals-card" style="display: none; margin-bottom: 24px; padding: 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: var(--card-bg);">
+                        <h3 style="color: var(--text-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; font-size: 16px;"><i class="fa-solid fa-user-clock" style="color: var(--primary);"></i> Novos Funcionários (Aguardando Aprovação)</h3>
+                        <div class="table-scroll-container">
+                            <table class="excel-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>Login</th>
+                                        <th>Status</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="lista-pendentes-body">
+                                    <!-- Injetado dinamicamente -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="func-layout-grid">
+                        <!-- Formulário de cadastro -->
+                        <div class="func-form-card">
+                            <h3>Cadastrar Novo Funcionário</h3>
+                            <form id="form-cadastro-funcionario">
+                                <div class="form-group">
+                                    <label for="func-nome">Nome Completo *</label>
+                                    <input type="text" id="func-nome" required class="form-control" placeholder="Ex: Carlos Magno">
+                                </div>
+                                <div class="form-group mt-3">
+                                    <label for="func-email">E-mail *</label>
+                                    <input type="email" id="func-email" required class="form-control" placeholder="Ex: carlos@email.com">
+                                </div>
+                                <div class="form-group-grid mt-3">
+                                    <div class="form-group">
+                                        <label for="func-login">Login *</label>
+                                        <input type="text" id="func-login" required class="form-control" placeholder="carlos.magno">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="func-senha">Senha *</label>
+                                        <input type="password" id="func-senha" required class="form-control" placeholder="Min. 3 caracteres">
+                                    </div>
+                                </div>
+                                <div class="form-group-grid mt-3">
+                                    <div class="form-group">
+                                        <label for="func-depto">Departamento *</label>
+                                        <select id="func-depto" required class="form-control">
+                                            <option value="" disabled selected>Selecione</option>
+                                            <option value="selecao">Seleção (Recrutamento)</option>
+                                            <option value="dp">Departamento Pessoal (DP)</option>
+                                            <option value="comissao">Comissão (Estatísticas)</option>
+                                            <option value="administracao">Administração / Gestão</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="func-status">Status *</label>
+                                        <select id="func-status" required class="form-control">
+                                            <option value="ativo" selected>Ativo</option>
+                                            <option value="inativo">Inativo</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary mt-4" style="width: 100%;">
+                                    <i class="fa-solid fa-user-plus"></i> Cadastrar Funcionário
+                                </button>
+                            </form>
+                        </div>
+                        
+                        <!-- Listagem / Tabela de funcionários -->
+                        <div class="func-list-card">
+                            <h3>Colaboradores Cadastrados</h3>
+                            <div class="table-scroll-container mt-3">
+                                <table class="excel-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Nome</th>
+                                            <th>Login</th>
+                                            <th>Departamento</th>
+                                            <th>Status</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="lista-funcionarios-body">
+                                        <!-- Injetado dinamicamente -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- 10. ABA: AUDITORIA GERAL (LOGS DO SISTEMA) -->
+                <section id="aba-auditoria" class="aba-content">
+                    <div class="page-title-section">
+                        <h1>Auditoria Administrativa</h1>
+                        <p class="page-subtitle">Logs cronológicos de ações e segurança do CRM R&amp;T Empregos</p>
+                    </div>
+                    <div class="table-box bg-glass">
+                        <div class="table-header-area">
+                            <h3>Histórico de Eventos</h3>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <select id="filtro-auditoria-categoria" class="form-control" style="width: 180px; height: 36px; padding: 0 10px; font-size: 13px;">
+                                    <option value="todos">Todas as Categorias</option>
+                                    <option value="sistema">Sistema</option>
+                                    <option value="vagas">Vagas</option>
+                                    <option value="selecao">Seleção</option>
+                                    <option value="dp">Depto. Pessoal</option>
+                                    <option value="comissao">Comissão</option>
+                                    <option value="exportacoes">Exportações</option>
+                                    <option value="funcionarios">Funcionários</option>
+                                </select>
+                                <button class="btn btn-secondary btn-sm" id="btn-limpar-auditoria" style="background-color: var(--primary); border: none; font-size: 12px; height: 36px;"><i class="fa-solid fa-trash-can"></i> Limpar Logs</button>
+                            </div>
+                        </div>
+                        <div class="table-scroll-container">
+                            <table class="excel-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 180px;">Data & Hora</th>
+                                        <th style="width: 180px;">Colaborador</th>
+                                        <th style="width: 120px;">Categoria</th>
+                                        <th>Ação Realizada</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="lista-auditoria-body">
+                                    <!-- Logs injetados dinamicamente -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- 11. ABA: INAPTOS (SOMENTE ADMIN) -->
+                <section id="aba-inaptos" class="aba-content">
+                    <div class="page-title-section">
+                        <h1>Gestão de Inaptos</h1>
+                        <p class="page-subtitle">Motivos de inaptidão e registro de candidatos inaptos</p>
+                    </div>
+
+                    <!-- Bloco: Motivos de Inaptidão -->
+                    <div class="table-box bg-glass" style="margin-bottom: 24px;">
+                        <div class="table-header-area">
+                            <h3><i class="fa-solid fa-list-check" style="color:#ef4444;"></i> Motivos de Inaptidão</h3>
+                        </div>
+                        <div style="padding: 16px 20px;">
+                            <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+                                <input type="text" id="novo-motivo-input" class="form-control" placeholder="Digite o novo motivo de inaptidão..." style="flex: 1; height: 40px; padding: 0 14px; font-size: 13px;">
+                                <button onclick="salvarMotivoInaptidao()" class="btn btn-primary btn-sm" style="height: 40px; padding: 0 20px; white-space: nowrap;"><i class="fa-solid fa-plus"></i> Adicionar Motivo</button>
+                            </div>
+                            <div id="motivos-inaptidao-lista"></div>
+                        </div>
+                    </div>
+
+                    <!-- Bloco: Candidatos Inaptos -->
+                    <div class="table-box bg-glass">
+                        <div class="table-header-area">
+                            <h3><i class="fa-solid fa-ban" style="color:#ef4444;"></i> Candidatos Inaptos</h3>
+                            <span id="inaptos-count-badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700;"></span>
+                        </div>
+                        <div style="padding: 8px 16px 16px;" id="inaptos-candidatos-lista"></div>
+                    </div>
+                </section>
+
+                <!-- 8. ABA: PORTAL DE CAPTAÇÃO (GESTÃO DE LINKS — SOMENTE STAFF) -->
+                <section id="aba-site" class="aba-content">
+                    <div style="max-width: 900px; margin: 0 auto; padding: 0 0 40px;">
+                    <div class="page-title-section">
+                        <h1>Portal de Captação</h1>
+                        <p class="page-subtitle">Links públicos de cadastro — compartilhe com candidatos</p>
+                    </div>
+
+                    <!-- Cards de acesso rápido -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin-bottom: 32px;">
+
+                        <!-- Card 1: Ficha Online Completa -->
+                        <div class="kpi-card" style="cursor:default; border:1px solid rgba(190,18,60,0.2); padding:20px; flex-direction:column; gap:0;">
+                            <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
+                                <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#be123c,#f43f5e);box-shadow:0 4px 14px rgba(190,18,60,0.35);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <i class="fa-solid fa-clipboard-list" style="color:#fff;font-size:22px;"></i>
+                                </div>
+                                <div>
+                                    <div style="font-weight:800;color:var(--text-primary);font-size:14px;">Ficha Online</div>
+                                    <div style="font-size:11px;color:#be123c;font-weight:600;margin-top:2px;">Formulário completo de candidato</div>
+                                </div>
+                            </div>
+                            <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">Dados pessoais, bancários, tamanhos de uniforme e envio de documentos. Link para candidatos a distância.</p>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;">
+                                <button class="btn btn-primary btn-sm" style="flex:1;justify-content:center;gap:7px;font-size:12px;" onclick="window.open('candidato.html','_blank')">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir
+                                </button>
+                                <button class="btn btn-secondary btn-sm" id="btn-copiar-link-completo" style="flex:1;justify-content:center;gap:7px;font-size:12px;">
+                                    <i class="fa-solid fa-link"></i> Copiar Link
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Banco de Talentos -->
+                        <div class="kpi-card" style="cursor:default; border:1px solid rgba(59,130,246,0.2); padding:20px; flex-direction:column; gap:0;">
+                            <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
+                                <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#2563eb,#60a5fa);box-shadow:0 4px 14px rgba(59,130,246,0.35);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <i class="fa-solid fa-users-rectangle" style="color:#fff;font-size:20px;"></i>
+                                </div>
+                                <div>
+                                    <div style="font-weight:800;color:var(--text-primary);font-size:14px;">Banco de Talentos</div>
+                                    <div style="font-size:11px;color:#2563eb;font-weight:600;margin-top:2px;">Cadastro rápido simplificado</div>
+                                </div>
+                            </div>
+                            <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">Nome, CPF, telefone e endereço. Ideal para feirões, campanhas e captação em massa de candidatos.</p>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;">
+                                <button class="btn btn-sm" style="flex:1;justify-content:center;gap:7px;font-size:12px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;border:none;" onclick="window.open('talento.html','_blank')">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir
+                                </button>
+                                <button class="btn btn-secondary btn-sm" id="btn-copiar-link-talento" style="flex:1;justify-content:center;gap:7px;font-size:12px;">
+                                    <i class="fa-solid fa-link"></i> Copiar Link
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Card 3: Formulário Presencial (Agência) -->
+                        <div class="kpi-card" style="cursor:default; border:1px solid rgba(234,179,8,0.3); background:rgba(234,179,8,0.04); padding:20px; flex-direction:column; gap:0;">
+                            <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
+                                <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#b45309,#f59e0b);box-shadow:0 4px 14px rgba(234,179,8,0.4);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <i class="fa-solid fa-building-user" style="color:#fff;font-size:20px;"></i>
+                                </div>
+                                <div>
+                                    <div style="font-weight:800;color:var(--text-primary);font-size:14px;">Presencial — Agência</div>
+                                    <div style="font-size:11px;color:#b45309;font-weight:600;margin-top:2px;">🔒 Uso interno R&amp;T</div>
+                                </div>
+                            </div>
+                            <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px;line-height:1.6;">Candidatos que vieram pessoalmente. Exibe campo de número de senha e "Como soube da vaga".</p>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;">
+                                <button class="btn btn-sm" style="flex:1;justify-content:center;gap:7px;font-size:12px;background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff;border:none;" onclick="window.open('candidato.html?presencial=1','_blank')">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir
+                                </button>
+                                <button class="btn btn-secondary btn-sm" id="btn-copiar-link-presencial" style="flex:1;justify-content:center;gap:7px;font-size:12px;">
+                                    <i class="fa-solid fa-link"></i> Copiar Link
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Links personalizados por recrutador -->
+                    <div class="table-box bg-glass">
+                        <div class="table-header-area">
+                            <h3><i class="fa-solid fa-link" style="color:var(--primary);"></i> Links Personalizados por Recrutador</h3>
+                        </div>
+                        <div id="portal-links-recrutadores" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+                            <!-- Renderizado por renderPortalLinks() -->
+                        </div>
+                    </div>
+
+                    </div>
+                </section>
+
+                <!-- ABA: MEU PAINEL -->
+                <section id="aba-meu-painel" class="aba-content">
+                    <div style="max-width:940px;margin:0 auto;padding:0 0 40px;">
+                        <div class="page-title-section">
+                            <h1>Meu Painel</h1>
+                            <p class="page-subtitle">Central de trabalho pessoal — links, candidatos, disparo e ferramentas</p>
+                        </div>
+                        <div id="meu-painel-conteudo">
+                            <!-- renderizado por renderMeuPainel() -->
+                        </div>
+                    </div>
+                </section>
+
+
+            </main>
+        </div>
+        
+    </div>
+
+    <!-- MODAL: DETALHES DO CANDIDATO (SIDE-DRAWER DE SELEÇÃO) -->
+    <div id="modal-candidato-detalhes" class="modal-overlay">
+        <div class="drawer-candidato">
+            <div class="drawer-header">
+                <div class="drawer-header-left">
+                    <div class="candidato-avatar-large" id="det-avatar">JS</div>
+                    <div>
+                        <h2 id="det-nome">João Silva</h2>
+                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <span class="badge-status" id="det-status-badge">Em análise</span>
+                            <span id="det-numero-fila" style="font-size:11px; color:var(--text-secondary); font-weight:600; letter-spacing:0.5px;"></span>
+                            <span id="det-origem-badge"></span>
+                            <button id="det-inapto-action-btn" onclick="abrirModalInapto(currentCandidateId)" style="display:none;"></button>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn-close-drawer" id="btn-close-details"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div class="drawer-body">
+                
+                <!-- Banner: Banco de Talentos — Link para completar ficha -->
+                <div id="bt-completar-banner" style="display:none; margin:0 0 16px; padding:14px 16px; background:rgba(168,85,247,0.1); border:1px solid rgba(168,85,247,0.35); border-radius:10px;">
+                    <div style="font-size:12px; font-weight:700; color:#a855f7; margin-bottom:6px;"><i class="fa-solid fa-users"></i> Banco de Talentos — Ficha Incompleta</div>
+                    <div style="font-size:11px; color:var(--text-secondary); margin-bottom:10px;">Envie o link abaixo para o candidato completar o cadastro com dados bancários, documentos e tamanhos de uniforme.</div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button id="btn-copiar-link-completar" style="padding:7px 14px; border-radius:7px; border:none; background:#a855f7; color:#fff; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px;">
+                            <i class="fa-solid fa-copy"></i> Copiar link da ficha
+                        </button>
+                        <button id="btn-whatsapp-completar" style="padding:7px 14px; border-radius:7px; border:none; background:#25d366; color:#fff; font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px;">
+                            <i class="fa-brands fa-whatsapp"></i> Enviar pelo WhatsApp
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Banner: CPF DETECTADO NO BANCO DE INAPTOS (candidato ainda não marcado) -->
+                <div id="inapto-deteccao-banner" style="display:none; margin:0 0 12px; padding:14px 16px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.4); border-radius:10px;">
+                    <div style="font-size:12px; font-weight:700; color:#ef4444; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-triangle-exclamation"></i> CPF CONSTA NO BANCO DE INAPTOS
+                    </div>
+                    <div id="inapto-deteccao-motivo" style="font-size:11px; color:#fca5a5; margin-bottom:10px;">Motivo: —</div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button id="btn-confirmar-inapto-deteccao" style="padding:7px 14px;border-radius:7px;border:none;background:rgba(239,68,68,0.2);color:#ef4444;border:1px solid rgba(239,68,68,0.4);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                            <i class="fa-solid fa-circle-xmark"></i> Confirmar inaptidão
+                        </button>
+                        <button onclick="document.getElementById('inapto-deteccao-banner').style.display='none'" style="padding:7px 14px;border-radius:7px;border:1px solid rgba(255,255,255,0.1);background:transparent;color:#94a3b8;font-size:11px;cursor:pointer;">
+                            Ignorar por agora
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Banner: CANDIDATO INAPTO -->
+                <div id="inapto-banner-drawer" class="inapto-banner-drawer">
+                    <div class="inapto-titulo"><i class="fa-solid fa-circle-xmark"></i> CANDIDATO INAPTO</div>
+                    <div class="inapto-motivo" id="inapto-banner-motivo">Motivo: —</div>
+                    <!-- Ações: só mostradas quando ainda não foi tomada uma decisão -->
+                    <div id="inapto-banner-actions" style="display:none;gap:8px;flex-wrap:wrap;margin-top:12px;">
+                        <button onclick="aprovarMesmoInapto(currentCandidateId)" style="padding:7px 14px;border-radius:7px;border:none;background:#f59e0b;color:#fff;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                            <i class="fa-solid fa-check"></i> Seguir mesmo assim
+                        </button>
+                        <button onclick="naoSeguirComInapto(currentCandidateId)" style="padding:7px 14px;border-radius:7px;border:none;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                            <i class="fa-solid fa-xmark"></i> Não seguir
+                        </button>
+                    </div>
+                    <!-- Informativo: mostrado quando decisão já foi tomada -->
+                    <div id="inapto-banner-decisao" style="display:none;margin-top:10px;font-size:11px;color:#94a3b8;"></div>
+                </div>
+
+                <!-- Painel: Consulta de CPF (presencial aguardando) -->
+                <div id="cpf-consulta-panel" class="cpf-consulta-panel" style="display:none;">
+                    <h4><i class="fa-solid fa-magnifying-glass"></i> Consulta de CPF</h4>
+                    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">Consulte o CPF do candidato externamente e registre o resultado abaixo:</p>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                        <button onclick="aprovarConsultaCPF(currentCandidateId)" style="flex:1;padding:10px 14px;border-radius:8px;border:none;background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                            <i class="fa-solid fa-check-circle"></i> CPF Aprovado / Liberado
+                        </button>
+                        <button onclick="abrirModalInapto(currentCandidateId)" style="flex:1;padding:10px 14px;border-radius:8px;border:none;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                            <i class="fa-solid fa-circle-xmark"></i> CPF Inapto
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Painel: Link de Continuação (presencial CPF aprovado) -->
+                <div id="link-continuacao-panel" class="link-continuacao-panel">
+                    <h4><i class="fa-solid fa-link"></i> Link para Continuar a Ficha</h4>
+                    <p style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;">CPF aprovado! Copie o link abaixo e envie ao candidato pelo WhatsApp para que ele complete os documentos:</p>
+                    <div class="link-continuacao-url" id="link-continuacao-url">—</div>
+                    <button id="btn-copiar-link-presencial" style="padding:7px 14px;border-radius:7px;border:none;background:#22c55e;color:#fff;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                        <i class="fa-solid fa-copy"></i> Copiar link
+                    </button>
+                </div>
+
+                <!-- Alerta de devolução pelo DP -->
+                <div id="devolucao-alert-box" class="devolucao-alert" style="display: none;">
+                    <div class="devolucao-alert-header">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span>Ficha Devolvida pelo DP</span>
+                    </div>
+                    <p id="devolucao-alert-reason">Motivo: Documento ilegível</p>
+                </div>
+                
+                <!-- Abas internas do Drawer (Dados vs Documentos vs Histórico) -->
+                <div class="drawer-tabs">
+                    <button class="drawer-tab-btn active" data-drawer-tab="dados">Dados Pessoais</button>
+                    <button class="drawer-tab-btn" data-drawer-tab="documentos">Documentos (<span id="det-doc-count">6</span>)</button>
+                    <button class="drawer-tab-btn" data-drawer-tab="historico">Histórico</button>
+                </div>
+                
+                <!-- Conteúdo Tab: Dados -->
+                <div class="drawer-tab-content active" id="drawer-content-dados">
+                    
+                    <!-- DADOS PESSOAIS -->
+                    <div class="drawer-section">
+                        <h4>Dados Pessoais</h4>
+                        <div class="drawer-grid">
+                            <div class="form-group col-span-2">
+                                <label for="det-nome-input">Nome Completo</label>
+                                <input type="text" id="det-nome-input" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="det-cpf-input">CPF</label>
+                                <input type="text" id="det-cpf-input" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="det-rg-input">RG</label>
+                                <input type="text" id="det-rg-input" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="det-pis-input">PIS/NIS</label>
+                                <input type="text" id="det-pis-input" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="det-nascimento-input">Data Nascimento</label>
+                                <input type="text" id="det-nascimento-input" class="form-control" placeholder="dd/mm/aaaa">
+                            </div>
+                            <div class="form-group col-span-2">
+                                <label for="det-mae-input">Nome da Mãe</label>
+                                <input type="text" id="det-mae-input" class="form-control">
+                            </div>
+                            <div class="form-group col-span-2">
+                                <label for="det-pai-input">Nome do Pai</label>
+                                <input type="text" id="det-pai-input" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="det-telefone-input">Telefone / WhatsApp</label>
+                                <input type="text" id="det-telefone-input" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="det-email-input">E-mail</label>
+                                <input type="email" id="det-email-input" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ENDEREÇO -->
+                    <div class="drawer-section">
+                        <h4>Endereço Residencial</h4>
+                        <div class="drawer-grid">
+                            <div class="form-group">
+                                <label for="det-cep-input">CEP</label>
+                                <input type="text" id="det-cep-input" class="form-control">
+                            </div>
+                            <div class="form-group col-span-2">
+                                <label for="det-rua-input">Rua</label>
+                                <input type="text" id="det-rua-input" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="det-numero-input">Número</label>
+                                <input type="text" id="det-numero-input" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="det-bairro-input">Bairro</label>
+                                <input type="text" id="det-bairro-input" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="det-cidade-input">Cidade</label>
+                                <input type="text" id="det-cidade-input" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="det-estado-input">Estado</label>
+                                <input type="text" id="det-estado-input" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DADOS BANCÁRIOS -->
+                    <div class="drawer-section">
+                        <h4>Dados Bancários</h4>
+                        <div class="drawer-grid">
+                            <div class="form-group">
+                                <label for="det-banco-input">Banco</label>
+                                <input type="text" id="det-banco-input" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="det-tipopix-input">Tipo Chave PIX</label>
+                                <select id="det-tipopix-input" class="form-control">
+                                    <option value="CPF">CPF</option>
+                                    <option value="Telefone">Telefone</option>
+                                    <option value="E-mail">E-mail</option>
+                                </select>
+                            </div>
+                            <div class="form-group col-span-2">
+                                <label for="det-chavepix-input">Chave PIX</label>
+                                <input type="text" id="det-chavepix-input" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- UNIFORME -->
+                    <div class="drawer-section">
+                        <h4>Tamanhos de Uniforme</h4>
+                        <div class="drawer-grid">
+                            <div class="form-group">
+                                <label for="det-camiseta-input">Camiseta</label>
+                                <select id="det-camiseta-input" class="form-control">
+                                    <option value="P">P</option>
+                                    <option value="M">M</option>
+                                    <option value="G">G</option>
+                                    <option value="GG">GG</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="det-calca-input">Calça</label>
+                                <input type="text" id="det-calca-input" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="det-bota-input">Bota</label>
+                                <input type="text" id="det-bota-input" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="drawer-form-box">
+                        <h3>Vínculo e Atribuição</h3>
+                        <div class="form-group">
+                            <label for="det-select-turno">Turno da Vaga</label>
+                            <select id="det-select-turno" class="form-control">
+                                <option value="Diurno">Diurno</option>
+                                <option value="Noturno">Noturno</option>
+                                <option value="Misto">Misto</option>
+                            </select>
+                        </div>
+                        <div id="vaga-escala-box" style="display:none;margin-top:8px;padding:8px 12px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-radius:8px;font-size:12px;color:#1e40af;">
+                            <i class="fa-solid fa-calendar-days" style="margin-right:5px;"></i>
+                            <strong>Escala da vaga:</strong> <span id="vaga-escala-valor">—</span>
+                        </div>
+                        
+                        <div class="form-group mt-3">
+                            <label for="det-select-vaga">Vaga & Empresa Parceira</label>
+                            <select id="det-select-vaga" class="form-control">
+                                <!-- Opções dinâmicas das vagas -->
+                            </select>
+                        </div>
+                        
+                        <div class="vaga-details-autoprev" id="vaga-autoprev-box">
+                            <div class="prev-title">Dados da Vaga Associada:</div>
+                            <div class="prev-grid">
+                                <div><strong>Salário:</strong> <span id="prev-salario">R$ 1.800,00</span></div>
+                                <div><strong>Unidade:</strong> <span id="prev-codigo">CGH7</span></div>
+                                <div class="col-full"><strong>Local:</strong> <span id="prev-local">Cajamar, SP</span></div>
+                                <div class="col-full"><strong>Benefícios:</strong> <span id="prev-beneficios">VT, VR</span></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Como soube (preenchido via JS, oculto se não houver) -->
+                        <div class="form-group mt-3" data-como-soube-row style="display:none;">
+                            <label>Como soube da vaga</label>
+                            <div id="det-como-soube" style="font-size:13px; font-weight:600; color:var(--text-primary); padding:8px 12px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:8px;"></div>
+                        </div>
+
+                        <div class="form-group mt-3">
+                            <label for="det-select-recrutador">Recrutador Responsável</label>
+                            <select id="det-select-recrutador" class="form-control">
+                                <!-- Opções dinâmicas dos recrutadores -->
+                            </select>
+                        </div>
+                        
+                        <!-- Etapa do Processo (Kanban) — oculto por enquanto; o status é controlado pelo Kanban -->
+                        <div class="form-group mt-3" style="display:none;">
+                            <label for="det-select-status">Etapa do Processo (Kanban)</label>
+                            <select id="det-select-status" class="form-control">
+                                <option value="pendente">Pendente</option>
+                                <option value="aguardando_consulta_cpf">Aguardando Consulta CPF</option>
+                                <option value="em_analise">Em análise</option>
+                                <option value="entrevista">Entrevista</option>
+                                <option value="aprovado">Aprovado (Enviar p/ DP)</option>
+                                <option value="reprovado">Reprovado</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group mt-3">
+                            <label for="det-observacoes">Observações da Seleção</label>
+                            <textarea id="det-observacoes" class="form-control" rows="3" placeholder="Insira observações internas sobre o candidato..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- SEÇÃO: BENEFÍCIOS DA SELEÇÃO (só selecionadora preenche) -->
+                    <div class="beneficios-selecao-section">
+                        <div class="section-label"><i class="fa-solid fa-star"></i> Benefícios — Preenchimento da Seleção</div>
+
+                        <!-- BLOCO FRETADO -->
+                        <div style="border:1px solid var(--border-color);border-radius:8px;padding:12px 14px;margin-bottom:10px;">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:0;">
+                                <input type="checkbox" id="ben-fretado-chk" onchange="document.getElementById('ben-fretado-fields').style.display=this.checked?'grid':'none'">
+                                <i class="fa-solid fa-bus" style="color:#3b82f6;"></i> Candidato vai usar fretado
+                            </label>
+                            <div id="ben-fretado-fields" style="display:none;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+                                <div class="form-group">
+                                    <label for="ben-qual-fretado">Qual fretado</label>
+                                    <input type="text" id="ben-qual-fretado" class="form-control" placeholder="Ex: Fretado Cajamar A">
+                                </div>
+                                <div class="form-group">
+                                    <label for="ben-linha-fretado">Linha do fretado</label>
+                                    <input type="text" id="ben-linha-fretado" class="form-control" placeholder="Busque ou digite a linha" list="ben-linha-fretado-list" autocomplete="off">
+                                    <datalist id="ben-linha-fretado-list"></datalist>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BLOCO PASSAGEM -->
+                        <div style="border:1px solid var(--border-color);border-radius:8px;padding:12px 14px;margin-bottom:10px;">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:0;">
+                                <input type="checkbox" id="ben-passagem-chk" onchange="document.getElementById('ben-passagem-fields').style.display=this.checked?'block':'none'">
+                                <i class="fa-solid fa-ticket" style="color:#10b981;"></i> Candidato vai usar passagem
+                            </label>
+                            <div id="ben-passagem-fields" style="display:none;margin-top:10px;">
+                                <div class="form-group">
+                                    <label for="ben-passagem-ida-volta">Valor da passagem ida e volta (R$)</label>
+                                    <input type="text" id="ben-passagem-ida-volta" class="form-control" placeholder="Ex: 17,00" style="max-width:180px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <button onclick="salvarBeneficiosSelecao()" class="btn btn-primary btn-sm" style="margin-top:4px;width:100%;justify-content:center;display:flex;align-items:center;gap:6px;">
+                            <i class="fa-solid fa-floppy-disk"></i> Salvar Benefícios
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Conteúdo Tab: Documentos -->
+                <div class="drawer-tab-content" id="drawer-content-documentos">
+                    <div class="docs-view-container">
+                        
+                        <div class="doc-card-view">
+                            <h4>Selfie do Rosto</h4>
+                            <div class="doc-image-frame">
+                                <img src="" id="img-doc-selfie" class="previewable-doc" alt="Selfie do Candidato" style="cursor: pointer;">
+                            </div>
+                        </div>
+                        
+                        <div class="doc-card-view">
+                            <h4>RG Frente</h4>
+                            <div class="doc-image-frame">
+                                <img src="" id="img-doc-rgFrente" class="previewable-doc" alt="RG Frente do Candidato" style="cursor: pointer;">
+                            </div>
+                        </div>
+                        
+                        <div class="doc-card-view">
+                            <h4>Foto do PIS/NIS</h4>
+                            <div class="doc-image-frame">
+                                <img src="" id="img-doc-fotoPis" class="previewable-doc" alt="Foto PIS/NIS do Candidato" style="cursor: pointer;">
+                            </div>
+                        </div>
+
+                        <div class="doc-card-view">
+                            <h4>CPF Documento</h4>
+                            <div class="doc-image-frame">
+                                <img src="" id="img-doc-cpfDocumento" class="previewable-doc" alt="CPF do Candidato" style="cursor: pointer;">
+                            </div>
+                        </div>
+
+                        <div class="doc-card-view">
+                            <h4>Comprovante de Residência</h4>
+                            <div class="doc-image-frame">
+                                <img src="" id="img-doc-comprovanteResidencia" class="previewable-doc" alt="Comprovante de Residência" style="cursor: pointer;">
+                            </div>
+                        </div>
+
+                        <div class="doc-card-view">
+                            <h4>Cartão do Banco Verso</h4>
+                            <div class="doc-image-frame">
+                                <img src="" id="img-doc-cartaoBancoVerso" class="previewable-doc" alt="Cartão Banco Verso do Candidato" style="cursor: pointer;">
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+                
+                <!-- Conteúdo Tab: Histórico/Auditoria -->
+                <div class="drawer-tab-content" id="drawer-content-historico">
+                    <div class="timeline-container">
+                        <h4 style="margin-bottom: 16px;">Histórico de Ações e Auditoria</h4>
+                        <div class="timeline-vertical" id="det-historico-timeline">
+                            <!-- Timeline injetada dinamicamente -->
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+            
+            <div class="drawer-footer">
+                <div class="drawer-footer-row" style="width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px;">
+                    <button class="btn btn-secondary" id="btn-download-pasta" style="width: 100%;"><i class="fa-solid fa-download"></i> Baixar Pasta</button>
+                    <button class="btn btn-primary" id="btn-salvar-detalhes" style="width: 100%;"><i class="fa-solid fa-floppy-disk"></i> Salvar Alterações</button>
+                </div>
+                <button class="btn btn-success" id="btn-subir-dp" style="width: 100%; background-color: #22c55e; color: white; border: none; padding: 10px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: var(--transition);"><i class="fa-solid fa-arrow-up-from-bracket"></i> SUBIR FICHA PARA DP</button>
+                
+                <!-- Painel de Ações Especiais do DP (Somente Leitura) -->
+                <div class="drawer-footer-dp" id="drawer-footer-dp-actions" style="width: 100%; display: none; flex-direction: column; gap: 8px; margin-top: 8px;">
+                    <button class="btn btn-primary" id="btn-dp-exportar" style="width: 100%; background-color: #3b82f6; color: white; border: none; padding: 10px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;"><i class="fa-solid fa-file-zipper"></i> EXPORTAR FICHA COMPLETA</button>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%;">
+                        <button class="btn btn-success" id="btn-dp-contrato" style="width: 100%; background-color: #10b981; color: white; border: none; padding: 10px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;"><i class="fa-solid fa-circle-check"></i> CONTRATO FEITO</button>
+                        <button class="btn btn-danger" id="btn-dp-devolver" style="width: 100%; background-color: #ef4444; color: white; border: none; padding: 10px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;"><i class="fa-solid fa-circle-left"></i> DEVOLVER</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CADASTRAR/EDITAR CANDIDATO MANUALMENTE -->
+    <div id="modal-candidato-add" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Adicionar Novo Candidato</h3>
+                <button class="btn-close-modal" onclick="fecharModalAddCandidato()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-add-candidato">
+                <input type="hidden" id="add-candidato-coluna">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="add-nome">Nome Completo *</label>
+                        <input type="text" id="add-nome" required class="form-control" placeholder="Ex: João da Silva">
+                    </div>
+                    
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="add-cpf">CPF *</label>
+                            <input type="text" id="add-cpf" required class="form-control" placeholder="000.000.000-00">
+                        </div>
+                        <div class="form-group">
+                            <label for="add-rg">RG *</label>
+                            <input type="text" id="add-rg" required class="form-control" placeholder="00.000.000-0">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="add-email">E-mail *</label>
+                            <input type="email" id="add-email" required class="form-control" placeholder="nome@email.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="add-telefone">Telefone *</label>
+                            <input type="text" id="add-telefone" required class="form-control" placeholder="(11) 99999-9999">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="add-vaga">Vaga Associada *</label>
+                            <select id="add-vaga" required class="form-control">
+                                <!-- Vagas -->
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="add-recrutador">Recrutador Responsável *</label>
+                            <select id="add-recrutador" required class="form-control">
+                                <!-- Recrutadores -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="fecharModalAddCandidato()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Adicionar Candidato</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: REPROVAÇÃO COM MOTIVO OBRIGATÓRIO -->
+    <div id="modal-reprovar-motivo" class="modal-overlay">
+        <div class="modal-box max-w-sm">
+            <div class="modal-header bg-red-header">
+                <h3>Reprovação de Candidato</h3>
+                <button class="btn-close-modal" onclick="fecharModalReprovar()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-reprovar-motivo">
+                <input type="hidden" id="reprovar-candidato-id">
+                <div class="modal-body">
+                    <p class="warning-text">Você está prestes a reprovar a contratação de <strong id="reprovar-nome-candidato">Candidato</strong> no Departamento Pessoal.</p>
+                    <div class="form-group mt-3">
+                        <label for="reprovar-motivo-texto">Motivo da Reprovação *</label>
+                        <textarea id="reprovar-motivo-texto" required class="form-control" rows="4" placeholder="Descreva de forma clara por que o candidato está sendo reprovado (ex: RG ilegível, falta de comprovante, desistência...)"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="fecharModalReprovar()">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Confirmar Reprovação</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: CRIAR NOVA VAGA -->
+    <div id="modal-nova-vaga" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Criar Nova Vaga de Emprego</h3>
+                <button class="btn-close-modal" onclick="fecharModalVaga()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-nova-vaga">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="vaga-add-empresa">Empresa Parceira *</label>
+                        <select id="vaga-add-empresa" required class="form-control">
+                            <!-- Empresas -->
+                        </select>
+                    </div>
+                    
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-cargo">Cargo / Ocupação *</label>
+                            <input type="text" id="vaga-add-cargo" required class="form-control" placeholder="Ex: Operador de Logística">
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-codigo">Código da Unidade / Filial *</label>
+                            <input type="text" id="vaga-add-codigo" required class="form-control" placeholder="Ex: CGH7, SP01, GRU">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-salario">Salário (R$) *</label>
+                            <input type="number" step="0.01" id="vaga-add-salario" required class="form-control" placeholder="1800.00">
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-quantidade">Quantidade de Vagas Disponíveis *</label>
+                            <input type="number" id="vaga-add-quantidade" required class="form-control" placeholder="10">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="vaga-add-local">Local de Trabalho *</label>
+                        <input type="text" id="vaga-add-local" required class="form-control" placeholder="Cidade - Estado (e regiões próximas)">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="vaga-add-beneficios">Benefícios (Separados por vírgula) *</label>
+                        <input type="text" id="vaga-add-beneficios" required class="form-control" placeholder="VT, VR, Seguro de Vida, Convênio Médico">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="vaga-add-linhas-fretado">Linhas de Fretado <span style="font-weight:400;color:var(--text-secondary)">(uma por linha — opcional)</span></label>
+                        <textarea id="vaga-add-linhas-fretado" class="form-control" rows="3" placeholder="Ex:&#10;Linha 01 — Cajamar&#10;Linha 07 — Santo André&#10;Linha 12 — São Paulo Centro"></textarea>
+                    </div>
+
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-escala">Escala da Vaga</label>
+                            <select id="vaga-add-escala" class="form-control" onchange="document.getElementById('vaga-escala-custom-box').style.display=this.value==='personalizada'?'block':'none'">
+                                <option value="">Não definida</option>
+                                <option value="5x2">5x2 (5 dias trabalho / 2 folga)</option>
+                                <option value="3x1">3x1 (3 dias trabalho / 1 folga)</option>
+                                <option value="6x1">6x1 (6 dias trabalho / 1 folga)</option>
+                                <option value="12x36">12x36 (12h trabalho / 36h folga)</option>
+                                <option value="personalizada">Personalizada (descrever)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="vaga-escala-custom-box" style="display:none;">
+                            <label for="vaga-add-escala-custom">Descrever escala personalizada</label>
+                            <input type="text" id="vaga-add-escala-custom" class="form-control" placeholder="Ex: Seg, Qua e Sex apenas">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="vaga-add-turnos">Turnos disponíveis <span style="font-weight:400;color:var(--text-secondary)">(um por linha — opcional)</span></label>
+                        <textarea id="vaga-add-turnos" class="form-control" rows="3" placeholder="Ex:&#10;1º Turno: 06h00 – 14h00&#10;2º Turno: 14h00 – 22h00&#10;3º Turno: 22h00 – 06h00"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="vaga-add-desc">Descrição Breve da Oportunidade *</label>
+                        <textarea id="vaga-add-desc" required class="form-control" rows="3" placeholder="Descreva os requisitos básicos e atividades..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="fecharModalVaga()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Publicar Vaga</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: DETALHE DO TALENTO (Banco de Talentos) -->
+    <div id="modal-bt-detalhe" class="modal-overlay">
+        <div class="modal-box" style="max-width:480px;">
+            <div class="modal-header" id="modal-bt-detalhe-header">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div id="bt-det-avatar" style="width:44px;height:44px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0;"></div>
+                    <div>
+                        <h3 id="bt-det-nome" style="margin:0;font-size:16px;"></h3>
+                        <span id="bt-det-sexo-badge"></span>
+                    </div>
+                </div>
+                <button class="btn-close-modal" onclick="document.getElementById('modal-bt-detalhe').classList.remove('active')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" style="padding:20px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+                    <div>
+                        <div style="font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:2px;">Telefone / WhatsApp</div>
+                        <div id="bt-det-telefone" style="font-size:13px;color:var(--text-primary);font-weight:500;">—</div>
+                    </div>
+                    <div>
+                        <div style="font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:2px;">E-mail</div>
+                        <div id="bt-det-email" style="font-size:13px;color:var(--text-primary);font-weight:500;word-break:break-all;">—</div>
+                    </div>
+                    <div>
+                        <div style="font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:2px;">CPF</div>
+                        <div id="bt-det-cpf" style="font-size:13px;color:var(--text-primary);font-weight:500;">—</div>
+                    </div>
+                    <div>
+                        <div style="font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:2px;">Cidade / Estado</div>
+                        <div id="bt-det-cidade" style="font-size:13px;color:var(--text-primary);font-weight:500;">—</div>
+                    </div>
+                    <div>
+                        <div style="font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:2px;">Cargo de Interesse</div>
+                        <div id="bt-det-cargo" style="font-size:13px;color:var(--text-primary);font-weight:500;">—</div>
+                    </div>
+                    <div>
+                        <div style="font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:2px;">Experiência</div>
+                        <div id="bt-det-exp" style="font-size:13px;color:var(--text-primary);font-weight:500;">—</div>
+                    </div>
+                </div>
+                <div id="bt-det-obs-box" style="display:none;background:var(--bg-main);border-radius:7px;padding:10px 12px;margin-bottom:12px;">
+                    <div style="font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px;">Observação</div>
+                    <div id="bt-det-obs" style="font-size:12px;color:var(--text-primary);"></div>
+                </div>
+                <div id="bt-det-proximas" style="margin-bottom:4px;"></div>
+                <div style="font-size:10px;color:var(--text-secondary);margin-top:8px;" id="bt-det-data"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-bt-detalhe').classList.remove('active')">Fechar</button>
+                <button type="button" class="btn btn-primary" id="btn-puxar-processo-det" style="gap:7px;display:flex;align-items:center;">
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i> Puxar para Processo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CADASTRAR NOVO CLIENTE (EMPRESA PARCEIRA) -->
+    <div id="modal-novo-cliente" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;">
+                <h3 style="color:#fff;"><i class="fa-solid fa-building-circle-arrow-right" style="margin-right:8px;"></i>Cadastrar Novo Cliente</h3>
+                <button class="btn-close-modal" onclick="fecharModalNovoCliente()" style="color:#fff;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-novo-cliente">
+                <div class="modal-body">
+                    <div class="form-group-grid">
+                        <div class="form-group" style="grid-column:1/-1;">
+                            <label for="cli-nome">Nome da Empresa *</label>
+                            <input type="text" id="cli-nome" required class="form-control" placeholder="Ex: DHL Express, Total Express, Correios..." oninput="autoSiglaCliente()">
+                        </div>
+                    </div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="cli-sigla">Sigla (até 4 letras) *</label>
+                            <input type="text" id="cli-sigla" required class="form-control" placeholder="Ex: DHL" maxlength="4" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase();this.dataset.userEdited='1'">
+                        </div>
+                        <div class="form-group">
+                            <label for="cli-cor">Cor da Marca</label>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input type="color" id="cli-cor" value="#6366f1" class="form-control" style="padding:4px;height:38px;width:60px;cursor:pointer;">
+                                <span style="font-size:12px;color:var(--text-secondary);">Cor usada no badge da empresa</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="cli-cidade">Cidade *</label>
+                            <input type="text" id="cli-cidade" required class="form-control" placeholder="Ex: Cajamar, Guarulhos, São Paulo..." oninput="autoLatLngCliente()">
+                        </div>
+                        <div class="form-group">
+                            <label for="cli-estado">Estado *</label>
+                            <input type="text" id="cli-estado" required class="form-control" placeholder="SP" maxlength="2" style="text-transform:uppercase;" value="SP" oninput="this.value=this.value.toUpperCase()">
+                        </div>
+                    </div>
+                    <div id="cli-coords-box" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;font-size:12px;color:#15803d;display:none;margin-bottom:8px;">
+                        <i class="fa-solid fa-location-dot" style="margin-right:5px;"></i>
+                        <span id="cli-coords-txt"></span>
+                    </div>
+                    <input type="hidden" id="cli-lat">
+                    <input type="hidden" id="cli-lng">
+                    <p style="font-size:11px;color:var(--text-secondary);margin:0;">
+                        <i class="fa-solid fa-circle-info"></i>
+                        Se a cidade estiver no nosso banco de dados, a localização é preenchida automaticamente para cálculo de proximidade.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="fecharModalNovoCliente()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" style="background:linear-gradient(135deg,#059669,#10b981);border:none;">
+                        <i class="fa-solid fa-check"></i> Cadastrar Cliente
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: MARCAR CANDIDATO COMO INAPTO -->
+    <div id="modal-inapto" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('active')">
+        <div class="modal-dialog" style="max-width:480px;" onclick="event.stopPropagation()">
+            <div class="modal-header" style="background:rgba(239,68,68,0.1);border-bottom:1px solid rgba(239,68,68,0.2);">
+                <h3 id="inapto-modal-titulo" style="color:#b91c1c;display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;"><i class="fa-solid fa-circle-xmark"></i> Marcar como Inapto</h3>
+                <button class="btn-close-modal" onclick="document.getElementById('modal-inapto').classList.remove('active')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="inapto-candidato-id">
+                <div id="inapto-modal-auto-note" style="display:none; margin-bottom:12px; padding:10px 14px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3); border-radius:8px; font-size:12px; color:#fca5a5;">
+                    <i class="fa-solid fa-database"></i> CPF detectado no banco de inaptos. O motivo abaixo foi preenchido automaticamente. Confirme para registrar neste candidato.
+                </div>
+                <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;">Selecione o motivo pelo qual este candidato está sendo marcado como inapto. O CPF será registrado no banco de inaptos.</p>
+                <div class="form-group">
+                    <label for="inapto-motivo-select">Motivo da Inaptidão *</label>
+                    <select id="inapto-motivo-select" class="form-control">
+                        <option value="">Selecione o motivo...</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="document.getElementById('modal-inapto').classList.remove('active')">Cancelar</button>
+                <button class="btn btn-primary" onclick="confirmarInapto()" style="background:#ef4444;border:none;">
+                    <i class="fa-solid fa-circle-xmark"></i> Confirmar Inaptidão
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LIGHTBOX MODAL: VISUALIZAR DOCUMENTO EM TELA CHEIA -->
+    <div id="modal-documento-preview" class="modal-overlay" onclick="fecharLightboxDoc()">
+        <div class="lightbox-container" onclick="event.stopPropagation()">
+            <button class="btn-close-lightbox" onclick="fecharLightboxDoc()"><i class="fa-solid fa-xmark"></i></button>
+            <div class="lightbox-content">
+                <img src="" id="lightbox-img" alt="Visualização do Documento">
+                <iframe src="" id="lightbox-pdf" style="display:none; width:100%; height:80vh; border:none;"></iframe>
+            </div>
+            <div class="lightbox-caption" id="lightbox-caption">Documento</div>
+        </div>
+    </div>
+
+    <!-- MODAL: DEVOLUÇÃO DO DP COM MOTIVO OBRIGATÓRIO -->
+    <div id="modal-dp-devolver-motivo" class="modal-overlay">
+        <div class="modal-box max-w-sm">
+            <div class="modal-header bg-red-header" style="background-color: var(--primary); color: white;">
+                <h3>Devolver para Seleção</h3>
+                <button class="btn-close-modal" id="btn-close-devolver-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-dp-devolver-motivo">
+                <input type="hidden" id="devolver-candidato-id">
+                <div class="modal-body">
+                    <p class="warning-text" style="color: var(--text-primary); font-size: 13px;">Insira o motivo detalhado para devolução da ficha de <strong id="devolver-nome-candidato">Candidato</strong> de volta para o time de Seleção.</p>
+                    <div class="form-group mt-3">
+                        <label for="devolver-motivo-texto">Justificativa da Devolução (Obrigatório) *</label>
+                        <textarea id="devolver-motivo-texto" required class="form-control" rows="4" placeholder="Ex: Foto do comprovante de residência está cortada ou ilegível..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-devolver">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" style="background-color: var(--primary); color: white; border: none;">Confirmar Devolução</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: GERENCIAR FUNCIONÁRIO (PERMISSÕES E CARGO) -->
+    <div id="modal-gerenciar-funcionario" class="modal-overlay">
+        <div class="modal-box" style="max-width: 900px; width: 95%;">
+            <div class="modal-header">
+                <h3>Configurar Funcionário & Permissões</h3>
+                <button class="btn-close-modal" id="btn-close-gerenciar-modal" type="button"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-gerenciar-funcionario">
+                <input type="hidden" id="gerenciar-func-id">
+                <div class="modal-body">
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="gerenciar-func-nome">Nome Completo</label>
+                            <input type="text" id="gerenciar-func-nome" class="form-control" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="gerenciar-func-username">Nome de Usuário</label>
+                            <input type="text" id="gerenciar-func-username" class="form-control" readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group-grid mt-3">
+                        <div class="form-group">
+                            <label for="gerenciar-func-depto">Departamento *</label>
+                            <select id="gerenciar-func-depto" required class="form-control">
+                                <option value="selecao">Seleção (Recrutamento)</option>
+                                <option value="dp">Departamento Pessoal (DP)</option>
+                                <option value="comissao">Comissão (Estatísticas)</option>
+                                <option value="administracao">Administração / Gestão</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="gerenciar-func-cargo">Cargo / Função *</label>
+                            <input type="text" id="gerenciar-func-cargo" required class="form-control" placeholder="Ex: Analista de Recrutamento">
+                        </div>
+                    </div>
+
+                    <div class="form-group-grid mt-3">
+                        <div class="form-group">
+                            <label for="gerenciar-func-status">Status da Conta *</label>
+                            <select id="gerenciar-func-status" required class="form-control">
+                                <option value="ativo">Ativo</option>
+                                <option value="inativo">Inativo</option>
+                                <option value="aguardando_aprovacao">Aguardando Aprovação</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: center; margin-top: 24px; padding-left: 10px;">
+                            <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; cursor: pointer;">
+                                <input type="checkbox" id="gerenciar-func-representante">
+                                <span>Representante do Departamento</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- MATRIZ DE PERMISSÕES -->
+                    <div class="permissoes-matrix-area mt-4">
+                        <h4 style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; color: var(--text-primary);">
+                            <span><i class="fa-solid fa-shield-halved" style="color: var(--primary);"></i> Matriz de Permissões de Acesso</span>
+                            <button type="button" class="btn btn-secondary btn-sm" id="btn-toggle-all-perms" style="font-size: 11px; padding: 2px 8px;">Marcar/Desmarcar Todos</button>
+                        </h4>
+                        <div class="table-scroll-container" style="max-height: 250px; overflow-y: auto;">
+                            <table class="excel-table matrix-table" style="font-size: 12px; width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Área do Sistema</th>
+                                        <th class="text-center">Visualizar</th>
+                                        <th class="text-center">Criar</th>
+                                        <th class="text-center">Editar</th>
+                                        <th class="text-center">Excluir</th>
+                                        <th class="text-center">Aprovar</th>
+                                        <th class="text-center">Exportar</th>
+                                        <th class="text-center">Ver Relat.</th>
+                                        <th class="text-center">Alt. Perms.</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="permissoes-matrix-body">
+                                    <!-- Gerado dinamicamente por JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-gerenciar">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" style="background-color: var(--primary); border: none;">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: AJUSTE MANUAL DE VAGAS -->
+    <div id="modal-ajustar-vagas-manual" class="modal-overlay">
+        <div class="modal-box max-w-sm">
+            <div class="modal-header">
+                <h3>Ajustar Vagas Manualmente</h3>
+                <button class="btn-close-modal" id="btn-close-ajustar-vagas-modal" type="button"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-ajustar-vagas-manual">
+                <input type="hidden" id="ajustar-vagas-id">
+                <div class="modal-body">
+                    <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
+                        Você está alterando o estoque de vagas para: <strong id="ajustar-vagas-nome-cargo" style="color: var(--text-primary);">Cargo</strong>
+                    </p>
+                    
+                    <div class="form-group">
+                       <label for="ajustar-vagas-tipo">Ação de Ajuste *</label>
+                       <select id="ajustar-vagas-tipo" required class="form-control">
+                           <option value="adicionar">Adicionar Vagas (+)</option>
+                           <option value="remover">Remover Vagas (-)</option>
+                           <option value="cancelar">Cancelar Vagas</option>
+                           <option value="reabrir">Reabrir Vagas</option>
+                           <option value="corrigir">Corrigir Quantidade Manualmente</option>
+                       </select>
+                    </div>
+                    
+                    <div class="form-group mt-3" id="ajustar-vagas-qty-group">
+                       <label for="ajustar-vagas-qtd">Quantidade de Vagas *</label>
+                       <input type="number" id="ajustar-vagas-qtd" required class="form-control" min="1" value="1">
+                    </div>
+                    
+                    <div class="form-group mt-3">
+                       <label for="ajustar-vagas-motivo">Motivo da Alteração (Obrigatório) *</label>
+                       <textarea id="ajustar-vagas-motivo" required class="form-control" rows="3" placeholder="Ex: Candidato faltou no primeiro dia de trabalho..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-ajustar-vagas">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" style="background-color: var(--primary); border: none;">Salvar Alteração</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: MEU PERFIL / CONFIGURAÇÕES DO COLABORADOR -->
+    <div id="modal-meu-perfil" class="modal-overlay">
+        <div class="modal-box" style="max-width: 480px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, var(--primary), #9f1239);">
+                <h3><i class="fa-solid fa-circle-user" style="margin-right:8px;"></i> Meu Perfil & Configurações</h3>
+                <button class="modal-close-btn" onclick="fecharModalMeuPerfil()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+
+                <!-- Dados do colaborador -->
+                <div style="display: flex; align-items: center; gap: 16px; padding: 16px; background: rgba(255,255,255,0.04); border-radius: 10px; border: 1px solid var(--border-color);">
+                    <div style="width: 52px; height: 52px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; color: #fff; flex-shrink: 0;" id="header-user-avatar-perfil">AD</div>
+                    <div>
+                        <div style="font-weight: 700; font-size: 16px; color: var(--text-primary);" id="perfil-nome">—</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">@<span id="perfil-login">—</span></div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;"><span id="perfil-depto">—</span> · <span id="perfil-cargo">—</span></div>
+                    </div>
+                </div>
+
+                <!-- Link personalizado de captação -->
+                <div id="perfil-link-section" style="display: none;">
+                    <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block;">
+                        <i class="fa-solid fa-link" style="color: var(--primary);"></i> Seu Link de Captação Personalizado
+                    </label>
+                    <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">Compartilhe este link. Candidatos que se inscreverem via ele serão atribuídos a você automaticamente.</p>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="text" id="perfil-meu-link" readonly
+                            style="flex: 1; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: rgba(0,0,0,0.2); color: var(--text-primary); font-size: 11px; font-family: monospace; cursor: text;">
+                        <button onclick="copiarMeuLink(this)"
+                            style="padding: 8px 14px; background: var(--primary); border: none; border-radius: 6px; color: #fff; font-size: 12px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px; transition: all .2s;">
+                            <i class="fa-solid fa-copy"></i> Copiar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tema claro / escuro -->
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px; background: rgba(255,255,255,0.04); border-radius: 10px; border: 1px solid var(--border-color);">
+                    <div>
+                        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Aparência</div>
+                        <div style="font-size: 11px; color: var(--text-secondary);">Altere entre tema escuro e claro</div>
+                    </div>
+                    <button id="btn-tema-toggle" onclick="toggleTema()"
+                        style="padding: 8px 14px; background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all .2s;">
+                        <i class="fa-solid fa-sun"></i> Modo Claro
+                    </button>
+                </div>
+
+                <!-- Configurações ADM (só para administradores) -->
+                <div id="perfil-admin-section" style="display: none; padding: 14px; background: rgba(255,200,50,0.06); border: 1px solid rgba(255,200,50,0.2); border-radius: 10px;">
+                    <div style="font-size: 13px; font-weight: 700; color: #f59e0b; margin-bottom: 12px;">
+                        <i class="fa-solid fa-shield-halved"></i> Configurações Administrativas
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                        <div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text-primary);">Permitir que o DP edite fichas</div>
+                            <div style="font-size: 11px; color: var(--text-secondary);">Por padrão, o DP só pode visualizar fichas (texto copiável). Ative para permitir edição.</div>
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0;">
+                            <label style="position:relative; display:inline-block; width:44px; height:24px;">
+                                <input type="checkbox" id="toggle-dp-pode-editar" style="opacity:0; width:0; height:0;" onchange="salvarConfigDpEditar()">
+                                <span style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#374151; border-radius:24px; transition:.3s;"
+                                    onclick="document.getElementById('toggle-dp-pode-editar').click()">
+                                    <span style="position:absolute; height:18px; width:18px; left:3px; bottom:3px; background:white; border-radius:50%; transition:.3s;"></span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <div class="modal-footer" style="padding: 14px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
+                <button onclick="fecharModalMeuPerfil()" class="btn btn-secondary">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSS: Tema Claro, DP Readonly e ajustes globais -->
+    <style>
+        /* ── DP Readonly Mode: campos visíveis e copiáveis, não editáveis ── */
+        .dp-readonly-mode input[readonly],
+        .dp-readonly-mode select[readonly],
+        .dp-readonly-mode textarea[readonly] {
+            background: transparent !important;
+            border-color: transparent !important;
+            box-shadow: none !important;
+            color: var(--text-primary) !important;
+            cursor: text !important;
+            user-select: text !important;
+            -webkit-user-select: text !important;
+            pointer-events: auto !important;
+        }
+        .dp-readonly-mode input[readonly]:focus,
+        .dp-readonly-mode select[readonly]:focus,
+        .dp-readonly-mode textarea[readonly]:focus {
+            outline: none !important;
+            border-color: transparent !important;
+        }
+
+        /* ── Tema Claro ── */
+        [data-theme="light"] {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #ffffff;
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --sidebar-bg: #ffffff;
+            --header-bg: #ffffff;
+        }
+        [data-theme="light"] .sidebar,
+        [data-theme="light"] .app-header {
+            background: #ffffff;
+            border-color: #e2e8f0;
+        }
+        [data-theme="light"] .nav-item:hover,
+        [data-theme="light"] .nav-item.active {
+            background: rgba(190,18,60,0.08);
+        }
+        [data-theme="light"] .kpi-card,
+        [data-theme="light"] .vaga-card,
+        [data-theme="light"] .modal-box,
+        [data-theme="light"] .drawer-panel {
+            background: #ffffff;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+        [data-theme="light"] input,
+        [data-theme="light"] select,
+        [data-theme="light"] textarea {
+            background: #f8fafc;
+            color: #0f172a;
+            border-color: #cbd5e1;
+        }
+        [data-theme="light"] .kanban-column {
+            background: #f1f5f9;
+        }
+        [data-theme="light"] .modal-overlay {
+            background: rgba(0,0,0,0.35);
+        }
+
+        /* ── Toggle checkbox estilizado ── */
+        #toggle-dp-pode-editar:checked + span {
+            background: var(--primary) !important;
+        }
+        #toggle-dp-pode-editar:checked + span span {
+            transform: translateX(20px);
+        }
+
+        /* ── Site Form Tabs Bar ── */
+        .site-form-tabs-bar {
+            display: flex;
+            gap: 8px;
+            padding: 20px 20px 0;
+            max-width: 860px;
+            margin: 0 auto;
+        }
+        .site-form-tab-btn {
+            flex: 1;
+            padding: 12px 20px;
+            border: 2px solid var(--border-color);
+            border-bottom: none;
+            border-radius: 10px 10px 0 0;
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .site-form-tab-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #fff;
+        }
+        .site-form-tab-btn:not(.active):hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* ── Mobile Responsiveness ── */
+        @media (max-width: 600px) {
+            .site-nav-container {
+                padding: 12px 16px;
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+            .site-form-tabs-bar {
+                padding: 12px 12px 0;
+                gap: 6px;
+            }
+            .site-form-tab-btn {
+                font-size: 12px;
+                padding: 10px 12px;
+            }
+            .site-form-section {
+                padding: 0 12px 24px !important;
+            }
+            .form-container-box {
+                padding: 20px 16px !important;
+            }
+            .form-group-grid {
+                grid-template-columns: 1fr !important;
+            }
+            .form-group-grid.col-3 {
+                grid-template-columns: 1fr !important;
+            }
+            .document-uploads-grid {
+                grid-template-columns: 1fr 1fr !important;
+            }
+            .file-upload-box {
+                padding: 14px 10px !important;
+                min-height: 90px !important;
+            }
+            .btn-large {
+                font-size: 15px !important;
+                padding: 14px 20px !important;
+            }
+            .drawer-candidato {
+                width: 100% !important;
+                max-width: 100% !important;
+                border-radius: 0 !important;
+            }
+            .drawer-grid {
+                grid-template-columns: 1fr !important;
+            }
+            .col-span-2 {
+                grid-column: span 1 !important;
+            }
+            .app-header {
+                padding: 0 12px !important;
+            }
+            .header-right {
+                gap: 6px !important;
+            }
+            .kpi-grid {
+                grid-template-columns: 1fr 1fr !important;
+            }
+            .kanban-board {
+                flex-direction: column !important;
+            }
+            .kanban-column {
+                min-width: unset !important;
+                width: 100% !important;
+            }
+        }
+    </style>
+
+    <!-- ROCKET ANIMATION OVERLAYS -->
+    <div class="rocket-animation-overlay" id="rocket-anim-overlay">
+        <img src="img/rocket.png" class="animated-rocket-element" id="animated-rocket" alt="Decolando">
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div class="modern-success-toast" id="modern-toast">
+        <i class="fa-solid fa-circle-check" style="font-size: 20px;"></i>
+        <span id="modern-toast-text">Ação concluída com sucesso!</span>
+    </div>
+
+    <!-- COPY TOOLTIP -->
+    <div class="copy-tooltip-success" id="copy-tooltip">
+        <i class="fa-solid fa-copy"></i> Texto copiado para a área de transferência!
+    </div>
+
+    <!-- Core App Scripts -->
+    <script src="js/security.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

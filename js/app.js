@@ -1,0 +1,6237 @@
+// ==========================================================================
+// APLICATIVO PRINCIPAL (SPA) - R&T EMPREGOS
+// ==========================================================================
+
+let state = null;
+let loggedUser = null;
+let charts = {
+  recrutador: null,
+  empresa: null
+};
+let dashboardCharts = {
+  dia: null,
+  empresa: null,
+  selecionador: null,
+  status: null,
+  vagas: null,
+  fretados: null
+};
+let activeAba = 'dashboard';
+let activeDashboardSubTab = 'visao-geral';
+let currentCandidateId = null;
+let _drawerSnapshotAntes = null;
+
+const CAMPOS_AUDIT = {
+  nome: 'Nome', cpf: 'CPF', rg: 'RG', pis: 'PIS/NIS',
+  dataNascimento: 'Data de Nascimento', nomeMae: 'Nome da Mãe', nomePai: 'Nome do Pai',
+  telefone: 'Telefone', email: 'E-mail',
+  cep: 'CEP', rua: 'Rua', numeroCasa: 'Número', bairro: 'Bairro', cidade: 'Cidade', estado: 'Estado',
+  banco: 'Banco', tipoPix: 'Tipo PIX', chavePix: 'Chave PIX',
+  status: 'Status', turnoTrabalho: 'Turno', recrutadorId: 'Recrutador', vagaId: 'Vaga'
+};
+
+// ─── Detecção de sexo pelo primeiro nome ──────────────────────────────────────
+const _NOMES_F = new Set('maria,ana,fernanda,camila,beatriz,juliana,mariana,amanda,carla,paula,vanessa,patricia,sandra,renata,claudia,daniela,luciana,adriana,fabiana,leticia,priscila,viviane,simone,tatiana,cristina,natalia,silvia,regina,vera,laura,isabel,isabela,isabella,isadora,bianca,carolina,aline,bruna,jessica,deborah,debora,michele,micheli,larissa,melissa,thais,thamires,giovana,giovanna,helena,livia,luiza,sara,sarah,gabriela,gabrielle,rafaela,raquel,solange,elaine,erica,kelly,keila,gisele,gisela,rosana,rosangela,josiane,elizabete,elizabeth,andressa,andrea,angela,denise,catarina,aparecida,conceicao,cleuza,cleide,celia,noemia,zelia,fatima,tereza,teresa,irene,ines,edna,elza,ilda,ieda,iolanda,ivone,ivani,jacira,janete,jaqueline,joana,josefa,lourdes,luzia,marta,neuza,nilza,nilda,odete,olga,ruth,selma,sonia,sueli,suely,valdete,valeria,vilma,wilma,zilda,zenaide,alice,alicia,cecilia,diana,elena,eleonora,emilia,estela,estefania,eunice,evelise,eveline,filomena,flora,flavia,gilda,gloria,heloisa,yara,yasmin,yasmine,maya,mia,milena,nina,rebeca,rebecca,sofia,sophia,taina,thalia,thalita,vitoria,wanessa,yolanda,lais,nayara,nathalia,nathalie,nadia,nadiely,nathaly,tamires,tainara,taynara,karolina,cintia,cinthia,lidiane,graziele,graziela,marilene,marli,marilda,marlene,marcia,marcela,micaela,micaella,michely,monique,monica,pamela,pollyana,poliana,polyanna,rosilene,roseli,rosiele,samara,samantha,shirley,silvana,sirlene,socorro,suellen,tamara,tania,telma,veronica,viviana,edilene,edileusa,eliane,elizangela,elizandra,ingrid,iris,izabela,izabella,joice,joyce,julianna,karina,katia,katiane,keyla,luana,luanna,ludimila,ludmila,luziane,luzinete,gleice,gleiciane,franciele,franciely,gislene,grecia,greice,lindalva,lindinalva,liandra,liane,luzinete,naiara,naiely,nailane,nailton,nayane,naiane,naara,nubia,nubia,odete,osana,ozana,raiane,raissa,raiany,raylane,rayssa,rebeka,renyelle,rilane,rosineide,rosinei,rossana,rozane,rozangela,sabrina,samille,sandriele,sandrieli,selene,sibely,simony,sindy,sirley,soledad,soraya,taiane,taissa,talita,tamiles,tamy,tassiane,tayane,thaiane,thaianny,thauane,thayane,thaysa,thyane,thyara,valquiria,vanda,vanderleide,vanusa,wendy,yandra'.split(','));
+
+const _NOMES_M = new Set('joao,jose,carlos,luis,paulo,pedro,marcos,lucas,mateus,matheus,gabriel,rafael,leonardo,felipe,bruno,rodrigo,marcelo,anderson,andre,daniel,diego,eduardo,eric,fabio,fernando,francisco,gilberto,gustavo,henrique,igor,ivo,jorge,julio,leandro,marcio,marco,mario,nelson,nilson,nilton,otavio,patrick,raul,renato,ricardo,roberto,sergio,thiago,victor,vitor,wagner,wesley,william,wilson,alexandre,antonio,arnaldo,arthur,artur,augusto,caio,claudio,cleber,cristiano,davi,david,emerson,ezequiel,flavio,fausto,geraldo,giovanni,guilherme,humberto,iago,ivan,jean,jefferson,jonathas,jonathan,jonatas,jeferson,lauro,luan,luiz,manoel,manuel,mauricio,miguel,milton,murilo,nicolas,oscar,osvaldo,ramon,renan,rui,samuel,saulo,sebastiao,silas,silvio,tarcisio,tadeu,thadeu,tiago,valter,walter,vanderlei,vinicius,yago,yuri,adilson,adriano,alisson,alan,almir,alfredo,amancio,amaro,benicio,bento,bernardo,caetano,cassio,cezar,clovis,dalton,demetrio,denilson,derik,diogo,domingos,douglas,edmar,edson,ednaldo,edevaldo,eli,elias,elinaldo,eliseu,elton,erico,ernesto,euclides,evandro,everton,fabiano,fabricio,frederico,geovani,geovanny,geronimo,gerson,gilmar,gilson,glauco,gleison,haroldo,helio,hercules,hermes,hilario,hilton,hugo,inacio,iran,ismael,jadir,jairo,jair,jeronimo,jilson,jocimar,joelson,josimar,josue,juan,junior,jurandir,juvenal,lazaro,leocadio,leonel,luciano,magno,marcal,marcelino,marcilio,mauro,moises,natan,natanael,nelio,neto,newton,nildo,odair,olavo,onofre,orlando,osmar,pablo,plinio,raimundo,reinaldo,robson,rodolfo,rogerio,ronaldo,ronildo,rufino,salomao,sandro,saul,sidnei,sidney,silvestre,tarcio,teodoro,tobias,tomas,tulio,ulisses,ubiratan,valentim,valmir,valdecir,valdir,vanderson,vasco,venancio,waldir,wanderlei,wanderson,wendel,wolney,zacarias,zaqueu,luca,nikita,elisha,josias,matias,isaias,elias,tobias,nicolas,thomas,jesus,elvis,anselmo,arisson,artur,axel,aylton,beto,celso,celso,cesar,cicero,ciro,cleuton,clodoaldo,cloves,creso,darlan,darlison,darlei,davi,delmir,demir,denirio,deonizio,derik,devan,diran,dirceu,divo,edilson,edmar,edmilson,ednilson,elan,eldenir,eldevan,eldo,elenildo,elenilson,elizaldo,elmo,eloir,elson,elton,ely,emiliano,eneas,enir,eranio,eranildo,erclito,erlon,ervino,evaldo,evelson,evelino,ezio,fidelis,flaminio,fontes,fransico,gean,genivaldo,genildo,gennaro,gervazio,gildo,gilvan,glauber,gleibson,glenio,glennio,gonçalo,goncalo,helder,heleno,helias,heloi,heloino,herberto,heron,hervaldo,hildebrando,homero,honorato,horacio,hosana,huberto,ideraldo,ideval,idinei,idmar,inar,indalecio,indio,irani,iramar,irenio,irlan,irmar,isael,isais,isidoro,isley,itamar,ivo,izeldo,izenildo,jaci,jacir,jaison,jander,janio,jardel,jarlan,jarlei,jarlison,jarlysson,jarson,jaudel,jecleiton,jedson,jeison,jeovah,jerlandio,jerson,jesiel,jessie,jivago,joaldo,joadir,joceli,jocelin,jocelito,jocelino,jocivaldo,joel,joelmir,joffre,jolber,jonailson,jonathas,jonder,jorio,josafat,josias,josiel,josivaldo,joslanio,juarez,julierme,juliete,junior,junio,juninho,jurandir,kelton,kelvim,kelvin,keven,kleison,kleyton,kleiton,laercio,laionardo,lander,landir,lazaro,leomir,leonidas,leopoldino,lesandro,lessandro,lindalvo,lindomar,lineu,lino,livio,lorival,lorival,lourival,lucelino,luceni,lucerio,lucidio,lucimar,lucindo,lucinei,luciomar,luciomario,lucival,lucivaldo,lucivandro,manasses,marcani,marcelo,marcenildo,marcenio,marcondes,marcondes,marcos,mariano,marilio,mariscal,marley,marlon,marqos,marques,marquinho,martim,matias,mauro,maylon,melquisedeque,melvino,menaseu,menezes,messias,mirialdo,moab,moacir,moiseis,monaro,mucio,nabor,naelson,nailton,nair,naivaldo,nando,naran,narciso,nardeli,natael,natalio,nataniel,naum,neivaldo,nelcinho,nemias,nenson,neraldo,neron,nerval,neto,neves,noaldo,noelmo,nonato,normando,notario,odacir,odair,odalvo,odilon,odimar,odirley,odirlei,odilon,olemir,olemar,olenir,oleone,olimpio,olimpo,olivaldo,olmar,olmir,oloaldo,onivaldo,orcival,orcino,orlando,orsival,ortolan,osias,osmar,osmario,osni,osório,osorio,ossian,osvaldo,otacilio,otavio,otniel,otoniel,ozias,pablo,paulinho,percival,pericles,perseu,placido,plinio,policarpo,porfirio,primitivo,quirino,queisson,querino,radovan,raimundo,rainaldo,raone,raphaell,raquelino,rarison,rarlison,raul,reinaldo,reinan,reinildo,rejailson,renildo,renivaldo,rildo,rimario,robervaldo,robnei,robson,rochaldo,rodinei,rodolfo,rodolpho,rodrigo,rogerio,romelio,ronaldo,ronei,ronivaldo,rorisson,rosivaldo,rosivando,rosley,rosmar,rosnei,rosner,rovanildo,rubens,rubio,rubmario,rudinei,rudimar,rudnei,rufino,rui,sandro,sansao,saulo,serafim,sidnei,sidinei,sidmar,silas,silvino,sinedio,sinivaldo,siome,sirley,siumar,soldano,soldati,solenir,solemar,suelen,tarcio,tassio,teobaldo,teodoro,teofilo,tercilio,tercio,terencio,timoteo,tobias,tomas,toninho,tonino,tulio,ulisses,ulysses,ubiratan,udson,ueslei,udenilson,ueneliton,ulisses,uriel,vagnaldo,vagner,valcir,valdemar,valdemiro,valdeni,valdenilson,valdenor,valdilei,valdimar,valdinei,valdinor,valdirlei,valdirmar,valdomiro,valdovino,valentim,valindo,valionor,valmar,valmor,valnei,valtemir,valton,vanderlon,vander,vando,vandoval,vanildo,vanilton,vanner,vanoni,variomar,varlei,varmar,varo,vatson,vergilio,veriato,vernaldo,verner,vicentinho,vieirinha,vinicius,wal,waldir,waldomiro,waldivino,wanderlon,warley,warlei,warlisson,warnildo,wendell,wilian,willian,wolmar,wolnei,zacarias,zaqueu,zeferino,zelito,zelio,zelino,zenobio,zequinha,zuenir'.split(','));
+
+function detectarSexoPeloNome(nome) {
+  if (!nome) return '';
+  const n = nome.trim().split(/\s+/)[0].toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '');
+  if (_NOMES_F.has(n)) return 'F';
+  if (_NOMES_M.has(n)) return 'M';
+  // Heurísticas por terminação para nomes não listados
+  if (n.endsWith('a') && !['luca','nikita','elisha','joshua'].includes(n)) return 'F';
+  if (/son$|sao$|aldo$|ildo$|eiro$|inho$|ando$|endo$|ondo$|undo$|isco$|isto$|erto$|orge$|ique$|nior$|imar$|ival$|inei$|imar$|aldo$|elmo$|eron$/.test(n)) return 'M';
+  if (/ela$|ane$|iane$|iene$|aine$|eine$|aiane$|elle$|elli$|iane$|ioni$/.test(n)) return 'F';
+  return '';
+}
+
+// Tabela de coordenadas de cidades da região metropolitana de São Paulo
+const CIDADE_COORDS = {
+  'cajamar':                   { lat: -23.3570, lng: -46.8750 },
+  'guarulhos':                 { lat: -23.4530, lng: -46.5330 },
+  'osasco':                    { lat: -23.5320, lng: -46.7920 },
+  'barueri':                   { lat: -23.5116, lng: -46.8756 },
+  'santana de parnaiba':       { lat: -23.4448, lng: -46.9178 },
+  'santana de parnaíba':       { lat: -23.4448, lng: -46.9178 },
+  'itapecerica da serra':      { lat: -23.7170, lng: -46.8487 },
+  'sao paulo':                 { lat: -23.5505, lng: -46.6333 },
+  'são paulo':                 { lat: -23.5505, lng: -46.6333 },
+  'santo andre':               { lat: -23.6639, lng: -46.5383 },
+  'santo andré':               { lat: -23.6639, lng: -46.5383 },
+  'sao bernardo do campo':     { lat: -23.6914, lng: -46.5646 },
+  'são bernardo do campo':     { lat: -23.6914, lng: -46.5646 },
+  'diadema':                   { lat: -23.6858, lng: -46.6207 },
+  'maua':                      { lat: -23.6678, lng: -46.4617 },
+  'mauá':                      { lat: -23.6678, lng: -46.4617 },
+  'mogi das cruzes':           { lat: -23.5222, lng: -46.1875 },
+  'suzano':                    { lat: -23.5422, lng: -46.3103 },
+  'itaquaquecetuba':           { lat: -23.4873, lng: -46.3486 },
+  'ferraz de vasconcelos':     { lat: -23.5400, lng: -46.3671 },
+  'poa':                       { lat: -23.5252, lng: -46.3465 },
+  'poá':                       { lat: -23.5252, lng: -46.3465 },
+  'ribeirao pires':            { lat: -23.7109, lng: -46.4125 },
+  'ribeirão pires':            { lat: -23.7109, lng: -46.4125 },
+  'francisco morato':          { lat: -23.2817, lng: -46.7394 },
+  'franco da rocha':           { lat: -23.3211, lng: -46.7250 },
+  'caieiras':                  { lat: -23.3631, lng: -46.7406 },
+  'mairipora':                 { lat: -23.3181, lng: -46.5867 },
+  'mairiporã':                 { lat: -23.3181, lng: -46.5867 },
+  'aruja':                     { lat: -23.3964, lng: -46.3197 },
+  'arujá':                     { lat: -23.3964, lng: -46.3197 },
+  'santa isabel':              { lat: -23.3167, lng: -46.2253 },
+  'jandira':                   { lat: -23.5289, lng: -46.9036 },
+  'itapevi':                   { lat: -23.5489, lng: -47.0589 },
+  'carapicuiba':               { lat: -23.5225, lng: -46.8353 },
+  'carapicuíba':               { lat: -23.5225, lng: -46.8353 },
+  'cotia':                     { lat: -23.6036, lng: -46.9189 },
+  'embu das artes':            { lat: -23.6481, lng: -46.8517 },
+  'embu-guaçu':                { lat: -23.8328, lng: -46.8097 },
+  'embu guacu':                { lat: -23.8328, lng: -46.8097 },
+  'taboao da serra':           { lat: -23.6072, lng: -46.7575 },
+  'taboão da serra':           { lat: -23.6072, lng: -46.7575 },
+  'vargem grande paulista':    { lat: -23.6017, lng: -47.0328 },
+  'sao roque':                 { lat: -23.5247, lng: -47.1381 },
+  'são roque':                 { lat: -23.5247, lng: -47.1381 },
+  'pirapora do bom jesus':     { lat: -23.3939, lng: -47.0158 },
+  'campo limpo paulista':      { lat: -23.2286, lng: -46.7875 },
+  'varzea paulista':           { lat: -23.2111, lng: -46.8278 },
+  'várzea paulista':           { lat: -23.2111, lng: -46.8278 },
+  'jundiai':                   { lat: -23.1864, lng: -46.8978 },
+  'jundiaí':                   { lat: -23.1864, lng: -46.8978 },
+  'itupeva':                   { lat: -23.1539, lng: -47.0606 },
+  'sorocaba':                  { lat: -23.5015, lng: -47.4526 },
+  'campinas':                  { lat: -22.9099, lng: -47.0626 },
+  'guaruja':                   { lat: -23.9933, lng: -46.2565 },
+  'guarujá':                   { lat: -23.9933, lng: -46.2565 },
+  'santos':                    { lat: -23.9608, lng: -46.3336 },
+  'sao vicente':               { lat: -23.9619, lng: -46.3919 },
+  'são vicente':               { lat: -23.9619, lng: -46.3919 },
+  'praia grande':              { lat: -24.0059, lng: -46.4022 },
+  'cubatao':                   { lat: -23.8944, lng: -46.4258 },
+  'cubatão':                   { lat: -23.8944, lng: -46.4258 },
+};
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function empresasMaisProximas(talento) {
+  const raw = (talento.cidade || '').toLowerCase().trim();
+  // normaliza removendo acentos para fallback
+  const sem = raw.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const coords = CIDADE_COORDS[raw] || CIDADE_COORDS[sem];
+  if (!coords) return [];
+  return (state.empresas || [])
+    .filter(e => e.lat && e.lng)
+    .map(e => ({ ...e, distKm: Math.round(haversineKm(coords.lat, coords.lng, e.lat, e.lng)) }))
+    .sort((a, b) => a.distKm - b.distKm);
+}
+
+function fileToBase64(file) {
+  return new Promise(async (resolve, reject) => {
+    // Validação de segurança: verifica extensão, tamanho E magic bytes (cabeçalho real do arquivo)
+    // Isso impede que um .exe ou .js renomeado para .jpg entre no sistema
+    if (typeof validarArquivoSeguro === 'function') {
+      const validacao = await validarArquivoSeguro(file);
+      if (!validacao.valido) {
+        return reject(new Error(validacao.mensagem));
+      }
+    } else {
+      // Fallback caso security.js não tenha carregado
+      const allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf', 'webp'];
+      const extension = file.name.split('.').pop().toLowerCase();
+      if (!allowedExtensions.includes(extension)) {
+        return reject(new Error(`Formato inválido para "${file.name}". Apenas JPG, JPEG, PNG, PDF ou WEBP são aceitos.`));
+      }
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        return reject(new Error(`O arquivo "${file.name}" ultrapassa o limite máximo permitido de 10MB.`));
+      }
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Helpers para Sessão, Auditoria e Empacotamento ZIP
+function verificarSessao() {
+  // Usa verificarSessaoValida() do módulo security.js (expira após 8h)
+  const sessaoAtiva = (typeof verificarSessaoValida === 'function')
+    ? verificarSessaoValida()
+    : (() => {
+        try { const r = localStorage.getItem('rt_logged_user'); return r ? JSON.parse(r) : null; } catch { return null; }
+      })();
+
+  const loginScreen = document.getElementById('login-screen');
+  const userProfile = document.getElementById('header-user-profile');
+  const btnLogout = document.getElementById('btn-logout');
+
+  if (sessaoAtiva) {
+    loggedUser = sessaoAtiva;
+    // Ocultar tela de login
+    if (loginScreen) loginScreen.style.display = 'none';
+    
+    // Preencher dados do cabeçalho
+    if (userProfile) {
+      userProfile.style.display = 'flex';
+      const nameEl = document.getElementById('header-user-name');
+      const roleEl = document.getElementById('header-user-role');
+      const avatarEl = document.getElementById('header-user-avatar');
+
+      if (nameEl) nameEl.textContent = loggedUser.nome;
+      if (roleEl) {
+        const deptoLabels = {
+          'administracao': 'Gestão Executiva',
+          'selecao': 'Recrutamento & Seleção',
+          'dp': 'Departamento Pessoal',
+          'comissao': 'Comissões & Estatísticas'
+        };
+        roleEl.textContent = deptoLabels[loggedUser.departamento] || 'Colaborador';
+      }
+      if (avatarEl) {
+        const initials = loggedUser.nome.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+        avatarEl.textContent = initials;
+        const perfilAvatar = document.getElementById('header-user-avatar-perfil');
+        if (perfilAvatar) perfilAvatar.textContent = initials;
+      }
+    }
+    if (btnLogout) btnLogout.style.display = 'block';
+
+    // Aplicar regras de menu (RBAC)
+    verificarPermissoesMenu();
+  } else {
+    loggedUser = null;
+    if (loginScreen) loginScreen.style.display = 'flex';
+    if (userProfile) userProfile.style.display = 'none';
+    if (btnLogout) btnLogout.style.display = 'none';
+  }
+}
+
+function isAbaAutorizada(abaId) {
+  if (!loggedUser) return false;
+  if (abaId === 'meu-painel') return true;
+  if (loggedUser.login === 'joaobalaf') return true;
+  const depto = loggedUser.departamento;
+  if (depto === 'administracao') return true;
+  // Usar permissões granulares se disponíveis
+  const area = ABA_PARA_AREA[abaId];
+  if (area && loggedUser.permissoes && loggedUser.permissoes[area]) {
+    return loggedUser.permissoes[area].visualizar === true;
+  }
+  // Fallback por departamento para contas antigas sem permissões definidas
+  if (depto === 'selecao') {
+    const temVinculo = state && state.recrutadores && state.recrutadores.some(r => r.loginVinculado === loggedUser.login);
+    if (temVinculo) return abaId === 'meu-painel';
+    return ['dashboard', 'vagas', 'banco-talentos', 'selecao', 'site', 'meu-painel'].includes(abaId);
+  }
+  if (depto === 'dp') return ['depto-pessoal', 'banco-talentos'].includes(abaId);
+  if (depto === 'comissao') return ['comissao'].includes(abaId);
+  return false;
+}
+
+function verificarPermissoesMenu() {
+  const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
+  navItems.forEach(item => {
+    const aba = item.getAttribute('data-aba');
+    // Ignorar itens especiais (funcionarios e auditoria têm controle próprio abaixo)
+    if (aba === 'funcionarios' || aba === 'auditoria') return;
+    item.style.display = isAbaAutorizada(aba) ? '' : 'none';
+  });
+
+  // Controle do menu Funcionários
+  const navFunc = document.getElementById('nav-item-funcionarios');
+  if (navFunc) {
+    const pode = loggedUser && (
+      loggedUser.login === 'joaobalaf' ||
+      loggedUser.departamento === 'administracao' ||
+      loggedUser.permissoes?.funcionarios?.visualizar === true
+    );
+    navFunc.style.display = pode ? '' : 'none';
+  }
+
+  // Controle do menu Auditoria
+  const navAuditoria = document.getElementById('nav-item-auditoria');
+  if (navAuditoria) {
+    const pode = loggedUser && (
+      loggedUser.login === 'joaobalaf' ||
+      loggedUser.departamento === 'administracao' ||
+      loggedUser.permissoes?.sistema?.visualizar === true
+    );
+    navAuditoria.style.display = pode ? '' : 'none';
+  }
+
+  // Controle do menu Inaptos (somente admin)
+  const navInaptos = document.getElementById('nav-item-inaptos');
+  if (navInaptos) {
+    const podeInaptos = loggedUser && (
+      loggedUser.login === 'joaobalaf' ||
+      loggedUser.departamento === 'administracao'
+    );
+    navInaptos.style.display = podeInaptos ? '' : 'none';
+  }
+
+  if (!isAbaAutorizada(activeAba)) {
+    let homeAba = 'dashboard';
+    if (loggedUser.departamento === 'dp') homeAba = 'depto-pessoal';
+    else if (loggedUser.departamento === 'comissao') homeAba = 'comissao';
+    else if (loggedUser.departamento === 'selecao') {
+      const temVinculo = state && state.recrutadores && state.recrutadores.some(r => r.loginVinculado === loggedUser.login);
+      if (temVinculo) homeAba = 'meu-painel';
+    }
+    switchAba(homeAba);
+  }
+}
+
+function registrarAcaoHistorico(candidato, acao) {
+  // Se for o usuário joaobalaf, não deixa rastros na auditoria
+  if (loggedUser && loggedUser.login === 'joaobalaf') {
+    return;
+  }
+  if (!candidato.historico) candidato.historico = [];
+  const autor = loggedUser ? `${loggedUser.nome} (${loggedUser.departamento.toUpperCase()})` : 'Sistema R&T';
+  
+  const log = {
+    data: new Date().toLocaleString('pt-BR'),
+    autor: autor,
+    acao: acao
+  };
+  
+  candidato.historico.push(log);
+}
+
+function base64ToBlob(base64Data) {
+  if (!base64Data) return null;
+  if (!base64Data.startsWith('data:')) return null;
+
+  try {
+    const parts = base64Data.split(';base64,');
+    const contentType = parts[0].split(':')[1];
+    const raw = window.atob(parts[1]);
+    const rawLength = raw.length;
+    const uInt8Array = new Uint8Array(rawLength);
+    
+    for (let i = 0; i < rawLength; ++i) {
+      uInt8Array[i] = raw.charCodeAt(i);
+    }
+    
+    return new Blob([uInt8Array], { type: contentType });
+  } catch (e) {
+    console.error('Erro ao converter base64 para Blob:', e);
+    return null;
+  }
+}
+
+// Retorna Promise que adiciona o arquivo real no ZIP (base64 ou URL remota).
+// Se não houver dado, resolve sem adicionar nada (sem placeholder .txt).
+function adicionarDocumentoAoZip(folder, filename, dado) {
+  if (!dado) return Promise.resolve();
+
+  // Dado já é base64 data URI — converte para Blob direto
+  if (dado.startsWith('data:')) {
+    return new Promise(resolve => {
+      const blob = base64ToBlob(dado);
+      if (blob) {
+        const mime = dado.split(';base64,')[0].split(':')[1];
+        let ext = 'png';
+        if (mime === 'application/pdf') ext = 'pdf';
+        else if (mime === 'image/jpeg') ext = 'jpg';
+        else if (mime === 'image/webp') ext = 'webp';
+        folder.file(`${filename}.${ext}`, blob, { binary: true });
+      }
+      resolve();
+    });
+  }
+
+  // URL externa (https://...) — faz fetch e obtém o binário real
+  return fetch(dado)
+    .then(res => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.blob();
+    })
+    .then(blob => {
+      const mime = blob.type || 'image/jpeg';
+      let ext = 'jpg';
+      if (mime === 'application/pdf') ext = 'pdf';
+      else if (mime === 'image/png') ext = 'png';
+      else if (mime === 'image/webp') ext = 'webp';
+      folder.file(`${filename}.${ext}`, blob, { binary: true });
+    })
+    .catch(() => {
+      // Se fetch falhar, registra só um aviso (sem travar o ZIP)
+      folder.file(`${filename}_nao_baixado.txt`, `Não foi possível baixar este documento. URL original: ${dado}`);
+    });
+}
+
+function gerarFichaCadastralTexto(cand) {
+  const vaga = state.vagas.find(v => v.id === cand.vagaId);
+  const rec   = state.recrutadores.find(r => r.id === cand.recrutadorId);
+  const recNome = rec
+    ? rec.nome
+    : (cand.origemLink === 'agencia_rt' ? 'Agência R&T' : 'Não definido');
+
+  const linha = (label, valor) => `${label}: ${valor || 'Não informado'}`;
+
+  const historicoTxt = (cand.historico && cand.historico.length > 0)
+    ? cand.historico.map((h, i) => `  ${i + 1}. [${h.data}] ${h.autor}\n     ${h.acao}`).join('\n')
+    : '  Nenhum histórico registrado.';
+
+  return [
+    '================================================================',
+    'FICHA CADASTRAL — R&T EMPREGOS (GRUPO RT)',
+    `Gerado em: ${new Date().toLocaleString('pt-BR')}`,
+    '================================================================',
+    '',
+    '[ IDENTIFICAÇÃO ]',
+    linha('Número da fila',       cand.numeroFila ? `#${cand.numeroFila}` : null),
+    linha('Data do cadastro',     cand.dataCadastro ? new Date(cand.dataCadastro).toLocaleString('pt-BR') : null),
+    '',
+    '[ DADOS PESSOAIS ]',
+    linha('Nome completo',        cand.nome),
+    linha('CPF',                  cand.cpf),
+    linha('RG',                   cand.rg),
+    linha('PIS/NIS',              cand.pis),
+    linha('Data de nascimento',   cand.dataNascimento),
+    linha('Nome da mãe',          cand.nomeMae),
+    linha('Nome do pai',          cand.nomePai),
+    linha('Telefone',             cand.telefone),
+    linha('E-mail',               cand.email),
+    '',
+    '[ ENDEREÇO ]',
+    linha('CEP',                  cand.cep),
+    linha('Rua',                  cand.rua),
+    linha('Número',               cand.numeroCasa),
+    linha('Bairro',               cand.bairro),
+    linha('Cidade',               cand.cidade),
+    linha('Estado',               cand.estado),
+    '',
+    '[ DADOS BANCÁRIOS ]',
+    linha('Banco',                cand.banco),
+    linha('Tipo de chave PIX',    cand.tipoPix),
+    linha('Chave PIX',            cand.chavePix),
+    '',
+    '[ UNIFORME ]',
+    linha('Tamanho da camiseta',  cand.tamanhoCamiseta),
+    linha('Tamanho da calça',     cand.tamanhoCalca),
+    linha('Tamanho da bota',      cand.tamanhoBota),
+    '',
+    '[ VAGA & EMPRESA ]',
+    linha('Vaga',                 vaga ? vaga.cargo : cand.codigoVaga),
+    linha('Empresa',              vaga ? vaga.empresaNome : null),
+    linha('Unidade / Código',     vaga ? vaga.codigo : null),
+    linha('Local de trabalho',    vaga ? vaga.localTrabalho : null),
+    linha('Salário base',         vaga ? `R$ ${Number(vaga.salario).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : null),
+    linha('Turno',                cand.turnoTrabalho),
+    linha('Escala',               cand.escala),
+    linha('Linha de fretado',     cand.linhaFretado),
+    '',
+    '[ RECRUTAMENTO ]',
+    linha('Recrutado por',        recNome),
+    linha('Tipo de cadastro',     cand.origemCadastro === 'presencial' ? 'PRESENCIAL (Agência R&T)' : 'ONLINE'),
+    linha('Como soube da vaga',   cand.comoSoube ? ({instagram:'Instagram R&T',facebook:'Facebook R&T',anuncios_fb:'Anúncios Facebook',sel_mayara:'Selecionadora Mayara',sel_alessandra:'Selecionadora Alessandra',sel_lucas:'Selecionadora Lucas',sel_julio:'Selecionadora Júlio',sel_julia:'Selecionadora Júlia',sel_milena:'Selecionadora Milena',sel_vitoria:'Selecionadora Vitória',sel_sara:'Selecionadora Sara'}[cand.comoSoube] || cand.comoSoube) : null),
+    linha('Origem do link',       cand.origemLink),
+    linha('Data envio ao DP',     cand.dataSubiuDP),
+    linha('Aprovador Seleção',    cand.aprovadorSelecao),
+    '',
+    '[ DEVOLUÇÃO / CORREÇÃO ]',
+    cand.devolvidoPor
+      ? [
+          linha('Devolvida por',      cand.devolvidoPor),
+          linha('Data devolução',     cand.dataDevolucaoDP),
+          linha('Motivo',             cand.motivoDevolucaoDP),
+          linha('Corrigida por',      cand.corrigidoPor),
+          linha('Data correção',      cand.dataCorrecao),
+        ].join('\n')
+      : '  Sem devolução pelo DP.',
+    '',
+    '[ OBSERVAÇÕES DA SELEÇÃO ]',
+    cand.observacoesSelecao ? `  ${cand.observacoesSelecao}` : '  Nenhuma observação.',
+    '',
+    '[ HISTÓRICO DA FICHA ]',
+    historicoTxt,
+    '',
+    '================================================================',
+    'Documento gerado pelo CRM R&T Empregos. Uso interno — LGPD.',
+    '================================================================',
+  ].join('\n');
+}
+
+async function exportarFichaCompletaZip(candidatoId) {
+  const cand = state.candidatos.find(c => c.id === candidatoId);
+  if (!cand) { alert('Candidato não encontrado.'); return; }
+
+  // Nome limpo: sem acentos, sem caracteres especiais
+  const cleanName = cand.nome
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+
+  // Feedback visual enquanto gera
+  const btnExportar = document.getElementById('btn-dp-exportar') || document.getElementById('btn-download-pasta');
+  const labelOriginal = btnExportar ? btnExportar.innerHTML : '';
+  if (btnExportar) {
+    btnExportar.disabled = true;
+    btnExportar.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Gerando ZIP...';
+  }
+
+  try {
+    const zip = new JSZip(); // CDN global
+    const folder = zip.folder(cleanName);
+
+    // Arquivo de texto com todos os dados escritos
+    folder.file('dados_do_candidato.txt', gerarFichaCadastralTexto(cand));
+
+    // Documentos reais (base64 ou URL remota) — todos em paralelo
+    const docs = cand.documentos || {};
+    await Promise.all([
+      adicionarDocumentoAoZip(folder, 'selfie',                 docs.selfie),
+      adicionarDocumentoAoZip(folder, 'rg_frente',              docs.rgFrente),
+      adicionarDocumentoAoZip(folder, 'foto_pis_nis',           docs.fotoPis),
+      adicionarDocumentoAoZip(folder, 'cpf_documento',          docs.cpfDocumento),
+      adicionarDocumentoAoZip(folder, 'comprovante_residencia', docs.comprovanteResidencia),
+      adicionarDocumentoAoZip(folder, 'cartao_banco_verso',     docs.cartaoBancoVerso),
+    ]);
+
+    // Gera o ZIP e dispara o download
+    const content = await zip.generateAsync({ type: 'blob' });
+    const url = window.URL.createObjectURL(content);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = cleanName + '.zip';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    registrarAcaoHistorico(cand, 'Exportou ficha completa em ZIP — ' + cleanName + '/ (dados + documentos reais).');
+    saveState();
+
+  } catch (err) {
+    alert('Erro ao gerar o arquivo ZIP: ' + err.message);
+  } finally {
+    if (btnExportar) {
+      btnExportar.disabled = false;
+      btnExportar.innerHTML = labelOriginal;
+    }
+  }
+}
+
+// Executa ao carregar a página
+document.addEventListener('DOMContentLoaded', () => {
+  initLocalStorage();
+  verificarSessao();
+  setupNavigation();
+  setupEventListeners();
+  initNewModules();
+  renderCurrentAba();
+});
+
+// 1. GERENCIAMENTO DE ESTADO E LOCALSTORAGE
+function initLocalStorage() {
+  const localData = localStorage.getItem('rt_empregos_data');
+  if (!localData) {
+    localStorage.setItem('rt_empregos_data', JSON.stringify(INITIAL_DATA));
+    state = JSON.parse(JSON.stringify(INITIAL_DATA));
+  } else {
+    try {
+      state = JSON.parse(localData);
+    } catch (e) {
+      console.error('[RT Segurança] localStorage corrompido, reiniciando...', e);
+      localStorage.removeItem('rt_empregos_data');
+      state = JSON.parse(JSON.stringify(INITIAL_DATA));
+    }
+  }
+
+  // Garantir compatibilidade reversa para campos novos
+  if (state && state.candidatos) {
+    let alterado = false;
+    state.candidatos.forEach(c => {
+      if (!c.historico) {
+        c.historico = [];
+        c.historico.push({
+          data: c.dataCadastro ? new Date(c.dataCadastro).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR'),
+          autor: 'Sistema R&T',
+          acao: 'Candidato cadastrado no portal de vagas.'
+        });
+        alterado = true;
+      }
+      if (c.devolvidoDP === undefined) {
+        c.devolvidoDP = false;
+        alterado = true;
+      }
+      if (!c.motivoDevolucaoDP) {
+        c.motivoDevolucaoDP = '';
+        alterado = true;
+      }
+      if (!c.turnoTrabalho) {
+        c.turnoTrabalho = 'Diurno';
+        alterado = true;
+      }
+    });
+
+    // Inserir os funcionários padrão se não existirem
+    if (!state.funcionarios || state.funcionarios.length === 0) {
+      state.funcionarios = JSON.parse(JSON.stringify(INITIAL_DATA.funcionarios));
+      alterado = true;
+    }
+
+    // Garantir que o login joaobalaf está na base ativa e com privilégios de administrador
+    const temJoaoBalaf = state.funcionarios.some(f => f.login === 'joaobalaf');
+    if (!temJoaoBalaf) {
+      state.funcionarios.push({
+        id: 'func-5',
+        nome: 'João Balaf (Admin)',
+        email: 'joaobalaf@rtempregos.com',
+        login: 'joaobalaf',
+        senha: '.jJ970262405',
+        departamento: 'administracao',
+        nivelAcesso: 'administrador',
+        status: 'ativo'
+      });
+      alterado = true;
+    }
+
+    // Garantir campos novos em vagas
+    if (state.vagas) {
+      state.vagas.forEach(v => {
+        if (v.vagasSolicitadas === undefined) {
+          v.vagasSolicitadas = (v.vagasPreenchidas || 0) + (v.vagasDisponiveis || 0);
+          alterado = true;
+        }
+        if (v.vagasPreenchidas === undefined) { v.vagasPreenchidas = 0; alterado = true; }
+        if (v.vagasCanceladas === undefined) { v.vagasCanceladas = 0; alterado = true; }
+        if (v.vagasReabertas === undefined) { v.vagasReabertas = 0; alterado = true; }
+        if (!v.statusDemanda) { v.statusDemanda = 'ativa'; alterado = true; }
+        if (!v.historicoAjustes) { v.historicoAjustes = []; alterado = true; }
+      });
+    }
+
+    // Garantir array de logs de auditoria
+    if (!state.logs) {
+      state.logs = JSON.parse(JSON.stringify(INITIAL_DATA.logs || []));
+      alterado = true;
+    }
+
+    // Garantir objeto de configurações globais
+    if (!state.config) {
+      state.config = { dpPodeEditar: false };
+      alterado = true;
+    }
+
+    // Garantir contador de fila
+    if (!state.proximaFilaNum) {
+      state.proximaFilaNum = (state.candidatos ? state.candidatos.length : 0) + 1;
+      // Retroativamente atribuir número de fila aos candidatos existentes
+      state.candidatos.forEach((c, idx) => {
+        if (!c.numeroFila) { c.numeroFila = idx + 1; }
+      });
+      alterado = true;
+    }
+
+    // Garantir banco de talentos simples
+    if (!state.bancoTalentos) {
+      state.bancoTalentos = [];
+      alterado = true;
+    }
+
+    // Garantir arrays de inaptos e motivos
+    if (!state.inaptos) { state.inaptos = []; alterado = true; }
+    if (!state.motivosInaptidao) {
+      state.motivosInaptidao = JSON.parse(JSON.stringify(INITIAL_DATA.motivosInaptidao || []));
+      alterado = true;
+    }
+
+    // Garantir whatsapp nos recrutadores
+    if (state.recrutadores) {
+      state.recrutadores.forEach(r => {
+        if (r.whatsapp === undefined) { r.whatsapp = ''; alterado = true; }
+        if (r.loginVinculado === undefined) { r.loginVinculado = ''; alterado = true; }
+        if (!r.templates) { r.templates = {}; alterado = true; }
+        if (!r.disparosLog) { r.disparosLog = []; alterado = true; }
+      });
+    }
+
+    // Garantir campos novos nos candidatos
+    if (state.candidatos) {
+      state.candidatos.forEach(c => {
+        if (!c.beneficiosSelecao) {
+          c.beneficiosSelecao = { fretado: false, qualFretado: '', linhaFretado: '', valorVT: '', passagemIdaVolta: '' };
+          alterado = true;
+        }
+        if (c.inaptidaoInfo === undefined) { c.inaptidaoInfo = null; alterado = true; }
+        if (c.aprovadoMesmoInapto === undefined) { c.aprovadoMesmoInapto = false; alterado = true; }
+        if (c.statusCpf === undefined) { c.statusCpf = null; alterado = true; }
+        if (c.dpLock === undefined) { c.dpLock = null; alterado = true; }
+      });
+    }
+
+    // Garantir recrutadorId nos entries do banco de talentos
+    if (state.bancoTalentos) {
+      state.bancoTalentos.forEach(bt => {
+        if (!bt.recrutadorId) {
+          if (bt.origemLink && bt.origemLink.startsWith('rec_')) {
+            bt.recrutadorId = bt.origemLink.replace('rec_', '');
+          } else {
+            bt.recrutadorId = null;
+          }
+          alterado = true;
+        }
+        if (!bt.dataCadastroISO) {
+          bt.dataCadastroISO = new Date().toISOString();
+          alterado = true;
+        }
+      });
+    }
+
+    // Garantir permissões em funcionários antigos
+    if (state.funcionarios) {
+      state.funcionarios.forEach(f => {
+        if (!f.permissoes) {
+          // Admin e joaobalaf recebem permissão total; outros recebem zero
+          if (f.departamento === 'administracao' || f.login === 'joaobalaf') {
+            f.permissoes = JSON.parse(JSON.stringify(INITIAL_DATA.funcionarios[0].permissoes));
+          } else {
+            f.permissoes = criarPermissoesZeradas();
+            // Conceder permissões básicas do departamento conforme INITIAL_DATA
+            const modelo = INITIAL_DATA.funcionarios.find(fi => fi.departamento === f.departamento);
+            if (modelo) f.permissoes = JSON.parse(JSON.stringify(modelo.permissoes));
+          }
+          alterado = true;
+        }
+        if (!f.cargo) { f.cargo = 'Colaborador'; alterado = true; }
+        if (f.representanteDepto === undefined) { f.representanteDepto = false; alterado = true; }
+      });
+    }
+
+    if (alterado) {
+      saveState();
+    }
+
+    // Migrar senhas em texto puro para SHA-256 (operação assíncrona silenciosa)
+    if (typeof migrarSenhasParaHash === 'function') {
+      migrarSenhasParaHash(state).then(migrou => {
+        if (migrou) {
+          saveState();
+          console.log('[RT Segurança] Senhas migradas para SHA-256 com sucesso.');
+        }
+      });
+    }
+  }
+}
+
+function saveState() {
+  localStorage.setItem('rt_empregos_data', JSON.stringify(state));
+}
+
+// 2. SISTEMA DE ABA E ROTEAMENTO SPA
+function setupNavigation() {
+  const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
+  navItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const aba = item.getAttribute('data-aba');
+      switchAba(aba);
+    });
+  });
+
+  // Toggle Sidebar para telas menores
+  const sidebarBtn = document.getElementById('sidebar-toggle');
+  const sidebar = document.querySelector('.sidebar');
+  if (sidebarBtn && sidebar) {
+    sidebarBtn.addEventListener('click', () => {
+      sidebar.classList.toggle('collapsed');
+      if (sidebar.classList.contains('collapsed')) {
+        sidebar.style.width = '0px';
+        sidebar.style.overflow = 'hidden';
+      } else {
+        sidebar.style.width = '250px';
+      }
+    });
+  }
+
+  // Lógica de sub-abas do Dashboard
+  const subtabBtns = document.querySelectorAll('.subtab-btn');
+  subtabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      subtabBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const subtabId = btn.getAttribute('data-subtab');
+      document.querySelectorAll('.dashboard-sub-aba').forEach(c => c.classList.remove('active'));
+      document.getElementById(`dash-sub-${subtabId}`).classList.add('active');
+      activeDashboardSubTab = subtabId;
+      renderCurrentAba();
+    });
+  });
+}
+
+function switchAba(abaId) {
+  if (!isAbaAutorizada(abaId)) return;
+  activeAba = abaId;
+
+  // Atualiza botões no menu
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
+    item.classList.remove('active');
+    if (item.getAttribute('data-aba') === abaId) {
+      item.classList.add('active');
+    }
+  });
+
+  // Atualiza containers de abas
+  document.querySelectorAll('.aba-content').forEach(content => {
+    content.classList.remove('active');
+  });
+
+  const targetAba = document.getElementById(`aba-${abaId}`);
+  if (targetAba) {
+    targetAba.classList.add('active');
+  }
+
+  // Define ícone e título no cabeçalho
+  const headerIcon = document.querySelector('.header-icon');
+  const headerAppName = document.querySelector('.header-app-name');
+  
+  const iconMap = {
+    'dashboard': 'fa-solid fa-table-cells-large',
+    'vagas': 'fa-solid fa-briefcase',
+    'banco-talentos': 'fa-solid fa-users-viewfinder',
+    'selecao': 'fa-solid fa-square-check',
+    'depto-pessoal': 'fa-solid fa-building-user',
+    'relatorios': 'fa-solid fa-chart-line',
+    'comissao': 'fa-solid fa-dollar-sign',
+    'site': 'fa-solid fa-globe',
+    'funcionarios': 'fa-solid fa-user-gear',
+    'auditoria': 'fa-solid fa-clock-rotate-left',
+    'inaptos': 'fa-solid fa-ban',
+    'meu-painel': 'fa-solid fa-id-card-clip'
+  };
+
+  const titleMap = {
+    'dashboard': 'R&T EMPREGOS — DASHBOARD',
+    'vagas': 'R&T EMPREGOS — VAGAS DISPONÍVEIS',
+    'banco-talentos': 'R&T EMPREGOS — BANCO DE TALENTOS',
+    'selecao': 'R&T EMPREGOS — SELEÇÃO',
+    'depto-pessoal': 'R&T EMPREGOS — DEPARTAMENTO PESSOAL',
+    'relatorios': 'R&T EMPREGOS — RELATÓRIOS E INDICADORES',
+    'comissao': 'R&T EMPREGOS — PLANILHA DE COMISSÕES',
+    'site': 'R&T EMPREGOS — SITE PÚBLICO',
+    'funcionarios': 'R&T EMPREGOS — GESTÃO DE COLABORADORES',
+    'auditoria': 'R&T EMPREGOS — AUDITORIA ADMINISTRATIVA',
+    'inaptos': 'R&T EMPREGOS — INAPTOS',
+    'meu-painel': 'R&T EMPREGOS — MEU PAINEL'
+  };
+
+  if (headerIcon) headerIcon.className = `${iconMap[abaId] || 'fa-solid fa-building'} header-icon`;
+  if (headerAppName) headerAppName.textContent = titleMap[abaId] || 'R&T EMPREGOS';
+
+  // Renderiza a aba ativa
+  renderCurrentAba();
+}
+
+function renderCurrentAba() {
+  switch (activeAba) {
+    case 'dashboard':
+      renderDashboardOverview();
+      break;
+    case 'vagas':
+      renderVagasGrid();
+      break;
+    case 'banco-talentos':
+      renderBancoTalentos();
+      break;
+    case 'selecao':
+      renderSelecaoGrid();
+      break;
+    case 'depto-pessoal':
+      renderDeptoPessoal();
+      break;
+    case 'relatorios':
+      renderRelatoriosCharts();
+      break;
+    case 'comissao':
+      renderComissaoSheet();
+      break;
+    case 'site':
+      renderSitePublico();
+      break;
+    case 'funcionarios':
+      renderFuncionarios();
+      break;
+    case 'auditoria':
+      renderAuditoria();
+      setupAuditoriaListeners();
+      break;
+    case 'inaptos':
+      renderInaptos();
+      break;
+    case 'meu-painel':
+      renderMeuPainel();
+      break;
+  }
+}
+
+// 3. LISTENERS GLOBAIS
+function setupEventListeners() {
+  // Busca em tempo real no Dashboard
+  const dashSearch = document.getElementById('dashboard-search');
+  if (dashSearch) {
+    dashSearch.addEventListener('input', () => {
+      renderDashboardKanban(dashSearch.value.trim());
+    });
+  }
+
+  // Busca em tempo real no Banco
+  const bancoSearch = document.getElementById('banco-search');
+  if (bancoSearch) {
+    bancoSearch.addEventListener('input', () => {
+      renderBancoTalentos(bancoSearch.value.trim());
+    });
+  }
+
+  // Fechar gaveta de detalhes
+  const btnCloseDetails = document.getElementById('btn-close-details');
+  if (btnCloseDetails) {
+    btnCloseDetails.addEventListener('click', fecharDrawerDetalhes);
+  }
+
+  // Mudar abas da gaveta de detalhes
+  const drawerTabs = document.querySelectorAll('.drawer-tab-btn');
+  drawerTabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      drawerTabs.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
+      const tabId = btn.getAttribute('data-drawer-tab');
+      document.querySelectorAll('.drawer-tab-content').forEach(c => c.classList.remove('active'));
+      document.getElementById(`drawer-content-${tabId}`).classList.add('active');
+    });
+  });
+
+  // Autopreview de Vagas no Drawer
+  const selectVagaDrawer = document.getElementById('det-select-vaga');
+  if (selectVagaDrawer) {
+    selectVagaDrawer.addEventListener('change', () => {
+      atualizarAutopreviewVaga(selectVagaDrawer.value);
+    });
+  }
+
+  // Salvar edições do Drawer
+  const btnSalvarDetails = document.getElementById('btn-salvar-detalhes');
+  if (btnSalvarDetails) {
+    btnSalvarDetails.addEventListener('click', salvarDetalhesCandidato);
+  }
+
+  // Promover ficha do candidato para o DP (Subir Ficha para DP)
+  const btnSubirDp = document.getElementById('btn-subir-dp');
+  if (btnSubirDp) {
+    btnSubirDp.addEventListener('click', () => {
+      if (!currentCandidateId) return;
+      const cand = state.candidatos.find(c => c.id === currentCandidateId);
+      if (!cand) return;
+      
+      // 1. Validar e capturar os campos da tela de detalhes antes de subir
+      const nome = document.getElementById('det-nome-input').value.trim();
+      const cpf = document.getElementById('det-cpf-input').value.trim();
+      const rg = document.getElementById('det-rg-input').value.trim();
+      const pis = document.getElementById('det-pis-input').value.trim();
+      const nascimento = document.getElementById('det-nascimento-input').value.trim();
+      const mae = document.getElementById('det-mae-input').value.trim();
+      const pai = document.getElementById('det-pai-input').value.trim();
+      const telefone = document.getElementById('det-telefone-input').value.trim();
+      const email = document.getElementById('det-email-input').value.trim();
+
+      if (!nome || !cpf || !rg || !telefone || !email) {
+        alert('Por favor, preencha todos os campos obrigatórios pessoais (Nome, CPF, RG, Telefone, E-mail).');
+        return;
+      }
+
+      const vagaId = document.getElementById('det-select-vaga').value;
+      if (!vagaId) {
+        alert('Por favor, selecione a Vaga Destinada para o candidato antes de subir para o Departamento Pessoal.');
+        return;
+      }
+
+      const vaga = state.vagas.find(v => v.id === vagaId);
+      if (!vaga) {
+        alert('Vaga inválida.');
+        return;
+      }
+
+      const confirmMove = confirm(`Deseja salvar as alterações e subir a ficha do candidato "${nome}" para o Departamento Pessoal associada à vaga "${vaga.cargo} — ${vaga.empresaNome}"?`);
+      if (!confirmMove) return;
+
+      // Endereço
+      const cep = document.getElementById('det-cep-input').value.trim();
+      const rua = document.getElementById('det-rua-input').value.trim();
+      const numero = document.getElementById('det-numero-input').value.trim();
+      const bairro = document.getElementById('det-bairro-input').value.trim();
+      const cidade = document.getElementById('det-cidade-input').value.trim();
+      const estado = document.getElementById('det-estado-input').value.trim();
+
+      // Dados Bancários
+      const banco = document.getElementById('det-banco-input').value.trim();
+      const tipopix = document.getElementById('det-tipopix-input').value;
+      const chavepix = document.getElementById('det-chavepix-input').value.trim();
+
+      // Uniforme
+      const camiseta = document.getElementById('det-camiseta-input').value;
+      const calca = document.getElementById('det-calca-input').value.trim();
+      const bota = document.getElementById('det-bota-input').value.trim();
+
+      const recrutadorId = document.getElementById('det-select-recrutador').value;
+      const observacoes = document.getElementById('det-observacoes').value.trim();
+
+      // Atualiza as propriedades do candidato no estado
+      cand.nome = nome;
+      cand.cpf = cpf;
+      cand.rg = rg;
+      cand.pis = pis;
+      cand.dataNascimento = nascimento;
+      cand.nomeMae = mae;
+      cand.nomePai = pai;
+      cand.telefone = telefone;
+      cand.email = email;
+
+      cand.cep = cep;
+      cand.rua = rua;
+      cand.numeroCasa = numero;
+      cand.bairro = bairro;
+      cand.cidade = cidade;
+      cand.estado = estado;
+      cand.endereco = rua && numero ? `${rua}, ${numero}, ${bairro} - ${cidade}/${estado}` : cand.endereco;
+
+      cand.banco = banco;
+      cand.tipoPix = tipopix;
+      cand.chavePix = chavepix;
+
+      cand.tamanhoCamiseta = camiseta;
+      cand.tamanhoCalca = calca;
+      cand.tamanhoBota = bota;
+
+      cand.vagaId = vagaId;
+      cand.empresaId = vaga.empresaId;
+      cand.codigoVaga = `${vaga.empresaNome} ${vaga.codigo}`;
+      cand.recrutadorId = recrutadorId;
+      cand.status = 'aprovado'; // Move status para aprovado (DP)
+      cand.diasEtapa = 1;
+      cand.observacoesSelecao = observacoes;
+
+      const turno = document.getElementById('det-select-turno').value;
+      cand.turnoTrabalho = turno;
+      const foiDevolvida = cand.devolvidoDP === true;
+      cand.devolvidoDP = false;
+      cand.motivoDevolucaoDP = '';
+      cand.aprovadorSelecao = loggedUser ? `${loggedUser.nome} (Seleção)` : 'Recrutador';
+      cand.dataSubiuDP = new Date().toLocaleString('pt-BR');
+      if (foiDevolvida) {
+        cand.corrigidoPor = loggedUser ? loggedUser.nome : 'Seleção';
+        cand.dataCorrecao = new Date().toLocaleString('pt-BR');
+        registrarAcaoHistorico(cand, `Ficha corrigida por ${cand.corrigidoPor} (Seleção) e reenviada ao DP. Turno: ${turno}`);
+      } else {
+        registrarAcaoHistorico(cand, `Ficha cadastral aprovada na Seleção por ${cand.aprovadorSelecao} e enviada ao DP. Turno: ${turno}`);
+      }
+      
+      // Log activity
+      if (!loggedUser || loggedUser.login !== 'joaobalaf') {
+        state.atividades.unshift({
+          id: `act-${Date.now()}`,
+          descricao: `Ficha cadastral de ${cand.nome} enviada com sucesso para o Departamento Pessoal`,
+          data: 'Agora'
+        });
+      }
+      
+      triggerRocketAnimationDP(cand, foiDevolvida, () => {
+        saveState();
+        fecharDrawerDetalhes();
+        renderCurrentAba();
+      });
+    });
+  }
+
+  // Download da pasta do candidato — ZIP real com documentos
+  const btnDownloadPasta = document.getElementById('btn-download-pasta');
+  if (btnDownloadPasta) {
+    btnDownloadPasta.addEventListener('click', () => {
+      if (currentCandidateId) exportarFichaCompletaZip(currentCandidateId);
+    });
+  }
+
+  // Mostrar botões de vagas conforme permissão
+  const btnNovaVaga = document.getElementById('btn-nova-vaga');
+  const btnNovoCliente = document.getElementById('btn-novo-cliente');
+  const podeCriarVaga = loggedUser?.permissoes?.vagas?.criar === true;
+  const podeGerenciarCliente = loggedUser?.permissoes?.vagas?.excluir === true;
+  if (btnNovaVaga) {
+    btnNovaVaga.style.display = podeCriarVaga ? 'flex' : 'none';
+    btnNovaVaga.addEventListener('click', () => {
+      const selectEmpresaModal = document.getElementById('vaga-add-empresa');
+      if (selectEmpresaModal) {
+        selectEmpresaModal.innerHTML = state.empresas.map(e => `<option value="${e.id}">${e.nome}</option>`).join('');
+      }
+      document.getElementById('modal-nova-vaga').classList.add('active');
+    });
+  }
+  if (btnNovoCliente) {
+    btnNovoCliente.style.display = podeGerenciarCliente ? 'flex' : 'none';
+    btnNovoCliente.addEventListener('click', () => {
+      document.getElementById('modal-novo-cliente').classList.add('active');
+    });
+  }
+
+  const formNovaVaga = document.getElementById('form-nova-vaga');
+  if (formNovaVaga) {
+    formNovaVaga.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const empresaId = document.getElementById('vaga-add-empresa').value;
+      const empresa = state.empresas.find(emp => emp.id === empresaId);
+      const cargo = document.getElementById('vaga-add-cargo').value;
+      const codigo = document.getElementById('vaga-add-codigo').value;
+      const salario = parseFloat(document.getElementById('vaga-add-salario').value);
+      const quantidade = parseInt(document.getElementById('vaga-add-quantidade').value);
+      const local = document.getElementById('vaga-add-local').value;
+      const beneficios = document.getElementById('vaga-add-beneficios').value.split(',').map(b => b.trim());
+      const descricao = document.getElementById('vaga-add-desc').value;
+      const linhasFretadoRaw = (document.getElementById('vaga-add-linhas-fretado') || {}).value || '';
+      const linhasFretado = linhasFretadoRaw.split('\n').map(l => l.trim()).filter(Boolean);
+      const escalaVal = (document.getElementById('vaga-add-escala') || {}).value || '';
+      const escalaCustom = ((document.getElementById('vaga-add-escala-custom') || {}).value || '').trim();
+      const escala = escalaVal === 'personalizada' ? escalaCustom : escalaVal;
+      const turnosRaw = (document.getElementById('vaga-add-turnos') || {}).value || '';
+      const turnos = turnosRaw.split('\n').map(l => l.trim()).filter(Boolean);
+
+      const novaVaga = {
+        id: `vaga-${Date.now()}`,
+        empresaId,
+        empresaNome: empresa.nome,
+        cargo,
+        codigo,
+        salario,
+        vagasDisponiveis: quantidade,
+        beneficios,
+        linhasFretado,
+        escala,
+        turnos,
+        localTrabalho: local,
+        descricao
+      };
+
+      state.vagas.push(novaVaga);
+      saveState();
+      fecharModalVaga();
+      renderVagasGrid();
+      alert('Vaga cadastrada com sucesso!');
+    });
+  }
+
+  // Cadastro de novo cliente (empresa parceira)
+  const formNovoCliente = document.getElementById('form-novo-cliente');
+  if (formNovoCliente) {
+    formNovoCliente.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const nome   = document.getElementById('cli-nome').value.trim();
+      const sigla  = document.getElementById('cli-sigla').value.trim().toUpperCase();
+      const cor    = document.getElementById('cli-cor').value;
+      const cidade = document.getElementById('cli-cidade').value.trim();
+      const estado = document.getElementById('cli-estado').value.trim().toUpperCase() || 'SP';
+      const lat    = parseFloat(document.getElementById('cli-lat').value) || null;
+      const lng    = parseFloat(document.getElementById('cli-lng').value) || null;
+
+      const id = sigla.toLowerCase().replace(/\s+/g, '') + '-' + Date.now();
+      if (state.empresas.find(e => e.sigla === sigla)) {
+        alert('Já existe um cliente com essa sigla. Use uma sigla diferente.');
+        return;
+      }
+      const novaEmpresa = { id, nome, sigla, cor, cidade, estado, lat, lng };
+      state.empresas.push(novaEmpresa);
+      saveState();
+      fecharModalNovoCliente();
+      renderVagasGrid();
+      alert(`Cliente "${nome}" cadastrado com sucesso!`);
+    });
+  }
+
+  // Cadastro Manual de Candidato no Kanban
+  const formAddCandidato = document.getElementById('form-add-candidato');
+  if (formAddCandidato) {
+    formAddCandidato.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const coluna = document.getElementById('add-candidato-coluna').value;
+      const nome = document.getElementById('add-nome').value;
+      const cpf = document.getElementById('add-cpf').value;
+      const rg = document.getElementById('add-rg').value;
+      const email = document.getElementById('add-email').value;
+      const telefone = document.getElementById('add-telefone').value;
+      const vagaId = document.getElementById('add-vaga').value;
+      const recrutadorId = document.getElementById('add-recrutador').value;
+      
+      const vaga = state.vagas.find(v => v.id === vagaId);
+
+      const novoCandidato = {
+        id: `candidato-${Date.now()}`,
+        numeroFila: gerarNumeroFila(),
+        nome,
+        cpf,
+        rg,
+        pis: '000.00000.00-0',
+        telefone,
+        email,
+        endereco: 'Endereço não informado',
+        vagaId,
+        empresaId: vaga.empresaId,
+        codigoVaga: `${vaga.empresaNome} ${vaga.codigo}`,
+        recrutadorId,
+        status: coluna,
+        diasEtapa: 1,
+        dataCadastro: new Date().toISOString(),
+        documentos: {
+          selfie: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+          rgFrontal: 'https://images.unsplash.com/photo-1554774853-aae0a22c8aa4?w=400',
+          comprovante: 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=400'
+        }
+      };
+
+      state.candidatos.push(novoCandidato);
+      saveState();
+      fecharModalAddCandidato();
+      renderDashboardKanban();
+      alert('Candidato inserido com sucesso!');
+    });
+  }
+
+  // Modal Reprovação no DP
+  const formReprovar = document.getElementById('form-reprovar-motivo');
+  if (formReprovar) {
+    formReprovar.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const candId = document.getElementById('reprovar-candidato-id').value;
+      const motivo = document.getElementById('reprovar-motivo-texto').value;
+
+      const cand = state.candidatos.find(c => c.id === candId);
+      if (cand) {
+        cand.status = 'reprovado';
+        cand.motivoReprovacao = motivo;
+        cand.diasEtapa = 0;
+        
+        // Log de atividade
+        if (!loggedUser || loggedUser.login !== 'joaobalaf') {
+          state.atividades.unshift({
+            id: `act-${Date.now()}`,
+            descricao: `DP reprovou a contratação de ${cand.nome} por: "${motivo}"`,
+            data: 'Agora'
+          });
+        }
+
+        saveState();
+        fecharModalReprovar();
+        renderDeptoPessoal();
+        alert('Candidato reprovado e removido do DP.');
+      }
+    });
+  }
+
+  // Exportar Excel de Comissão
+  const btnExportExcel = document.getElementById('btn-export-excel');
+  if (btnExportExcel) {
+    btnExportExcel.addEventListener('click', () => {
+      alert('📥 Sucesso! A planilha de controle de comissão de recrutadores foi exportada com sucesso em formato Excel (.xlsx).');
+    });
+  }
+
+  // Relatórios Recrutadores Pills
+  const pillBtns = document.querySelectorAll('.recrutador-filter-bar .pill-btn');
+  pillBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      pillBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const recrutadorFilter = btn.getAttribute('data-recrutador');
+      renderRelatoriosCharts(recrutadorFilter);
+    });
+  });
+
+  // Lightbox de visualização de documentos (no click das imagens com classe .previewable-doc)
+  const previewableDocs = document.querySelectorAll('.previewable-doc');
+  previewableDocs.forEach(img => {
+    img.addEventListener('click', () => {
+      const src = img.dataset.originalSrc || img.src;
+      if (!src) return;
+      
+      const caption = img.alt || "Visualização do Documento";
+      const lightboxModal = document.getElementById('modal-documento-preview');
+      const lightboxImg = document.getElementById('lightbox-img');
+      const lightboxPdf = document.getElementById('lightbox-pdf');
+      const lightboxCaption = document.getElementById('lightbox-caption');
+      
+      if (lightboxCaption) lightboxCaption.textContent = caption;
+      
+      const isPdf = src.startsWith('data:application/pdf') || src.toLowerCase().endsWith('.pdf');
+      if (isPdf) {
+        if (lightboxImg) lightboxImg.style.display = 'none';
+        if (lightboxPdf) {
+          lightboxPdf.style.display = 'block';
+          lightboxPdf.src = src;
+        }
+      } else {
+        if (lightboxPdf) lightboxPdf.style.display = 'none';
+        if (lightboxImg) {
+          lightboxImg.style.display = 'block';
+          lightboxImg.src = src;
+        }
+      }
+      
+      if (lightboxModal) lightboxModal.classList.add('active');
+    });
+  });
+
+  // Formulário Público de Candidato (Aba Site) - Conversão e Validação Base64
+  const fileInputs = document.querySelectorAll('.file-input-hidden');
+  fileInputs.forEach(input => {
+    input.addEventListener('change', () => {
+      const box = input.parentElement;
+      const statusInd = box.querySelector('.upload-status-indicator');
+      if (input.files && input.files.length > 0) {
+        const file = input.files[0];
+        fileToBase64(file).then(base64Data => {
+          input.dataset.base64 = base64Data;
+          box.classList.add('uploaded');
+          if (statusInd) {
+            statusInd.textContent = 'Carregado';
+          }
+        }).catch(err => {
+          alert(err.message);
+          input.value = '';
+          delete input.dataset.base64;
+          box.classList.remove('uploaded');
+          if (statusInd) {
+            statusInd.textContent = 'Pendente';
+          }
+        });
+      } else {
+        delete input.dataset.base64;
+        box.classList.remove('uploaded');
+        if (statusInd) {
+          statusInd.textContent = 'Pendente';
+        }
+      }
+    });
+  });
+
+  // Formulário de login — com proteção contra brute force e hash de senha
+  const loginForm = document.getElementById('login-form');
+  if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const userVal = document.getElementById('login-username').value.trim();
+      const passVal = document.getElementById('login-password').value.trim();
+      const loginError = document.getElementById('login-error-msg');
+      const submitBtn = loginForm.querySelector('button[type="submit"]');
+
+      // Verificar bloqueio por brute force
+      if (typeof verificarBloqueio === 'function') {
+        const bloqueio = verificarBloqueio();
+        if (bloqueio.bloqueado) {
+          if (loginError) {
+            loginError.querySelector('span').textContent =
+              `Muitas tentativas incorretas. Aguarde ${bloqueio.segundosRestantes}s para tentar novamente.`;
+            loginError.style.display = 'flex';
+          }
+          return;
+        }
+      }
+
+      // Desabilitar botão durante verificação assíncrona
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = '0.6'; }
+
+      try {
+        // Encontrar usuário pelo login (comparação case-sensitive)
+        const userFound = state.funcionarios.find(f => f.login === userVal);
+
+        // Verificar senha (com suporte a hash SHA-256 e texto puro legado)
+        let senhaCorreta = false;
+        if (userFound) {
+          if (typeof verificarSenha === 'function') {
+            senhaCorreta = await verificarSenha(passVal, userFound.senha);
+          } else {
+            senhaCorreta = userFound.senha === passVal;
+          }
+        }
+
+        const found = senhaCorreta ? userFound : null;
+
+        if (found) {
+          if (found.status === 'aguardando_aprovacao') {
+            if (loginError) {
+              loginError.querySelector('span').textContent = 'Seu cadastro ainda aguarda aprovação do administrador. Tente novamente em breve.';
+              loginError.style.display = 'flex';
+            }
+            return;
+          }
+          if (found.status !== 'ativo') {
+            if (loginError) {
+              loginError.querySelector('span').textContent = 'Esta conta foi inativada pelo administrador.';
+              loginError.style.display = 'flex';
+            }
+            return;
+          }
+
+          // Resetar contador de tentativas falhas
+          if (typeof resetarTentativasLogin === 'function') resetarTentativasLogin();
+
+          // Criar sessão com expiração de 8h
+          if (typeof criarSessaoComExpiracao === 'function') {
+            criarSessaoComExpiracao(found);
+          } else {
+            localStorage.setItem('rt_logged_user', JSON.stringify(found));
+          }
+
+          if (loginError) loginError.style.display = 'none';
+          document.getElementById('login-username').value = '';
+          document.getElementById('login-password').value = '';
+          verificarSessao(); // seta loggedUser
+          // Registrar acesso no log de auditoria (joaobalaf é ignorado internamente)
+          registrarLogGlobal(`${found.nome} fez login no sistema.`, 'sistema');
+          // Redirecionar baseado no departamento
+          let homeAba = 'dashboard';
+          if (found.departamento === 'dp') homeAba = 'depto-pessoal';
+          else if (found.departamento === 'comissao') homeAba = 'comissao';
+          else if (found.departamento === 'selecao') {
+            const temVinculo = state.recrutadores && state.recrutadores.some(r => r.loginVinculado === found.login);
+            if (temVinculo) homeAba = 'meu-painel';
+          }
+          switchAba(homeAba);
+        } else {
+          // Registrar tentativa falha para controle de brute force
+          if (typeof registrarTentativaFalha === 'function') registrarTentativaFalha();
+
+          const bloqueioAtual = typeof verificarBloqueio === 'function' ? verificarBloqueio() : { bloqueado: false };
+          if (loginError) {
+            loginError.querySelector('span').textContent = bloqueioAtual.bloqueado
+              ? `Conta temporariamente bloqueada. Aguarde ${bloqueioAtual.segundosRestantes}s.`
+              : 'Usuário ou senha incorretos!';
+            loginError.style.display = 'flex';
+          }
+        }
+      } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = '1'; }
+      }
+    });
+  }
+
+  // Logout
+  const btnLogout = document.getElementById('btn-logout');
+  if (btnLogout) {
+    btnLogout.addEventListener('click', (e) => {
+      e.preventDefault();
+      localStorage.removeItem('rt_logged_user');
+      verificarSessao();
+    });
+  }
+
+  // Ações do DP na ficha
+  const btnDpExportar = document.getElementById('btn-dp-exportar');
+  if (btnDpExportar) {
+    btnDpExportar.addEventListener('click', () => {
+      if (currentCandidateId) {
+        exportarFichaCompletaZip(currentCandidateId);
+      }
+    });
+  }
+
+  const btnDpContrato = document.getElementById('btn-dp-contrato');
+  if (btnDpContrato) {
+    btnDpContrato.addEventListener('click', () => {
+      if (currentCandidateId) {
+        finalizarContratacao(currentCandidateId);
+        fecharDrawerDetalhes();
+      }
+    });
+  }
+
+  const btnDpDevolver = document.getElementById('btn-dp-devolver');
+  if (btnDpDevolver) {
+    btnDpDevolver.addEventListener('click', () => {
+      if (!currentCandidateId) return;
+      const cand = state.candidatos.find(c => c.id === currentCandidateId);
+      if (!cand) return;
+      document.getElementById('devolver-candidato-id').value = cand.id;
+      document.getElementById('devolver-nome-candidato').textContent = cand.nome;
+      document.getElementById('devolver-motivo-texto').value = '';
+      document.getElementById('modal-dp-devolver-motivo').classList.add('active');
+    });
+  }
+
+  const btnCloseDevolver = document.getElementById('btn-close-devolver-modal');
+  if (btnCloseDevolver) {
+    btnCloseDevolver.addEventListener('click', () => {
+      document.getElementById('modal-dp-devolver-motivo').classList.remove('active');
+    });
+  }
+
+  const btnCancelDevolver = document.getElementById('btn-cancel-devolver');
+  if (btnCancelDevolver) {
+    btnCancelDevolver.addEventListener('click', () => {
+      document.getElementById('modal-dp-devolver-motivo').classList.remove('active');
+    });
+  }
+
+  const formDpDevolverMotivo = document.getElementById('form-dp-devolver-motivo');
+  if (formDpDevolverMotivo) {
+    formDpDevolverMotivo.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const candId = document.getElementById('devolver-candidato-id').value;
+      const motivo = document.getElementById('devolver-motivo-texto').value.trim();
+
+      const cand = state.candidatos.find(c => c.id === candId);
+      if (cand) {
+        cand.status = 'em_analise';
+        cand.devolvidoDP = true;
+        cand.motivoDevolucaoDP = motivo;
+        cand.devolvidoPor = loggedUser ? loggedUser.nome : 'Departamento Pessoal';
+        cand.dataDevolucaoDP = new Date().toLocaleString('pt-BR');
+        cand.diasEtapa = 1;
+
+        registrarAcaoHistorico(cand, `Ficha devolvida para a Seleção por ${cand.devolvidoPor} (DP). Motivo: ${motivo}`);
+
+        saveState();
+        document.getElementById('modal-dp-devolver-motivo').classList.remove('active');
+        fecharDrawerDetalhes();
+        renderCurrentAba();
+        alert(`Ficha de "${cand.nome}" devolvida com sucesso para a Seleção.`);
+      }
+    });
+  }
+
+  // Cadastro de funcionário interno — com validação de senha e hash
+  const formCadastroFuncionario = document.getElementById('form-cadastro-funcionario');
+  if (formCadastroFuncionario) {
+    formCadastroFuncionario.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const nome = document.getElementById('func-nome').value.trim();
+      const email = document.getElementById('func-email').value.trim();
+      const loginVal = document.getElementById('func-login').value.trim();
+      const senhaVal = document.getElementById('func-senha').value.trim();
+      const depto = document.getElementById('func-depto').value;
+      const statusVal = document.getElementById('func-status').value;
+
+      // Validar força da senha
+      if (typeof validarSenhaForca === 'function') {
+        const forca = validarSenhaForca(senhaVal);
+        if (!forca.valida) {
+          alert(forca.mensagem);
+          return;
+        }
+      }
+
+      const exists = state.funcionarios.some(f => f.login.toLowerCase() === loginVal.toLowerCase());
+      if (exists) {
+        alert('Este login de usuário já está cadastrado.');
+        return;
+      }
+
+      // Hash da senha antes de salvar
+      const senhaFinal = (typeof hashSenha === 'function') ? await hashSenha(senhaVal) : senhaVal;
+
+      const newFunc = {
+        id: `func-${Date.now()}`,
+        nome,
+        email,
+        login: loginVal,
+        senha: senhaFinal,
+        departamento: depto,
+        nivelAcesso: depto === 'administracao' ? 'administrador' : 'comum',
+        status: statusVal
+      };
+
+      state.funcionarios.push(newFunc);
+      saveState();
+      formCadastroFuncionario.reset();
+      renderFuncionarios();
+      alert(`Funcionário "${nome}" cadastrado com sucesso!`);
+    });
+  }
+}
+
+// 4. RENDERS DAS ABAS DO SISTEMA
+
+// ABA 1: DASHBOARD (KANBAN DE CANDIDATOS COM DRAG & DROP)
+function renderDashboardKanban(filtroNome = '') {
+  // Limpa containers
+  const colunas = ['pendente', 'em_analise', 'entrevista', 'aprovado', 'reprovado'];
+  colunas.forEach(col => {
+    document.getElementById(`cards-${col}`).innerHTML = '';
+  });
+
+  // Filtra candidatos que não estão "contratados" (processo concluído)
+  const candidatosAtivos = state.candidatos.filter(c => {
+    const matchStatus = colunas.includes(c.status);
+    const matchFiltro = filtroNome === '' || c.nome.toLowerCase().includes(filtroNome.toLowerCase());
+    return matchStatus && matchFiltro;
+  });
+
+  // Contadores
+  const counts = { pendente: 0, em_analise: 0, entrevista: 0, aprovado: 0, reprovado: 0 };
+
+  candidatosAtivos.forEach(c => {
+    counts[c.status]++;
+    const cardHtml = createKanbanCardHtml(c);
+    const container = document.getElementById(`cards-${c.status}`);
+    if (container) {
+      container.insertAdjacentHTML('beforeend', cardHtml);
+    }
+  });
+
+  // Atualiza indicadores numéricos das colunas
+  colunas.forEach(col => {
+    document.getElementById(`count-${col}`).textContent = counts[col];
+  });
+
+  // Atualiza KPIs do topo
+  document.getElementById('dash-kpi-total').textContent = state.candidatos.filter(c => c.status !== 'contratado').length;
+  document.getElementById('dash-kpi-analise').textContent = counts['em_analise'];
+  document.getElementById('dash-kpi-aprovados').textContent = counts['aprovado'];
+  document.getElementById('dash-kpi-reprovados').textContent = counts['reprovado'];
+
+  // Habilita eventos de Drag and Drop
+  setupDragAndDrop();
+}
+
+function createKanbanCardHtml(c) {
+  // Sanitizar campos de dados do candidato para prevenir XSS
+  const esc = typeof escapeHTML === 'function' ? escapeHTML : (v => String(v || ''));
+  const nomeSeguro = esc(c.nome);
+  const vagaSegura = esc(c.codigoVaga || 'Vaga Geral');
+
+  const initials = nomeSeguro.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+  const recruiter = state.recrutadores.find(r => r.id === c.recrutadorId);
+  const recruiterNome = esc(recruiter ? recruiter.nome : 'Sem rec.');
+  
+  // Classe de cor para o avatar redondo
+  let avatarColorClass = 'c-yellow';
+  if (c.status === 'em_analise') avatarColorClass = 'c-blue';
+  if (c.status === 'entrevista') avatarColorClass = 'c-purple';
+  if (c.status === 'aprovado') avatarColorClass = 'c-green';
+  if (c.status === 'reprovado') avatarColorClass = 'c-red';
+
+  // Alerta de tempo na etapa
+  const isHighDuration = c.diasEtapa >= 10;
+  const timeBadgeClass = isHighDuration ? 'duration-badge high-duration' : 'duration-badge';
+
+  return `
+    <div class="kanban-card" draggable="true" data-id="${esc(c.id)}" onclick="abrirDrawerDetalhes('${esc(c.id)}')">
+      <div class="card-top">
+        <div class="avatar-circle ${avatarColorClass}">${initials}</div>
+        <div class="card-info" style="flex: 1;">
+          <span class="candidate-name" style="display: flex; align-items: center; justify-content: space-between; gap: 4px; width: 100%;">
+            <span style="display:flex; align-items:center; gap:5px;">
+              ${c.numeroFila ? `<span style="background:rgba(190,18,60,0.15); color:var(--primary); font-size:9px; font-weight:700; padding:1px 5px; border-radius:10px;">#${Number(c.numeroFila)}</span>` : ''}
+              ${nomeSeguro}
+            </span>
+            ${c.devolvidoDP ? `<span class="tag-devolvida" style="animation: pulse 1.5s infinite; font-size: 8px; padding: 1.5px 4px;"><i class="fa-solid fa-circle-exclamation"></i> DEVOLVIDO</span>` : ''}
+          </span>
+          <span class="candidate-job-tag">${vagaSegura}</span>
+        </div>
+      </div>
+      <div class="card-bottom">
+        <span class="recruiter-name-tag">Recrutador: ${recruiterNome}</span>
+        ${c.status !== 'reprovado' ? `
+          <span class="${timeBadgeClass}">
+            <i class="fa-regular fa-clock"></i> ${Number(c.diasEtapa)}d
+          </span>
+        ` : `
+          <span class="duration-badge badge-red" style="background-color: #fee2e2; color: #b91c1c;">
+            Reprovado
+          </span>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+// Lógica de Drag & Drop Real
+function setupDragAndDrop() {
+  const cards = document.querySelectorAll('.kanban-card');
+  const columns = document.querySelectorAll('.kanban-column');
+
+  cards.forEach(card => {
+    card.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', card.getAttribute('data-id'));
+      card.style.opacity = '0.5';
+    });
+
+    card.addEventListener('dragend', () => {
+      card.style.opacity = '1';
+    });
+  });
+
+  columns.forEach(col => {
+    col.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      col.style.backgroundColor = '#e2e8f0';
+    });
+
+    col.addEventListener('dragleave', () => {
+      col.style.backgroundColor = '#f1f5f9';
+    });
+
+    col.addEventListener('drop', (e) => {
+      e.preventDefault();
+      col.style.backgroundColor = '#f1f5f9';
+      
+      const candidateId = e.dataTransfer.getData('text/plain');
+      const targetStatus = col.getAttribute('data-status');
+      
+      const cand = state.candidatos.find(c => c.id === candidateId);
+      if (cand && cand.status !== targetStatus) {
+        // Se mover para Reprovado de forma rápida, coloca motivo padrão
+        if (targetStatus === 'reprovado' && !cand.motivoReprovacao) {
+          cand.motivoReprovacao = 'Filtro e triagem rápida no Kanban.';
+        }
+        
+        cand.status = targetStatus;
+        cand.diasEtapa = 1; // reinicia contagem
+        
+        // Log de atividade
+        if (!loggedUser || loggedUser.login !== 'joaobalaf') {
+          state.atividades.unshift({
+            id: `act-${Date.now()}`,
+            descricao: `Candidato ${cand.nome} movido para etapa "${targetStatus.replace('_', ' ')}" no Kanban`,
+            data: 'Agora'
+          });
+        }
+
+        saveState();
+        renderDashboardKanban();
+      }
+    });
+  });
+}
+
+// ABA 2: VAGAS (VITRINE DE VAGAS)
+function renderVagasGrid() {
+  const container = document.getElementById('vagas-cards-container');
+  if (!container) return;
+
+  const podeExcluir = loggedUser?.permissoes?.vagas?.excluir === true;
+
+  if (!state.vagas.length) {
+    container.innerHTML = '<p style="color:var(--text-secondary);font-size:14px;text-align:center;padding:40px 0;">Nenhuma vaga cadastrada. Clique em "Criar Nova Vaga" para começar.</p>';
+    return;
+  }
+
+  container.innerHTML = state.vagas.map(v => {
+    const emp = state.empresas.find(e => e.id === v.empresaId);
+    const cor = emp?.cor || '#6366f1';
+    const siglaDisplay = emp?.sigla || v.empresaNome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 4);
+
+    const benefitsHtml = (v.beneficios || []).map(b => `<span class="benefit-tag">${b}</span>`).join('');
+    const btnExcluir = podeExcluir
+      ? `<button onclick="excluirVaga('${v.id}')" style="margin-top:10px;padding:7px 14px;border-radius:7px;border:1px solid #fca5a5;background:#fff1f2;color:#dc2626;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background 0.15s;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fff1f2'"><i class="fa-solid fa-trash-can"></i> Excluir Vaga</button>`
+      : '';
+
+    return `
+      <div class="vaga-card">
+        <div class="vaga-card-header">
+          <div class="vaga-logo-badge" style="background:${cor};color:#fff;">${siglaDisplay}</div>
+          <div class="vaga-title-area">
+            <span class="vaga-company">${v.empresaNome}</span>
+            <span class="vaga-cargo">${v.cargo}</span>
+          </div>
+        </div>
+        <p class="vaga-desc">${v.descricao}</p>
+        <span class="vaga-salario">R$ ${Number(v.salario).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        <div class="vaga-tags-benefits">${benefitsHtml}</div>
+        <div class="vaga-details">
+          <div class="vaga-detail-row"><i class="fa-solid fa-location-dot"></i><span>Local: ${v.localTrabalho}</span></div>
+          <div class="vaga-detail-row"><i class="fa-solid fa-users"></i><span>${v.vagasDisponiveis} vagas disponíveis</span></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+          <button class="btn btn-primary btn-vaga-inscrever" onclick="irParaInscricaoSite('${v.id}')" style="flex:1;">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i> Cadastrar-se
+          </button>
+          ${btnExcluir}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.excluirVaga = function(vagaId) {
+  const vaga = state.vagas.find(v => v.id === vagaId);
+  if (!vaga) return;
+  if (!confirm(`Excluir a vaga "${vaga.cargo} — ${vaga.empresaNome}"?\nEssa ação não pode ser desfeita.`)) return;
+  state.vagas = state.vagas.filter(v => v.id !== vagaId);
+  saveState();
+  renderVagasGrid();
+};
+
+function irParaInscricaoSite(vagaId) {
+  // Abre a página pública de candidato em nova aba, com a vaga pré-selecionada
+  const base = window.location.origin + window.location.pathname.replace('index.html', '');
+  window.open(base + 'candidato.html' + (vagaId ? '?vaga=' + vagaId : ''), '_blank');
+}
+
+// ABA 3: BANCO DE TALENTOS (AGRUPADO POR EMPRESAS)
+function renderBancoTalentos(filtroNome = '') {
+  const container = document.getElementById('banco-grupos-list');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  state.empresas.forEach(emp => {
+    // Candidatos vinculados a esta empresa parceira
+    const candEmpresa = state.candidatos.filter(c => {
+      const matchEmp = c.empresaId === emp.id;
+      const matchFiltro = filtroNome === '' || c.nome.toLowerCase().includes(filtroNome.toLowerCase());
+      return matchEmp && matchFiltro;
+    });
+
+    if (candEmpresa.length === 0 && filtroNome !== '') return; // oculta grupo vazio na busca
+
+    const candHtml = candEmpresa.map(c => {
+      const initials = c.nome.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+      let colorClass = 'c-yellow';
+      if (emp.id === 'az') colorClass = 'c-orange';
+      if (emp.id === 'sp') colorClass = 'c-red';
+      if (emp.id === 'mg') colorClass = 'c-blue';
+      if (emp.id === 'dh') colorClass = 'c-yellow';
+
+      return `
+        <div class="banco-candidato-card" onclick="abrirDrawerDetalhes('${c.id}')" style="cursor: pointer;">
+          <div class="avatar-circle ${colorClass}">${initials}</div>
+          <div class="banco-cand-info">
+            <span class="banco-cand-name">${c.nome}</span>
+            <span class="banco-cand-sub">${c.codigoVaga || emp.nome}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const groupHtml = `
+      <div class="banco-grupo-secao">
+        <div class="banco-grupo-header">
+          <div class="banco-grupo-title">
+            <div class="banco-logo-badge" style="background-color: ${emp.cor};">${emp.sigla}</div>
+            <h2>Banco de dados — ${emp.nome}</h2>
+          </div>
+          <span class="banco-count-badge">${candEmpresa.length}</span>
+        </div>
+        <div class="banco-grupo-grid">
+          ${candEmpresa.length > 0 ? candHtml : `<p style="grid-column: span 4; font-size: 11px; color: var(--text-secondary); text-align: center; padding: 12px;">Nenhum talento neste banco de dados.</p>`}
+        </div>
+      </div>
+    `;
+
+    container.insertAdjacentHTML('beforeend', groupHtml);
+  });
+
+  // Render simple talent bank entries at the bottom
+  setupBTFilters();
+  renderBancoTalentosSimples();
+  setupImportarBT();
+}
+
+// ABA 4: SELEÇÃO (PRÉ-DP COM BORDAS COLORIDAS)
+function renderSelecaoGrid() {
+  const container = document.getElementById('selecao-cards-container');
+  if (!container) return;
+
+  // Filtra quem está nas etapas de Seleção
+  const statusSelecao = ['pendente', 'aguardando_consulta_cpf', 'em_analise', 'entrevista'];
+  const candidatosSelecao = state.candidatos.filter(c => statusSelecao.includes(c.status));
+
+  if (candidatosSelecao.length === 0) {
+    container.innerHTML = `<p style="grid-column: span 4; font-size: 13px; color: var(--text-secondary); text-align: center; padding: 48px;">Nenhum candidato aguardando triagem ou em análise na Seleção.</p>`;
+    return;
+  }
+
+  container.innerHTML = candidatosSelecao.map(c => {
+    // Sanitizar campos de dados do candidato para prevenir XSS
+    const esc = typeof escapeHTML === 'function' ? escapeHTML : (v => String(v || ''));
+    const nomeSeguro = esc(c.nome);
+    const vagaSegura = esc(c.codigoVaga || 'Vaga Não Definida');
+
+    const initials = nomeSeguro.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+    const recruiter = state.recrutadores.find(r => r.id === c.recrutadorId);
+
+    const borderCorHex = recruiter ? recruiter.corHex : '#e2e8f0';
+    const recNome = esc(recruiter ? recruiter.nome : 'Sem rec.');
+
+    // Classes extras para inapto
+    const isInapto = c.inaptidaoInfo && !c.aprovadoMesmoInapto;
+    const isAprovadoInapto = c.inaptidaoInfo && c.aprovadoMesmoInapto;
+    let extraClass = '';
+    if (isInapto) extraClass = 'card-inapto';
+    else if (isAprovadoInapto) extraClass = 'card-aprovado-inapto';
+
+    let avatarColorClass = 'c-yellow';
+    if (c.status === 'aguardando_consulta_cpf') avatarColorClass = 'c-purple';
+    else if (c.status === 'em_analise') avatarColorClass = 'c-blue';
+    else if (c.status === 'entrevista') avatarColorClass = 'c-purple';
+
+    const statusLabels = {
+      pendente: 'Pendente',
+      aguardando_consulta_cpf: 'Aguard. Consulta CPF',
+      em_analise: 'Em análise',
+      entrevista: 'Entrevista'
+    };
+    const statusTexto = statusLabels[c.status] || esc(c.status);
+
+    const origemBadge = c.origemCadastro === 'presencial'
+      ? `<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:10px;background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.4);flex-shrink:0;letter-spacing:.3px;"><i class="fa-solid fa-building"></i> FICHA PRESENCIAL</span>`
+      : c.origemCadastro === 'banco_talentos'
+      ? `<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:10px;background:rgba(168,85,247,0.15);color:#a855f7;border:1px solid rgba(168,85,247,0.4);flex-shrink:0;letter-spacing:.3px;"><i class="fa-solid fa-users"></i> BANCO DE TALENTOS</span>`
+      : `<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:10px;background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.4);flex-shrink:0;letter-spacing:.3px;"><i class="fa-solid fa-globe"></i> FICHA ONLINE</span>`;
+
+    const inaptoBadge = isInapto
+      ? `<span class="tag-inapto"><i class="fa-solid fa-circle-xmark"></i> INAPTO</span>`
+      : isAprovadoInapto
+      ? `<span class="tag-aprovado-inapto"><i class="fa-solid fa-triangle-exclamation"></i> APROVADO (ERA INAPTO)</span>`
+      : '';
+
+    const cpfBadge = c.status === 'aguardando_consulta_cpf'
+      ? `<span class="tag-aguardando-cpf"><i class="fa-solid fa-magnifying-glass"></i> AGUARD. CPF</span>`
+      : '';
+
+    const inaptMotivo = (isInapto || isAprovadoInapto) && c.inaptidaoInfo
+      ? `<div style="font-size:10px;color:${isInapto ? '#fca5a5' : '#fcd34d'};margin-top:4px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><i class="fa-solid fa-circle-info"></i> Motivo: ${esc(c.inaptidaoInfo.motivo)}</div>`
+      : '';
+
+    return `
+      <div class="selecao-card ${extraClass}" style="border-left-color: ${isInapto ? '#ef4444' : isAprovadoInapto ? '#f59e0b' : borderCorHex};" onclick="abrirDrawerDetalhes('${esc(c.id)}')">
+        <div class="selecao-card-avatar ${avatarColorClass}">${initials}</div>
+        <div class="selecao-card-details" style="flex: 1; min-width: 0;">
+          <span class="selecao-cand-name" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px;">
+            ${nomeSeguro}
+            ${c.devolvidoDP ? `<span class="tag-devolvida" style="animation: pulse 1.5s infinite; font-size: 8px; padding: 1.5px 4px;"><i class="fa-solid fa-circle-exclamation"></i> DEVOLVIDO DP</span>` : ''}
+          </span>
+          <span class="selecao-cand-company">${vagaSegura}</span>
+          <div class="selecao-card-footer" style="flex-wrap:wrap;">
+            <span class="tag-badge tag-blue">${statusTexto}</span>
+            ${cpfBadge}
+            ${inaptoBadge}
+            ${origemBadge}
+            <span class="recrutador-label">Recrutador: ${recNome}</span>
+          </div>
+          ${inaptMotivo}
+          ${c.devolvidoDP ? `<div style="font-size: 10px; color: #dc2626; margin-top: 4px; font-weight: 500; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;"><strong>Motivo:</strong> ${esc(c.motivoDevolucaoDP)}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ABA 5: DEPARTAMENTO PESSOAL (VALIDAÇÃO FINAL)
+function renderDeptoPessoal() {
+  const container = document.getElementById('dp-cards-container');
+  if (!container) return;
+
+  // ── Seção: Contratos Finalizados Hoje ─────────────────────────────────────
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  const contratadosHoje = state.candidatos.filter(c => c.status === 'contratado' && c.dataContratacao === hoje);
+
+  let secaoFinalizados = document.getElementById('dp-contratos-hoje-section');
+  if (!secaoFinalizados) {
+    secaoFinalizados = document.createElement('div');
+    secaoFinalizados.id = 'dp-contratos-hoje-section';
+    container.parentElement.insertBefore(secaoFinalizados, container);
+  }
+
+  if (contratadosHoje.length > 0) {
+    secaoFinalizados.innerHTML = `
+      <div style="margin-bottom: 24px;">
+        <h3 style="font-size: 14px; font-weight: 700; color: #10b981; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-circle-check"></i> Contratos Finalizados Hoje (${hoje})
+          <span style="background:#10b98120; color:#10b981; padding:2px 10px; border-radius:20px; font-size:12px;">${contratadosHoje.length}</span>
+        </h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px;">
+          ${contratadosHoje.map(c => {
+            const initials = c.nome.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+            const recFinDia = state.recrutadores.find(r => r.id === c.recrutadorId);
+            const vagaFinDia = state.vagas.find(v => v.id === c.vagaId);
+            return `
+              <div style="background: rgba(16,185,129,0.07); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 14px; display: flex; align-items: center; gap: 12px; cursor: pointer;"
+                onclick="abrirDrawerDetalhes('${c.id}')">
+                <div style="width:40px; height:40px; border-radius:50%; background:#10b981; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; flex-shrink:0;">${initials}</div>
+                <div style="min-width:0;">
+                  <div style="font-weight:600; color:var(--text-primary); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.nome}</div>
+                  <div style="font-size:11px; color:var(--text-secondary);">${vagaFinDia ? vagaFinDia.cargo : 'Vaga não definida'}</div>
+                  <div style="font-size:10px; color:#10b981; margin-top:2px;">Rec.: ${recFinDia ? recFinDia.nome : '—'} · ${c.aprovadorSelecao || 'DP'}</div>
+                </div>
+                <i class="fa-solid fa-check-double" style="color:#10b981; margin-left:auto; flex-shrink:0;"></i>
+              </div>
+            `;
+          }).join('')}
+        </div>
+        <hr style="border:none; border-top:1px solid var(--border-color); margin: 20px 0 0 0;">
+      </div>
+    `;
+  } else {
+    secaoFinalizados.innerHTML = '';
+  }
+  // ── Fim seção contratos hoje ───────────────────────────────────────────────
+
+  // Filtra candidatos "aprovados"
+  const candidatosAprovados = state.candidatos.filter(c => c.status === 'aprovado');
+
+  if (candidatosAprovados.length === 0) {
+    container.innerHTML = `<p style="grid-column: span 4; font-size: 13px; color: var(--text-secondary); text-align: center; padding: 48px;">Nenhum candidato aprovado aguardando validação final do Departamento Pessoal.</p>`;
+    return;
+  }
+
+  container.innerHTML = candidatosAprovados.map(c => {
+    // Sanitizar campos de dados do candidato para prevenir XSS
+    const esc = typeof escapeHTML === 'function' ? escapeHTML : (v => String(v || ''));
+    const nomeSeguro = esc(c.nome);
+    const vagaSegura = esc(c.codigoVaga || 'Vaga Geral');
+
+    const initials = nomeSeguro.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+    const recruiter = state.recrutadores.find(r => r.id === c.recrutadorId);
+    const recNome = esc(recruiter ? recruiter.nome : 'Sem rec.');
+
+    const dpLock = c.dpLock;
+    const isLocked = dpLock && dpLock.userLogin;
+    const lockHora = isLocked && dpLock.lockedAt ? new Date(dpLock.lockedAt).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}) : '';
+    const lockStyle = isLocked ? 'background:rgba(59,130,246,0.06);border-color:rgba(59,130,246,0.35);' : '';
+
+    return `
+      <div class="dp-card" style="${lockStyle}">
+        ${isLocked ? `
+          <div style="padding:6px 16px 0;display:flex;align-items:center;gap:6px;">
+            <i class="fa-solid fa-lock" style="color:#3b82f6;font-size:10px;"></i>
+            <span style="font-size:10px;font-weight:700;color:#3b82f6;">${esc(dpLock.userName)} está editando${lockHora ? ' desde ' + lockHora : ''}</span>
+          </div>` : ''}
+        <div class="dp-card-header" onclick="abrirDrawerDetalhes('${esc(c.id)}')" style="cursor: pointer;">
+          <div class="dp-avatar" style="${isLocked ? 'background:#3b82f6;' : ''}">${initials}</div>
+          <div class="dp-title-info">
+            <span class="dp-cand-name" style="display:flex; align-items:center; gap:6px;">
+              ${c.numeroFila ? `<span style="background:rgba(190,18,60,0.15); color:var(--primary); font-size:9px; font-weight:700; padding:1px 5px; border-radius:10px; white-space:nowrap;">#${Number(c.numeroFila)}</span>` : ''}
+              ${nomeSeguro}
+            </span>
+            <span class="dp-cand-company">${vagaSegura}</span>
+          </div>
+        </div>
+        <div class="dp-card-meta" style="display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-bottom: 1px solid var(--border-color); font-size: 11px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 600; color: var(--text-secondary);">Origem:</span>
+            ${c.origemCadastro === 'presencial'
+              ? `<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:10px;background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.4);letter-spacing:.3px;"><i class="fa-solid fa-building"></i> FICHA PRESENCIAL</span>`
+              : `<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:10px;background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.4);letter-spacing:.3px;"><i class="fa-solid fa-globe"></i> FICHA ONLINE</span>`}
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="font-weight: 600; color: var(--text-secondary);">Turno:</span>
+            <span style="color: var(--text-primary); font-weight: 500;">${esc(c.turnoTrabalho || 'Diurno')}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="font-weight: 600; color: var(--text-secondary);">Recrutador:</span>
+            <span style="color: var(--text-primary); font-weight: 500;">${recNome}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="font-weight: 600; color: var(--text-secondary);">Aprovador:</span>
+            <span style="color: var(--text-primary); font-weight: 500;">${esc(c.aprovadorSelecao || 'Seleção')}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="font-weight: 600; color: var(--text-secondary);">Data/Hora:</span>
+            <span style="color: var(--text-primary); font-weight: 500;">${esc(c.dataSubiuDP || 'Sem data')}</span>
+          </div>
+        </div>
+        <div style="padding: 12px 16px;">
+          <button class="btn btn-primary btn-sm" onclick="abrirDrawerDetalhes('${esc(c.id)}')"
+            style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; background:var(--primary); border:none; font-size:12px;">
+            <i class="fa-solid fa-folder-open"></i> Abrir Ficha Completa
+          </button>
+          ${c.devolvidoDP ? `
+          <div style="margin-top:8px; padding:6px 8px; background:#fee2e2; border-radius:6px; font-size:10px; color:#dc2626;">
+            <i class="fa-solid fa-rotate-left"></i>
+            <strong>Devolvida por:</strong> ${esc(c.devolvidoPor || 'DP')}
+            — ${esc(c.motivoDevolucaoDP || '')}
+          </div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// AÇÃO FINALIZAR CONTRATAÇÃO (NO DP)
+function finalizarContratacao(candidatoId) {
+  const cand = state.candidatos.find(c => c.id === candidatoId);
+  if (!cand) return;
+
+  const confirmHiring = confirm(`Deseja confirmar e finalizar a contratação do candidato "${cand.nome}"?`);
+  if (!confirmHiring) return;
+
+  // Dispara a animação vertical do foguete com rastro e tremor de tela
+  triggerRocketAnimationContract(cand, () => {
+    // Move para contratado
+    cand.status = 'contratado';
+    cand.diasEtapa = 0;
+    cand.dataContratacao = new Date().toLocaleDateString('pt-BR');
+    cand.aprovadorDP = loggedUser ? loggedUser.nome : 'Departamento Pessoal';
+
+    registrarAcaoHistorico(cand, 'Contratação finalizada e validada no DP. Adicionado ao quadro de funcionários.');
+
+    // Adiciona na planilha de comissão
+    const vaga = state.vagas.find(v => v.id === cand.vagaId);
+    const empresaNome = vaga ? vaga.empresaNome : 'Empresa Geral';
+
+    const novaContratacao = {
+      id: `c-${Date.now()}`,
+      recrutadorId: cand.recrutadorId,
+      candidatoId: cand.id,
+      candidatoNome: cand.nome,
+      empresaNome: empresaNome,
+      vagaId: cand.vagaId,
+      data: new Date().toLocaleDateString('pt-BR')
+    };
+
+    state.contratacoes.push(novaContratacao);
+
+    // BAIXA AUTOMÁTICA de -1 vaga disponível
+    if (vaga && vaga.vagasDisponiveis > 0) {
+      vaga.vagasDisponiveis--;
+      vaga.vagasPreenchidas = (vaga.vagasPreenchidas || 0) + 1;
+    }
+
+    // Log global de auditoria
+    registrarLogGlobal(`Contratação de "${cand.nome}" finalizada para ${empresaNome}. Vaga baixada automaticamente.`, 'dp');
+
+    // Log de atividade no feed
+    if (!loggedUser || loggedUser.login !== 'joaobalaf') {
+      state.atividades.unshift({
+        id: `act-${Date.now()}`,
+        descricao: `DP finalizou a contratação de ${cand.nome} para a empresa ${empresaNome}`,
+        data: 'Agora'
+      });
+    }
+
+    saveState();
+    renderDeptoPessoal();
+    // Exibe toast premium ao invés de alert
+    showToast(`🎉 +1 contrato feito! ${cand.nome} finalizado com sucesso.`, 'success');
+  });
+}
+
+// ABA 6: RELATÓRIOS (MÉTRICAS, GRÁFICOS E FILTROS AVANÇADOS)
+function renderRelatoriosCharts() {
+  // 1. Popular selects de filtros (apenas na primeira vez)
+  popularFiltrosRelatorios();
+  setupFiltrosRelatoriosListeners();
+
+  // 2. Destaque da semana
+  renderDestaquesSemana();
+
+  // 3. Dados filtrados
+  const contratacoesFiltradas = getContratacoesFiltradas();
+
+  // 4. KPI Cards principais
+  const kpiContratos = document.getElementById('kpi-contratos-finalizados');
+  const kpiAguardandoDP = document.getElementById('kpi-fichas-aguardando-dp');
+  const kpiDevolvidas = document.getElementById('kpi-fichas-devolvidas');
+  const kpiNoShows = document.getElementById('kpi-no-shows');
+
+  if (kpiContratos) kpiContratos.textContent = contratacoesFiltradas.length;
+  if (kpiAguardandoDP) kpiAguardandoDP.textContent = state.candidatos.filter(c => c.status === 'aprovado').length;
+  if (kpiDevolvidas) kpiDevolvidas.textContent = state.candidatos.filter(c => c.devolvidoDP === true).length;
+  if (kpiNoShows) kpiNoShows.textContent = state.candidatos.filter(c => c.status === 'reprovado').length;
+
+  // 5. Tabela de Vagas e Demandas
+  renderVagasDemandasTable();
+
+  // 6. Dados para gráficos
+  const labelsRecrutadores = state.recrutadores.map(r => r.nome);
+  const dataRecrutadores = state.recrutadores.map(r =>
+    contratacoesFiltradas.filter(c => c.recrutadorId === r.id).length
+  );
+  const labelsEmpresas = state.empresas.map(e => e.nome);
+  const dataEmpresas = state.empresas.map(e =>
+    contratacoesFiltradas.filter(c => c.empresaNome === e.nome).length
+  );
+
+  // Destrói gráficos antigos
+  if (charts.recrutador) { charts.recrutador.destroy(); charts.recrutador = null; }
+  if (charts.empresa) { charts.empresa.destroy(); charts.empresa = null; }
+
+  // Gráfico 1: Barras — Hires por Recrutador
+  const ctxRec = document.getElementById('chartRecrutadores');
+  if (ctxRec) {
+    charts.recrutador = new Chart(ctxRec, {
+      type: 'bar',
+      data: {
+        labels: labelsRecrutadores,
+        datasets: [{
+          label: 'Contratações',
+          data: dataRecrutadores,
+          backgroundColor: state.recrutadores.map(r => r.corHex || '#be123c'),
+          borderRadius: 6,
+          barThickness: 32
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { stepSize: 1, color: '#94a3b8' }, grid: { color: '#f1f5f940' } },
+          x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  // Gráfico 2: Donut — Hires por Empresa
+  const ctxEmp = document.getElementById('chartEmpresas');
+  if (ctxEmp) {
+    charts.empresa = new Chart(ctxEmp, {
+      type: 'doughnut',
+      data: {
+        labels: labelsEmpresas,
+        datasets: [{
+          data: dataEmpresas,
+          backgroundColor: state.empresas.map(e => e.cor || '#94a3b8'),
+          borderWidth: 2,
+          borderColor: '#1e293b'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 }, color: '#94a3b8' } }
+        }
+      }
+    });
+  }
+
+  // 7. Tabela de contratações filtradas
+  renderTabelaContratacoes();
+
+  // 8. Botão exportar relatório
+  const btnExportar = document.getElementById('btn-exportar-relatorio-excel');
+  if (btnExportar && !btnExportar.dataset.listenerAdded) {
+    btnExportar.dataset.listenerAdded = 'true';
+    btnExportar.addEventListener('click', () => {
+      alert('📥 Relatório exportado com sucesso em formato Excel (.xlsx).');
+    });
+  }
+}
+
+function filtrarRelatorioPorPill(recrutadorId) {
+  filtrosRelatorios.recrutadorId = recrutadorId;
+  const sel = document.getElementById('filtro-recrutador');
+  if (sel) sel.value = recrutadorId;
+  renderRelatoriosCharts();
+}
+
+// ABA 7: COMISSÃO (EXCEL STYLE SHEET)
+function renderComissaoSheet() {
+  const kpisContainer = document.getElementById('comissao-kpis-container');
+  if (!kpisContainer) return;
+
+  // KPI cards por recrutador
+  kpisContainer.innerHTML = state.recrutadores.map(r => {
+    const count = state.contratacoes.filter(c => c.recrutadorId === r.id).length;
+    return `
+      <div class="kpi-card bg-glass">
+        <div class="kpi-icon-wrapper" style="background-color: #f1f5f9; color: ${r.corHex};">
+          <i class="fa-solid fa-award"></i>
+        </div>
+        <div class="kpi-data">
+          <span class="kpi-number">${count}</span>
+          <span class="kpi-label">${r.nome}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Tabela Registro
+  const tableBody = document.getElementById('comissao-table-body');
+  if (!tableBody) return;
+
+  // Ordena por data decrescente
+  const listSorted = [...state.contratacoes].reverse();
+
+  if (listSorted.length === 0) {
+    tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 24px;">Nenhuma comissão registrada até o momento.</td></tr>`;
+    return;
+  }
+
+  tableBody.innerHTML = listSorted.map(c => {
+    const rec = state.recrutadores.find(r => r.id === c.recrutadorId);
+    const recNome = rec ? rec.nome : 'Sem rec.';
+    const recColor = rec ? rec.corHex : '#94a3b8';
+
+    return `
+      <tr>
+        <td>
+          <span class="rec-badge-small" style="background-color: ${recColor}15; color: ${recColor};">
+            ${recNome}
+          </span>
+        </td>
+        <td style="font-weight: 600;">${c.candidatoNome}</td>
+        <td>${c.empresaNome}</td>
+        <td>${c.data}</td>
+        <td style="font-weight: 700; color: var(--color-green);">R$ 150,00</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ABA 8: PORTAL DE CAPTAÇÃO (STAFF ONLY — gestão de links)
+function renderSitePublico() {
+  renderPortalLinks();
+
+  // Botões de copiar link
+  const base = window.location.origin + window.location.pathname.replace('index.html', '');
+  const btnCompleto = document.getElementById('btn-copiar-link-completo');
+  if (btnCompleto && !btnCompleto.dataset.listenerAdded) {
+    btnCompleto.dataset.listenerAdded = 'true';
+    btnCompleto.addEventListener('click', () => {
+      navigator.clipboard.writeText(base + 'candidato.html').then(() => {
+        btnCompleto.innerHTML = '<i class="fa-solid fa-check"></i> Copiado!';
+        setTimeout(() => { btnCompleto.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar Link'; }, 2000);
+      });
+    });
+  }
+  const btnTalento = document.getElementById('btn-copiar-link-talento');
+  if (btnTalento && !btnTalento.dataset.listenerAdded) {
+    btnTalento.dataset.listenerAdded = 'true';
+    btnTalento.addEventListener('click', () => {
+      navigator.clipboard.writeText(base + 'talento.html').then(() => {
+        btnTalento.innerHTML = '<i class="fa-solid fa-check"></i> Copiado!';
+        setTimeout(() => { btnTalento.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar Link'; }, 2000);
+      });
+    });
+  }
+  const btnPresencial = document.getElementById('btn-copiar-link-presencial');
+  if (btnPresencial && !btnPresencial.dataset.listenerAdded) {
+    btnPresencial.dataset.listenerAdded = 'true';
+    btnPresencial.addEventListener('click', () => {
+      navigator.clipboard.writeText(base + 'candidato.html?presencial=1').then(() => {
+        btnPresencial.innerHTML = '<i class="fa-solid fa-check"></i> Copiado!';
+        setTimeout(() => { btnPresencial.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar Link'; }, 2000);
+      });
+    });
+  }
+}
+
+// Renderiza a tabela de links personalizados por recrutador
+function renderPortalLinks() {
+  const container = document.getElementById('portal-links-recrutadores');
+  if (!container) return;
+
+  const base = window.location.origin + window.location.pathname.replace('index.html', '');
+
+  const copiarBtn = (link) =>
+    `<button onclick="navigator.clipboard.writeText('${link}').then(()=>{this.innerHTML='<i class=\\'fa-solid fa-check\\'></i> Copiado!';setTimeout(()=>{this.innerHTML='<i class=\\'fa-solid fa-copy\\'></i> Copiar';},2000)})" `+
+    `style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-secondary);cursor:pointer;font-size:12px;display:inline-flex;align-items:center;gap:6px;">`+
+    `<i class="fa-solid fa-copy"></i> Copiar</button>`;
+
+  // Link da agência
+  const agenciaLink = base + 'candidato.html?rec=agencia';
+  let html = `
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:rgba(190,18,60,0.08);border:1px solid rgba(190,18,60,0.2);border-radius:8px;flex-wrap:wrap;">
+      <div style="width:32px;height:32px;border-radius:50%;background:#be123c;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;flex-shrink:0;">R</div>
+      <div style="flex:1;min-width:200px;">
+        <div style="font-weight:600;font-size:13px;color:var(--text-primary);">Agência R&amp;T (Link Oficial)</div>
+        <div style="font-size:11px;color:var(--text-secondary);word-break:break-all;">${agenciaLink}</div>
+      </div>
+      ${copiarBtn(agenciaLink)}
+    </div>
+  `;
+
+  // Links por recrutador
+  state.recrutadores.forEach(rec => {
+    const recLink = base + 'candidato.html?rec=' + rec.id;
+    const btLink  = base + 'talento.html?rec=' + rec.id;
+    const novosNoBt = getBtNovosPorRecrutadora(rec.id).length;
+    const alertaBt = novosNoBt > 0
+      ? `<div class="bt-rec-alert" style="margin-top:8px;font-size:12px;">
+           <i class="fa-solid fa-bell" style="color:#fb7185;"></i>
+           Você tem <strong>${novosNoBt}</strong> nova(s) pessoa(s) no seu banco de talentos!
+         </div>`
+      : '';
+
+    html += `
+      <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:10px;padding:14px 16px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div style="width:36px;height:36px;border-radius:50%;background:${rec.corHex};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;flex-shrink:0;">${rec.nome[0]}</div>
+          <div style="flex:1;min-width:160px;">
+            <div style="font-weight:700;font-size:13px;color:var(--text-primary);">${rec.nome}</div>
+            <div style="font-size:10px;color:var(--text-secondary);">Ficha completa: <span style="word-break:break-all;">${recLink}</span></div>
+            <div style="font-size:10px;color:var(--text-secondary);">Banco de Talentos: <span style="word-break:break-all;">${btLink}</span></div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${copiarBtn(recLink)}
+            <button onclick="navigator.clipboard.writeText('${btLink}').then(()=>{this.innerHTML='<i class=\\'fa-solid fa-check\\'></i> Copiado BT!';setTimeout(()=>{this.innerHTML='<i class=\\'fa-solid fa-users\\'></i> Link BT';},2000)})"
+              style="padding:6px 12px;border-radius:6px;border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.1);color:#a855f7;cursor:pointer;font-size:12px;display:inline-flex;align-items:center;gap:6px;">
+              <i class="fa-solid fa-users"></i> Link BT</button>
+          </div>
+        </div>
+        <!-- WhatsApp da recrutadora -->
+        <div class="recruiter-whatsapp-field" style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+          <i class="fa-brands fa-whatsapp" style="color:#25d366;font-size:16px;"></i>
+          <input type="text" id="whatsapp-rec-${rec.id}" value="${rec.whatsapp || ''}" placeholder="DDD + número WhatsApp (ex: 11999990000)"
+            style="flex:1;padding:7px 12px;border-radius:7px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-primary);font-size:12px;"
+            oninput="salvarWhatsappRecrutadora('${rec.id}', this.value)">
+        </div>
+        ${alertaBt}
+      </div>
+    `;
+  });
+
+  container.innerHTML = html || '<p style="font-size:13px;color:var(--text-secondary);">Nenhum recrutador cadastrado.</p>';
+}
+
+// 5. MODAIS & DETALHES (SIDE DRAWER DE PROCESSO)
+
+function setSafeText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text || '';
+}
+
+function setSafeValue(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.value = value || '';
+}
+
+window.fecharLightboxDoc = function() {
+  const lightboxModal = document.getElementById('modal-documento-preview');
+  if (lightboxModal) lightboxModal.classList.remove('active');
+  const lightboxPdf = document.getElementById('lightbox-pdf');
+  if (lightboxPdf) lightboxPdf.src = '';
+};
+
+function abrirDrawerDetalhes(candidatoId) {
+  currentCandidateId = candidatoId;
+  const cand = state.candidatos.find(c => c.id === candidatoId);
+  if (!cand) return;
+
+  // Captura snapshot para auditoria de alterações por campo
+  _drawerSnapshotAntes = {};
+  Object.keys(CAMPOS_AUDIT).forEach(k => { _drawerSnapshotAntes[k] = cand[k] || ''; });
+
+  // Bloqueio de ficha para DP: só entrar já marca — atualiza imediatamente
+  if (loggedUser && loggedUser.departamento === 'dp' && loggedUser.login !== 'joaobalaf') {
+    const lock = cand.dpLock;
+    const meuLogin = loggedUser.login;
+    if (!lock || !lock.userLogin) {
+      // Ficha livre — bloqueia na hora e atualiza cards antes de abrir o drawer
+      cand.dpLock = { userLogin: meuLogin, userName: loggedUser.nome, lockedAt: Date.now() };
+      saveState();
+      renderDeptoPessoal(); // atualiza cor do card imediatamente
+    }
+    // Se já está bloqueada (por mim ou por outro), apenas entra — sem confirmação
+  }
+
+  // Rastreio de acesso: registra toda vez que alguém abre a ficha
+  if (loggedUser && loggedUser.login !== 'joaobalaf') {
+    if (!cand.historico) cand.historico = [];
+    cand.historico.push({
+      data: new Date().toLocaleString('pt-BR'),
+      autor: `${loggedUser.nome} (${loggedUser.departamento.toUpperCase()})`,
+      acao: 'Ficha visualizada.',
+      tipo: 'visualizacao'
+    });
+    saveState();
+  }
+
+  // Preenche dados do candidato no Drawer (Texto Estático)
+  setSafeText('det-nome', cand.nome);
+  // Exibir número de fila no drawer
+  const filaEl = document.getElementById('det-numero-fila');
+  if (filaEl) filaEl.textContent = cand.numeroFila ? `Fila #${cand.numeroFila}` : '';
+
+  // Badge presencial / online
+  const origemEl = document.getElementById('det-origem-badge');
+  if (origemEl) {
+    if (cand.origemCadastro === 'presencial') {
+      origemEl.innerHTML = '<i class="fa-solid fa-building"></i> FICHA PRESENCIAL';
+      origemEl.style.cssText = 'display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.4);margin-left:8px;letter-spacing:.3px;';
+    } else if (cand.origemCadastro === 'banco_talentos') {
+      origemEl.innerHTML = '<i class="fa-solid fa-users"></i> BANCO DE TALENTOS';
+      origemEl.style.cssText = 'display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;background:rgba(168,85,247,0.15);color:#a855f7;border:1px solid rgba(168,85,247,0.4);margin-left:8px;letter-spacing:.3px;';
+    } else {
+      origemEl.innerHTML = '<i class="fa-solid fa-globe"></i> FICHA ONLINE';
+      origemEl.style.cssText = 'display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.4);margin-left:8px;letter-spacing:.3px;';
+    }
+  }
+
+  // Banner BT: link para completar ficha
+  const btBanner = document.getElementById('bt-completar-banner');
+  if (btBanner) {
+    if (cand.origemCadastro === 'banco_talentos' && !cand.fichaCompletada) {
+      btBanner.style.display = '';
+      const linkCompletar = gerarLinkCompletarFicha(cand.id);
+      const btnCopiar = document.getElementById('btn-copiar-link-completar');
+      const btnWa    = document.getElementById('btn-whatsapp-completar');
+      if (btnCopiar) {
+        btnCopiar.onclick = () => {
+          navigator.clipboard.writeText(linkCompletar).then(() => {
+            btnCopiar.innerHTML = '<i class="fa-solid fa-check"></i> Copiado!';
+            setTimeout(() => { btnCopiar.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar link da ficha'; }, 2000);
+          });
+        };
+      }
+      if (btnWa && cand.telefone) {
+        const msg = encodeURIComponent(`Olá, ${(cand.nome || '').split(' ')[0]}! Complete seu cadastro na R&T Empregos clicando no link: ${linkCompletar}`);
+        btnWa.onclick = () => window.open('https://wa.me/' + cand.telefone.replace(/\D/g,'') + '?text=' + msg, '_blank');
+      }
+    } else {
+      btBanner.style.display = 'none';
+    }
+  }
+
+  // Como soube (só para candidatos online)
+  const comoSoubeEl = document.getElementById('det-como-soube');
+  if (comoSoubeEl) {
+    if (cand.comoSoube) {
+      const labelMap = {
+        instagram: 'Instagram R&T', facebook: 'Facebook R&T', anuncios_fb: 'Anúncios Facebook',
+        sel_mayara: 'Selecionadora: Mayara', sel_alessandra: 'Selecionadora: Alessandra',
+        sel_lucas: 'Selecionadora: Lucas', sel_julio: 'Selecionadora: Júlio',
+        sel_julia: 'Selecionadora: Júlia', sel_milena: 'Selecionadora: Milena',
+        sel_vitoria: 'Selecionadora: Vitória', sel_sara: 'Selecionadora: Sara',
+      };
+      comoSoubeEl.textContent = labelMap[cand.comoSoube] || cand.comoSoube;
+      comoSoubeEl.closest('[data-como-soube-row]').style.display = '';
+    } else {
+      const row = comoSoubeEl.closest('[data-como-soube-row]');
+      if (row) row.style.display = 'none';
+    }
+  }
+  const avatarEl = document.getElementById('det-avatar');
+  if (avatarEl) {
+    avatarEl.textContent = cand.nome.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+  }
+  setSafeText('det-cpf', cand.cpf);
+  setSafeText('det-rg', cand.rg);
+  setSafeText('det-pis', cand.pis || '000.00000.00-0');
+  setSafeText('det-telefone', cand.telefone);
+  setSafeText('det-email', cand.email);
+  setSafeText('det-endereco', cand.endereco || 'Endereço não informado');
+  setSafeText('det-data-cadastro', cand.dataCadastro ? new Date(cand.dataCadastro).toLocaleDateString('pt-BR') : '');
+
+  // Badge Status
+  const badgeStatus = document.getElementById('det-status-badge');
+  if (badgeStatus) {
+    badgeStatus.textContent = cand.status.replace('_', ' ');
+    badgeStatus.className = 'badge-status';
+    if (cand.status === 'pendente') badgeStatus.classList.add('badge-yellow');
+    if (cand.status === 'em_analise') badgeStatus.classList.add('badge-blue');
+    if (cand.status === 'entrevista') badgeStatus.classList.add('badge-purple');
+    if (cand.status === 'aprovado') badgeStatus.classList.add('badge-green');
+    if (cand.status === 'reprovado') badgeStatus.classList.add('badge-red');
+    if (cand.status === 'contratado') {
+      badgeStatus.classList.add('badge-green');
+      badgeStatus.textContent = 'Contratado';
+    }
+  }
+
+  // Preenche todos os Inputs Editáveis (21+ campos)
+  setSafeValue('det-nome-input', cand.nome);
+  setSafeValue('det-cpf-input', cand.cpf);
+  setSafeValue('det-rg-input', cand.rg);
+  setSafeValue('det-pis-input', cand.pis);
+  setSafeValue('det-nascimento-input', cand.dataNascimento || '');
+  setSafeValue('det-mae-input', cand.nomeMae || '');
+  setSafeValue('det-pai-input', cand.nomePai || '');
+  setSafeValue('det-telefone-input', cand.telefone);
+  setSafeValue('det-email-input', cand.email);
+
+  setSafeValue('det-cep-input', cand.cep || '');
+  setSafeValue('det-rua-input', cand.rua || '');
+  setSafeValue('det-numero-input', cand.numeroCasa || '');
+  setSafeValue('det-bairro-input', cand.bairro || '');
+  setSafeValue('det-cidade-input', cand.cidade || '');
+  setSafeValue('det-estado-input', cand.estado || '');
+
+  setSafeValue('det-banco-input', cand.banco || '');
+  setSafeValue('det-tipopix-input', cand.tipoPix || '');
+  setSafeValue('det-chavepix-input', cand.chavePix || '');
+
+  setSafeValue('det-camiseta-input', cand.tamanhoCamiseta || '');
+  setSafeValue('det-calca-input', cand.tamanhoCalca || '');
+  setSafeValue('det-bota-input', cand.tamanhoBota || '');
+
+  // Preenche Select de Vagas
+  const selectVaga = document.getElementById('det-select-vaga');
+  if (selectVaga) {
+    selectVaga.innerHTML = '<option value="">-- Selecione a Vaga Destinada * --</option>' + state.vagas.map(v => `<option value="${v.id}">${v.cargo} — ${v.empresaNome}</option>`).join('');
+    selectVaga.value = cand.vagaId || '';
+  }
+  atualizarAutopreviewVaga(cand.vagaId);
+
+  // Preenche Select de Recrutador
+  const selectRec = document.getElementById('det-select-recrutador');
+  if (selectRec) {
+    selectRec.innerHTML = state.recrutadores.map(r => `<option value="${r.id}">${r.nome}</option>`).join('');
+    selectRec.value = cand.recrutadorId;
+  }
+
+  // Preenche Select de Status
+  setSafeValue('det-select-status', cand.status);
+
+  // Observações
+  setSafeValue('det-observacoes', cand.observacoesSelecao || '');
+
+  // Imagens e arquivos dos Documentos (Mapeando os 6 documentos)
+  const docs = cand.documentos || {};
+  let countUploaded = 0;
+
+  const selfieEl = document.getElementById('img-doc-selfie');
+  if (selfieEl) {
+    selfieEl.src = docs.selfie || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150';
+    selfieEl.alt = `Selfie de ${cand.nome}`;
+    if (docs.selfie) {
+      selfieEl.dataset.originalSrc = docs.selfie;
+      countUploaded++;
+    } else {
+      delete selfieEl.dataset.originalSrc;
+    }
+  }
+
+  const rgFrenteEl = document.getElementById('img-doc-rgFrente');
+  if (rgFrenteEl) {
+    rgFrenteEl.src = docs.rgFrente || 'https://images.unsplash.com/photo-1554774853-aae0a22c8aa4?w=400';
+    rgFrenteEl.alt = `RG Frente de ${cand.nome}`;
+    if (docs.rgFrente) {
+      rgFrenteEl.dataset.originalSrc = docs.rgFrente;
+      countUploaded++;
+    } else {
+      delete rgFrenteEl.dataset.originalSrc;
+    }
+  }
+
+  const fotoPisEl = document.getElementById('img-doc-fotoPis');
+  if (fotoPisEl) {
+    fotoPisEl.src = docs.fotoPis || 'https://images.unsplash.com/photo-1554774853-aae0a22c8aa4?w=400';
+    fotoPisEl.alt = `Foto PIS/NIS de ${cand.nome}`;
+    if (docs.fotoPis) {
+      fotoPisEl.dataset.originalSrc = docs.fotoPis;
+      countUploaded++;
+    } else {
+      delete fotoPisEl.dataset.originalSrc;
+    }
+  }
+
+  const cpfDocumentoEl = document.getElementById('img-doc-cpfDocumento');
+  if (cpfDocumentoEl) {
+    cpfDocumentoEl.src = docs.cpfDocumento || 'https://images.unsplash.com/photo-1554774853-aae0a22c8aa4?w=400';
+    cpfDocumentoEl.alt = `CPF de ${cand.nome}`;
+    if (docs.cpfDocumento) {
+      cpfDocumentoEl.dataset.originalSrc = docs.cpfDocumento;
+      countUploaded++;
+    } else {
+      delete cpfDocumentoEl.dataset.originalSrc;
+    }
+  }
+
+  const comprovanteEl = document.getElementById('img-doc-comprovanteResidencia');
+  if (comprovanteEl) {
+    comprovanteEl.src = docs.comprovanteResidencia || 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=400';
+    comprovanteEl.alt = `Comprovante de Residência de ${cand.nome}`;
+    if (docs.comprovanteResidencia) {
+      comprovanteEl.dataset.originalSrc = docs.comprovanteResidencia;
+      countUploaded++;
+    } else {
+      delete comprovanteEl.dataset.originalSrc;
+    }
+  }
+
+  const cartaoEl = document.getElementById('img-doc-cartaoBancoVerso');
+  if (cartaoEl) {
+    cartaoEl.src = docs.cartaoBancoVerso || 'https://images.unsplash.com/photo-1554774853-aae0a22c8aa4?w=400';
+    cartaoEl.alt = `Cartão Banco Verso de ${cand.nome}`;
+    if (docs.cartaoBancoVerso) {
+      cartaoEl.dataset.originalSrc = docs.cartaoBancoVerso;
+      countUploaded++;
+    } else {
+      delete cartaoEl.dataset.originalSrc;
+    }
+  }
+
+  // Atualiza contador de documentos no HTML
+  const docCountEl = document.getElementById('det-doc-count');
+  if (docCountEl) docCountEl.textContent = countUploaded;
+
+  // Popula turno select com os turnos da vaga (se existir), senão usa opções padrão
+  const vagaCandTurno = (state.vagas || []).find(v => v.id === cand.vagaId);
+  const turnoSelect = document.getElementById('det-select-turno');
+  if (turnoSelect) {
+    const turnosVaga = (vagaCandTurno && vagaCandTurno.turnos && vagaCandTurno.turnos.length) ? vagaCandTurno.turnos : null;
+    if (turnosVaga) {
+      turnoSelect.innerHTML = turnosVaga.map(t => `<option value="${t}">${t}</option>`).join('');
+    } else {
+      turnoSelect.innerHTML = '<option value="Diurno">Diurno</option><option value="Noturno">Noturno</option><option value="Misto">Misto</option>';
+    }
+    turnoSelect.value = cand.turnoTrabalho || (turnoSelect.options[0] ? turnoSelect.options[0].value : '');
+  }
+
+  // Exibe escala da vaga no drawer
+  const escalaBox = document.getElementById('vaga-escala-box');
+  const escalaValor = document.getElementById('vaga-escala-valor');
+  if (escalaBox && escalaValor) {
+    const escalaVaga = vagaCandTurno && vagaCandTurno.escala;
+    if (escalaVaga) {
+      escalaValor.textContent = escalaVaga;
+      escalaBox.style.display = 'block';
+    } else {
+      escalaBox.style.display = 'none';
+    }
+  }
+
+  // Lógica de Somente Leitura (Read-Only)
+  const isDpUser = loggedUser && loggedUser.departamento === 'dp';
+  const dpPodeEditar = state.config?.dpPodeEditar === true;
+  const isContratadoOrAdmin = cand.status === 'contratado';
+  // DP mode: campos visíveis e copiáveis mas sem edição (a menos que ADM libere)
+  const isDpReadonly = isDpUser && !dpPodeEditar;
+  // Seleção: bloqueia campos se candidato está aprovado/contratado
+  const isSelecaoBlocked = (cand.status === 'aprovado' || isContratadoOrAdmin) && !isDpUser;
+
+  const drawer = document.getElementById('modal-candidato-detalhes');
+  if (drawer) {
+    drawer.classList.toggle('dp-readonly-mode', isDpReadonly);
+    drawer.classList.toggle('selecao-blocked-mode', isSelecaoBlocked);
+  }
+
+  const editableSelectors = [
+    '#det-nome-input', '#det-cpf-input', '#det-rg-input', '#det-pis-input', '#det-nascimento-input',
+    '#det-mae-input', '#det-pai-input', '#det-telefone-input', '#det-email-input',
+    '#det-cep-input', '#det-rua-input', '#det-numero-input', '#det-bairro-input', '#det-cidade-input', '#det-estado-input',
+    '#det-banco-input', '#det-tipopix-input', '#det-chavepix-input',
+    '#det-camiseta-input', '#det-calca-input', '#det-bota-input',
+    '#det-select-vaga', '#det-select-recrutador', '#det-select-status', '#det-observacoes', '#det-select-turno'
+  ];
+  editableSelectors.forEach(sel => {
+    const el = document.querySelector(sel);
+    if (!el) return;
+    // DP readonly: use readOnly (texto copiável, não editável) — sem disabled
+    if (isDpReadonly) {
+      el.removeAttribute('disabled');
+      el.setAttribute('readonly', 'true');
+      el.style.pointerEvents = 'none';
+      el.style.userSelect = 'text';
+    } else if (isSelecaoBlocked) {
+      el.removeAttribute('readonly');
+      el.disabled = true;
+    } else {
+      el.removeAttribute('disabled');
+      el.removeAttribute('readonly');
+      el.style.pointerEvents = '';
+      el.style.userSelect = '';
+    }
+  });
+
+  // Banner de bloqueio DP
+  let dpLockBanner = document.getElementById('dp-lock-banner');
+  if (!dpLockBanner) {
+    dpLockBanner = document.createElement('div');
+    dpLockBanner.id = 'dp-lock-banner';
+    const alertInsertBefore = document.getElementById('devolucao-alert-box');
+    if (alertInsertBefore && alertInsertBefore.parentNode) {
+      alertInsertBefore.parentNode.insertBefore(dpLockBanner, alertInsertBefore);
+    }
+  }
+  if (dpLockBanner) {
+    const lock = cand.dpLock;
+    const euBloqueei = lock && lock.userLogin === (loggedUser && loggedUser.login);
+    if (lock && lock.userLogin) {
+      const hora = lock.lockedAt ? new Date(lock.lockedAt).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}) : '';
+      const rec = (state.recrutadores || []).find(r => r.id === cand.recrutadorId);
+      const recNome = rec ? rec.nome : (cand.recrutadorId || '—');
+      dpLockBanner.innerHTML = `
+        <div style="background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.3);border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <i class="fa-solid fa-lock" style="color:#3b82f6;font-size:15px;flex-shrink:0;"></i>
+          <div style="flex:1;min-width:200px;">
+            <div style="font-size:12px;color:#3b82f6;font-weight:700;margin-bottom:3px;">
+              <i class="fa-solid fa-user-tie" style="margin-right:4px;font-size:10px;"></i>${_esc(lock.userName)} (DP) está com essa ficha${hora ? ' — desde ' + hora : ''}
+            </div>
+            <div style="font-size:11px;color:var(--text-secondary);">
+              Candidato: <strong>${_esc(cand.nome)}</strong> &nbsp;·&nbsp; Selecionadora: <strong>${_esc(recNome)}</strong>
+            </div>
+          </div>
+          ${euBloqueei ? `
+          <button onclick="liberarFichaDP('${_esc(cand.id)}')" style="padding:5px 14px;border-radius:8px;border:1px solid rgba(59,130,246,0.4);background:rgba(59,130,246,0.1);color:#3b82f6;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit;white-space:nowrap;flex-shrink:0;">
+            <i class="fa-solid fa-unlock"></i> Liberar Ficha
+          </button>` : ''}
+        </div>`;
+    } else {
+      dpLockBanner.innerHTML = '';
+    }
+  }
+
+  // Exibe/oculta Alerta de Devolução
+  const alertBox = document.getElementById('devolucao-alert-box');
+  const alertReason = document.getElementById('devolucao-alert-reason');
+  if (cand.devolvidoDP && cand.status !== 'aprovado' && cand.status !== 'contratado') {
+    if (alertBox) alertBox.style.display = 'block';
+    if (alertReason) {
+      alertReason.innerHTML = `
+        <strong>Devolvida por:</strong> ${cand.devolvidoPor || 'Departamento Pessoal'}
+        ${cand.dataDevolucaoDP ? `<span style="font-size:10px; opacity:.7;"> · ${cand.dataDevolucaoDP}</span>` : ''}<br>
+        <strong>Motivo:</strong> ${cand.motivoDevolucaoDP || 'Não informado'}
+        ${cand.corrigidoPor ? `<br><span style="color:#22c55e;"><strong>✓ Corrigida por:</strong> ${cand.corrigidoPor} · ${cand.dataCorrecao || ''}</span>` : ''}
+      `;
+    }
+  } else {
+    if (alertBox) alertBox.style.display = 'none';
+  }
+
+  // Preenche a Timeline do Histórico de Auditoria
+  const timelineEl = document.getElementById('det-historico-timeline');
+  if (timelineEl) {
+    if (cand.historico && cand.historico.length > 0) {
+      timelineEl.innerHTML = [...cand.historico].reverse().map(h => {
+        if (h.tipo === 'visualizacao') {
+          return `
+            <div class="timeline-item" style="opacity:.6;">
+              <div class="timeline-dot" style="background:#94a3b8;width:8px;height:8px;margin-top:3px;"></div>
+              <div class="timeline-content">
+                <span class="timeline-time" style="font-size:10px;">${h.data}</span>
+                <p class="timeline-desc" style="font-size:11px;color:var(--text-secondary);margin:1px 0;"><i class="fa-regular fa-eye" style="margin-right:4px;"></i>${h.acao}</p>
+                <span class="timeline-author" style="font-size:10px;"><i class="fa-solid fa-user"></i> ${h.autor}</span>
+              </div>
+            </div>`;
+        }
+        if (h.tipo === 'liberacao') {
+          return `
+            <div class="timeline-item" style="opacity:.7;">
+              <div class="timeline-dot" style="background:#10b981;width:8px;height:8px;margin-top:3px;"></div>
+              <div class="timeline-content">
+                <span class="timeline-time" style="font-size:10px;">${h.data}</span>
+                <p class="timeline-desc" style="font-size:11px;color:#10b981;margin:1px 0;"><i class="fa-solid fa-lock-open" style="margin-right:4px;"></i>${h.acao}</p>
+                <span class="timeline-author" style="font-size:10px;"><i class="fa-solid fa-user"></i> ${h.autor}</span>
+              </div>
+            </div>`;
+        }
+        if (h.tipo === 'entrada_forcada') {
+          return `
+            <div class="timeline-item" style="background:rgba(239,68,68,0.04);border-radius:8px;padding:4px 6px;">
+              <div class="timeline-dot" style="background:#ef4444;width:10px;height:10px;margin-top:2px;"></div>
+              <div class="timeline-content">
+                <span class="timeline-time" style="color:#ef4444;">${h.data}</span>
+                <p class="timeline-desc" style="color:#ef4444;font-weight:600;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:4px;"></i>${h.acao}</p>
+                <span class="timeline-author"><i class="fa-solid fa-user-shield"></i> ${h.autor}</span>
+              </div>
+            </div>`;
+        }
+        if (h.tipo === 'alteracao') {
+          return `
+            <div class="timeline-item">
+              <div class="timeline-dot" style="background:#f59e0b;"></div>
+              <div class="timeline-content">
+                <span class="timeline-time">${h.data}</span>
+                <p class="timeline-desc" style="color:#f59e0b;"><i class="fa-solid fa-pen-to-square" style="margin-right:4px;"></i>${h.acao}</p>
+                <span class="timeline-author"><i class="fa-solid fa-user-pen"></i> ${h.autor}</span>
+              </div>
+            </div>`;
+        }
+        return `
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+              <span class="timeline-time">${h.data}</span>
+              <p class="timeline-desc">${h.acao}</p>
+              <span class="timeline-author"><i class="fa-solid fa-user-shield"></i> ${h.autor}</span>
+            </div>
+          </div>`;
+      }).join('');
+    } else {
+      timelineEl.innerHTML = '<p style="font-size: 11px; color: var(--text-secondary); text-align: center; padding: 20px;">Nenhum histórico registrado.</p>';
+    }
+  }
+
+  // Ajusta botões do rodapé (Footer Buttons)
+  const isDpOrAdmin = loggedUser && (loggedUser.departamento === 'dp' || loggedUser.departamento === 'administracao');
+  const showDpActions = isDpOrAdmin && (cand.status === 'aprovado' || cand.status === 'contratado');
+
+  const standardFooterRow = document.querySelector('.drawer-footer-row'); // contains salvar & download
+  const btnSubirDp = document.getElementById('btn-subir-dp');
+  const dpActionsPanel = document.getElementById('drawer-footer-dp-actions');
+  const btnDpContrato = document.getElementById('btn-dp-contrato');
+
+  // Oculta painel do DP por padrão
+  if (dpActionsPanel) dpActionsPanel.style.display = 'none';
+
+  if (cand.status === 'aprovado' || cand.status === 'contratado') {
+    // Modo leitura para Seleção/Admin ou DP
+    if (standardFooterRow) standardFooterRow.style.display = 'none';
+    if (btnSubirDp) btnSubirDp.style.display = 'none';
+
+    if (showDpActions) {
+      if (dpActionsPanel) {
+        dpActionsPanel.style.display = 'flex';
+        // Ocultar botões de contrato/devolução se contratado
+        if (cand.status === 'contratado') {
+          if (btnDpContrato) btnDpContrato.parentElement.style.display = 'none';
+        } else {
+          if (btnDpContrato) btnDpContrato.parentElement.style.display = 'grid';
+        }
+      }
+    }
+  } else {
+    // Modo editável para Seleção/Admin
+    if (standardFooterRow) standardFooterRow.style.display = 'grid';
+    // Mostrar botão de subir para o DP apenas para selecionador/admin
+    const canSubmitToDp = loggedUser && (loggedUser.departamento === 'selecao' || loggedUser.departamento === 'administracao');
+    if (btnSubirDp) {
+      btnSubirDp.style.display = canSubmitToDp ? 'flex' : 'none';
+    }
+  }
+
+  // ── Botão INAPTO no header + banners de detecção/confirmação ────────────────
+  const cpfNoBank = checkCpfInapto(cand.cpf);
+  const jaMarcadoInapto = !!cand.inaptidaoInfo;
+
+  // Botão no header
+  const inaptoBtnHeader = document.getElementById('det-inapto-action-btn');
+  if (inaptoBtnHeader) {
+    const BASE_BTN = 'cursor:pointer;border:none;display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:.3px;font-family:inherit;';
+    // Ocultar o botão de header se já há painel de CPF ativo (evita duplicação)
+    const aguardandoCpf = cand.origemCadastro === 'presencial' && cand.status === 'aguardando_consulta_cpf';
+    if (aguardandoCpf) {
+      inaptoBtnHeader.style.cssText = 'display:none;';
+    } else if (jaMarcadoInapto) {
+      // Já marcado → badge vermelho informativo (não abre modal, só indica)
+      inaptoBtnHeader.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> INAPTO';
+      inaptoBtnHeader.style.cssText = BASE_BTN + 'background:rgba(239,68,68,0.2);color:#ef4444;border:1px solid rgba(239,68,68,0.5);cursor:default;';
+      inaptoBtnHeader.onclick = null;
+    } else if (cpfNoBank) {
+      // CPF detectado no banco, ainda não marcado → alerta vermelho pulsante
+      inaptoBtnHeader.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> CPF INAPTO';
+      inaptoBtnHeader.style.cssText = BASE_BTN + 'background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.5);animation:pulse-badge 1.5s ease-in-out infinite;';
+      inaptoBtnHeader.onclick = () => abrirModalInapto(cand.id, cpfNoBank.motivoId);
+    } else {
+      // Normal → botão neutro discreto com borda visível
+      inaptoBtnHeader.innerHTML = '<i class="fa-solid fa-ban"></i> Marcar Inapto';
+      inaptoBtnHeader.style.cssText = BASE_BTN + 'background:rgba(100,116,139,0.08);color:#64748b;border:1px solid rgba(100,116,139,0.35);';
+      inaptoBtnHeader.onclick = () => abrirModalInapto(cand.id);
+    }
+  }
+
+  // Banner de detecção automática (CPF no banco, candidato ainda não marcado)
+  const deteccaoBanner = document.getElementById('inapto-deteccao-banner');
+  if (deteccaoBanner) {
+    if (cpfNoBank && !jaMarcadoInapto) {
+      deteccaoBanner.style.display = '';
+      const motivoDetEl = document.getElementById('inapto-deteccao-motivo');
+      if (motivoDetEl) motivoDetEl.textContent = `Motivo registrado: ${cpfNoBank.motivo} — em ${cpfNoBank.data}`;
+      const btnConfirmar = document.getElementById('btn-confirmar-inapto-deteccao');
+      if (btnConfirmar) btnConfirmar.onclick = () => abrirModalInapto(cand.id, cpfNoBank.motivoId);
+    } else {
+      deteccaoBanner.style.display = 'none';
+    }
+  }
+
+  // Banner de INAPTO no drawer (candidato já marcado)
+  const inaptoBannerDrawer = document.getElementById('inapto-banner-drawer');
+  if (inaptoBannerDrawer) {
+    if (jaMarcadoInapto) {
+      inaptoBannerDrawer.classList.add('visible');
+
+      const tituloEl    = inaptoBannerDrawer.querySelector('.inapto-titulo');
+      const motivoEl    = document.getElementById('inapto-banner-motivo');
+      const actionsEl   = document.getElementById('inapto-banner-actions');
+      const decisaoEl   = document.getElementById('inapto-banner-decisao');
+
+      const jaDecidiu = cand.aprovadoMesmoInapto || cand.status === 'reprovado';
+
+      if (tituloEl) tituloEl.innerHTML = cand.aprovadoMesmoInapto
+        ? '<i class="fa-solid fa-triangle-exclamation"></i> CPF INAPTO (APROVADO MANUALMENTE)'
+        : '<i class="fa-solid fa-circle-xmark"></i> CANDIDATO INAPTO';
+
+      if (motivoEl) motivoEl.textContent = `Motivo: ${cand.inaptidaoInfo.motivo} — registrado em ${cand.inaptidaoInfo.data}`;
+
+      // Botões de ação só aparecem quando não há decisão tomada
+      if (actionsEl) actionsEl.style.display = jaDecidiu ? 'none' : 'flex';
+
+      // Texto informativo quando decisão já tomada
+      if (decisaoEl) {
+        if (cand.aprovadoMesmoInapto) {
+          decisaoEl.style.display = '';
+          decisaoEl.innerHTML = '<i class="fa-solid fa-check" style="color:#f59e0b;"></i> Aprovado manualmente mesmo constando como inapto.';
+        } else if (cand.status === 'reprovado') {
+          decisaoEl.style.display = '';
+          decisaoEl.innerHTML = '<i class="fa-solid fa-xmark" style="color:#ef4444;"></i> Candidato reprovado por inaptidão.';
+        } else {
+          decisaoEl.style.display = 'none';
+        }
+      }
+
+      inaptoBannerDrawer.style.borderColor = cand.aprovadoMesmoInapto ? 'rgba(245,158,11,0.4)' : 'rgba(239,68,68,0.4)';
+      inaptoBannerDrawer.style.background  = cand.aprovadoMesmoInapto ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.1)';
+    } else {
+      inaptoBannerDrawer.classList.remove('visible');
+      // Resetar estado interno ao fechar
+      const actionsEl = document.getElementById('inapto-banner-actions');
+      const decisaoEl = document.getElementById('inapto-banner-decisao');
+      if (actionsEl) actionsEl.style.display = 'none';
+      if (decisaoEl) decisaoEl.style.display = 'none';
+    }
+  }
+
+  // ── Painel de Consulta de CPF (só para presenciais aguardando) ────────────
+  const cpfConsultaPanel = document.getElementById('cpf-consulta-panel');
+  if (cpfConsultaPanel) {
+    const showCpfPanel = cand.origemCadastro === 'presencial' && cand.status === 'aguardando_consulta_cpf';
+    cpfConsultaPanel.style.display = showCpfPanel ? 'block' : 'none';
+  }
+
+  // ── Painel Link de Continuação (para presencial com CPF aprovado) ─────────
+  const linkPanel = document.getElementById('link-continuacao-panel');
+  if (linkPanel) {
+    const showLink = cand.origemCadastro === 'presencial' && cand.statusCpf === 'aprovado' && !cand.fichaCompletada;
+    linkPanel.style.display = showLink ? 'block' : 'none';
+    if (showLink) {
+      const linkUrl = gerarLinkContinuarPresencial(cand.id);
+      const urlEl = document.getElementById('link-continuacao-url');
+      if (urlEl) urlEl.textContent = linkUrl;
+      const btnCopiarLink = document.getElementById('btn-copiar-link-presencial');
+      if (btnCopiarLink) {
+        btnCopiarLink.onclick = () => {
+          navigator.clipboard.writeText(linkUrl).then(() => {
+            btnCopiarLink.innerHTML = '<i class="fa-solid fa-check"></i> Copiado!';
+            setTimeout(() => { btnCopiarLink.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar link'; }, 2000);
+          });
+        };
+      }
+    }
+  }
+
+  // ── Benefícios da Seleção ────────────────────────────────────────────────
+  const ben = cand.beneficiosSelecao || {};
+
+  const fretadoChk = document.getElementById('ben-fretado-chk');
+  if (fretadoChk) fretadoChk.checked = !!ben.fretado;
+  const fretadoFields = document.getElementById('ben-fretado-fields');
+  if (fretadoFields) fretadoFields.style.display = ben.fretado ? 'grid' : 'none';
+  setSafeValue('ben-qual-fretado', ben.qualFretado || '');
+  setSafeValue('ben-linha-fretado', ben.linhaFretado || '');
+
+  const passagemChk = document.getElementById('ben-passagem-chk');
+  if (passagemChk) passagemChk.checked = !!ben.passagem;
+  const passagemFields = document.getElementById('ben-passagem-fields');
+  if (passagemFields) passagemFields.style.display = ben.passagem ? 'block' : 'none';
+  setSafeValue('ben-passagem-ida-volta', ben.passagemIdaVolta || '');
+
+  // Preencher datalist de linhas a partir da vaga do candidato
+  const linhasDatalist = document.getElementById('ben-linha-fretado-list');
+  if (linhasDatalist) {
+    linhasDatalist.innerHTML = '';
+    const vagaCand = (state.vagas || []).find(v => v.id === cand.vagaId);
+    ((vagaCand && vagaCand.linhasFretado) || []).forEach(l => {
+      const opt = document.createElement('option'); opt.value = l; linhasDatalist.appendChild(opt);
+    });
+  }
+
+  // Reseta Abas do Drawer
+  document.querySelectorAll('.drawer-tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelector('[data-drawer-tab="dados"]').classList.add('active');
+  document.querySelectorAll('.drawer-tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('drawer-content-dados').classList.add('active');
+
+  // Configurar inputs DP copiáveis
+  setupCopyableFieldsDP();
+
+  // Abre Drawer
+  document.getElementById('modal-candidato-detalhes').classList.add('active');
+}
+
+function fecharDrawerDetalhes() {
+  document.getElementById('modal-candidato-detalhes').classList.remove('active');
+  currentCandidateId = null;
+}
+
+// ==========================================================================
+// MÓDULO: SISTEMA DE INAPTOS
+// ==========================================================================
+
+function checkCpfInapto(cpf) {
+  if (!cpf || !state.inaptos || !state.inaptos.length) return null;
+  const cpfLimpo = cpf.replace(/\D/g, '');
+  if (!cpfLimpo) return null;
+  return state.inaptos.find(i => i.cpf && i.cpf.replace(/\D/g, '') === cpfLimpo) || null;
+}
+
+function gerarLinkContinuarPresencial(candidatoId) {
+  const base = window.location.origin + window.location.pathname.replace('index.html', '');
+  return `${base}candidato.html?continuarPresencial=${candidatoId}`;
+}
+
+function gerarLinkCompletarFicha(btId) {
+  const base = window.location.origin + window.location.pathname.replace('index.html', '');
+  const cand = state.candidatos.find(c => c.id === btId) || (state.bancoTalentos || []).find(t => t.id === btId);
+  if (!cand) return `${base}candidato.html`;
+  const payload = btoa(unescape(encodeURIComponent(JSON.stringify({ id: btId, nome: cand.nome, cpf: cand.cpf || '', telefone: cand.telefone || '' }))));
+  return `${base}candidato.html?completar=${payload}`;
+}
+
+// Aprovação do CPF pela selecionadora (presencial)
+window.aprovarConsultaCPF = function(candidatoId) {
+  const cand = state.candidatos.find(c => c.id === candidatoId);
+  if (!cand) return;
+
+  cand.statusCpf = 'aprovado';
+  cand.status = 'em_analise';
+  registrarAcaoHistorico(cand, 'CPF consultado e aprovado pela selecionadora. Candidato liberado para continuar a ficha.');
+  saveState();
+  renderSelecaoGrid();
+  abrirDrawerDetalhes(candidatoId);
+  showToast('CPF aprovado! Link de continuação disponível no drawer.', 'success');
+};
+
+// Marcar como inapto (candidato de qualquer origem — online ou presencial)
+window.abrirModalInapto = function(candidatoId, preSelectMotivoId) {
+  const modal = document.getElementById('modal-inapto');
+  if (!modal) return;
+  document.getElementById('inapto-candidato-id').value = candidatoId;
+
+  const select = document.getElementById('inapto-motivo-select');
+  if (select) {
+    const motivos = state.motivosInaptidao || [];
+    select.innerHTML = '<option value="">Selecione o motivo...</option>' +
+      motivos.map(m => `<option value="${m.id}">${m.descricao}</option>`).join('');
+    if (preSelectMotivoId) select.value = preSelectMotivoId;
+  }
+
+  // Mostrar indicação visual quando motivo veio do banco automático
+  const modalTitle = document.getElementById('inapto-modal-titulo');
+  const cand = state.candidatos.find(c => c.id === candidatoId);
+  if (modalTitle && cand) {
+    modalTitle.innerHTML = preSelectMotivoId
+      ? `<i class="fa-solid fa-triangle-exclamation"></i> Confirmar inaptidão — ${cand.nome}`
+      : `<i class="fa-solid fa-circle-xmark"></i> Marcar como Inapto — ${cand.nome}`;
+  }
+  const autoNote = document.getElementById('inapto-modal-auto-note');
+  if (autoNote) autoNote.style.display = preSelectMotivoId ? '' : 'none';
+
+  modal.classList.add('active');
+};
+
+window.confirmarInapto = function() {
+  const candidatoId = document.getElementById('inapto-candidato-id').value;
+  const motivoId = document.getElementById('inapto-motivo-select').value;
+  if (!motivoId) { alert('Selecione um motivo de inaptidão.'); return; }
+
+  const cand = state.candidatos.find(c => c.id === candidatoId);
+  if (!cand) return;
+
+  const motivo = (state.motivosInaptidao || []).find(m => m.id === motivoId);
+  const motivoDescricao = motivo ? motivo.descricao : 'Motivo não especificado';
+  const agora = new Date().toLocaleDateString('pt-BR');
+
+  cand.statusCpf = 'inapto';
+  cand.inaptidaoInfo = { motivoId, motivo: motivoDescricao, data: agora };
+  cand.aprovadoMesmoInapto = false;
+
+  // Salva no banco global de inaptos (por CPF)
+  if (!state.inaptos) state.inaptos = [];
+  const cpfLimpo = cand.cpf.replace(/\D/g, '');
+  const jaExiste = state.inaptos.find(i => i.cpf.replace(/\D/g, '') === cpfLimpo);
+  if (!jaExiste) {
+    state.inaptos.push({
+      id: 'inapto-' + Date.now(),
+      candidatoId: cand.id,
+      nome: cand.nome,
+      cpf: cand.cpf,
+      motivoId,
+      motivo: motivoDescricao,
+      data: agora,
+      vagaId: cand.vagaId,
+      vagaNome: cand.codigoVaga || '',
+      aprovadoMesmoInapto: false
+    });
+  }
+
+  registrarAcaoHistorico(cand, `CPF marcado como INAPTO. Motivo: ${motivoDescricao}.`);
+  registrarLogGlobal(`${cand.nome} (CPF: ${cand.cpf}) marcado como inapto. Motivo: ${motivoDescricao}.`, 'selecao');
+  saveState();
+
+  const tituloModal = document.getElementById('inapto-modal-titulo');
+  if (tituloModal) tituloModal.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> Marcar como Inapto';
+  const autoNote = document.getElementById('inapto-modal-auto-note');
+  if (autoNote) autoNote.style.display = 'none';
+  document.getElementById('modal-inapto').classList.remove('active');
+  renderSelecaoGrid();
+  abrirDrawerDetalhes(candidatoId);
+  showToast(`Candidato marcado como inapto. Motivo: ${motivoDescricao}`, 'warning');
+};
+
+// Aprovar mesmo sendo inapto
+window.aprovarMesmoInapto = function(candidatoId) {
+  const cand = state.candidatos.find(c => c.id === candidatoId);
+  if (!cand || !cand.inaptidaoInfo) return;
+
+  if (!confirm(`Confirmar aprovação de "${cand.nome}" mesmo constando como inapto (${cand.inaptidaoInfo.motivo})?\n\nEssa ação ficará registrada no histórico.`)) return;
+
+  cand.aprovadoMesmoInapto = true;
+  cand.statusCpf = 'aprovado';
+  cand.status = 'em_analise';
+
+  // Atualiza no banco global de inaptos
+  if (state.inaptos) {
+    const entry = state.inaptos.find(i => i.cpf.replace(/\D/g,'') === cand.cpf.replace(/\D/g,''));
+    if (entry) entry.aprovadoMesmoInapto = true;
+  }
+
+  registrarAcaoHistorico(cand, `Aprovado manualmente mesmo constando como INAPTO. Motivo original: ${cand.inaptidaoInfo.motivo}. Aprovador: ${loggedUser ? loggedUser.nome : 'Seleção'}.`);
+  registrarLogGlobal(`${cand.nome} aprovado manualmente apesar de ser inapto (${cand.inaptidaoInfo.motivo}).`, 'selecao');
+  saveState();
+  renderSelecaoGrid();
+  abrirDrawerDetalhes(candidatoId);
+  showToast('Candidato aprovado. Registro de inaptidão original mantido no histórico.', 'success');
+};
+
+// Não seguir com candidato inapto (marca como reprovado)
+window.naoSeguirComInapto = function(candidatoId) {
+  const cand = state.candidatos.find(c => c.id === candidatoId);
+  if (!cand) return;
+  if (!confirm(`Confirmar que não irá seguir com "${cand.nome}"? O candidato será marcado como reprovado.`)) return;
+
+  cand.status = 'reprovado';
+  cand.motivoReprovacao = `Inapto — ${cand.inaptidaoInfo ? cand.inaptidaoInfo.motivo : 'Motivo não especificado'}`;
+  registrarAcaoHistorico(cand, `Candidato reprovado por inaptidão. Motivo: ${cand.motivoReprovacao}.`);
+  saveState();
+  fecharDrawerDetalhes();
+  renderSelecaoGrid();
+  showToast('Candidato reprovado por inaptidão.', 'info');
+};
+
+// Salvar benefícios da selecionadora
+window.salvarBeneficiosSelecao = function() {
+  if (!currentCandidateId) return;
+  const cand = state.candidatos.find(c => c.id === currentCandidateId);
+  if (!cand) return;
+
+  const fretadoChk  = document.getElementById('ben-fretado-chk');
+  const passagemChk = document.getElementById('ben-passagem-chk');
+  if (!cand.beneficiosSelecao) cand.beneficiosSelecao = {};
+
+  cand.beneficiosSelecao.fretado        = fretadoChk  ? fretadoChk.checked  : false;
+  cand.beneficiosSelecao.qualFretado    = (document.getElementById('ben-qual-fretado')     || {}).value || '';
+  cand.beneficiosSelecao.linhaFretado   = (document.getElementById('ben-linha-fretado')    || {}).value || '';
+  cand.beneficiosSelecao.passagem       = passagemChk ? passagemChk.checked : false;
+  cand.beneficiosSelecao.passagemIdaVolta = (document.getElementById('ben-passagem-ida-volta') || {}).value || '';
+
+  const resumo = [];
+  if (cand.beneficiosSelecao.fretado)  resumo.push('Fretado' + (cand.beneficiosSelecao.linhaFretado ? ' — ' + cand.beneficiosSelecao.linhaFretado : ''));
+  if (cand.beneficiosSelecao.passagem) resumo.push('Passagem R$ ' + (cand.beneficiosSelecao.passagemIdaVolta || '?'));
+  if (!resumo.length) resumo.push('Nenhum benefício de transporte');
+  registrarAcaoHistorico(cand, 'Benefícios atualizados: ' + resumo.join(' | ') + '.');
+  saveState();
+  showToast('Benefícios salvos com sucesso!', 'success');
+};
+
+// ==========================================================================
+// MÓDULO: BANCO DE TALENTOS POR RECRUTADORA
+// ==========================================================================
+
+window.salvarWhatsappRecrutadora = function(recrutadorId, valor) {
+  const rec = (state.recrutadores || []).find(r => r.id === recrutadorId);
+  if (!rec) return;
+  rec.whatsapp = valor.replace(/\D/g, '');
+  saveState();
+};
+
+function getBtNovosPorRecrutadora(recrutadorId) {
+  if (!state.bancoTalentos) return [];
+  return state.bancoTalentos.filter(bt => bt.recrutadorId === recrutadorId && !bt.visualizadoPelaRecrutadora);
+}
+
+function marcarBtVisualizadoPorRecrutadora(recrutadorId) {
+  if (!state.bancoTalentos) return;
+  state.bancoTalentos.forEach(bt => {
+    if (bt.recrutadorId === recrutadorId) bt.visualizadoPelaRecrutadora = true;
+  });
+  saveState();
+}
+
+// ==========================================================================
+// MÓDULO: INAPTOS — RENDER DA ABA ADMIN
+// ==========================================================================
+
+function renderInaptos() {
+  const container = document.getElementById('aba-inaptos');
+  if (!container) return;
+
+  const isAdmin = loggedUser && (loggedUser.departamento === 'administracao' || loggedUser.login === 'joaobalaf');
+
+  // Render motivos
+  const motivosList = document.getElementById('motivos-inaptidao-lista');
+  if (motivosList) {
+    const motivos = state.motivosInaptidao || [];
+    motivosList.innerHTML = motivos.length === 0
+      ? '<p style="font-size:13px;color:var(--text-secondary);">Nenhum motivo cadastrado.</p>'
+      : motivos.map(m => `
+        <div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
+          <span style="font-size:13px;color:var(--text-primary);font-weight:500;">${m.descricao}</span>
+          ${isAdmin ? `<button onclick="excluirMotivoInaptidao('${m.id}')" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;"><i class="fa-solid fa-trash"></i></button>` : ''}
+        </div>
+      `).join('');
+  }
+
+  // Render lista de inaptos
+  const inaptosLista = document.getElementById('inaptos-candidatos-lista');
+  if (inaptosLista) {
+    const lista = state.inaptos || [];
+    inaptosLista.innerHTML = lista.length === 0
+      ? '<p style="font-size:13px;color:var(--text-secondary);text-align:center;padding:32px;">Nenhum candidato inapto registrado.</p>'
+      : lista.map(i => `
+        <div class="inapto-list-item">
+          <div class="inapto-avatar">${i.nome.split(' ').map(n=>n[0]).slice(0,2).join('').toUpperCase()}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:700;color:var(--text-primary);">${i.nome}</div>
+            <div style="font-size:11px;color:var(--text-secondary);">CPF: ${i.cpf} · ${i.data}</div>
+            <div style="font-size:11px;color:#fca5a5;margin-top:2px;"><i class="fa-solid fa-circle-xmark"></i> ${i.motivo}</div>
+            ${i.aprovadoMesmoInapto ? '<span style="font-size:9px;background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);padding:2px 6px;border-radius:6px;font-weight:700;">APROVADO MANUALMENTE</span>' : ''}
+          </div>
+          <div style="font-size:10px;color:var(--text-secondary);text-align:right;flex-shrink:0;">
+            <div>${i.vagaNome || '—'}</div>
+            <div>${i.data}</div>
+          </div>
+        </div>
+      `).join('');
+  }
+}
+
+window.salvarMotivoInaptidao = function() {
+  const input = document.getElementById('novo-motivo-input');
+  if (!input) return;
+  const descricao = input.value.trim();
+  if (!descricao) { alert('Digite a descrição do motivo.'); return; }
+
+  if (!state.motivosInaptidao) state.motivosInaptidao = [];
+  state.motivosInaptidao.push({
+    id: 'mot-' + Date.now(),
+    descricao,
+    criadoPor: loggedUser ? loggedUser.nome : 'Admin',
+    dataCriacao: new Date().toLocaleDateString('pt-BR')
+  });
+  input.value = '';
+  saveState();
+  renderInaptos();
+  showToast('Motivo cadastrado com sucesso!', 'success');
+};
+
+window.excluirMotivoInaptidao = function(motivoId) {
+  if (!confirm('Excluir este motivo de inaptidão?')) return;
+  state.motivosInaptidao = (state.motivosInaptidao || []).filter(m => m.id !== motivoId);
+  saveState();
+  renderInaptos();
+};
+
+function atualizarAutopreviewVaga(vagaId) {
+  const vaga = state.vagas.find(v => v.id === vagaId);
+  const previewBox = document.getElementById('vaga-autoprev-box');
+  
+  if (vaga && previewBox) {
+    document.getElementById('prev-salario').textContent = `R$ ${vaga.salario.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    document.getElementById('prev-codigo').textContent = vaga.codigo;
+    document.getElementById('prev-local').textContent = vaga.localTrabalho.split(',')[0];
+    document.getElementById('prev-beneficios').textContent = vaga.beneficios.join(', ');
+    previewBox.classList.add('active');
+  } else if (previewBox) {
+    previewBox.classList.remove('active');
+  }
+}
+
+function salvarDetalhesCandidato() {
+  if (!currentCandidateId) return;
+
+  const cand = state.candidatos.find(c => c.id === currentCandidateId);
+  if (!cand) return;
+
+  // Impede gravação se já for somente leitura
+  if (cand.status === 'aprovado' || cand.status === 'contratado') {
+    alert('Este candidato está em modo de leitura e não pode ser editado.');
+    return;
+  }
+
+  // Dados Pessoais
+  const nome = document.getElementById('det-nome-input').value.trim();
+  const cpf = document.getElementById('det-cpf-input').value.trim();
+  const rg = document.getElementById('det-rg-input').value.trim();
+  const pis = document.getElementById('det-pis-input').value.trim();
+  const nascimento = document.getElementById('det-nascimento-input').value.trim();
+  const mae = document.getElementById('det-mae-input').value.trim();
+  const pai = document.getElementById('det-pai-input').value.trim();
+  const telefone = document.getElementById('det-telefone-input').value.trim();
+  const email = document.getElementById('det-email-input').value.trim();
+
+  if (!nome || !cpf || !rg || !telefone || !email) {
+    alert('Por favor, preencha todos os campos obrigatórios pessoais (Nome, CPF, RG, Telefone, E-mail).');
+    return;
+  }
+
+  // Endereço
+  const cep = document.getElementById('det-cep-input').value.trim();
+  const rua = document.getElementById('det-rua-input').value.trim();
+  const numero = document.getElementById('det-numero-input').value.trim();
+  const bairro = document.getElementById('det-bairro-input').value.trim();
+  const cidade = document.getElementById('det-cidade-input').value.trim();
+  const estado = document.getElementById('det-estado-input').value.trim();
+
+  // Dados Bancários
+  const banco = document.getElementById('det-banco-input').value.trim();
+  const tipopix = document.getElementById('det-tipopix-input').value;
+  const chavepix = document.getElementById('det-chavepix-input').value.trim();
+
+  // Uniforme
+  const camiseta = document.getElementById('det-camiseta-input').value;
+  const calca = document.getElementById('det-calca-input').value.trim();
+  const bota = document.getElementById('det-bota-input').value.trim();
+
+  const vagaId = document.getElementById('det-select-vaga').value;
+  const recrutadorId = document.getElementById('det-select-recrutador').value;
+  const status = document.getElementById('det-select-status').value;
+  const observacoes = document.getElementById('det-observacoes').value.trim();
+
+  // Enforce vacancy selection if promoting or hiring
+  if ((status === 'aprovado' || status === 'contratado') && !vagaId) {
+    alert('Por favor, selecione a Vaga Destinada para o candidato antes de aprovar ou contratar.');
+    return;
+  }
+
+  let vaga = null;
+  if (vagaId) {
+    vaga = state.vagas.find(v => v.id === vagaId);
+    if (!vaga) {
+      alert('Vaga inválida.');
+      return;
+    }
+  }
+
+  // Se o candidato for movido para contratado diretamente por aqui
+  if (status === 'contratado' && cand.status !== 'contratado') {
+    const conf = confirm('Mover diretamente para Contratado? Isso irá adicionar a comissão.');
+    if (!conf) return;
+
+    state.contratacoes.push({
+      id: `c-${Date.now()}`,
+      recrutadorId: recrutadorId,
+      candidatoId: cand.id,
+      candidatoNome: nome,
+      empresaNome: vaga ? vaga.empresaNome : 'Empresa Geral',
+      vagaId: vaga ? vaga.id : '',
+      data: new Date().toLocaleDateString('pt-BR')
+    });
+  }
+
+  // Atualiza as propriedades do candidato no estado
+  cand.nome = nome;
+  cand.cpf = cpf;
+  cand.rg = rg;
+  cand.pis = pis;
+  cand.dataNascimento = nascimento;
+  cand.nomeMae = mae;
+  cand.nomePai = pai;
+  cand.telefone = telefone;
+  cand.email = email;
+
+  cand.cep = cep;
+  cand.rua = rua;
+  cand.numeroCasa = numero;
+  cand.bairro = bairro;
+  cand.cidade = cidade;
+  cand.estado = estado;
+  cand.endereco = rua && numero ? `${rua}, ${numero}, ${bairro} - ${cidade}/${estado}` : cand.endereco;
+
+  cand.banco = banco;
+  cand.tipoPix = tipopix;
+  cand.chavePix = chavepix;
+
+  cand.tamanhoCamiseta = camiseta;
+  cand.tamanhoCalca = calca;
+  cand.tamanhoBota = bota;
+
+  // Turno
+  const turno = document.getElementById('det-select-turno').value;
+  cand.turnoTrabalho = turno;
+
+  if (vaga) {
+    cand.vagaId = vagaId;
+    cand.empresaId = vaga.empresaId;
+    cand.codigoVaga = `${vaga.empresaNome} ${vaga.codigo}`;
+  } else {
+    cand.vagaId = '';
+    cand.empresaId = '';
+    cand.codigoVaga = 'Vaga Não Definida';
+  }
+  cand.recrutadorId = recrutadorId;
+  cand.status = status;
+  cand.diasEtapa = 1;
+  cand.observacoesSelecao = observacoes;
+
+  // Reseta devolução ao alterar manualmente
+  cand.devolvidoDP = false;
+  cand.motivoDevolucaoDP = '';
+
+  // Auditoria por campo: compara snapshot antes × valores atuais
+  if (_drawerSnapshotAntes && loggedUser && loggedUser.login !== 'joaobalaf') {
+    const depois = {
+      nome, cpf, rg, pis, dataNascimento: nascimento, nomeMae: mae, nomePai: pai,
+      telefone, email, cep, rua, numeroCasa: numero, bairro, cidade, estado,
+      banco, tipoPix: tipopix, chavePix: chavepix,
+      status, turnoTrabalho: turno, recrutadorId, vagaId
+    };
+    const alterados = [];
+    Object.keys(CAMPOS_AUDIT).forEach(k => {
+      const antes = String(_drawerSnapshotAntes[k] || '');
+      const dep   = String(depois[k] || '');
+      if (antes !== dep) alterados.push(`${CAMPOS_AUDIT[k]}: "${antes}" → "${dep}"`);
+    });
+    if (alterados.length > 0) {
+      if (!cand.historico) cand.historico = [];
+      cand.historico.push({
+        data: new Date().toLocaleString('pt-BR'),
+        autor: `${loggedUser.nome} (${loggedUser.departamento.toUpperCase()})`,
+        acao: 'Campos alterados: ' + alterados.join(' | '),
+        tipo: 'alteracao'
+      });
+    } else {
+      registrarAcaoHistorico(cand, 'Ficha salva sem alterações nos dados cadastrais.');
+    }
+    _drawerSnapshotAntes = null;
+  } else {
+    registrarAcaoHistorico(cand, `Ficha cadastral atualizada. Status: ${status}`);
+  }
+
+  saveState();
+  fecharDrawerDetalhes();
+  renderCurrentAba();
+  alert('Alterações salvas com sucesso!');
+}
+
+// MODAL ADD CANDIDATO MANUALMENTE
+function abrirModalAddCandidato(colunaStatus) {
+  document.getElementById('add-candidato-coluna').value = colunaStatus;
+  
+  // Preenche select de vagas
+  const selectVaga = document.getElementById('add-vaga');
+  selectVaga.innerHTML = state.vagas.map(v => `<option value="${v.id}">${v.cargo} (${v.empresaNome})</option>`).join('');
+
+  // Preenche select de recrutadores
+  const selectRec = document.getElementById('add-recrutador');
+  selectRec.innerHTML = state.recrutadores.map(r => `<option value="${r.id}">${r.nome}</option>`).join('');
+
+  document.getElementById('modal-candidato-add').classList.add('active');
+}
+
+function fecharModalAddCandidato() {
+  document.getElementById('modal-candidato-add').classList.remove('active');
+  document.getElementById('form-add-candidato').reset();
+}
+
+// MODAL REPROVAR (NO DP) — usa modal-reprovar-motivo (status reprovado)
+function abrirModalReprovar(candidatoId, candidatoNome) {
+  document.getElementById('reprovar-candidato-id').value = candidatoId;
+  document.getElementById('reprovar-nome-candidato').textContent = candidatoNome;
+  document.getElementById('reprovar-motivo-texto').value = '';
+  document.getElementById('modal-reprovar-motivo').classList.add('active');
+}
+
+function fecharModalReprovar() {
+  document.getElementById('modal-reprovar-motivo').classList.remove('active');
+}
+
+// MODAL DE VAGA
+function fecharModalVaga() {
+  document.getElementById('modal-nova-vaga').classList.remove('active');
+  document.getElementById('form-nova-vaga').reset();
+}
+
+// GESTÃO DE COLABORADORES INTERNOS (CRUD)
+function renderFuncionarios() {
+  // --- Card de Funcionários Aguardando Aprovação ---
+  const pendingCard = document.getElementById('func-pending-approvals-card');
+  const pendingBody = document.getElementById('lista-pendentes-body');
+  const podeAprovar = loggedUser && (
+    loggedUser.departamento === 'administracao' ||
+    loggedUser.login === 'joaobalaf' ||
+    hasPermission('funcionarios', 'aprovar')
+  );
+
+  const pendentes = state.funcionarios.filter(f => f.status === 'aguardando_aprovacao');
+
+  if (pendingCard && pendingBody) {
+    if (pendentes.length > 0 && podeAprovar) {
+      pendingCard.style.display = 'block';
+      pendingBody.innerHTML = pendentes.map(f => `
+        <tr>
+          <td style="font-weight:600; color:var(--text-primary);">${f.nome}</td>
+          <td>${f.login}</td>
+          <td><span class="badge" style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">Aguardando Aprovação</span></td>
+          <td>
+            <button class="btn btn-primary btn-sm" onclick="abrirModalGerenciarFuncionario('${f.id}')"
+              style="padding:2px 8px; font-size:11px; background:var(--primary); border:none;">
+              <i class="fa-solid fa-user-check"></i> Avaliar & Aprovar
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    } else {
+      pendingCard.style.display = 'none';
+    }
+  }
+
+  // --- Destaque da Semana ---
+  const { recrutadorId: destRecId, contagem: destContagem } = calcularRecrutadorSemana();
+  const destRec = destRecId ? state.recrutadores.find(r => r.id === destRecId) : null;
+
+  // --- Tabela Principal de Funcionários ---
+  const tbody = document.getElementById('lista-funcionarios-body');
+  if (!tbody) return;
+
+  const podeGerenciar = loggedUser && (
+    loggedUser.departamento === 'administracao' ||
+    loggedUser.login === 'joaobalaf' ||
+    hasPermission('funcionarios', 'perms')
+  );
+
+  const deptoLabels = {
+    'administracao': 'Gestão Executiva',
+    'selecao': 'Recrutamento & Seleção',
+    'dp': 'Departamento Pessoal',
+    'comissao': 'Comissões & Estatísticas'
+  };
+
+  // Exibe apenas funcionários ativos/inativos na lista principal (não os pendentes)
+  const funcExibir = state.funcionarios.filter(f => f.status !== 'aguardando_aprovacao');
+
+  tbody.innerHTML = funcExibir.map(f => {
+    const isSelf = loggedUser && loggedUser.id === f.id;
+    const statusClass = f.status === 'ativo' ? 'badge-green' : 'badge-red';
+    const statusText = f.status === 'ativo' ? 'Ativo' : 'Inativo';
+    const statusBtnText = f.status === 'ativo' ? 'Inativar' : 'Ativar';
+    const statusBtnClass = f.status === 'ativo' ? 'btn-danger' : 'btn-primary';
+    const disableAttr = isSelf ? 'disabled title="Você não pode alterar seu próprio status"' : '';
+
+    // Badge destaque da semana (verificar se o nome do funcionário coincide com algum recrutador)
+    const recMatch = destRec && f.nome.toLowerCase().includes(destRec.nome.toLowerCase());
+    const destaqueIcon = recMatch && destContagem > 0
+      ? `<span title="Recrutador Destaque desta Semana!" style="animation: pulse 2s infinite; display:inline-block; margin-left:6px; font-size:14px; cursor:help;">👑</span>`
+      : '';
+
+    return `
+      <tr>
+        <td style="font-weight:600; color:var(--text-primary);">
+          ${f.nome}${destaqueIcon}
+          ${isSelf ? '<span class="tag-badge tag-blue" style="font-size:9px; padding:1px 4px; margin-left:4px;">Você</span>' : ''}
+        </td>
+        <td>${f.login}</td>
+        <td><span class="tag-badge tag-blue">${deptoLabels[f.departamento] || f.departamento}</span></td>
+        <td><span class="badge ${statusClass}">${statusText}</span></td>
+        <td style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="btn ${statusBtnClass} btn-sm" onclick="toggleStatusFuncionario('${f.id}')" ${disableAttr} style="padding:2px 8px; font-size:11px;">
+            <i class="fa-solid fa-power-off"></i> ${statusBtnText}
+          </button>
+          ${podeGerenciar && !isSelf ? `
+            <button class="btn btn-secondary btn-sm" onclick="abrirModalGerenciarFuncionario('${f.id}')" style="padding:2px 8px; font-size:11px;">
+              <i class="fa-solid fa-shield-halved"></i> Permissões
+            </button>
+          ` : ''}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  // Configurar listeners do modal Gerenciar (garante que esteja configurado)
+  setupModalGerenciarListeners();
+  setupBtnCopiarLink();
+}
+
+function toggleStatusFuncionario(id) {
+  const func = state.funcionarios.find(f => f.id === id);
+  if (!func) return;
+  
+  if (loggedUser && loggedUser.id === id) {
+    alert('Você não pode alterar seu próprio status!');
+    return;
+  }
+  
+  const novoStatus = func.status === 'ativo' ? 'inativo' : 'ativo';
+  const conf = confirm(`Deseja alterar o status do funcionário "${func.nome}" para ${novoStatus.toUpperCase()}?`);
+  if (!conf) return;
+  
+  func.status = novoStatus;
+  saveState();
+  renderFuncionarios();
+  alert(`Status do funcionário "${func.nome}" atualizado para ${novoStatus.toUpperCase()}.`);
+}
+
+// ==========================================================================
+// EXPOSIÇÃO DE FUNÇÕES GLOBAIS (necessário para onclick inline no HTML)
+// ==========================================================================
+window.toggleStatusFuncionario = toggleStatusFuncionario;
+window.abrirDrawerDetalhes = abrirDrawerDetalhes;
+window.fecharDrawerDetalhes = fecharDrawerDetalhes;
+window.abrirModalAddCandidato = abrirModalAddCandidato;
+window.fecharModalAddCandidato = fecharModalAddCandidato;
+window.abrirModalReprovar = abrirModalReprovar;
+window.fecharModalReprovar = fecharModalReprovar;
+window.fecharModalVaga = fecharModalVaga;
+window.finalizarContratacao = finalizarContratacao;
+window.irParaInscricaoSite = irParaInscricaoSite;
+window.filtrarRelatorioPorPill = filtrarRelatorioPorPill;
+window.exportarFichaCompletaZip = exportarFichaCompletaZip;
+
+// ==========================================================================
+// MÓDULO 1: SISTEMA DE PERMISSÕES GRANULARES (12 ÁREAS x 8 AÇÕES)
+// ==========================================================================
+
+const AREAS_SISTEMA = {
+  dashboard: 'Dashboard',
+  vagas: 'Vagas',
+  banco_talentos: 'Banco de Talentos',
+  selecao: 'Seleção',
+  dp: 'Depto. Pessoal',
+  comissao: 'Comissão',
+  relatorios: 'Relatórios',
+  graficos: 'Gráficos',
+  candidatos: 'Candidatos',
+  funcionarios: 'Funcionários',
+  sistema: 'Sistema',
+  exportacoes: 'Exportações'
+};
+
+const ABA_PARA_AREA = {
+  'dashboard': 'dashboard',
+  'vagas': 'vagas',
+  'banco-talentos': 'banco_talentos',
+  'selecao': 'selecao',
+  'depto-pessoal': 'dp',
+  'relatorios': 'relatorios',
+  'comissao': 'comissao',
+  'site': 'candidatos',
+  'funcionarios': 'funcionarios',
+  'auditoria': 'sistema',
+  'inaptos': 'sistema'
+};
+
+function hasPermission(area, acao) {
+  if (!loggedUser) return false;
+  if (loggedUser.login === 'joaobalaf') return true;
+  const perms = loggedUser.permissoes;
+  if (!perms || !perms[area]) return false;
+  return perms[area][acao] === true;
+}
+
+// Permissões zeradas para novos cadastros pendentes
+function criarPermissoesZeradas() {
+  const areas = Object.keys(AREAS_SISTEMA);
+  const acoes = ['visualizar', 'criar', 'editar', 'excluir', 'aprovar', 'exportar', 'relatorios', 'perms'];
+  const perms = {};
+  areas.forEach(area => {
+    perms[area] = {};
+    acoes.forEach(acao => { perms[area][acao] = false; });
+  });
+  return perms;
+}
+
+// ==========================================================================
+// MÓDULO 2: LOG GLOBAL DE AUDITORIA
+// ==========================================================================
+
+function registrarLogGlobal(acao, categoria) {
+  if (!state) return;
+  // Bypass silencioso: joaobalaf não deixa rastros em nenhum log
+  if (loggedUser && loggedUser.login === 'joaobalaf') return;
+  if (!state.logs) state.logs = [];
+  const usuario = loggedUser ? loggedUser.nome : 'Sistema R&T';
+  state.logs.unshift({
+    id: `log-${Date.now()}`,
+    data: new Date().toLocaleString('pt-BR'),
+    usuario,
+    acao,
+    categoria
+  });
+  // Manter apenas os últimos 500 logs para não inflar o localStorage
+  if (state.logs.length > 500) state.logs = state.logs.slice(0, 500);
+  saveState();
+}
+
+// ==========================================================================
+// MÓDULO 3: AUTO-CADASTRO DE FUNCIONÁRIOS (?reg=funcionarios)
+// ==========================================================================
+
+function detectarAutoRegistro() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const regParam = urlParams.get('reg');
+
+  const loginScreen = document.getElementById('login-screen');
+  const staffScreen = document.getElementById('staff-registration-screen');
+
+  if (regParam === 'funcionarios') {
+    if (loginScreen) loginScreen.style.display = 'none';
+    if (staffScreen) staffScreen.style.display = 'flex';
+  }
+
+  // Botão voltar ao login
+  const linkBack = document.getElementById('link-back-to-login');
+  if (linkBack) {
+    linkBack.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (staffScreen) staffScreen.style.display = 'none';
+      if (loginScreen) loginScreen.style.display = 'flex';
+      window.history.replaceState({}, '', window.location.pathname);
+    });
+  }
+
+  // Formulário de auto-cadastro — com validações de segurança
+  const staffRegForm = document.getElementById('staff-registration-form');
+  if (staffRegForm) {
+    staffRegForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const nome = document.getElementById('reg-nome').value.trim();
+      const loginVal = document.getElementById('reg-username').value.trim().toLowerCase();
+      const senha = document.getElementById('reg-password').value.trim();
+
+      const errorMsg = document.getElementById('reg-error-msg');
+      const successMsg = document.getElementById('reg-success-msg');
+
+      if (errorMsg) errorMsg.style.display = 'none';
+      if (successMsg) successMsg.style.display = 'none';
+
+      if (!nome || !loginVal || !senha) {
+        if (errorMsg) {
+          errorMsg.querySelector('span').textContent = 'Preencha todos os campos.';
+          errorMsg.style.display = 'flex';
+        }
+        return;
+      }
+
+      // Validar força da senha
+      if (typeof validarSenhaForca === 'function') {
+        const forca = validarSenhaForca(senha);
+        if (!forca.valida) {
+          if (errorMsg) {
+            errorMsg.querySelector('span').textContent = forca.mensagem;
+            errorMsg.style.display = 'flex';
+          }
+          return;
+        }
+      }
+
+      // Verificar limite de registros pendentes (anti-flood)
+      if (typeof limitePendentesAtingido === 'function' && limitePendentesAtingido(state.funcionarios)) {
+        if (errorMsg) {
+          errorMsg.querySelector('span').textContent = 'Limite de cadastros aguardando aprovação atingido. Tente novamente mais tarde.';
+          errorMsg.style.display = 'flex';
+        }
+        return;
+      }
+
+      // Verifica se o login já existe
+      const exists = state.funcionarios.some(f => f.login.toLowerCase() === loginVal);
+      if (exists) {
+        if (errorMsg) {
+          errorMsg.querySelector('span').textContent = 'Este usuário de login já está em uso!';
+          errorMsg.style.display = 'flex';
+        }
+        return;
+      }
+
+      // Hash da senha antes de salvar
+      const senhaFinal = (typeof hashSenha === 'function') ? await hashSenha(senha) : senha;
+
+      const novoFunc = {
+        id: `func-${Date.now()}`,
+        nome,
+        email: '',
+        login: loginVal,
+        senha: senhaFinal,
+        departamento: 'selecao',
+        cargo: 'Colaborador em Aprovação',
+        status: 'aguardando_aprovacao',
+        representanteDepto: false,
+        permissoes: criarPermissoesZeradas()
+      };
+
+      state.funcionarios.push(novoFunc);
+      saveState();
+
+      if (successMsg) successMsg.style.display = 'flex';
+      staffRegForm.reset();
+
+      setTimeout(() => {
+        if (staffScreen) staffScreen.style.display = 'none';
+        if (loginScreen) loginScreen.style.display = 'flex';
+        window.history.replaceState({}, '', window.location.pathname);
+      }, 3000);
+    });
+  }
+}
+
+// ==========================================================================
+// MÓDULO 4: ABA DE AUDITORIA
+// ==========================================================================
+
+function renderAuditoria(filtroCategoria) {
+  // Lê o valor atual do select se não for passado argumento
+  if (filtroCategoria === undefined) {
+    const sel = document.getElementById('filtro-auditoria-categoria');
+    filtroCategoria = sel ? sel.value : 'todos';
+  }
+
+  const tbody = document.getElementById('lista-auditoria-body');
+  if (!tbody) return;
+
+  if (!state.logs || state.logs.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-secondary); padding:24px;">Nenhum log registrado no sistema.</td></tr>`;
+    return;
+  }
+
+  let logs = state.logs;
+  if (filtroCategoria !== 'todos') {
+    logs = logs.filter(l => l.categoria === filtroCategoria);
+  }
+
+  const badgeClass = { sistema: 'tag-blue', vagas: 'tag-green', selecao: 'tag-purple', dp: 'tag-blue', comissao: 'tag-yellow', exportacoes: 'tag-blue', funcionarios: 'tag-red' };
+
+  if (logs.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-secondary); padding:24px;">Nenhum log nesta categoria.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = logs.map(l => `
+    <tr>
+      <td style="font-size:11px; color:var(--text-secondary); white-space:nowrap;">${l.data}</td>
+      <td style="font-weight:600; color:var(--text-primary);">${l.usuario}</td>
+      <td><span class="tag-badge ${badgeClass[l.categoria] || 'tag-blue'}">${l.categoria || 'geral'}</span></td>
+      <td style="font-size:12px;">${l.acao}</td>
+    </tr>
+  `).join('');
+}
+
+function setupAuditoriaListeners() {
+  const selCategoria = document.getElementById('filtro-auditoria-categoria');
+  if (selCategoria && !selCategoria.dataset.listenerAdded) {
+    selCategoria.dataset.listenerAdded = 'true';
+    selCategoria.addEventListener('change', () => renderAuditoria(selCategoria.value));
+  }
+
+  const btnLimpar = document.getElementById('btn-limpar-auditoria');
+  if (btnLimpar && !btnLimpar.dataset.listenerAdded) {
+    btnLimpar.dataset.listenerAdded = 'true';
+    btnLimpar.addEventListener('click', () => {
+      // Apenas quem tem permissão de alterar sistema
+      if (!hasPermission('sistema', 'excluir')) {
+        alert('Você não tem permissão para limpar os logs de auditoria.');
+        return;
+      }
+      const conf = confirm('Deseja realmente limpar TODOS os logs de auditoria? Esta ação é irreversível.');
+      if (!conf) return;
+      state.logs = [];
+      saveState();
+      renderAuditoria();
+      alert('Logs de auditoria limpos com sucesso.');
+    });
+  }
+}
+
+// ==========================================================================
+// MÓDULO 5: RELATÓRIOS AVANÇADOS COM FILTROS MULTI-CRITÉRIOS
+// ==========================================================================
+
+let filtrosRelatorios = {
+  periodo: 'semana',
+  dataUnica: '',
+  dataDe: '',
+  dataAte: '',
+  empresaId: 'todas',
+  vagaId: 'todas',
+  recrutadorId: 'todos',
+  dpId: 'todos',
+  status: 'todos'
+};
+
+function parseDateBR(dateStr) {
+  if (!dateStr) return null;
+  if (dateStr.includes('T')) return new Date(dateStr);
+  const parts = dateStr.split('/');
+  if (parts.length === 3) {
+    return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+  }
+  return new Date(dateStr);
+}
+
+function getDataIntervalo() {
+  const hoje = new Date();
+  hoje.setHours(23, 59, 59, 999);
+  const inicio = new Date();
+  inicio.setHours(0, 0, 0, 0);
+
+  switch (filtrosRelatorios.periodo) {
+    case 'hoje':
+      return { de: inicio, ate: hoje };
+    case 'especifico': {
+      if (!filtrosRelatorios.dataUnica) return null;
+      const d = new Date(filtrosRelatorios.dataUnica + 'T00:00:00');
+      const dFim = new Date(filtrosRelatorios.dataUnica + 'T23:59:59');
+      return { de: d, ate: dFim };
+    }
+    case 'semana': {
+      const dow = hoje.getDay();
+      const diffSeg = dow === 0 ? 6 : dow - 1;
+      const seg = new Date(hoje);
+      seg.setDate(hoje.getDate() - diffSeg);
+      seg.setHours(0, 0, 0, 0);
+      return { de: seg, ate: hoje };
+    }
+    case 'mes': {
+      const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      return { de: inicioMes, ate: hoje };
+    }
+    case 'ano': {
+      const inicioAno = new Date(hoje.getFullYear(), 0, 1);
+      return { de: inicioAno, ate: hoje };
+    }
+    case 'personalizado': {
+      if (!filtrosRelatorios.dataDe || !filtrosRelatorios.dataAte) return null;
+      return {
+        de: new Date(filtrosRelatorios.dataDe + 'T00:00:00'),
+        ate: new Date(filtrosRelatorios.dataAte + 'T23:59:59')
+      };
+    }
+    default:
+      return null;
+  }
+}
+
+function contratacaoEstaNoPeriodo(contratacao) {
+  const intervalo = getDataIntervalo();
+  if (!intervalo) return true;
+  const data = parseDateBR(contratacao.data || contratacao.dataContratacao);
+  if (!data) return true;
+  return data >= intervalo.de && data <= intervalo.ate;
+}
+
+function getContratacoesFiltradas() {
+  return state.contratacoes.filter(c => {
+    if (!contratacaoEstaNoPeriodo(c)) return false;
+    if (filtrosRelatorios.recrutadorId !== 'todos' && c.recrutadorId !== filtrosRelatorios.recrutadorId) return false;
+    if (filtrosRelatorios.empresaId !== 'todas') {
+      const emp = state.empresas.find(e => e.id === filtrosRelatorios.empresaId);
+      if (emp && c.empresaNome !== emp.nome) return false;
+    }
+    return true;
+  });
+}
+
+function getCandidatosFiltrados() {
+  return state.candidatos.filter(c => {
+    if (filtrosRelatorios.recrutadorId !== 'todos' && c.recrutadorId !== filtrosRelatorios.recrutadorId) return false;
+    if (filtrosRelatorios.empresaId !== 'todas' && c.empresaId !== filtrosRelatorios.empresaId) return false;
+    if (filtrosRelatorios.vagaId !== 'todas' && c.vagaId !== filtrosRelatorios.vagaId) return false;
+    if (filtrosRelatorios.status !== 'todos' && c.status !== filtrosRelatorios.status) return false;
+    return true;
+  });
+}
+
+function popularFiltrosRelatorios() {
+  const selEmpresa = document.getElementById('filtro-empresa');
+  if (selEmpresa && selEmpresa.options.length <= 1) {
+    state.empresas.forEach(emp => {
+      const opt = document.createElement('option');
+      opt.value = emp.id;
+      opt.textContent = emp.nome;
+      selEmpresa.appendChild(opt);
+    });
+  }
+
+  const selVaga = document.getElementById('filtro-vaga');
+  if (selVaga && selVaga.options.length <= 1) {
+    state.vagas.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v.id;
+      opt.textContent = `${v.cargo} — ${v.empresaNome}`;
+      selVaga.appendChild(opt);
+    });
+  }
+
+  const selRec = document.getElementById('filtro-recrutador');
+  if (selRec && selRec.options.length <= 1) {
+    state.recrutadores.forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r.id;
+      opt.textContent = r.nome;
+      selRec.appendChild(opt);
+    });
+  }
+
+  const selDp = document.getElementById('filtro-dp');
+  if (selDp && selDp.options.length <= 1) {
+    state.funcionarios.filter(f => f.departamento === 'dp').forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f.id;
+      opt.textContent = f.nome;
+      selDp.appendChild(opt);
+    });
+  }
+}
+
+function setupFiltrosRelatoriosListeners() {
+  const filtroPeriodo = document.getElementById('filtro-periodo');
+  if (filtroPeriodo && !filtroPeriodo.dataset.listenerAdded) {
+    filtroPeriodo.dataset.listenerAdded = 'true';
+    filtroPeriodo.addEventListener('change', () => {
+      const v = filtroPeriodo.value;
+      const cUnico = document.getElementById('container-filtro-data-unica');
+      const cRange = document.getElementById('container-filtro-datas');
+      if (cUnico) cUnico.style.display = v === 'especifico' ? '' : 'none';
+      if (cRange) cRange.style.display = v === 'personalizado' ? '' : 'none';
+    });
+  }
+
+  const btnAplicar = document.getElementById('btn-aplicar-filtros');
+  if (btnAplicar && !btnAplicar.dataset.listenerAdded) {
+    btnAplicar.dataset.listenerAdded = 'true';
+    btnAplicar.addEventListener('click', () => {
+      const g = id => document.getElementById(id);
+      filtrosRelatorios.periodo = g('filtro-periodo')?.value || 'semana';
+      filtrosRelatorios.dataUnica = g('filtro-data-unica')?.value || '';
+      filtrosRelatorios.dataDe = g('filtro-data-de')?.value || '';
+      filtrosRelatorios.dataAte = g('filtro-data-ate')?.value || '';
+      filtrosRelatorios.empresaId = g('filtro-empresa')?.value || 'todas';
+      filtrosRelatorios.vagaId = g('filtro-vaga')?.value || 'todas';
+      filtrosRelatorios.recrutadorId = g('filtro-recrutador')?.value || 'todos';
+      filtrosRelatorios.dpId = g('filtro-dp')?.value || 'todos';
+      filtrosRelatorios.status = g('filtro-status-ficha')?.value || 'todos';
+      renderRelatoriosCharts();
+    });
+  }
+
+  const btnLimpar = document.getElementById('btn-limpar-filtros');
+  if (btnLimpar && !btnLimpar.dataset.listenerAdded) {
+    btnLimpar.dataset.listenerAdded = 'true';
+    btnLimpar.addEventListener('click', () => {
+      filtrosRelatorios = { periodo: 'semana', dataUnica: '', dataDe: '', dataAte: '', empresaId: 'todas', vagaId: 'todas', recrutadorId: 'todos', dpId: 'todos', status: 'todos' };
+      const g = id => document.getElementById(id);
+      if (g('filtro-periodo')) g('filtro-periodo').value = 'semana';
+      if (g('filtro-empresa')) g('filtro-empresa').value = 'todas';
+      if (g('filtro-vaga')) g('filtro-vaga').value = 'todas';
+      if (g('filtro-recrutador')) g('filtro-recrutador').value = 'todos';
+      if (g('filtro-dp')) g('filtro-dp').value = 'todos';
+      if (g('filtro-status-ficha')) g('filtro-status-ficha').value = 'todos';
+      if (g('container-filtro-data-unica')) g('container-filtro-data-unica').style.display = 'none';
+      if (g('container-filtro-datas')) g('container-filtro-datas').style.display = 'none';
+      renderRelatoriosCharts();
+    });
+  }
+}
+
+// ==========================================================================
+// MÓDULO 6: TABELA DE VAGAS E DEMANDAS
+// ==========================================================================
+
+function renderVagasDemandasTable() {
+  const tbody = document.getElementById('vagas-demandas-body');
+  if (!tbody) return;
+
+  if (!state.vagas || state.vagas.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:24px; color:var(--text-secondary);">Nenhuma vaga cadastrada.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = state.vagas.map(v => {
+    const solicitadas = v.vagasSolicitadas || ((v.vagasPreenchidas || 0) + (v.vagasDisponiveis || 0));
+    const preenchidas = v.vagasPreenchidas || 0;
+    const disponiveis = v.vagasDisponiveis || 0;
+    const canceladas = v.vagasCanceladas || 0;
+    const reabertas = v.vagasReabertas || 0;
+    const aproveito = solicitadas > 0 ? Math.round((preenchidas / solicitadas) * 100) : 0;
+    const status = v.statusDemanda || 'ativa';
+    const statusCor = { ativa: '#22c55e', concluida: '#3b82f6', cancelada: '#ef4444' };
+    const statusNome = { ativa: 'Ativa', concluida: 'Concluída', cancelada: 'Cancelada' };
+
+    return `
+      <tr>
+        <td style="font-weight:600;">${v.empresaNome}</td>
+        <td>${v.cargo} <span style="font-size:10px;color:var(--text-secondary);">(${v.codigo})</span></td>
+        <td style="text-align:center;">${solicitadas}</td>
+        <td style="text-align:center; color:#22c55e; font-weight:700;">${disponiveis}</td>
+        <td style="text-align:center; color:#3b82f6;">${preenchidas}</td>
+        <td style="text-align:center; color:#f97316;">${canceladas}</td>
+        <td style="text-align:center; color:#a855f7;">${reabertas}</td>
+        <td style="text-align:center;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <div style="flex:1; height:6px; background:#e2e8f0; border-radius:3px;">
+              <div style="width:${aproveito}%; height:100%; background:var(--primary); border-radius:3px;"></div>
+            </div>
+            <span style="font-size:11px; font-weight:600;">${aproveito}%</span>
+          </div>
+        </td>
+        <td><span style="background:${statusCor[status]}22; color:${statusCor[status]}; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">${statusNome[status]}</span></td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="abrirModalAjustarVagas('${v.id}')" style="font-size:11px; padding:2px 8px; white-space:nowrap;">
+            <i class="fa-solid fa-sliders"></i> Ajustar
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ==========================================================================
+// MÓDULO 7: GAMIFICAÇÃO — FUNCIONÁRIO (RECRUTADOR) DA SEMANA
+// ==========================================================================
+
+function calcularRecrutadorSemana() {
+  const hoje = new Date();
+  const dow = hoje.getDay();
+  const diffSeg = dow === 0 ? 6 : dow - 1;
+  const seg = new Date(hoje);
+  seg.setDate(hoje.getDate() - diffSeg);
+  seg.setHours(0, 0, 0, 0);
+  const domingo = new Date(seg);
+  domingo.setDate(seg.getDate() + 6);
+  domingo.setHours(23, 59, 59, 999);
+
+  const contagemPorRec = {};
+  state.contratacoes.forEach(c => {
+    const data = parseDateBR(c.data);
+    if (data && data >= seg && data <= domingo) {
+      contagemPorRec[c.recrutadorId] = (contagemPorRec[c.recrutadorId] || 0) + 1;
+    }
+  });
+
+  // Fallback: se não houver contratações esta semana, usa total histórico
+  const fonte = Object.keys(contagemPorRec).length > 0 ? contagemPorRec : {};
+  if (Object.keys(fonte).length === 0) {
+    state.recrutadores.forEach(r => {
+      fonte[r.id] = state.contratacoes.filter(c => c.recrutadorId === r.id).length;
+    });
+  }
+
+  let melhorId = null, melhorContagem = 0;
+  Object.entries(fonte).forEach(([id, count]) => {
+    if (count > melhorContagem) { melhorContagem = count; melhorId = id; }
+  });
+
+  return { recrutadorId: melhorId, contagem: melhorContagem, estasSemana: Object.keys(contagemPorRec).length > 0 };
+}
+
+function renderDestaquesSemana() {
+  const { recrutadorId, contagem, estasSemana } = calcularRecrutadorSemana();
+  const nomeEl = document.getElementById('destaque-recrutador-nome');
+  const metaEl = document.getElementById('destaque-recrutador-meta');
+
+  if (recrutadorId && contagem > 0) {
+    const rec = state.recrutadores.find(r => r.id === recrutadorId);
+    if (nomeEl) nomeEl.textContent = rec ? rec.nome : 'N/A';
+    if (metaEl) metaEl.textContent = estasSemana
+      ? `${contagem} contrato${contagem > 1 ? 's' : ''} esta semana 🏆`
+      : `${contagem} contratos no total (sem dados desta semana)`;
+  } else {
+    if (nomeEl) nomeEl.textContent = 'Nenhum destaque';
+    if (metaEl) metaEl.textContent = 'Sem contratações registradas';
+  }
+
+  return { recrutadorId, contagem };
+}
+
+// ==========================================================================
+// MÓDULO 8: TABELA DE CONTRATAÇÕES FILTRADAS
+// ==========================================================================
+
+function renderTabelaContratacoes() {
+  const tbody = document.getElementById('tabela-contratacao-dia-body');
+  const totalEl = document.getElementById('tabela-contratacao-total-geral');
+  if (!tbody) return;
+
+  const filtradas = getContratacoesFiltradas();
+
+  if (filtradas.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-secondary); padding:24px;">Nenhuma contratação no período/filtro selecionado.</td></tr>`;
+    if (totalEl) totalEl.textContent = '0';
+    return;
+  }
+
+  tbody.innerHTML = filtradas.map(c => {
+    const rec = state.recrutadores.find(r => r.id === c.recrutadorId);
+    const recNome = rec ? rec.nome : 'N/A';
+    const recColor = rec ? rec.corHex : '#94a3b8';
+    const cand = state.candidatos.find(ca => ca.nome === c.candidatoNome);
+    const turno = cand ? (cand.turnoTrabalho || 'Diurno') : '—';
+    const dpConf = cand ? (cand.aprovadorSelecao || 'Departamento Pessoal') : 'DP';
+    const vagaLabel = cand ? (state.vagas.find(v => v.id === cand.vagaId)?.cargo || c.empresaNome) : c.empresaNome;
+
+    return `
+      <tr>
+        <td><span style="background:${recColor}22; color:${recColor}; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">${recNome}</span></td>
+        <td style="font-weight:600;">${c.candidatoNome}</td>
+        <td>${c.empresaNome}</td>
+        <td style="font-size:11px;">${vagaLabel}</td>
+        <td style="font-size:11px; white-space:nowrap;">${c.data || '—'}</td>
+        <td><span style="background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; font-size:11px;">${turno}</span></td>
+        <td style="font-size:11px; color:var(--text-secondary);">${dpConf}</td>
+      </tr>
+    `;
+  }).join('');
+
+  if (totalEl) totalEl.textContent = filtradas.length;
+}
+
+// ==========================================================================
+// MÓDULO 9: MODAL GERENCIAR FUNCIONÁRIO + MATRIZ DE PERMISSÕES
+// ==========================================================================
+
+let funcAtualGerenciando = null;
+
+window.abrirModalGerenciarFuncionario = function(funcId) {
+  const func = state.funcionarios.find(f => f.id === funcId);
+  if (!func) return;
+
+  // Restrição de representante: só pode gerenciar do próprio depto
+  if (loggedUser && loggedUser.representanteDepto && !hasPermission('sistema', 'perms')) {
+    if (func.departamento !== loggedUser.departamento) {
+      alert('Você só pode gerenciar funcionários do seu próprio departamento.');
+      return;
+    }
+  }
+
+  funcAtualGerenciando = func;
+
+  document.getElementById('gerenciar-func-id').value = func.id;
+  document.getElementById('gerenciar-func-nome').value = func.nome;
+  document.getElementById('gerenciar-func-username').value = func.login;
+  document.getElementById('gerenciar-func-depto').value = func.departamento || 'selecao';
+  document.getElementById('gerenciar-func-cargo').value = func.cargo || '';
+  document.getElementById('gerenciar-func-status').value = func.status || 'ativo';
+  document.getElementById('gerenciar-func-representante').checked = func.representanteDepto || false;
+
+  // Garantir permissões definidas
+  if (!func.permissoes) func.permissoes = criarPermissoesZeradas();
+
+  renderPermissoesMatrix(func);
+  document.getElementById('modal-gerenciar-funcionario').classList.add('active');
+};
+
+function renderPermissoesMatrix(func) {
+  const tbody = document.getElementById('permissoes-matrix-body');
+  if (!tbody) return;
+
+  const acoes = ['visualizar', 'criar', 'editar', 'excluir', 'aprovar', 'exportar', 'relatorios', 'perms'];
+  const perms = func.permissoes || {};
+
+  tbody.innerHTML = Object.entries(AREAS_SISTEMA).map(([areaKey, areaNome]) => {
+    const areaPerms = perms[areaKey] || {};
+    const cbs = acoes.map(acao => {
+      const checked = areaPerms[acao] ? 'checked' : '';
+      // Representante não pode conceder o que não tem
+      let disabled = '';
+      if (loggedUser && loggedUser.representanteDepto && loggedUser.login !== 'joaobalaf') {
+        if (!loggedUser.permissoes?.[areaKey]?.[acao]) {
+          disabled = 'disabled title="Você não possui esta permissão para delegá-la"';
+        }
+      }
+      return `<td class="text-center" style="text-align:center;">
+        <input type="checkbox" class="perm-checkbox" data-area="${areaKey}" data-acao="${acao}" ${checked} ${disabled}
+          style="width:16px; height:16px; cursor:pointer; accent-color:var(--primary);">
+      </td>`;
+    }).join('');
+    return `<tr><td style="font-weight:600; white-space:nowrap; padding:6px 10px;">${areaNome}</td>${cbs}</tr>`;
+  }).join('');
+}
+
+function setupModalGerenciarListeners() {
+  const btnClose = document.getElementById('btn-close-gerenciar-modal');
+  if (btnClose && !btnClose.dataset.listenerAdded) {
+    btnClose.dataset.listenerAdded = 'true';
+    btnClose.addEventListener('click', () => document.getElementById('modal-gerenciar-funcionario').classList.remove('active'));
+  }
+
+  const btnCancel = document.getElementById('btn-cancel-gerenciar');
+  if (btnCancel && !btnCancel.dataset.listenerAdded) {
+    btnCancel.dataset.listenerAdded = 'true';
+    btnCancel.addEventListener('click', () => document.getElementById('modal-gerenciar-funcionario').classList.remove('active'));
+  }
+
+  const btnToggleAll = document.getElementById('btn-toggle-all-perms');
+  if (btnToggleAll && !btnToggleAll.dataset.listenerAdded) {
+    btnToggleAll.dataset.listenerAdded = 'true';
+    btnToggleAll.addEventListener('click', () => {
+      const cbs = document.querySelectorAll('.perm-checkbox:not([disabled])');
+      const allChecked = Array.from(cbs).every(cb => cb.checked);
+      cbs.forEach(cb => { cb.checked = !allChecked; });
+    });
+  }
+
+  const form = document.getElementById('form-gerenciar-funcionario');
+  if (form && !form.dataset.listenerAdded) {
+    form.dataset.listenerAdded = 'true';
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      salvarPermissoesFuncionario();
+    });
+  }
+}
+
+function salvarPermissoesFuncionario() {
+  const funcId = document.getElementById('gerenciar-func-id').value;
+  const func = state.funcionarios.find(f => f.id === funcId);
+  if (!func) return;
+
+  const novoDepto = document.getElementById('gerenciar-func-depto').value;
+  const novoCargo = document.getElementById('gerenciar-func-cargo').value.trim();
+  const novoStatus = document.getElementById('gerenciar-func-status').value;
+  const novoRep = document.getElementById('gerenciar-func-representante').checked;
+
+  if (!novoCargo) { alert('Informe o cargo do funcionário.'); return; }
+
+  // Coleta permissões dos checkboxes
+  const novasPerms = criarPermissoesZeradas();
+  document.querySelectorAll('.perm-checkbox').forEach(cb => {
+    const area = cb.dataset.area;
+    const acao = cb.dataset.acao;
+    if (area && acao) novasPerms[area][acao] = cb.checked;
+  });
+
+  // Restrição de representante: não pode escalar além do que tem
+  if (loggedUser && loggedUser.representanteDepto && loggedUser.login !== 'joaobalaf') {
+    const loggedPerms = loggedUser.permissoes || {};
+    Object.keys(novasPerms).forEach(area => {
+      Object.keys(novasPerms[area]).forEach(acao => {
+        if (novasPerms[area][acao] && !loggedPerms[area]?.[acao]) {
+          novasPerms[area][acao] = false;
+        }
+      });
+    });
+  }
+
+  func.departamento = novoDepto;
+  func.cargo = novoCargo;
+  func.status = novoStatus;
+  func.representanteDepto = novoRep;
+  func.permissoes = novasPerms;
+
+  registrarLogGlobal(`Permissões e configurações do funcionário "${func.nome}" atualizadas pelo gerente ${loggedUser?.nome}.`, 'funcionarios');
+  saveState();
+
+  document.getElementById('modal-gerenciar-funcionario').classList.remove('active');
+  funcAtualGerenciando = null;
+  renderFuncionarios();
+  alert(`Configurações de "${func.nome}" salvas com sucesso!`);
+}
+
+// ==========================================================================
+// MÓDULO 10: MODAL DE AJUSTE MANUAL DE VAGAS
+// ==========================================================================
+
+window.abrirModalAjustarVagas = function(vagaId) {
+  const vaga = state.vagas.find(v => v.id === vagaId);
+  if (!vaga) return;
+
+  document.getElementById('ajustar-vagas-id').value = vaga.id;
+  const nomeEl = document.getElementById('ajustar-vagas-nome-cargo');
+  if (nomeEl) nomeEl.textContent = `${vaga.cargo} — ${vaga.empresaNome} (${vaga.vagasDisponiveis || 0} disponíveis)`;
+
+  const motivoEl = document.getElementById('ajustar-vagas-motivo');
+  if (motivoEl) motivoEl.value = '';
+
+  const qtdEl = document.getElementById('ajustar-vagas-qtd');
+  if (qtdEl) qtdEl.value = 1;
+
+  const tipoEl = document.getElementById('ajustar-vagas-tipo');
+  if (tipoEl) tipoEl.value = 'adicionar';
+
+  document.getElementById('modal-ajustar-vagas-manual').classList.add('active');
+};
+
+function setupModalAjustarVagasListeners() {
+  const btnClose = document.getElementById('btn-close-ajustar-vagas-modal');
+  if (btnClose && !btnClose.dataset.listenerAdded) {
+    btnClose.dataset.listenerAdded = 'true';
+    btnClose.addEventListener('click', () => document.getElementById('modal-ajustar-vagas-manual').classList.remove('active'));
+  }
+
+  const btnCancel = document.getElementById('btn-cancel-ajustar-vagas');
+  if (btnCancel && !btnCancel.dataset.listenerAdded) {
+    btnCancel.dataset.listenerAdded = 'true';
+    btnCancel.addEventListener('click', () => document.getElementById('modal-ajustar-vagas-manual').classList.remove('active'));
+  }
+
+  const tipoSel = document.getElementById('ajustar-vagas-tipo');
+  if (tipoSel && !tipoSel.dataset.listenerAdded) {
+    tipoSel.dataset.listenerAdded = 'true';
+    tipoSel.addEventListener('change', () => {
+      const label = document.querySelector('#ajustar-vagas-qty-group label');
+      if (label) label.textContent = tipoSel.value === 'corrigir'
+        ? 'Nova Quantidade Total Disponível *'
+        : 'Quantidade de Vagas *';
+    });
+  }
+
+  const form = document.getElementById('form-ajustar-vagas-manual');
+  if (form && !form.dataset.listenerAdded) {
+    form.dataset.listenerAdded = 'true';
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const vagaId = document.getElementById('ajustar-vagas-id').value;
+      const vaga = state.vagas.find(v => v.id === vagaId);
+      if (!vaga) return;
+
+      const tipo = document.getElementById('ajustar-vagas-tipo').value;
+      const qtd = parseInt(document.getElementById('ajustar-vagas-qtd').value) || 0;
+      const motivo = document.getElementById('ajustar-vagas-motivo').value.trim();
+
+      if (!motivo) { alert('A justificativa da alteração é obrigatória.'); return; }
+
+      const vagasAntes = vaga.vagasDisponiveis || 0;
+      if (!vaga.historicoAjustes) vaga.historicoAjustes = [];
+
+      switch (tipo) {
+        case 'adicionar':
+          vaga.vagasDisponiveis = vagasAntes + qtd;
+          vaga.vagasReabertas = (vaga.vagasReabertas || 0) + qtd;
+          break;
+        case 'remover':
+          vaga.vagasDisponiveis = Math.max(0, vagasAntes - qtd);
+          break;
+        case 'cancelar':
+          vaga.vagasCanceladas = (vaga.vagasCanceladas || 0) + qtd;
+          vaga.vagasDisponiveis = Math.max(0, vagasAntes - qtd);
+          break;
+        case 'reabrir':
+          vaga.vagasDisponiveis = vagasAntes + qtd;
+          vaga.vagasReabertas = (vaga.vagasReabertas || 0) + qtd;
+          break;
+        case 'corrigir':
+          vaga.vagasDisponiveis = qtd;
+          break;
+      }
+
+      vaga.historicoAjustes.push({
+        data: new Date().toLocaleString('pt-BR'),
+        usuario: loggedUser ? loggedUser.nome : 'Sistema',
+        tipo, qtd,
+        vagasAntes,
+        vagasDepois: vaga.vagasDisponiveis,
+        motivo
+      });
+
+      registrarLogGlobal(
+        `Vagas de "${vaga.cargo} — ${vaga.empresaNome}" ajustadas (${tipo}): ${vagasAntes} → ${vaga.vagasDisponiveis}. Motivo: ${motivo}`,
+        'vagas'
+      );
+
+      saveState();
+      document.getElementById('modal-ajustar-vagas-manual').classList.remove('active');
+
+      if (activeAba === 'relatorios') renderRelatoriosCharts();
+      alert(`Vagas ajustadas! Disponíveis agora: ${vaga.vagasDisponiveis}`);
+    });
+  }
+}
+
+// ==========================================================================
+// MÓDULO 11: BOTÃO COPIAR LINK DE AUTO-CADASTRO
+// ==========================================================================
+
+function setupBtnCopiarLink() {
+  const btn = document.getElementById('btn-copiar-link-cadastro');
+  if (btn && !btn.dataset.listenerAdded) {
+    btn.dataset.listenerAdded = 'true';
+    btn.addEventListener('click', () => {
+      const url = `${window.location.origin}${window.location.pathname}?reg=funcionarios`;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(() => {
+          const orig = btn.innerHTML;
+          btn.innerHTML = '<i class="fa-solid fa-check"></i> Link Copiado!';
+          btn.style.backgroundColor = '#22c55e';
+          setTimeout(() => { btn.innerHTML = orig; btn.style.backgroundColor = ''; }, 2500);
+        }).catch(() => { prompt('Copie o link abaixo:', url); });
+      } else {
+        prompt('Copie o link abaixo:', url);
+      }
+    });
+  }
+}
+
+// ==========================================================================
+// MÓDULO 12: INICIALIZAÇÃO DOS NOVOS MÓDULOS
+// ==========================================================================
+
+// ==========================================================================
+// MÓDULO 13: LINKS PERSONALIZADOS DE CAPTAÇÃO POR RECRUTADOR
+// ==========================================================================
+
+// Global: recrutador detectado via ?rec=ID na URL (modo candidato público)
+window._recrutadorLinkId = null;
+
+function detectarLinkCaptacao() {
+  const params = new URLSearchParams(window.location.search);
+  const recId = params.get('rec');
+  if (!recId) return;
+
+  // Links de captação (?rec=X) são redirecionados para a página pública isolada
+  // O CRM nunca expõe seus dados a candidatos — eles usam candidato.html
+  const dest = 'candidato.html?' + window.location.search.replace(/^\?/, '');
+  window.location.replace(dest);
+}
+
+function renderLinksRecrutadores() {
+  // Remove bloco anterior se existir
+  const old = document.getElementById('bloco-links-recrutadores');
+  if (old) old.remove();
+
+  if (!loggedUser) return; // Só mostra para staff logado
+
+  const baseUrl = `${window.location.origin}${window.location.pathname}`;
+
+  const bloco = document.createElement('div');
+  bloco.id = 'bloco-links-recrutadores';
+  bloco.style.cssText = `
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+  `;
+  bloco.innerHTML = `
+    <h3 style="font-size:15px; font-weight:700; color:var(--text-primary); margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+      <i class="fa-solid fa-link" style="color:var(--primary);"></i> Links Personalizados de Captação
+    </h3>
+    <p style="font-size:12px; color:var(--text-secondary); margin-bottom:16px;">
+      Compartilhe o link do(a) recrutador(a) com candidatos. Quem se cadastrar via esse link será automaticamente atribuído a ele(a) no painel.
+    </p>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px;">
+      ${state.recrutadores.map(r => {
+        const link = `${baseUrl}?rec=${r.id}`;
+        return `
+          <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:8px; padding:14px; display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="width:34px; height:34px; border-radius:50%; background:${r.corHex}; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:14px; flex-shrink:0;">${r.nome[0]}</div>
+              <span style="font-weight:600; color:var(--text-primary); font-size:14px;">${r.nome}</span>
+            </div>
+            <div style="font-size:10px; color:var(--text-secondary); word-break:break-all; font-family:monospace; background:rgba(0,0,0,0.2); padding:6px 8px; border-radius:4px;">${link}</div>
+            <button onclick="copiarLinkRecrutador('${r.id}', this)"
+              style="width:100%; padding:6px 10px; background:transparent; border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition:all .2s;">
+              <i class="fa-solid fa-copy"></i> Copiar link de ${r.nome}
+            </button>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+
+  // Inserir acima da seção do formulário na aba Site
+  const formSection = document.querySelector('#aba-site .site-form-section');
+  if (formSection) {
+    formSection.insertBefore(bloco, formSection.firstChild);
+  }
+}
+
+window.copiarLinkRecrutador = function(recId, btn) {
+  const baseUrl = `${window.location.origin}${window.location.pathname}`;
+  const link = `${baseUrl}?rec=${recId}`;
+  const rec = state.recrutadores.find(r => r.id === recId);
+  const nomeRec = rec ? rec.nome : recId;
+
+  const copy = (text) => {
+    if (navigator.clipboard) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise((_, reject) => {
+      const val = prompt(`Link de captação de ${nomeRec}:`, text);
+      val !== null ? Promise.resolve() : reject();
+    });
+  };
+
+  copy(link).then(() => {
+    const orig = btn.innerHTML;
+    btn.innerHTML = `<i class="fa-solid fa-check"></i> Copiado!`;
+    btn.style.background = '#22c55e';
+    btn.style.color = '#fff';
+    btn.style.border = '1px solid #22c55e';
+    setTimeout(() => {
+      btn.innerHTML = orig;
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.border = '';
+    }, 2500);
+  }).catch(() => {});
+};
+
+// ==========================================================================
+// MÓDULO 14: INICIALIZAÇÃO COMPLETA
+// ==========================================================================
+
+function initNewModules() {
+  detectarAutoRegistro();
+  detectarLinkCaptacao(); // precisa rodar após initLocalStorage + verificarSessao
+  setupModalGerenciarListeners();
+  setupModalAjustarVagasListeners();
+  setupBtnCopiarLink();
+  setupAuditoriaListeners();
+  setupCepAutoFill();
+  setupCameraCapture();
+  setupDocumentQualityValidation();
+  aplicarTemaSalvo();
+  setupHeaderProfileButton();
+  // Registrar acesso no log global (só se já logado)
+  if (loggedUser) {
+    registrarLogGlobal(`${loggedUser.nome} acessou o sistema R&T Empregos.`, 'sistema');
+  }
+}
+
+// ==========================================================================
+// MÓDULO 15: VALIDAÇÃO DE CPF
+// ==========================================================================
+
+function validarCPF(cpf) {
+  cpf = cpf.replace(/[^\d]/g, '');
+  if (cpf.length !== 11) return false;
+  // Sequências inválidas (ex: 000.000.000-00)
+  if (/^(\d)\1{10}$/.test(cpf)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(cpf[i]) * (10 - i);
+  let rest = (sum * 10) % 11;
+  if (rest === 10 || rest === 11) rest = 0;
+  if (rest !== parseInt(cpf[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(cpf[i]) * (11 - i);
+  rest = (sum * 10) % 11;
+  if (rest === 10 || rest === 11) rest = 0;
+  return rest === parseInt(cpf[10]);
+}
+
+// ==========================================================================
+// MÓDULO 16: CEP AUTO-FILL VIA VIACEP API
+// ==========================================================================
+
+function setupCepAutoFill() {
+  // Formulário público do candidato
+  const formCep = document.getElementById('form-cep');
+  if (formCep && !formCep.dataset.cepListener) {
+    formCep.dataset.cepListener = 'true';
+    formCep.addEventListener('blur', () => buscarCep(formCep.value, {
+      rua: 'form-rua', bairro: 'form-bairro', cidade: 'form-cidade', estado: 'form-estado'
+    }));
+  }
+
+  // Drawer de detalhes do candidato (Seleção)
+  const detCep = document.getElementById('det-cep-input');
+  if (detCep && !detCep.dataset.cepListener) {
+    detCep.dataset.cepListener = 'true';
+    detCep.addEventListener('blur', () => buscarCep(detCep.value, {
+      rua: 'det-rua-input', bairro: 'det-bairro-input', cidade: 'det-cidade-input', estado: 'det-estado-input'
+    }));
+  }
+}
+
+function buscarCep(cepRaw, campos) {
+  const cep = cepRaw.replace(/\D/g, '');
+  if (cep.length !== 8) return;
+
+  fetch(`https://viacep.com.br/ws/${cep}/json/`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.erro) return;
+      const g = id => document.getElementById(id);
+      if (campos.rua && g(campos.rua) && !g(campos.rua).value) g(campos.rua).value = data.logradouro || '';
+      if (campos.bairro && g(campos.bairro) && !g(campos.bairro).value) g(campos.bairro).value = data.bairro || '';
+      if (campos.cidade && g(campos.cidade)) g(campos.cidade).value = data.localidade || '';
+      if (campos.estado && g(campos.estado)) g(campos.estado).value = data.uf || '';
+    })
+    .catch(() => {}); // falha silenciosa — sem internet não bloqueia o form
+}
+
+// ==========================================================================
+// MÓDULO 17: CAPTURA VIA CÂMERA EM DISPOSITIVOS MÓVEIS
+// ==========================================================================
+
+function setupCameraCapture() {
+  // Selfie: sugerir câmera frontal
+  const selfie = document.getElementById('file-selfie');
+  if (selfie) selfie.setAttribute('capture', 'user');
+
+  // Documentos: câmera traseira (captura de documentos físicos)
+  ['file-rgFrente', 'file-fotoPis', 'file-cpfDocumento', 'file-comprovanteResidencia', 'file-cartaoBancoVerso'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.setAttribute('capture', 'environment');
+  });
+}
+
+// ==========================================================================
+// MÓDULO 18: TEMA CLARO / ESCURO POR USUÁRIO
+// ==========================================================================
+
+function aplicarTemaSalvo() {
+  const userId = loggedUser ? loggedUser.id : 'guest';
+  const tema = localStorage.getItem(`rt_tema_${userId}`) || 'dark';
+  document.documentElement.setAttribute('data-theme', tema);
+  const btn = document.getElementById('btn-tema-toggle');
+  if (btn) btn.innerHTML = tema === 'dark'
+    ? '<i class="fa-solid fa-sun"></i> Modo Claro'
+    : '<i class="fa-solid fa-moon"></i> Modo Escuro';
+}
+
+window.toggleTema = function() {
+  const userId = loggedUser ? loggedUser.id : 'guest';
+  const atual = document.documentElement.getAttribute('data-theme') || 'dark';
+  const novo = atual === 'dark' ? 'light' : 'dark';
+  localStorage.setItem(`rt_tema_${userId}`, novo);
+  document.documentElement.setAttribute('data-theme', novo);
+  const btn = document.getElementById('btn-tema-toggle');
+  if (btn) btn.innerHTML = novo === 'dark'
+    ? '<i class="fa-solid fa-sun"></i> Modo Claro'
+    : '<i class="fa-solid fa-moon"></i> Modo Escuro';
+};
+
+// ==========================================================================
+// MÓDULO 19: MEU PERFIL — PAINEL INDIVIDUAL DO COLABORADOR
+// ==========================================================================
+
+function setupHeaderProfileButton() {
+  const profileBadge = document.getElementById('header-user-profile');
+  if (profileBadge && !profileBadge.dataset.profileListener) {
+    profileBadge.dataset.profileListener = 'true';
+    profileBadge.style.cursor = 'pointer';
+    profileBadge.title = 'Clique para abrir Meu Perfil';
+    profileBadge.addEventListener('click', abrirModalMeuPerfil);
+  }
+}
+
+window.abrirModalMeuPerfil = function() {
+  if (!loggedUser) return;
+  const modal = document.getElementById('modal-meu-perfil');
+  if (!modal) return;
+
+  // Preencher dados
+  const g = id => document.getElementById(id);
+  if (g('perfil-nome')) g('perfil-nome').textContent = loggedUser.nome;
+  if (g('perfil-login')) g('perfil-login').textContent = loggedUser.login;
+  const deptoLabels = {
+    'administracao': 'Gestão Executiva',
+    'selecao': 'Recrutamento & Seleção',
+    'dp': 'Departamento Pessoal',
+    'comissao': 'Comissões & Estatísticas'
+  };
+  if (g('perfil-depto')) g('perfil-depto').textContent = deptoLabels[loggedUser.departamento] || loggedUser.departamento;
+  if (g('perfil-cargo')) g('perfil-cargo').textContent = loggedUser.cargo || 'Colaborador';
+
+  // Link personalizado: usa candidato.html (página pública isolada)
+  const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
+  const recMatch = state.recrutadores.find(r =>
+    r.nome.toLowerCase().includes(loggedUser.nome.split(' ')[0].toLowerCase()) ||
+    loggedUser.nome.toLowerCase().includes(r.nome.split(' ')[0].toLowerCase())
+  );
+  const linkSection = g('perfil-link-section');
+  if (recMatch && linkSection) {
+    const meuLink = baseUrl + 'candidato.html?rec=' + recMatch.id;
+    linkSection.style.display = 'block';
+    if (g('perfil-meu-link')) g('perfil-meu-link').value = meuLink;
+  } else if (linkSection) {
+    linkSection.style.display = 'none';
+  }
+
+  // Botão de tema
+  const userId = loggedUser.id;
+  const tema = localStorage.getItem(`rt_tema_${userId}`) || 'dark';
+  const btnTema = g('btn-tema-toggle');
+  if (btnTema) btnTema.innerHTML = tema === 'dark'
+    ? '<i class="fa-solid fa-sun"></i> Ativar Modo Claro'
+    : '<i class="fa-solid fa-moon"></i> Ativar Modo Escuro';
+
+  // Toggle ADM: dpPodeEditar
+  const adminSection = g('perfil-admin-section');
+  const isAdmin = loggedUser.login === 'joaobalaf' || loggedUser.departamento === 'administracao';
+  if (adminSection) adminSection.style.display = isAdmin ? 'block' : 'none';
+  const toggleDpEdit = g('toggle-dp-pode-editar');
+  if (toggleDpEdit) toggleDpEdit.checked = state.config?.dpPodeEditar === true;
+
+  modal.classList.add('active');
+};
+
+window.fecharModalMeuPerfil = function() {
+  const modal = document.getElementById('modal-meu-perfil');
+  if (modal) modal.classList.remove('active');
+};
+
+window.copiarMeuLink = function(btn) {
+  const input = document.getElementById('perfil-meu-link');
+  if (!input) return;
+  const link = input.value;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(link).then(() => {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-check"></i> Copiado!';
+      btn.style.background = '#22c55e';
+      btn.style.color = '#fff';
+      setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; btn.style.color = ''; }, 2500);
+    }).catch(() => prompt('Seu link de captação:', link));
+  } else {
+    prompt('Seu link de captação:', link);
+  }
+};
+
+window.salvarConfigDpEditar = function() {
+  if (!state.config) state.config = {};
+  const toggle = document.getElementById('toggle-dp-pode-editar');
+  state.config.dpPodeEditar = toggle ? toggle.checked : false;
+  saveState();
+  registrarLogGlobal(
+    `Configuração "DP pode editar fichas" alterada para: ${state.config.dpPodeEditar ? 'ATIVADO' : 'DESATIVADO'}`,
+    'sistema'
+  );
+  alert(`Permissão de edição do DP ${state.config.dpPodeEditar ? 'ATIVADA' : 'DESATIVADA'} com sucesso.`);
+};
+
+// ==========================================================================
+// MÓDULO 20: VALIDAÇÃO DE LEGIBILIDADE DE DOCUMENTOS (Canvas API)
+// ==========================================================================
+
+/**
+ * Analisa a qualidade visual de uma imagem base64.
+ * Verifica brilho médio (escuro/claro) e variância (borrado/sem contraste).
+ * Retorna { ok: boolean, mensagem: string }
+ */
+function analisarQualidadeImagem(base64Data) {
+  return new Promise((resolve) => {
+    // PDF não pode ser analisado visualmente — passa direto
+    if (!base64Data || !base64Data.startsWith('data:image/')) {
+      resolve({ ok: true });
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const MAX_DIM = 200; // reduzir para performance
+        const scale = Math.min(MAX_DIM / img.width, MAX_DIM / img.height, 1);
+        const w = Math.max(1, Math.floor(img.width * scale));
+        const h = Math.max(1, Math.floor(img.height * scale));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+
+        const { data } = ctx.getImageData(0, 0, w, h);
+        const total = w * h;
+        let somaB = 0;
+        const brightness = [];
+
+        for (let i = 0; i < data.length; i += 4) {
+          const b = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+          somaB += b;
+          brightness.push(b);
+        }
+
+        const media = somaB / total;
+        const variancia = brightness.reduce((s, b) => s + (b - media) ** 2, 0) / total;
+
+        if (media < 35) {
+          resolve({ ok: false, mensagem: '⚠️ Imagem muito escura. Tire a foto em local com mais iluminação.' });
+        } else if (media > 235) {
+          resolve({ ok: false, mensagem: '⚠️ Imagem muito clara / estourada. Evite luz direta na câmera.' });
+        } else if (variancia < 80) {
+          resolve({ ok: false, mensagem: '⚠️ Documento parece borrado ou sem contraste suficiente. Tire uma foto mais nítida e próxima.' });
+        } else {
+          resolve({ ok: true });
+        }
+      } catch {
+        resolve({ ok: true }); // em caso de erro de Canvas, não bloqueia
+      }
+    };
+    img.onerror = () => resolve({ ok: true });
+    img.src = base64Data;
+  });
+}
+
+/**
+ * Valida a imagem de um input de arquivo e mostra feedback visual no box de upload.
+ * Retorna Promise<boolean> — true se aprovado.
+ */
+async function validarEExibirQualidade(input, boxEl) {
+  const base64 = input.dataset.base64;
+  if (!base64) return true; // ainda não enviou — valida apenas se enviou
+
+  const statusEl = boxEl ? boxEl.querySelector('.upload-status-indicator') : null;
+  const resultado = await analisarQualidadeImagem(base64);
+
+  if (!resultado.ok) {
+    boxEl.classList.add('upload-erro-qualidade');
+    if (statusEl) {
+      statusEl.textContent = 'Qualidade ruim';
+      statusEl.style.color = '#ef4444';
+    }
+    // Exibe tooltip de erro no box
+    let errEl = boxEl.querySelector('.upload-quality-error');
+    if (!errEl) {
+      errEl = document.createElement('div');
+      errEl.className = 'upload-quality-error';
+      errEl.style.cssText = 'color:#ef4444; font-size:10px; text-align:center; padding:4px 6px; background:#fee2e2; border-radius:4px; margin-top:4px; line-height:1.3;';
+      boxEl.appendChild(errEl);
+    }
+    errEl.textContent = resultado.mensagem;
+    return false;
+  } else {
+    boxEl.classList.remove('upload-erro-qualidade');
+    if (statusEl) { statusEl.textContent = 'Carregado ✓'; statusEl.style.color = '#22c55e'; }
+    const errEl = boxEl.querySelector('.upload-quality-error');
+    if (errEl) errEl.remove();
+    return true;
+  }
+}
+
+// Hook nos file inputs do formulário público para validar após upload
+function setupDocumentQualityValidation() {
+  const docInputIds = ['file-selfie','file-rgFrente','file-fotoPis','file-cpfDocumento','file-comprovanteResidencia','file-cartaoBancoVerso'];
+  docInputIds.forEach(id => {
+    const input = document.getElementById(id);
+    if (!input || input.dataset.qualityListener) return;
+    input.dataset.qualityListener = 'true';
+    input.addEventListener('change', async () => {
+      // aguarda o base64 ser gravado pelo handler existente
+      setTimeout(async () => {
+        const box = input.closest('.file-upload-box');
+        if (input.dataset.base64) {
+          await validarEExibirQualidade(input, box);
+        }
+      }, 500);
+    });
+  });
+}
+
+// ==========================================================================
+// MÓDULO 21: NÚMERO DE FILA FIXO DOS CANDIDATOS
+// ==========================================================================
+
+function gerarNumeroFila() {
+  if (!state.proximaFilaNum) state.proximaFilaNum = 1;
+  const num = state.proximaFilaNum;
+  state.proximaFilaNum++;
+  return num;
+}
+
+// Gera link para o candidato completar a ficha (pré-preenchida com dados existentes)
+function gerarLinkCompletarFicha(candidatoId) {
+  const cand = state.candidatos.find(c => c.id === candidatoId);
+  if (!cand) return '';
+  const base = window.location.origin + window.location.pathname.replace('index.html', '');
+  const data = {
+    id: cand.id,
+    nome: cand.nome || '', email: cand.email || '', cpf: cand.cpf || '',
+    rg: cand.rg || '', pis: cand.pis || '', telefone: cand.telefone || '',
+    dataNascimento: cand.dataNascimento || '', nomeMae: cand.nomeMae || '',
+    nomePai: cand.nomePai || '', cep: cand.cep || '', rua: cand.rua || '',
+    numeroCasa: cand.numeroCasa || '', bairro: cand.bairro || '',
+    cidade: cand.cidade || '', estado: cand.estado || '',
+    banco: cand.banco || '', tipoPix: cand.tipoPix || '', chavePix: cand.chavePix || '',
+    tamanhoCamiseta: cand.tamanhoCamiseta || '', tamanhoCalca: cand.tamanhoCalca || '',
+    tamanhoBota: cand.tamanhoBota || '', sexo: cand.sexo || '',
+  };
+  try {
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+    return base + 'candidato.html?completar=' + encoded;
+  } catch(e) { return ''; }
+}
+
+// Renderiza seção BT pendentes no dashboard
+function renderBTPendentes() {
+  const section   = document.getElementById('bt-pendentes-section');
+  const lista     = document.getElementById('bt-pendentes-lista');
+  const countEl   = document.getElementById('bt-pendentes-count');
+  if (!section || !lista) return;
+
+  const meuId = loggedUser ? loggedUser.id : null;
+  const meuRec = meuId ? state.recrutadores.find(r => r.funcionarioId === meuId || r.nome === loggedUser.nome) : null;
+
+  const btPendentes = state.candidatos.filter(c =>
+    c.origemCadastro === 'banco_talentos' && !c.fichaCompletada &&
+    (!meuRec || c.recrutadorId === meuRec.id)
+  );
+
+  if (!btPendentes.length) { section.style.display = 'none'; return; }
+
+  section.style.display = '';
+  if (countEl) countEl.textContent = btPendentes.length;
+
+  lista.innerHTML = btPendentes.map(c => {
+    const link = gerarLinkCompletarFicha(c.id);
+    const wa = 'https://wa.me/' + (c.telefone || '').replace(/\D/g,'') + '?text=' +
+      encodeURIComponent(`Olá, ${(c.nome || '').split(' ')[0]}! Clique no link para completar seu cadastro na R&T Empregos: ${link}`);
+    return `
+      <div style="background:var(--card-bg); border:1px solid rgba(168,85,247,0.3); border-radius:10px; padding:14px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div style="width:38px;height:38px;border-radius:50%;background:rgba(168,85,247,0.2);color:#a855f7;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;">
+          ${(c.nome||'?').split(' ').map(n=>n[0]).slice(0,2).join('').toUpperCase()}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:13px;color:var(--text-primary);">${c.nome || '—'}</div>
+          <div style="font-size:11px;color:var(--text-secondary);">${c.telefone || '—'} · ${c.cidade || '—'}</div>
+          <div style="font-size:10px;color:#a855f7;margin-top:2px;">Ficha aguardando preenchimento</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0;">
+          <button onclick="navigator.clipboard.writeText('${link}').then(()=>{this.innerHTML='<i class=\\'fa-solid fa-check\\'></i> Copiado!';setTimeout(()=>{this.innerHTML='<i class=\\'fa-solid fa-copy\\'></i> Copiar link';},2000)})"
+            style="padding:6px 12px;border-radius:7px;border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.1);color:#a855f7;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
+            <i class="fa-solid fa-copy"></i> Copiar link
+          </button>
+          <a href="${wa}" target="_blank"
+            style="padding:6px 12px;border-radius:7px;border:none;background:#25d366;color:#fff;font-size:11px;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:5px;">
+            <i class="fa-brands fa-whatsapp"></i> WhatsApp
+          </a>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// Renderiza a seção do Banco de Talentos simples na aba Banco de Talentos
+function renderBancoTalentosSimples() {
+  const container = document.getElementById('banco-talentos-simples-lista');
+  if (!container) return;
+
+  const fSexo    = (document.getElementById('bt-filter-sexo')    || {}).value || '';
+  const fCidade  = (document.getElementById('bt-filter-cidade')  || {}).value || '';
+  const fEmpresa = (document.getElementById('bt-filter-empresa') || {}).value || '';
+
+  let lista = state.bancoTalentos || [];
+  if (fSexo)   lista = lista.filter(t => (t.sexo || detectarSexoPeloNome(t.nome)) === fSexo);
+  if (fCidade) lista = lista.filter(t => (t.cidade || '').toLowerCase() === fCidade.toLowerCase());
+
+  if (!lista.length) {
+    const total = (state.bancoTalentos || []).length;
+    container.innerHTML = `<p style="font-size:13px;color:var(--text-secondary);text-align:center;padding:24px 0;">${
+      total ? 'Nenhum resultado para os filtros selecionados.' : 'Nenhuma pessoa cadastrada ainda. Importe uma planilha Excel para começar.'
+    }</p>`;
+    return;
+  }
+
+  // Contagem no topo
+  const headerHtml = `<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;font-weight:600;">
+    ${lista.length} talento${lista.length > 1 ? 's' : ''} encontrado${lista.length > 1 ? 's' : ''}
+    <span style="font-weight:400;"> — clique em um nome para ver detalhes e puxar para processo</span>
+  </div>`;
+
+  const cardsHtml = lista.map(t => {
+    const initials = (t.nome || '?').split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase();
+    const sexo     = t.sexo || detectarSexoPeloNome(t.nome);
+    const proximas = empresasMaisProximas(t);
+    const filtradas = fEmpresa ? proximas.filter(e => e.id === fEmpresa) : proximas.slice(0,1);
+
+    const sexoBadge = sexo === 'M'
+      ? '<span style="font-size:10px;color:#3b82f6;background:rgba(59,130,246,0.1);padding:1px 6px;border-radius:8px;border:1px solid rgba(59,130,246,0.2);font-weight:600;">♂</span>'
+      : sexo === 'F'
+      ? '<span style="font-size:10px;color:#ec4899;background:rgba(236,72,153,0.1);padding:1px 6px;border-radius:8px;border:1px solid rgba(236,72,153,0.2);font-weight:600;">♀</span>'
+      : '';
+
+    const proximaBadge = filtradas.length
+      ? (() => {
+          const e = filtradas[0];
+          const perto = e.distKm <= 15;
+          return `<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap;` +
+            `background:${perto ? 'rgba(34,197,94,0.12)' : 'rgba(148,163,184,0.08)'};` +
+            `color:${perto ? '#16a34a' : '#64748b'};` +
+            `border:1px solid ${perto ? 'rgba(34,197,94,0.35)' : 'rgba(148,163,184,0.2)'};">` +
+            (perto ? '<i class="fa-solid fa-location-dot" style="font-size:9px;"></i>' : '') +
+            ` ${e.distKm}km</span>`;
+        })()
+      : '';
+
+    return `<div onclick="abrirDetalheBT('${t.id}')" style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:box-shadow 0.15s,border-color 0.15s;" onmouseover="this.style.boxShadow='0 2px 10px rgba(0,0,0,0.1)';this.style.borderColor='var(--primary)'" onmouseout="this.style.boxShadow='';this.style.borderColor='var(--border-color)'">
+      <div style="width:34px;height:34px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">${initials}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+          <span style="font-weight:700;color:var(--text-primary);font-size:13px;">${t.nome || 'Sem nome'}</span>
+          ${sexoBadge}
+        </div>
+        <div style="font-size:11px;color:var(--text-secondary);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          ${t.telefone || '—'} · ${t.cidade ? t.cidade + (t.estado ? '/' + t.estado : '') : '—'}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+        ${proximaBadge}
+        <i class="fa-solid fa-chevron-right" style="color:var(--text-secondary);font-size:11px;"></i>
+      </div>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = headerHtml + cardsHtml;
+}
+
+window.abrirDetalheBT = function(btId) {
+  const t = (state.bancoTalentos || []).find(x => x.id === btId);
+  if (!t) return;
+
+  const sexo = t.sexo || detectarSexoPeloNome(t.nome);
+  const initials = (t.nome || '?').split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase();
+
+  const g = id => document.getElementById(id);
+  g('bt-det-avatar').textContent = initials;
+  g('bt-det-nome').textContent   = t.nome || '—';
+  g('bt-det-sexo-badge').innerHTML = sexo === 'M'
+    ? '<span style="font-size:11px;color:#3b82f6;background:rgba(59,130,246,0.1);padding:2px 8px;border-radius:8px;font-weight:600;">♂ Masculino</span>'
+    : sexo === 'F'
+    ? '<span style="font-size:11px;color:#ec4899;background:rgba(236,72,153,0.1);padding:2px 8px;border-radius:8px;font-weight:600;">♀ Feminino</span>'
+    : '';
+  g('bt-det-telefone').textContent = t.telefone || '—';
+  g('bt-det-email').textContent    = t.email    || '—';
+  g('bt-det-cpf').textContent      = t.cpf      || '—';
+  g('bt-det-cidade').textContent   = t.cidade   ? t.cidade + (t.estado ? ' / ' + t.estado : '') : '—';
+  g('bt-det-cargo').textContent    = t.cargoInteresse || '—';
+  g('bt-det-exp').textContent      = t.experiencia    || '—';
+  g('bt-det-data').textContent     = t.dataCadastro ? 'Cadastrado em: ' + t.dataCadastro : '';
+
+  const obsBox = g('bt-det-obs-box');
+  if (t.observacao) { obsBox.style.display = 'block'; g('bt-det-obs').textContent = t.observacao; }
+  else               { obsBox.style.display = 'none'; }
+
+  const proximas = empresasMaisProximas(t);
+  const proxEl = g('bt-det-proximas');
+  if (proximas.length) {
+    proxEl.innerHTML = '<div style="font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:5px;">Proximidade de empresas</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:5px;">' +
+      proximas.slice(0,5).map(e => {
+        const perto = e.distKm <= 15;
+        return `<span style="display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:600;
+          background:${perto ? 'rgba(34,197,94,0.12)' : 'rgba(148,163,184,0.08)'};
+          color:${perto ? '#16a34a' : '#64748b'};
+          border:1px solid ${perto ? 'rgba(34,197,94,0.35)' : 'rgba(148,163,184,0.2)'};">
+          ${perto ? '<i class="fa-solid fa-location-dot" style="font-size:10px;"></i>' : ''} ${e.nome} · ${e.distKm}km</span>`;
+      }).join('') + '</div>';
+  } else {
+    proxEl.innerHTML = t.cidade
+      ? '<span style="font-size:11px;color:#64748b;font-style:italic;">Cidade não mapeada — distância não calculada</span>'
+      : '';
+  }
+
+  const btnPuxar = g('btn-puxar-processo-det');
+  if (btnPuxar) {
+    btnPuxar.onclick = () => {
+      document.getElementById('modal-bt-detalhe').classList.remove('active');
+      puxarParaProcesso(btId);
+    };
+  }
+
+  document.getElementById('modal-bt-detalhe').classList.add('active');
+};
+
+// Puxar pessoa do Banco de Talentos para o processo de seleção
+window.puxarParaProcesso = function(btId) {
+  const t = (state.bancoTalentos || []).find(x => x.id === btId);
+  if (!t) return;
+
+  const nomeSel = loggedUser ? loggedUser.nome : 'Selecionadora';
+  const recrutadorId = loggedUser ? (state.recrutadores.find(r => r.nome === loggedUser.nome || r.funcionarioId === loggedUser.id) || {}).id || null : null;
+
+  const novoCand = {
+    id:              'cand-bt-' + Date.now(),
+    numeroFila:      gerarNumeroFila(),
+    nome:            t.nome || '',
+    email:           t.email || '',
+    cpf:             t.cpf  || '',
+    rg:              t.rg   || '',
+    pis:             '',
+    telefone:        t.telefone || '',
+    dataNascimento:  '',
+    nomeMae:         '',
+    nomePai:         '',
+    cep:             t.cep    || '',
+    rua:             t.rua    || '',
+    numeroCasa:      t.numero || '',
+    bairro:          t.bairro || '',
+    cidade:          t.cidade || '',
+    estado:          t.estado || '',
+    sexo:            t.sexo || detectarSexoPeloNome(t.nome),
+    banco:           '', tipoPix: '', chavePix: '',
+    tamanhoCamiseta: '', tamanhoCalca: '', tamanhoBota: '',
+    vagaId:          '', empresaId: '', codigoVaga: 'A definir',
+    recrutadorId:    recrutadorId,
+    origemCadastro:  'banco_talentos',
+    comoSoube:       null,
+    origemLink:      'banco_talentos_rt',
+    status:          'pendente',
+    diasEtapa:       0,
+    dataCadastro:    new Date().toISOString(),
+    observacoesSelecao: (t.cargoInteresse ? `Interesse: ${t.cargoInteresse}. ` : '') + (t.observacao || ''),
+    documentos:      { selfie:'', rgFrente:'', fotoPis:'', cpfDocumento:'', comprovanteResidencia:'', cartaoBancoVerso:'' },
+    historico:       [{ data: new Date().toLocaleString('pt-BR'), autor: nomeSel, acao: `Candidato puxado do Banco de Talentos RT por ${nomeSel}. Dados pré-preenchidos da planilha.` }],
+  };
+
+  if (!state.candidatos) state.candidatos = [];
+  state.candidatos.push(novoCand);
+
+  // Remove do banco de talentos
+  state.bancoTalentos = state.bancoTalentos.filter(x => x.id !== btId);
+  saveState();
+  renderBancoTalentosSimples();
+  renderSelecaoGrid();
+
+  alert(`✅ ${t.nome} foi adicionado(a) à Seleção com origem "Banco de Talentos RT".\nRecrutado(a) por: ${nomeSel}\n\nAbra a Seleção para completar a ficha.`);
+};
+
+// Inicializa filtros do Banco de Talentos simples
+function setupBTFilters() {
+  // Popula dropdown de empresas (apenas uma vez)
+  const fEmpresa = document.getElementById('bt-filter-empresa');
+  if (fEmpresa && fEmpresa.options.length <= 1) {
+    (state.empresas || []).forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = e.id;
+      opt.textContent = e.nome + ' (' + (e.cidade || '') + ')';
+      fEmpresa.appendChild(opt);
+    });
+  }
+
+  // Popula dropdown de cidades com as cidades únicas do BT
+  const fCidade = document.getElementById('bt-filter-cidade');
+  if (fCidade) {
+    const cidades = [...new Set((state.bancoTalentos || []).map(t => t.cidade).filter(Boolean))].sort();
+    while (fCidade.options.length > 1) fCidade.remove(1);
+    cidades.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = c;
+      fCidade.appendChild(opt);
+    });
+  }
+
+  // Registra listeners nos filtros (apenas uma vez)
+  ['bt-filter-sexo', 'bt-filter-cidade', 'bt-filter-empresa'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.dataset.btListenerAdded) {
+      el.dataset.btListenerAdded = 'true';
+      el.addEventListener('change', renderBancoTalentosSimples);
+    }
+  });
+
+  const btnLimpar = document.getElementById('bt-filter-limpar');
+  if (btnLimpar && !btnLimpar.dataset.btListenerAdded) {
+    btnLimpar.dataset.btListenerAdded = 'true';
+    btnLimpar.addEventListener('click', () => {
+      ['bt-filter-sexo', 'bt-filter-cidade', 'bt-filter-empresa'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      renderBancoTalentosSimples();
+    });
+  }
+}
+
+// Importar candidatos em lote via Excel/CSV
+function setupImportarBT() {
+  const input = document.getElementById('input-importar-bt');
+  if (!input || input.dataset.listenerAdded) return;
+  input.dataset.listenerAdded = 'true';
+
+  input.addEventListener('change', () => {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+        if (!rows.length) { mostrarResultadoImport(0, 0, ['Planilha vazia.']); return; }
+
+        const col = (row, ...keys) => {
+          for (const k of keys) {
+            const found = Object.keys(row).find(rk => rk.toLowerCase().replace(/[^a-z]/g,'') === k.toLowerCase().replace(/[^a-z]/g,''));
+            if (found && row[found] !== '') return String(row[found]).trim();
+          }
+          return '';
+        };
+
+        let inseridos = 0;
+        const erros = [];
+
+        rows.forEach((row, i) => {
+          const nome = col(row, 'nome', 'name', 'nomecompleto');
+          if (!nome) { erros.push(`Linha ${i+2}: nome não encontrado.`); return; }
+
+          const talento = {
+            id:           'bt-' + Date.now() + '-' + i,
+            nome,
+            telefone:     col(row, 'telefone', 'celular', 'fone', 'whatsapp'),
+            cpf:          col(row, 'cpf'),
+            rg:           col(row, 'rg'),
+            email:        col(row, 'email', 'email'),
+            cep:          col(row, 'cep'),
+            rua:          col(row, 'rua', 'logradouro', 'endereco'),
+            numero:       col(row, 'numero', 'num'),
+            bairro:       col(row, 'bairro'),
+            cidade:       col(row, 'cidade', 'municipio'),
+            estado:       col(row, 'estado', 'uf'),
+            sexo:           (function(){ const s = col(row,'sexo','genero','gender'); const n = s.toLowerCase(); return n.startsWith('m') ? 'M' : n.startsWith('f') ? 'F' : ''; })() || detectarSexoPeloNome(nome),
+            cargoInteresse: col(row, 'cargo', 'cargointeresse', 'funcao', 'vaga'),
+            experiencia:  col(row, 'experiencia', 'exp'),
+            observacao:   col(row, 'observacao', 'obs', 'observacoes'),
+            dataCadastro: new Date().toLocaleString('pt-BR'),
+            origemLink:   'importacao_lote',
+          };
+
+          if (!state.bancoTalentos) state.bancoTalentos = [];
+          state.bancoTalentos.push(talento);
+          inseridos++;
+        });
+
+        saveState();
+        setupBTFilters();
+        renderBancoTalentosSimples();
+        mostrarResultadoImport(rows.length, inseridos, erros);
+        input.value = '';
+      } catch (err) {
+        mostrarResultadoImport(0, 0, ['Erro ao ler arquivo: ' + err.message]);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  // Exportar CSV
+  const btnExportar = document.getElementById('btn-exportar-bt');
+  if (btnExportar && !btnExportar.dataset.listenerAdded) {
+    btnExportar.dataset.listenerAdded = 'true';
+    btnExportar.addEventListener('click', () => {
+      const lista = state.bancoTalentos || [];
+      if (!lista.length) { alert('Banco de talentos vazio.'); return; }
+      const ws = XLSX.utils.json_to_sheet(lista.map(t => ({
+        Nome: t.nome, Telefone: t.telefone, Email: t.email, CPF: t.cpf, RG: t.rg,
+        Sexo: t.sexo === 'M' ? 'Masculino' : t.sexo === 'F' ? 'Feminino' : '',
+        CEP: t.cep, Rua: t.rua, Número: t.numero, Bairro: t.bairro,
+        Cidade: t.cidade, Estado: t.estado,
+        'Cargo Interesse': t.cargoInteresse, Experiência: t.experiencia,
+        Observação: t.observacao, Cadastro: t.dataCadastro,
+      })));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Banco de Talentos');
+      XLSX.writeFile(wb, 'banco_talentos_RT.xlsx');
+    });
+  }
+}
+
+function mostrarResultadoImport(total, inseridos, erros) {
+  const el = document.getElementById('bt-import-result');
+  if (!el) return;
+  const cor = erros.length ? '#f59e0b' : '#22c55e';
+  el.style.display = '';
+  el.innerHTML = `
+    <div style="background:rgba(34,197,94,0.08); border:1px solid ${cor}40; border-radius:8px; padding:12px 16px; font-size:12px; color:var(--text-primary);">
+      <strong style="color:${cor};"><i class="fa-solid fa-file-import"></i> Importação concluída:</strong>
+      ${inseridos} de ${total} registros importados.
+      ${erros.length ? `<br><span style="color:#f59e0b;">${erros.slice(0,5).join(' | ')}${erros.length>5?` e mais ${erros.length-5}...`:''}</span>` : ''}
+    </div>`;
+  setTimeout(() => { el.style.display = 'none'; }, 8000);
+}
+
+// ==========================================================================
+// MÓDULO 23: LINK OFICIAL DA AGÊNCIA R&T (QR Code)
+// ==========================================================================
+
+function getAgenciaLinkUrl() {
+  return `${window.location.origin}${window.location.pathname}?rec=agencia`;
+}
+
+window.copiarLinkAgencia = function(btn) {
+  const link = getAgenciaLinkUrl();
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(link).then(() => {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-check"></i> Copiado!';
+      btn.style.background = '#22c55e'; btn.style.color = '#fff';
+      setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; btn.style.color = ''; }, 2500);
+    });
+  } else { prompt('Link da agência:', link); }
+};
+
+// ==========================================================================
+// UPGRADE VISUAL PREMIUM - NOVAS FUNÇÕES DE MÉTRIAS, GRÁFICOS E ANIMAÇÕES
+// ==========================================================================
+
+/* Visão Geral (Overview) do Dashboard */
+function renderDashboardOverview() {
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  
+  // 1. Saudação do Usuário
+  const greetingEl = document.getElementById('dash-welcome-title');
+  if (greetingEl) {
+    greetingEl.textContent = `Bem-vindo(a), ${loggedUser ? loggedUser.nome : 'Colaborador'}! 👋`;
+  }
+
+  // 2. Cálculos dos KPIs
+  const cadHoje = state.candidatos.filter(c => {
+    if (!c.dataCadastro) return false;
+    return new Date(c.dataCadastro).toLocaleDateString('pt-BR') === hoje;
+  }).length;
+  
+  const analiseSel = state.candidatos.filter(c => ['em_analise', 'entrevista'].includes(c.status)).length;
+  const enviadasDp = state.candidatos.filter(c => c.status === 'aprovado').length;
+  const devolvidasDp = state.candidatos.filter(c => c.devolvidoDP === true).length;
+  
+  const contratosHoje = state.candidatos.filter(c => {
+    return c.status === 'contratado' && c.dataContratacao === hoje;
+  }).length;
+
+  const vagasDisp = state.vagas.reduce((acc, v) => acc + (v.vagasDisponiveis || 0), 0);
+  const vagasPreenchidas = state.vagas.reduce((acc, v) => acc + (v.vagasPreenchidas || 0), 0);
+  
+  // Destaque da Semana
+  const { recrutadorId: destId, contagem: destContagem } = calcularRecrutadorSemana();
+  const destRec = destId ? state.recrutadores.find(r => r.id === destId) : null;
+  const destNome = destRec ? destRec.nome : 'Nenhum';
+
+  // 3. Renderização dos KPIs na tela
+  const setKPI = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  };
+
+  setKPI('dash-kpi-cad-hoje', cadHoje);
+  setKPI('dash-kpi-analise-sel', analiseSel);
+  setKPI('dash-kpi-enviadas-dp', enviadasDp);
+  setKPI('dash-kpi-devolvidas-dp', devolvidasDp);
+  setKPI('dash-kpi-contratos-hoje', contratosHoje);
+  setKPI('dash-kpi-vagas-disp', vagasDisp);
+  setKPI('dash-kpi-vagas-preenchidas', vagasPreenchidas);
+
+  const destNomeEl = document.getElementById('dash-kpi-recrutador-destaque-nome');
+  if (destNomeEl) {
+    destNomeEl.textContent = destContagem > 0 ? `${destNome} (${destContagem})` : 'Nenhum';
+  }
+
+  // 4. Trigger de verificação de coroa no cabeçalho do usuário
+  verificarDestaqueCabecalho();
+
+  // 4b. Seção BT pendentes (candidatos aguardando completar ficha)
+  renderBTPendentes();
+
+  // 5. Destruir gráficos anteriores se existirem para evitar sobreposição
+  Object.keys(dashboardCharts).forEach(key => {
+    if (dashboardCharts[key]) {
+      dashboardCharts[key].destroy();
+      dashboardCharts[key] = null;
+    }
+  });
+
+  // --- Gráfico 1: Contratações por Dia (Linha) ---
+  const ctxDia = document.getElementById('chartDashContratacoesDia');
+  if (ctxDia) {
+    const dates = [];
+    const counts = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const str = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      const fullStr = d.toLocaleDateString('pt-BR');
+      dates.push(str);
+      // Conta quantos candidatos fecharam contrato nesta data
+      const cCount = state.candidatos.filter(c => c.status === 'contratado' && c.dataContratacao === fullStr).length;
+      counts.push(cCount);
+    }
+
+    dashboardCharts.dia = new Chart(ctxDia, {
+      type: 'line',
+      data: {
+        labels: dates,
+        datasets: [{
+          label: 'Contratos Feitos',
+          data: counts,
+          borderColor: '#e11d48',
+          backgroundColor: 'rgba(225, 29, 72, 0.1)',
+          fill: true,
+          tension: 0.4,
+          borderWidth: 3,
+          pointBackgroundColor: '#e11d48'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { stepSize: 1, color: '#94a3b8' }, grid: { color: '#f1f5f940' } },
+          x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  // --- Gráfico 2: Contratações por Empresa (Rosca/Doughnut) ---
+  const ctxEmp = document.getElementById('chartDashContratacoesEmpresa');
+  if (ctxEmp) {
+    const labels = state.empresas.map(e => e.nome);
+    const data = state.empresas.map(e => {
+      return state.contratacoes.filter(c => c.empresaNome.toLowerCase().includes(e.nome.toLowerCase()) || c.empresaNome.toLowerCase().includes(e.sigla.toLowerCase())).length;
+    });
+
+    dashboardCharts.empresa = new Chart(ctxEmp, {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: data,
+          backgroundColor: state.empresas.map(e => e.cor || '#94a3b8'),
+          borderWidth: 2,
+          borderColor: '#1e293b'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 }, color: '#94a3b8' } }
+        }
+      }
+    });
+  }
+
+  // --- Gráfico 3: Contratações por Selecionador (Barras) ---
+  const ctxSel = document.getElementById('chartDashContratacoesSelecionador');
+  if (ctxSel) {
+    const labels = state.recrutadores.map(r => r.nome);
+    const data = state.recrutadores.map(r => {
+      return state.contratacoes.filter(c => c.recrutadorId === r.id).length;
+    });
+
+    dashboardCharts.selecionador = new Chart(ctxSel, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: data,
+          backgroundColor: state.recrutadores.map(r => r.corHex || '#be123c'),
+          borderRadius: 6,
+          barThickness: 24
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { stepSize: 1, color: '#94a3b8' }, grid: { color: '#f1f5f940' } },
+          x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  // --- Gráfico 4: Fichas por Status (Pie/Pizza) ---
+  const ctxStatus = document.getElementById('chartDashFichasStatus');
+  if (ctxStatus) {
+    const statuses = ['pendente', 'em_analise', 'entrevista', 'aprovado', 'reprovado', 'contratado'];
+    const labels = ['Pendente', 'Em Análise', 'Entrevista', 'Aguardando DP', 'Reprovado', 'Contratado'];
+    const data = statuses.map(st => state.candidatos.filter(c => c.status === st).length);
+
+    dashboardCharts.status = new Chart(ctxStatus, {
+      type: 'pie',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: data,
+          backgroundColor: ['#eab308', '#3b82f6', '#a855f7', '#10b981', '#ef4444', '#059669'],
+          borderWidth: 1,
+          borderColor: '#1e293b'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 }, color: '#94a3b8' } }
+        }
+      }
+    });
+  }
+
+  // --- Gráfico 5: Vagas Disponíveis por Empresa (Barras Verticais Duplas) ---
+  const ctxVagas = document.getElementById('chartDashVagasEmpresa');
+  if (ctxVagas) {
+    const labels = state.empresas.map(e => e.sigla);
+    const disponiveis = state.empresas.map(e => {
+      return state.vagas.filter(v => v.empresaId === e.id).reduce((acc, v) => acc + (v.vagasDisponiveis || 0), 0);
+    });
+    const preenchidas = state.empresas.map(e => {
+      return state.vagas.filter(v => v.empresaId === e.id).reduce((acc, v) => acc + (v.vagasPreenchidas || 0), 0);
+    });
+
+    dashboardCharts.vagas = new Chart(ctxVagas, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Disponíveis',
+            data: disponiveis,
+            backgroundColor: '#3b82f6',
+            borderRadius: 4
+          },
+          {
+            label: 'Preenchidas',
+            data: preenchidas,
+            backgroundColor: '#10b981',
+            borderRadius: 4
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, ticks: { stepSize: 5, color: '#94a3b8' }, grid: { color: '#f1f5f940' } },
+          x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+        },
+        plugins: {
+          legend: { labels: { color: '#94a3b8', font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  // --- Gráfico 6: Linhas de Fretado com mais Contratações (Barras Horizontais) ---
+  const ctxFretados = document.getElementById('chartDashFretadosHires');
+  if (ctxFretados) {
+    // Agrupa contratados por cidade/rota de fretado
+    const contratados = state.candidatos.filter(c => c.status === 'contratado');
+    const rotas = {};
+    contratados.forEach(c => {
+      const rota = c.cidade || 'Não Informado';
+      rotas[rota] = (rotas[rota] || 0) + 1;
+    });
+
+    // Ordena e pega as top 5 rotas
+    const sortedRotas = Object.entries(rotas)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    const labels = sortedRotas.map(r => r[0]);
+    const data = sortedRotas.map(r => r[1]);
+
+    dashboardCharts.fretados = new Chart(ctxFretados, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: data,
+          backgroundColor: '#f97316',
+          borderRadius: 6,
+          barThickness: 20
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { beginAtZero: true, ticks: { stepSize: 1, color: '#94a3b8' }, grid: { color: '#f1f5f940' } },
+          y: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+        }
+      }
+    });
+  }
+}
+
+/* Animação: Subir Ficha para DP (Decolagem Horizontal) */
+function triggerRocketAnimationDP(cand, foiDevolvida, callback) {
+  // 1. Tremor de tela
+  document.body.classList.add('apply-shake');
+  setTimeout(() => document.body.classList.remove('apply-shake'), 600);
+
+  // 2. Configurar foguete
+  const overlay = document.getElementById('rocket-anim-overlay');
+  const rocket = document.getElementById('animated-rocket');
+  
+  if (!overlay || !rocket) {
+    // Fallback se elementos não existirem
+    if (callback) callback();
+    return;
+  }
+
+  rocket.className = 'animated-rocket-element rocket-horizontal';
+  overlay.classList.add('active');
+  
+  // Força reflow
+  void rocket.offsetWidth;
+  
+  rocket.classList.add('animate');
+
+  // Gerador de partículas de rastro
+  let particleInterval = setInterval(() => {
+    const rect = rocket.getBoundingClientRect();
+    if (rect.left > 0 && rect.left < window.innerWidth) {
+      // Cria partícula vermelha/laranja atrás do bico do foguete (rastro)
+      createTrailParticle(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    }
+  }, 35);
+
+  // Finalizar após animação voar
+  setTimeout(() => {
+    clearInterval(particleInterval);
+    overlay.classList.remove('active');
+    rocket.classList.remove('animate');
+    
+    // Roda callback operacional (atualiza dados, fecha drawer, recarrega)
+    if (callback) callback();
+    
+    // Toast de sucesso no final
+    const msg = foiDevolvida
+      ? `Ficha de "${cand.nome}" corrigida e reenviada ao DP!`
+      : `🚀 Ficha de "${cand.nome}" enviada com sucesso para o DP!`;
+    showToast(msg, 'success');
+  }, 1600);
+}
+
+/* Animação: Contrato Feito (Decolagem Vertical para o espaço) */
+function triggerRocketAnimationContract(cand, callback) {
+  // 1. Tremor de tela
+  document.body.classList.add('apply-shake');
+  setTimeout(() => document.body.classList.remove('apply-shake'), 600);
+
+  // 2. Configurar foguete
+  const overlay = document.getElementById('rocket-anim-overlay');
+  const rocket = document.getElementById('animated-rocket');
+  
+  if (!overlay || !rocket) {
+    if (callback) callback();
+    return;
+  }
+
+  rocket.className = 'animated-rocket-element rocket-vertical';
+  overlay.classList.add('active');
+  
+  void rocket.offsetWidth;
+  rocket.classList.add('animate');
+
+  // Partículas de rastro vertical
+  let particleInterval = setInterval(() => {
+    const rect = rocket.getBoundingClientRect();
+    if (rect.top > -100 && rect.top < window.innerHeight) {
+      createTrailParticle(rect.left + rect.width / 2, rect.top + rect.height);
+    }
+  }, 30);
+
+  // Finalizar
+  setTimeout(() => {
+    clearInterval(particleInterval);
+    overlay.classList.remove('active');
+    rocket.classList.remove('animate');
+    
+    if (callback) callback();
+  }, 1800);
+}
+
+/* Criador de partículas de rastro brilhantes */
+function createTrailParticle(x, y) {
+  const particle = document.createElement('div');
+  particle.className = 'rocket-particle';
+  
+  // Cores dinâmicas de chama (Vermelho, Laranja, Amarelo)
+  const colors = ['#e11d48', '#f97316', '#eab308', '#ffffff'];
+  const color = colors[Math.floor(Math.random() * colors.length)];
+  
+  // Dimensões aleatórias
+  const size = Math.floor(Math.random() * 8) + 4;
+  
+  particle.style.width = `${size}px`;
+  particle.style.height = `${size}px`;
+  particle.style.background = color;
+  particle.style.left = `${x}px`;
+  particle.style.top = `${y}px`;
+  particle.style.boxShadow = `0 0 ${size}px ${color}`;
+  
+  document.body.appendChild(particle);
+  
+  // Remove após terminar animação CSS
+  setTimeout(() => {
+    particle.remove();
+  }, 800);
+}
+
+/* Sistema Premium de Toasts (Notificações) */
+function showToast(message, type = 'success') {
+  const toast = document.getElementById('modern-toast');
+  const toastText = document.getElementById('modern-toast-text');
+  
+  if (!toast || !toastText) {
+    // Fallback se não existir
+    alert(message);
+    return;
+  }
+
+  toastText.textContent = message;
+  
+  // Ajusta cor dependendo do status
+  if (type === 'success') {
+    toast.style.background = '#10b981';
+    toast.style.boxShadow = '0 10px 25px -5px rgba(16, 185, 129, 0.35)';
+  } else {
+    toast.style.background = '#ef4444';
+    toast.style.boxShadow = '0 10px 25px -5px rgba(239, 68, 68, 0.35)';
+  }
+
+  toast.classList.add('show');
+  
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 3500);
+}
+
+/* Sistema de Click to Copy com Cadeado e Tooltip no DP */
+function setupCopyableFieldsDP() {
+  const isDpUser = loggedUser && loggedUser.departamento === 'dp';
+  const dpPodeEditar = state.config?.dpPodeEditar === true;
+
+  // Limpar botões antigos
+  document.querySelectorAll('#modal-candidato-detalhes .dp-copy-btn').forEach(b => b.remove());
+  document.querySelectorAll('#modal-candidato-detalhes .form-group-copyable').forEach(p => {
+    p.classList.remove('form-group-copyable');
+    p.style.position = '';
+  });
+
+  if (!(isDpUser && !dpPodeEditar)) return;
+
+  const fields = document.querySelectorAll('#modal-candidato-detalhes .form-control');
+  fields.forEach(field => {
+    if (field.tagName.toLowerCase() === 'select') return;
+
+    const parent = field.parentElement;
+    if (!parent) return;
+    parent.classList.add('form-group-copyable');
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dp-copy-btn';
+    btn.title = 'Copiar';
+    btn.innerHTML = '<i class="fa-solid fa-copy"></i>';
+    btn.style.cssText = [
+      'position:absolute', 'right:8px', 'bottom:8px',
+      'width:24px', 'height:24px', 'border-radius:6px',
+      'border:1px solid var(--border-color)', 'background:var(--bg-card)',
+      'color:var(--text-secondary)', 'cursor:pointer', 'font-size:11px',
+      'display:flex', 'align-items:center', 'justify-content:center',
+      'opacity:0', 'transition:opacity .2s', 'z-index:2', 'padding:0'
+    ].join(';');
+
+    parent.style.position = 'relative';
+    parent.appendChild(btn);
+
+    parent.addEventListener('mouseenter', () => { btn.style.opacity = '1'; });
+    parent.addEventListener('mouseleave', () => { btn.style.opacity = '0'; });
+
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const val = (field.value || field.textContent || '').trim();
+      if (!val) return;
+      navigator.clipboard.writeText(val).then(() => {
+        btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+        btn.style.color = '#10b981';
+        setTimeout(() => {
+          btn.innerHTML = '<i class="fa-solid fa-copy"></i>';
+          btn.style.color = '';
+        }, 1500);
+        const tooltip = document.getElementById('copy-tooltip');
+        if (tooltip) {
+          tooltip.classList.add('show');
+          setTimeout(() => tooltip.classList.remove('show'), 1800);
+        }
+      });
+    });
+  });
+}
+
+/* Verifica se o usuário ativo é o destaque da semana e insere coroa */
+function verificarDestaqueCabecalho() {
+  const avatarEl = document.getElementById('header-user-avatar');
+  if (!avatarEl || !loggedUser) return;
+
+  const { recrutadorId: destId } = calcularRecrutadorSemana();
+  
+  const recMatch = destId && loggedUser.nome.toLowerCase().includes(destId.toLowerCase());
+  
+  if (recMatch) {
+    avatarEl.classList.add('avatar-destaque-glow');
+  } else {
+    avatarEl.classList.remove('avatar-destaque-glow');
+  }
+}
+
+// ──────────────────────────────────────────────
+// MODAL: NOVO CLIENTE (EMPRESA PARCEIRA)
+// ──────────────────────────────────────────────
+window.fecharModalNovoCliente = function() {
+  const m = document.getElementById('modal-novo-cliente');
+  if (m) { m.classList.remove('active'); document.getElementById('form-novo-cliente').reset(); }
+  const box = document.getElementById('cli-coords-box');
+  if (box) box.style.display = 'none';
+};
+
+window.autoSiglaCliente = function() {
+  const nome = document.getElementById('cli-nome').value.trim();
+  const siglaEl = document.getElementById('cli-sigla');
+  if (!siglaEl || siglaEl.dataset.userEdited) return;
+  const words = nome.split(/\s+/).filter(Boolean);
+  let sigla = '';
+  if (words.length === 1) sigla = words[0].slice(0, 4).toUpperCase();
+  else sigla = words.map(w => w[0]).join('').slice(0, 4).toUpperCase();
+  siglaEl.value = sigla;
+};
+
+window.autoLatLngCliente = function() {
+  const cidade = document.getElementById('cli-cidade').value.trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const coords = CIDADE_COORDS[cidade];
+  const latEl  = document.getElementById('cli-lat');
+  const lngEl  = document.getElementById('cli-lng');
+  const box    = document.getElementById('cli-coords-box');
+  const txt    = document.getElementById('cli-coords-txt');
+  if (coords && latEl && lngEl) {
+    latEl.value = coords.lat;
+    lngEl.value = coords.lng;
+    if (box && txt) {
+      txt.textContent = 'Localização encontrada automaticamente: ' + coords.lat + ', ' + coords.lng + ' — cálculo de proximidade ativo!';
+      box.style.display = 'block';
+    }
+  } else if (box) {
+    box.style.display = 'none';
+    if (latEl) latEl.value = '';
+    if (lngEl) lngEl.value = '';
+  }
+};
+
+// ==========================================================================
+// BLOQUEIO DE FICHA DP
+// ==========================================================================
+
+window.liberarFichaDP = function(candidatoId) {
+  const cand = state.candidatos.find(c => c.id === candidatoId);
+  if (!cand) return;
+  const lock = cand.dpLock;
+  if (!lock || lock.userLogin !== (loggedUser && loggedUser.login)) return;
+  cand.dpLock = null;
+  if (!cand.historico) cand.historico = [];
+  cand.historico.push({
+    data: new Date().toLocaleString('pt-BR'),
+    autor: `${loggedUser.nome} (DP)`,
+    acao: 'Ficha liberada para outros colaboradores do DP.',
+    tipo: 'liberacao'
+  });
+  saveState();
+  fecharDrawerDetalhes();
+  renderCurrentAba();
+};
+
+// ==========================================================================
+// MÓDULO: MEU PAINEL
+// ==========================================================================
+
+const _esc = (v) => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function renderMeuPainel() {
+  const container = document.getElementById('meu-painel-conteudo');
+  if (!container || !loggedUser) return;
+  try {
+    const rec = (state.recrutadores || []).find(r => r.loginVinculado === loggedUser.login);
+    if (!rec) {
+      _renderVinculacaoMeuPainel(container);
+    } else {
+      _renderPainelCompleto(container, rec);
+    }
+  } catch(e) {
+    container.innerHTML = `<div style="padding:20px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:10px;color:#ef4444;font-size:12px;">
+      <strong>Erro ao carregar o Meu Painel:</strong> ${_esc(e.message)}<br>
+      <span style="opacity:.7;">Recarregue a página (F5) para tentar novamente.</span>
+    </div>`;
+  }
+}
+
+function _renderVinculacaoMeuPainel(container) {
+  const livres = state.recrutadores.filter(r => !r.loginVinculado);
+  const opcoes = livres.map(r => `<option value="${r.id}">${r.nome}</option>`).join('');
+  container.innerHTML = `
+    <div style="max-width:460px;margin:40px auto;background:var(--bg-card);border:1px solid var(--border-color);border-radius:16px;padding:36px;text-align:center;">
+      <div style="width:64px;height:64px;border-radius:50%;background:rgba(59,130,246,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:28px;color:#3b82f6;">
+        <i class="fa-solid fa-id-card-clip"></i>
+      </div>
+      <h2 style="font-size:18px;font-weight:700;margin-bottom:8px;color:var(--text-primary);">Configure seu Meu Painel</h2>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:24px;line-height:1.6;">Selecione qual perfil de recrutadora é seu. Isso vincula seus links, candidatos e configurações pessoais.</p>
+      <div style="text-align:left;margin-bottom:20px;">
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px;">Meu perfil de recrutadora</label>
+        <select id="meu-painel-select-rec" class="form-control" style="width:100%;">
+          <option value="">— Selecione —</option>
+          ${opcoes || '<option disabled>Nenhum perfil disponível no momento</option>'}
+        </select>
+      </div>
+      <button onclick="vincularPerfilRecrutadora()" class="btn btn-primary" style="width:100%;padding:10px;">
+        <i class="fa-solid fa-link"></i> Vincular meu perfil
+      </button>
+      ${!opcoes ? '<p style="font-size:11px;color:#f59e0b;margin-top:12px;"><i class="fa-solid fa-triangle-exclamation"></i> Todos os perfis já estão vinculados. Peça ao administrador para desvincular se necessário.</p>' : ''}
+    </div>`;
+}
+
+
+function _renderPainelCompleto(container, rec) {
+  const base = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+  const linkFicha = base + 'candidato.html?rec=' + rec.id;
+  const linkBT    = base + 'talento.html?rec=' + rec.id;
+  const meusCands = (state.candidatos || []).filter(c => c.recrutadorId === rec.id);
+  const meusBT    = (state.bancoTalentos || []).filter(bt => bt.recrutadorId === rec.id);
+
+  const STATUS_COR   = { pendente:'#f59e0b', em_analise:'#3b82f6', entrevista:'#8b5cf6', aprovado:'#10b981', reprovado:'#ef4444', contratado:'#0ea5e9', aguardando_consulta_cpf:'#94a3b8' };
+  const STATUS_LABEL = { pendente:'Pendente', em_analise:'Em Análise', entrevista:'Entrevista', aprovado:'Aprovado', reprovado:'Reprovado', contratado:'Contratado', aguardando_consulta_cpf:'Ag. CPF' };
+
+  const linhasCands = meusCands.length === 0
+    ? `<tr><td colspan="4" style="padding:20px;text-align:center;font-size:12px;color:var(--text-secondary);">Nenhum candidato atribuído ainda.</td></tr>`
+    : meusCands.slice(0, 25).map(c => {
+        const sc = STATUS_COR[c.status] || '#94a3b8';
+        const sl = STATUS_LABEL[c.status] || c.status;
+        const dt = c.dataCadastro ? new Date(c.dataCadastro).toLocaleDateString('pt-BR') : '—';
+        return `<tr style="border-bottom:1px solid var(--border-color);cursor:pointer;" onclick="abrirDrawerDetalhes('${c.id}')">
+          <td style="padding:8px 12px;font-size:12px;font-weight:600;color:var(--text-primary);">${_esc(c.nome)}</td>
+          <td style="padding:8px 12px;"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${sc}22;color:${sc};border:1px solid ${sc}44;">${sl}</span></td>
+          <td style="padding:8px 12px;font-size:11px;color:var(--text-secondary);">${_esc(c.codigoVaga || '—')}</td>
+          <td style="padding:8px 12px;font-size:11px;color:var(--text-secondary);">${dt}</td>
+        </tr>`;
+      }).join('');
+
+  const waAbrirBtn = rec.whatsapp
+    ? `<a href="https://wa.me/${rec.whatsapp.replace(/\D/g,'')}" target="_blank" style="padding:8px 12px;border-radius:8px;border:none;background:#25d366;color:#fff;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0;"><i class="fa-brands fa-whatsapp"></i> Abrir</a>`
+    : '';
+
+  const qrBTUrl    = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(linkBT)}`;
+  const qrFichaUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(linkFicha)}`;
+
+  const msgBT    = `Olá! Me chamo ${rec.nome}, sou recrutadora da R&T Empregos. Temos vagas disponíveis na sua região! Acesse nosso banco de oportunidades e se candidate: ${linkBT}`;
+  const msgFicha = `Olá! Me chamo ${rec.nome}, sou recrutadora da R&T Empregos. Para se candidatar às nossas vagas, preencha sua ficha pelo link: ${linkFicha}`;
+
+  container.innerHTML = `
+    <!-- HEADER -->
+    <div style="display:flex;align-items:center;gap:18px;background:var(--bg-card);border:1px solid var(--border-color);border-radius:16px;padding:20px 24px;margin-bottom:20px;flex-wrap:wrap;">
+      <div style="width:56px;height:56px;border-radius:50%;background:${rec.corHex};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px;color:#fff;flex-shrink:0;">${rec.nome[0]}</div>
+      <div style="flex:1;min-width:160px;">
+        <div style="font-size:18px;font-weight:800;color:var(--text-primary);">${_esc(rec.nome)}</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${_esc(loggedUser.cargo || loggedUser.departamento)} · Meu Painel Pessoal</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <span style="font-size:11px;font-weight:600;padding:4px 12px;border-radius:12px;background:rgba(16,185,129,0.12);color:#10b981;border:1px solid rgba(16,185,129,0.3);">${meusCands.length} candidatos</span>
+        <span style="font-size:11px;font-weight:600;padding:4px 12px;border-radius:12px;background:rgba(168,85,247,0.12);color:#a855f7;border:1px solid rgba(168,85,247,0.3);">${meusBT.length} no BT</span>
+      </div>
+    </div>
+
+    <!-- GRID 2 COLUNAS: LINKS + WHATSAPP -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;">
+
+      <!-- MEUS LINKS -->
+      <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:14px;padding:20px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:16px;color:var(--text-primary);display:flex;align-items:center;gap:8px;">
+          <i class="fa-solid fa-link" style="color:#3b82f6;"></i> Meus Links
+        </div>
+        <!-- BT -->
+        <div style="background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.2);border-radius:10px;padding:14px;margin-bottom:12px;">
+          <div style="font-size:11px;font-weight:700;color:#a855f7;margin-bottom:10px;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-users"></i> Banco de Talentos</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+            <button onclick="navigator.clipboard.writeText('${linkBT}').then(()=>{this.textContent='✓ Copiado!';setTimeout(()=>{this.innerHTML='<i class=\\'fa-solid fa-copy\\'></i> Copiar'},1800)})"
+              style="padding:5px 10px;border-radius:7px;border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.1);color:#a855f7;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
+              <i class="fa-solid fa-copy"></i> Copiar</button>
+            <a href="${linkBT}" target="_blank" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-secondary);cursor:pointer;font-size:11px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
+              <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir</a>
+            <button onclick="toggleQrMeuPainel('qr-bt-img')"
+              style="padding:5px 10px;border-radius:7px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-secondary);cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
+              <i class="fa-solid fa-qrcode"></i> QR</button>
+            <button onclick="navigator.clipboard.writeText(${JSON.stringify(msgBT)}).then(()=>{this.textContent='✓ Copiado!';setTimeout(()=>{this.innerHTML='<i class=\\'fa-solid fa-message\\'></i> Divulgar'},1800)})"
+              style="padding:5px 10px;border-radius:7px;border:1px solid rgba(16,185,129,0.4);background:rgba(16,185,129,0.08);color:#10b981;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
+              <i class="fa-solid fa-message"></i> Divulgar</button>
+          </div>
+          <div id="qr-bt-img" style="display:none;text-align:center;padding-top:6px;">
+            <img src="${qrBTUrl}" alt="QR Code Banco de Talentos" style="border-radius:8px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.15);">
+          </div>
+        </div>
+        <!-- Ficha -->
+        <div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-radius:10px;padding:14px;">
+          <div style="font-size:11px;font-weight:700;color:#3b82f6;margin-bottom:10px;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-file-pen"></i> Ficha de Candidatura</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+            <button onclick="navigator.clipboard.writeText('${linkFicha}').then(()=>{this.textContent='✓ Copiado!';setTimeout(()=>{this.innerHTML='<i class=\\'fa-solid fa-copy\\'></i> Copiar'},1800)})"
+              style="padding:5px 10px;border-radius:7px;border:1px solid rgba(59,130,246,0.4);background:rgba(59,130,246,0.1);color:#3b82f6;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
+              <i class="fa-solid fa-copy"></i> Copiar</button>
+            <a href="${linkFicha}" target="_blank" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-secondary);cursor:pointer;font-size:11px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
+              <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir</a>
+            <button onclick="toggleQrMeuPainel('qr-ficha-img')"
+              style="padding:5px 10px;border-radius:7px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-secondary);cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
+              <i class="fa-solid fa-qrcode"></i> QR</button>
+            <button onclick="navigator.clipboard.writeText(${JSON.stringify(msgFicha)}).then(()=>{this.textContent='✓ Copiado!';setTimeout(()=>{this.innerHTML='<i class=\\'fa-solid fa-message\\'></i> Divulgar'},1800)})"
+              style="padding:5px 10px;border-radius:7px;border:1px solid rgba(16,185,129,0.4);background:rgba(16,185,129,0.08);color:#10b981;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
+              <i class="fa-solid fa-message"></i> Divulgar</button>
+          </div>
+          <div id="qr-ficha-img" style="display:none;text-align:center;padding-top:6px;">
+            <img src="${qrFichaUrl}" alt="QR Code Ficha" style="border-radius:8px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.15);">
+          </div>
+        </div>
+      </div>
+
+      <!-- MEU WHATSAPP -->
+      <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:14px;padding:20px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;">
+          <i class="fa-brands fa-whatsapp" style="color:#25d366;font-size:16px;"></i> Meu WhatsApp
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="meu-painel-wa-input" value="${rec.whatsapp || ''}" placeholder="DDD + número (ex: 11999990000)"
+            class="form-control" style="flex:1;font-size:13px;"
+            oninput="salvarWhatsappRecrutadora('${rec.id}', this.value)">
+          ${waAbrirBtn}
+        </div>
+        <p style="font-size:10px;color:var(--text-secondary);margin-top:6px;">Número salvo automaticamente ao digitar. Aparece como botão de contato no final dos formulários de candidatura.</p>
+      </div>
+    </div>
+
+    <!-- MEUS CANDIDATOS -->
+    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:14px;padding:20px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <i class="fa-solid fa-users" style="color:#10b981;"></i> Meus Candidatos
+        <span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(16,185,129,0.12);color:#10b981;">${meusCands.length} total</span>
+        <span style="font-size:11px;color:var(--text-secondary);font-weight:400;">· clique em uma linha para abrir a ficha</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border-color);">
+              <th style="padding:6px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Nome</th>
+              <th style="padding:6px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Status</th>
+              <th style="padding:6px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Vaga</th>
+              <th style="padding:6px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Cadastro</th>
+            </tr>
+          </thead>
+          <tbody>${linhasCands}</tbody>
+        </table>
+        ${meusCands.length > 25 ? `<p style="font-size:11px;color:var(--text-secondary);text-align:center;padding:10px 0 0;">Mostrando 25 de ${meusCands.length}. Veja todos na aba <strong>Seleção</strong>.</p>` : ''}
+      </div>
+    </div>`;
+}
+
+window.vincularPerfilRecrutadora = function() {
+  const sel = document.getElementById('meu-painel-select-rec');
+  if (!sel || !sel.value) { alert('Selecione um perfil para vincular.'); return; }
+  const rec = state.recrutadores.find(r => r.id === sel.value);
+  if (!rec) return;
+  rec.loginVinculado = loggedUser.login;
+  saveState();
+  renderMeuPainel();
+};
+
+window.desvincularPerfilRecrutadora = function() {
+  const rec = state.recrutadores.find(r => r.loginVinculado === loggedUser.login);
+  if (!rec) return;
+  if (!confirm(`Desvincular o perfil "${rec.nome}" da sua conta? Você poderá vincular outro.`)) return;
+  rec.loginVinculado = '';
+  saveState();
+  renderMeuPainel();
+};
+
+window.toggleQrMeuPainel = function(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+};
+
+

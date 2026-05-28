@@ -1,0 +1,508 @@
+/* ==========================================================================
+   R&T DESIGN SYSTEM - VERSÃO 5.0 (SOBRIEDADE, MÁXIMO PROFISSIONALISMO)
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* Identidade R&T */
+  --color-primary: #D40203;
+  --color-primary-dark: #9F0102;
+  --color-blue-dark: #0B1F3A;
+  --color-blue: #2563EB;
+  
+  /* Superfícies Sólidas e Seguras */
+  --color-bg-gradient-start: #F8FAFC;
+  --color-bg-gradient-end: #E2E8F0;
+  --color-white: #FFFFFF;
+  --color-glass-bg: #FFFFFF;
+  --color-glass-border: #E2E8F0;
+  
+  /* Textos Escuros Ajustados (Suaves e Profissionais, sem Preto Duro) */
+  --color-text-main: #1E293B;   /* Slate-800 para texto principal */
+  --color-text-title: #0F172A;  /* Slate-900 apenas para headings */
+  --color-text-muted: #64748B;  /* Slate-500 para textos secundários */
+  
+  /* Status */
+  --status-pending: #D97706;
+  --status-analysis: #2563EB;
+  --status-interview: #7C3AED;
+  --status-approved: #059669;
+  --status-hired: #059669;
+  --status-unfit: #DC2626;
+  
+  /* Sombras */
+  --shadow-premium:  0 10px 30px rgba(15, 23, 42, 0.04);
+  --shadow-floating: 0 20px 50px rgba(15, 23, 42, 0.12);
+  
+  /* Raios */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 20px;
+  --radius-pill: 22px;
+
+  /* Remapeamento */
+  --primary: var(--color-primary);
+  --primary-hover: var(--color-primary-dark);
+  --primary-light: rgba(212, 2, 3, 0.06);
+  --dark-sidebar: #090B11;
+  --dark-sidebar-active: var(--color-primary);
+  --bg-main: transparent;
+  --card-bg: var(--color-glass-bg);
+  --border-color: var(--color-glass-border);
+  --text-primary: var(--color-text-main);
+  --text-secondary: var(--color-text-muted);
+  --shadow-sm: var(--shadow-premium);
+  --shadow-md: var(--shadow-premium);
+  --shadow-lg: var(--shadow-floating);
+}
+
+/* 1. FUNDO E TEXTURA GRANULADA */
+body {
+  background: linear-gradient(135deg, var(--color-bg-gradient-start), var(--color-bg-gradient-end)) !important;
+  background-attachment: fixed !important;
+  min-height: 100vh;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  color: var(--color-text-main) !important;
+  position: relative;
+}
+
+body::before {
+  content: "" !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  opacity: 0.012 !important;
+  pointer-events: none !important;
+  z-index: 9999 !important;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E") !important;
+}
+
+/* 2. CARDS E BANNER (CORPORATIVO EQUILIBRADO E ONDA CINTILANTE) */
+.card-glass,
+.kpi-card,
+.vaga-card,
+.card-form,
+.dashboard-chart-card,
+.dashboard-greeting-banner,
+.table-box,
+.filter-box,
+.login-glass-box,
+.destaque-semana-box {
+  background: var(--color-white) !important;
+  border: 1px solid var(--color-glass-border) !important;
+  box-shadow: var(--shadow-premium) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 24px;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+/* Tipografia Corporativa nos cards (Sem forçar preto absoluto desnecessário no geral) */
+.card-glass h1, .card-glass h2, .card-glass h3, .card-glass h4,
+.kpi-card h1, .kpi-card h2, .kpi-card h3,
+.vaga-card h1, .vaga-card h2, .vaga-card h3,
+.dashboard-chart-card h3,
+.dashboard-greeting-banner h2 {
+  color: var(--color-text-title) !important;
+  font-family: 'Outfit', sans-serif !important;
+  font-weight: 700 !important;
+}
+
+.card-glass p, .card-glass span,
+.kpi-label, .page-subtitle,
+.recruiter-name-tag, .duration-badge,
+.dashboard-greeting-banner p {
+  color: var(--color-text-muted) !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+.kpi-number {
+  color: var(--color-text-title) !important;
+  font-family: 'Outfit', sans-serif !important;
+}
+
+/* Animação da onda de brilho cintilante lenta e premium */
+@keyframes shimmer-wave {
+  0% { transform: translateX(-150%) skewX(-25deg); }
+  25% { transform: translateX(150%) skewX(-25deg); }
+  100% { transform: translateX(150%) skewX(-25deg); }
+}
+
+.card-glass::after,
+.kpi-card::after,
+.vaga-card::after,
+.card-form::after,
+.dashboard-chart-card::after,
+.dashboard-greeting-banner::after,
+.table-box::after,
+.filter-box::after,
+.destaque-semana-box::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 50% !important;
+  height: 100% !important;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(255, 255, 255, 0.3) 50%, 
+    transparent 100%) !important;
+  animation: shimmer-wave 7s infinite ease-in-out !important;
+  pointer-events: none !important;
+  z-index: 10 !important;
+}
+
+/* 3. DETALHES DO CANDIDATO E MODAIS (FUNDO SÓLIDO TOTAL CONTRASTE E PRESERVAÇÃO DE CORES) */
+.detail-drawer,
+.custom-modal-content,
+.drawer-content-container,
+.modal-content,
+.modal-body {
+  background: var(--color-white) !important;
+  color: var(--color-text-main) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: var(--shadow-floating) !important;
+  border: 1px solid #CBD5E1 !important;
+}
+
+.detail-drawer h1, .detail-drawer h2, .detail-drawer h3,
+.custom-modal h1, .custom-modal h2 {
+  color: var(--color-text-title) !important;
+  font-family: 'Outfit', sans-serif !important;
+}
+
+.detail-drawer p, .detail-drawer span {
+  color: var(--color-text-main) !important;
+}
+
+/* Legibilidade máxima dos inputs e labels nos drawers */
+label,
+.form-group label,
+.detail-drawer label,
+.custom-modal label {
+  color: var(--color-text-title) !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  margin-bottom: 6px !important;
+}
+
+/* 4. SIDEBAR PRETA DE DIAMANTES COMPACTA (100% ANCORADA) */
+.app-container {
+  display: flex !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+}
+
+.sidebar,
+.sidebar-modern {
+  background-color: #090B11 !important;
+  background-image: 
+    linear-gradient(135deg, rgba(255, 255, 255, 0.015) 25%, transparent 25%), 
+    linear-gradient(225deg, rgba(255, 255, 255, 0.015) 25%, transparent 25%), 
+    linear-gradient(45deg, rgba(255, 255, 255, 0.015) 25%, transparent 25%), 
+    linear-gradient(315deg, rgba(255, 255, 255, 0.015) 25%, #090B11 25%) !important;
+  background-position: 8px 0, 8px 0, 0 0, 0 0 !important;
+  background-size: 16px 16px !important;
+  
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-floating) !important;
+  margin: 16px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  
+  /* ÂNCORA */
+  position: sticky !important;
+  top: 16px !important;
+  height: calc(100vh - 32px) !important;
+  width: 230px !important;
+  flex-shrink: 0 !important;
+  
+  padding: 16px 6px !important;
+  z-index: 1000 !important;
+  overflow-y: auto !important;
+}
+
+.sidebar::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* Logo da empresa com fundo branco absoluto e centralizado */
+.sidebar-header {
+  background: #FFFFFF !important;
+  border-radius: var(--radius-md) !important;
+  padding: 6px !important;
+  margin-bottom: 16px !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 60px !important;
+}
+
+.sidebar-header .logo-area {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+}
+
+.sidebar-header .logo-area img {
+  height: 48px !important;
+  max-width: 100% !important;
+  object-fit: contain !important;
+  padding: 0 !important;
+}
+
+/* Menu de navegação da sidebar */
+.sidebar-nav {
+  padding: 0 !important;
+}
+
+.nav-item {
+  margin-bottom: 2px !important;
+}
+
+.nav-item a {
+  border-radius: var(--radius-md) !important;
+  color: #E2E8F0 !important; /* Branco mais suave para as escritas padrão */
+  font-weight: 500 !important;
+  font-family: 'Inter', sans-serif !important;
+  transition: all 0.2s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 9px 12px !important;
+  font-size: 13px !important;
+  border-left: none !important;
+}
+
+/* ÍCONES PROFISSIONAIS, LEVES E INTEGRADOS (SEM NEON BAGUNÇADO) */
+.sidebar-nav .nav-item a i {
+  color: #64748B !important; /* Cor cinza/prata corporativa uniforme */
+  font-size: 16px !important;
+  transition: all 0.2s ease !important;
+}
+
+.nav-item:hover a {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: #FFFFFF !important;
+}
+
+.nav-item:hover a i {
+  color: #FFFFFF !important;
+  transform: scale(1.1) !important;
+}
+
+.nav-item.active a {
+  background: var(--color-primary) !important;
+  color: #FFFFFF !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 12px rgba(212, 2, 3, 0.25) !important;
+}
+
+.nav-item.active a i {
+  color: #FFFFFF !important;
+}
+
+.sidebar-footer {
+  display: none !important;
+}
+
+/* 5. MAIN LAYOUT & VIEWPORT CONTROLANDO ROLAGEM */
+.main-layout {
+  flex-grow: 1 !important;
+  height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+/* Topbar corporativa */
+.app-header,
+.topbar-glass {
+  background: var(--color-white) !important;
+  border: 1px solid var(--color-glass-border) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-premium) !important;
+  padding: 12px 24px !important;
+  margin: 16px 16px 16px 0 !important;
+  height: auto !important;
+  position: sticky !important;
+  top: 16px !important;
+  z-index: 999 !important;
+}
+
+.content-viewport {
+  flex-grow: 1 !important;
+  overflow-y: auto !important;
+  padding: 0 16px 32px 0 !important;
+  height: calc(100vh - 100px) !important;
+}
+
+/* 6. BOTÕES MODERNOS E LEGÍVEIS */
+.btn,
+.btn-login-submit,
+.btn-submit {
+  border-radius: var(--radius-md) !important;
+  padding: 10px 20px !important;
+  font-weight: 600 !important;
+  font-size: 13.5px !important;
+}
+
+.btn-primary,
+.btn-login-submit,
+.btn-submit {
+  background: var(--color-primary) !important;
+  color: var(--color-white) !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(212, 2, 3, 0.15) !important;
+}
+
+.btn-primary:hover,
+.btn-login-submit:hover,
+.btn-submit:hover:not(:disabled) {
+  background: var(--color-primary-dark) !important;
+}
+
+.btn-secondary {
+  background: #F1F5F9 !important;
+  color: var(--color-text-main) !important;
+  border: 1px solid #E2E8F0 !important;
+}
+
+.btn-secondary:hover {
+  background: #E2E8F0 !important;
+}
+
+/* 7. INPUTS COM CONTRASTE EXTREMO */
+.form-control,
+.form-control-login,
+.input-modern,
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="date"],
+select,
+textarea {
+  background: var(--color-white) !important;
+  border: 1px solid #CBD5E1 !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 10px 14px !important;
+  font-size: 13.5px !important;
+  color: #0F172A !important;
+}
+
+.form-control:focus,
+.form-control-login:focus,
+.input-modern:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 3px rgba(212, 2, 3, 0.10) !important;
+}
+
+/* 8. BADGES DE STATUS */
+.badge-status,
+.column-count,
+.status-badge,
+.doc-status,
+.badge-yellow,
+.badge-blue,
+.badge-purple,
+.badge-green,
+.badge-red {
+  padding: 4px 10px !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+}
+
+.badge-yellow, .st-pending { background: #FEF3C7 !important; color: #D97706 !important; }
+.badge-blue, .st-analysis { background: #DBEAFE !important; color: #2563EB !important; }
+.badge-purple, .st-interview { background: #F3E8FF !important; color: #7C3AED !important; }
+.badge-green, .st-approved, .st-hired { background: #D1FAE5 !important; color: #059669 !important; }
+.badge-red, .st-unfit { background: #FEE2E2 !important; color: #DC2626 !important; }
+
+/* 9. TABELAS LIMPAS E CORPORATIVAS */
+.table-modern,
+.excel-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+}
+
+.table-modern th,
+.excel-table th {
+  color: var(--color-text-muted) !important;
+  font-weight: 700 !important;
+  padding: 12px 16px !important;
+  font-size: 11.5px !important;
+  border-bottom: 2px solid #E2E8F0 !important;
+  background: transparent !important;
+}
+
+.table-modern td,
+.excel-table td {
+  background: var(--color-white) !important;
+  padding: 12px 16px !important;
+  border-bottom: 1px solid #F1F5F9 !important;
+  color: var(--color-text-main) !important;
+  font-size: 13px !important;
+}
+
+.table-modern tr:hover td,
+.excel-table tr:hover td {
+  background: #F8FAFC !important;
+}
+
+/* Kanban column styling */
+.kanban-column {
+  background: #F1F5F9 !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: var(--radius-md) !important;
+  padding: 12px !important;
+}
+
+.kanban-card {
+  border-radius: var(--radius-sm) !important;
+  border: 1px solid #E2E8F0 !important;
+  background: var(--color-white) !important;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.02) !important;
+}
+
+/* Document upload boxes in public forms */
+.doc-box {
+  background: var(--color-white) !important;
+  border: 2px dashed #CBD5E1 !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+.doc-box:hover {
+  border-color: var(--color-primary) !important;
+  background: rgba(212, 2, 3, 0.02) !important;
+}
+
+.doc-box.uploaded {
+  border-color: #059669 !important;
+  background: rgba(5, 150, 105, 0.02) !important;
+}
+
+/* 10. TIPOGRAFIA DO CABEÇALHO CORRIGIDA E SEM BUGS (INTER SANS) */
+.header-app-name {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  font-weight: 700 !important;
+  font-size: 14.5px !important;
+  letter-spacing: 0.5px !important;
+  color: var(--color-text-title) !important;
+}
+
+.header-title-container * {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  color: var(--color-text-title) !important;
+}

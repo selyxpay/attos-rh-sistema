@@ -1,0 +1,12 @@
+{
+  "name": "rt-vagas-ia",
+  "version": "1.0.0",
+  "description": "R&T Vagas IA - Sistema de Recrutamento Inteligente",
+  "main": "server.cjs",
+  "scripts": {
+    "start": "node server.cjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

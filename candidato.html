@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cadastro de Candidato — R&amp;T Empregos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+        integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/design-system.css">
+  <style>
+    body { color: var(--color-text-main); font-family: 'Inter', sans-serif; margin: 0; }
+    .pub-header {
+      background: rgba(11, 31, 58, 0.95) !important;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .pub-logo {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--color-primary); display: flex; align-items: center;
+      justify-content: center; font-weight: 800; font-size: 14px;
+      color: #fff; letter-spacing: -1px; flex-shrink: 0;
+    }
+    .pub-brand-name { font-weight: 700; font-size: 16px; color: #fff; }
+    .pub-brand-sub   { font-size: 11px; color: rgba(255,255,255,0.6); margin-top: 1px; }
+    .pub-body {
+      max-width: 860px; margin: 0 auto;
+      padding: 32px 24px 80px;
+    }
+    .pub-title { font-size: 22px; font-weight: 700; color: var(--color-text-main) !important; margin-bottom: 4px; }
+    .pub-subtitle { font-size: 14px; color: var(--color-text-muted) !important; margin-bottom: 28px; }
+    .recruiter-banner {
+      background: linear-gradient(135deg,#be123c,#9f1239);
+      color: #fff; padding: 14px 20px; border-radius: 10px;
+      margin-bottom: 24px; display: flex; align-items: center; gap: 12px;
+      font-size: 13px; font-weight: 500;
+    }
+    .recruiter-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 15px; flex-shrink: 0;
+    }
+    .success-screen {
+      text-align: center; padding: 60px 24px;
+      display: none;
+    }
+    .success-icon {
+      width: 80px; height: 80px; border-radius: 50%;
+      background: rgba(34,197,94,0.15); border: 2px solid #22c55e;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 24px; font-size: 36px; color: #22c55e;
+    }
+    .success-screen h2 { color: #22c55e; font-size: 22px; margin-bottom: 12px; }
+    .success-screen p  { color: var(--color-text-muted); font-size: 15px; max-width: 480px; margin: 0 auto; }
+    label { font-size: 13px; font-weight: 500; color: var(--color-text-main); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .form-row.col-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .form-row.col-1 { grid-template-columns: 1fr; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .section-title {
+      font-size: 11px; font-weight: 700; color: #0B1F3A !important;
+      text-transform: uppercase; letter-spacing: 1px;
+      padding: 12px 0 8px; border-top: 1px solid var(--color-glass-border);
+      margin-top: 8px;
+    }
+    .section-title:first-child { border-top: none; padding-top: 0; }
+    .required { color: var(--color-primary); }
+    .doc-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px; margin-top: 8px;
+    }
+    .doc-box {
+      border: 2px dashed rgba(0, 0, 0, 0.15); border-radius: 10px;
+      padding: 16px 12px; text-align: center; cursor: pointer;
+      position: relative; transition: all 0.2s;
+    }
+    .doc-box input[type=file] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+      width: 100%; height: 100%; padding: 0; z-index: 20;
+    }
+    .doc-icon { font-size: 22px; color: var(--color-text-muted); margin-bottom: 6px; transition: color 0.2s; }
+    .doc-label { font-size: 11px; font-weight: 600; color: var(--color-text-muted); }
+    .doc-status { font-size: 10px; font-weight: 600; margin-top: 4px; color: #94a3b8; text-transform: uppercase; letter-spacing: .4px; }
+    .doc-box.uploaded .doc-status { color: #16a34a; }
+    .doc-box.uploaded .doc-icon { color: #16a34a; }
+    .doc-box.error { border-color: #ef4444 !important; }
+    .doc-box.error .doc-status { color: #ef4444; }
+    .doc-box.error .doc-icon { color: #ef4444; }
+    .pub-footer {
+      text-align: center; padding: 24px; font-size: 12px; color: var(--color-text-muted);
+      border-top: 1px solid var(--color-glass-border); margin-top: 40px;
+    }
+    /* Badge presencial no header do form */
+    .modo-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;
+    }
+    .modo-badge.presencial { background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); }
+    .modo-badge.online     { background: rgba(34,197,94,0.12);  color: #10b981;  border: 1px solid rgba(34,197,94,0.25); }
+    /* Chips de "como soube" */
+    .como-soube-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .cs-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border-radius: 20px; cursor: pointer;
+      border: 1.5px solid var(--color-glass-border);
+      background: rgba(255,255,255,0.6);
+      font-size: 12px; font-weight: 600; color: var(--color-text-muted);
+      transition: all 0.18s; user-select: none;
+    }
+    .cs-chip:hover { border-color: rgba(0,0,0,0.15); color: var(--color-text-main); }
+    .cs-chip.sel   { border-color: var(--color-primary); background: rgba(212, 2, 3, 0.12); color: var(--color-primary); }
+    .cs-chip .ck   { display: none; font-size: 10px; }
+    .cs-chip.sel .ck { display: inline; }
+    .cs-divider { font-size: 11px; font-weight: 600; color: var(--color-text-muted); margin: 10px 0 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .privacy-consent {
+      margin: 18px 0 16px;
+      padding: 16px;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      border-radius: 10px;
+      background: rgba(248, 250, 252, 0.88);
+    }
+    .privacy-consent summary {
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--color-text-main);
+      list-style-position: inside;
+    }
+    .privacy-consent .privacy-text {
+      margin-top: 12px;
+      max-height: 220px;
+      overflow: auto;
+      padding: 12px;
+      border-radius: 8px;
+      background: #fff;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      font-size: 12px;
+      line-height: 1.55;
+      color: #475569;
+    }
+    .privacy-consent .privacy-text p { margin: 0 0 10px; }
+    .privacy-consent .privacy-text p:last-child { margin-bottom: 0; }
+    .privacy-consent .privacy-check {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 12px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #334155;
+    }
+    .privacy-consent input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-top: 1px;
+      flex-shrink: 0;
+      accent-color: var(--color-primary);
+    }
+    .form-group.field-error input,
+    .form-group.field-error select,
+    .form-group.field-error textarea {
+      border-color: #ef4444 !important;
+      box-shadow: 0 0 0 2px rgba(239,68,68,0.15) !important;
+    }
+    .form-group.field-error label { color: #ef4444 !important; }
+    @media (max-width: 600px) {
+      .pub-body { padding: 20px 16px 60px; }
+      .card-form { padding: 20px 16px; }
+      .form-row { grid-template-columns: 1fr !important; }
+      .doc-grid  { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="pub-header">
+    <img src="img/logo-rt.png" alt="R&amp;T Logo" style="height: 36px; width: auto; object-fit: contain; flex-shrink: 0; margin-right: 4px;">
+    <div>
+      <div class="pub-brand-name">R&amp;T EMPREGOS</div>
+      <div class="pub-brand-sub">Portal de Candidatos</div>
+    </div>
+  </header>
+
+  <div class="pub-body">
+
+    <!-- Banner de recrutador (mostrado se ?rec=X) -->
+    <div id="recruiter-banner" class="recruiter-banner" style="display:none;">
+      <div class="recruiter-avatar" id="recruiter-avatar">R</div>
+      <span id="recruiter-msg">Você está se candidatando pelo link oficial da R&amp;T Empregos.</span>
+    </div>
+
+    <!-- Tela de sucesso (fica oculta até envio) -->
+    <div class="success-screen" id="success-screen">
+      <div class="success-icon"><i class="fa-solid fa-circle-check"></i></div>
+      <h2 id="success-title">Cadastro enviado com sucesso!</h2>
+      <p id="success-msg">Nossa equipe irá analisar suas informações e entrará em contato em breve. Obrigado por se candidatar à R&amp;T Empregos.</p>
+    </div>
+
+    <!-- Formulário -->
+    <div id="form-wrapper">
+      <div class="pub-title">Ficha de Cadastro de Candidato</div>
+      <div class="pub-subtitle">Preencha todos os campos e anexe seus documentos para entrar no processo seletivo.</div>
+
+      <div class="card-form">
+        <form id="form-candidato" novalidate>
+
+          <!-- Wrapper de campos pessoais (oculto no modo continuarPresencial) -->
+          <div id="campos-ficha-section">
+
+          <!-- Número da Senha (só presencial) -->
+          <div id="senha-section" style="display:none;">
+            <div class="section-title" style="border-top:none;padding-top:0;"><i class="fa-solid fa-ticket"></i> Número da Senha</div>
+            <div class="form-group" style="margin-bottom:16px;">
+              <label for="f-senha">Nº da Senha <span class="required">*</span></label>
+              <input type="text" id="f-senha" placeholder="Digite o número da senha retirada na recepção" style="max-width:260px;">
+            </div>
+          </div>
+
+          <!-- Como soube da vaga (só presencial) -->
+          <div id="como-soube-section" style="display:none;">
+            <div class="section-title" style="border-top:none;padding-top:0;"><i class="fa-solid fa-bullhorn"></i> Como soube da vaga?</div>
+            <div class="como-soube-chips" id="cs-chips">
+              <div class="cs-chip" data-val="instagram"><i class="fa-brands fa-instagram"></i> <span class="ck">✓</span> Instagram R&amp;T</div>
+              <div class="cs-chip" data-val="facebook"><i class="fa-brands fa-facebook"></i> <span class="ck">✓</span> Facebook R&amp;T</div>
+              <div class="cs-chip" data-val="anuncios_fb"><i class="fa-solid fa-rectangle-ad"></i> <span class="ck">✓</span> Anúncios Facebook RT</div>
+              <div class="cs-chip" data-val="indicacao"><i class="fa-solid fa-handshake"></i> <span class="ck">✓</span> Indicação</div>
+            </div>
+            <div class="cs-divider">Ou foi indicado por uma selecionadora:</div>
+            <div class="como-soube-chips" id="cs-chips-sel">
+              <div class="cs-chip" data-val="sel_mayara"><span class="ck">✓</span> Mayara</div>
+              <div class="cs-chip" data-val="sel_alessandra"><span class="ck">✓</span> Alessandra</div>
+              <div class="cs-chip" data-val="sel_lucas"><span class="ck">✓</span> Lucas</div>
+              <div class="cs-chip" data-val="sel_julio"><span class="ck">✓</span> Júlio</div>
+              <div class="cs-chip" data-val="sel_julia"><span class="ck">✓</span> Júlia</div>
+              <div class="cs-chip" data-val="sel_milena"><span class="ck">✓</span> Milena</div>
+              <div class="cs-chip" data-val="sel_vitoria"><span class="ck">✓</span> Vitória</div>
+              <div class="cs-chip" data-val="sel_sara"><span class="ck">✓</span> Sara</div>
+            </div>
+            <div style="height:12px;"></div>
+          </div>
+
+          <!-- Dados Pessoais -->
+          <div class="section-title"><i class="fa-solid fa-user"></i> Dados Pessoais</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="f-nome">Nome Completo <span class="required">*</span></label>
+              <input type="text" id="f-nome" required placeholder="Digite seu nome completo">
+            </div>
+            <div class="form-group">
+              <label for="f-email">E-mail <span class="required">*</span></label>
+              <input type="email" id="f-email" required placeholder="seu@email.com">
+            </div>
+          </div>
+          <div class="form-row col-3">
+            <div class="form-group">
+              <label for="f-cpf">CPF <span class="required">*</span></label>
+              <input type="text" id="f-cpf" required placeholder="000.000.000-00" maxlength="14">
+            </div>
+            <div class="form-group">
+              <label for="f-rg">RG <span class="required">*</span></label>
+              <input type="text" id="f-rg" required placeholder="00.000.000-0">
+            </div>
+            <div class="form-group">
+              <label for="f-pis">PIS/NIS <span class="required">*</span></label>
+              <input type="text" id="f-pis" required placeholder="000.00000.00-0">
+            </div>
+          </div>
+          <div class="form-row col-3">
+            <div class="form-group">
+              <label for="f-telefone">Telefone / WhatsApp <span class="required">*</span></label>
+              <input type="text" id="f-telefone" required placeholder="(11) 99999-9999">
+            </div>
+            <div class="form-group">
+              <label for="f-nascimento">Data de Nascimento <span class="required">*</span></label>
+              <input type="text" id="f-nascimento" required placeholder="dd/mm/aaaa" maxlength="10">
+            </div>
+            <div class="form-group">
+              <label for="f-sexo">Sexo</label>
+              <select id="f-sexo">
+                <option value="">Prefiro não informar</option>
+                <option value="M">Masculino</option>
+                <option value="F">Feminino</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="f-mae">Nome da Mãe <span class="required">*</span></label>
+              <input type="text" id="f-mae" required placeholder="Nome completo da mãe">
+            </div>
+            <div class="form-group">
+              <label for="f-pai">Nome do Pai</label>
+              <input type="text" id="f-pai" placeholder="Nome completo do pai">
+            </div>
+          </div>
+
+          <!-- Endereço -->
+          <div class="section-title"><i class="fa-solid fa-map-pin"></i> Endereço Residencial</div>
+          <div class="form-row col-3">
+            <div class="form-group">
+              <label for="f-cep">CEP <span class="required">*</span></label>
+              <input type="text" id="f-cep" required placeholder="00000-000" maxlength="9">
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+              <label for="f-rua">Rua <span class="required">*</span></label>
+              <input type="text" id="f-rua" required placeholder="Preenchido pelo CEP">
+            </div>
+          </div>
+          <div class="form-row col-3">
+            <div class="form-group">
+              <label for="f-numero">Número <span class="required">*</span></label>
+              <input type="text" id="f-numero" required placeholder="Ex: 123">
+            </div>
+            <div class="form-group">
+              <label for="f-bairro">Bairro <span class="required">*</span></label>
+              <input type="text" id="f-bairro" required placeholder="Preenchido pelo CEP">
+            </div>
+            <div class="form-group">
+              <label for="f-cidade">Cidade <span class="required">*</span></label>
+              <input type="text" id="f-cidade" required placeholder="Preenchido pelo CEP">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="f-estado">Estado <span class="required">*</span></label>
+              <input type="text" id="f-estado" required placeholder="Ex: SP" maxlength="2">
+            </div>
+          </div>
+
+          <!-- Dados bancários -->
+          <div class="section-title"><i class="fa-solid fa-landmark"></i> Dados Bancários</div>
+          <div class="form-row col-3">
+            <div class="form-group">
+              <label for="f-banco">Banco <span class="required">*</span></label>
+              <input type="text" id="f-banco" required placeholder="Ex: Nubank, Itaú">
+            </div>
+            <div class="form-group">
+              <label for="f-tipopix">Tipo de Chave PIX <span class="required">*</span></label>
+              <select id="f-tipopix" required>
+                <option value="" disabled selected>Selecione</option>
+                <option value="CPF">CPF</option>
+                <option value="Telefone">Telefone</option>
+                <option value="E-mail">E-mail</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="f-chavepix">Chave PIX <span class="required">*</span></label>
+              <input type="text" id="f-chavepix" required placeholder="Sua chave PIX">
+            </div>
+          </div>
+
+          <!-- Uniforme -->
+          <div class="section-title"><i class="fa-solid fa-shirt"></i> Tamanhos de Uniforme</div>
+          <div class="form-row col-3">
+            <div class="form-group">
+              <label for="f-camiseta">Camiseta <span class="required">*</span></label>
+              <select id="f-camiseta" required>
+                <option value="" disabled selected>Selecione</option>
+                <option>P</option><option>M</option><option>G</option><option>GG</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="f-calca">Calça <span class="required">*</span></label>
+              <input type="text" id="f-calca" required placeholder="Ex: 40">
+            </div>
+            <div class="form-group">
+              <label for="f-bota">Bota <span class="required">*</span></label>
+              <input type="text" id="f-bota" required placeholder="Ex: 41">
+            </div>
+          </div>
+
+          </div><!-- /#campos-ficha-section -->
+
+          <!-- Documentos (oculto na ficha presencial inicial; exibido no modo continuarPresencial e online) -->
+          <div id="docs-section">
+          <div class="section-title"><i class="fa-solid fa-file-image"></i> Documentos (Fotos / PDF)</div>
+          <p style="font-size:12px; color:#64748b; margin-bottom:12px;">
+            Tire fotos nítidas e bem iluminadas. Aceito: JPG, PNG, PDF (máx. 10MB por arquivo).
+          </p>
+          <div class="doc-grid">
+            <div class="doc-box" id="box-selfie">
+              <div class="doc-icon"><i class="fa-solid fa-camera"></i></div>
+              <div class="doc-label">Selfie do Rosto</div>
+              <div class="doc-status" id="st-selfie">Pendente</div>
+              <input type="file" id="doc-selfie" accept="image/*" capture="user">
+            </div>
+            <div class="doc-box" id="box-rg">
+              <div class="doc-icon"><i class="fa-solid fa-address-card"></i></div>
+              <div class="doc-label">RG Frente</div>
+              <div class="doc-status" id="st-rg">Pendente</div>
+              <input type="file" id="doc-rg" accept="image/*,application/pdf" capture="environment">
+            </div>
+            <div class="doc-box" id="box-pis">
+              <div class="doc-icon"><i class="fa-solid fa-file-invoice"></i></div>
+              <div class="doc-label">Foto do PIS/NIS</div>
+              <div class="doc-status" id="st-pis">Pendente</div>
+              <input type="file" id="doc-pis" accept="image/*,application/pdf" capture="environment">
+            </div>
+            <div class="doc-box" id="box-cpf">
+              <div class="doc-icon"><i class="fa-solid fa-id-card-clip"></i></div>
+              <div class="doc-label">CPF Documento</div>
+              <div class="doc-status" id="st-cpf">Pendente</div>
+              <input type="file" id="doc-cpf" accept="image/*,application/pdf" capture="environment">
+            </div>
+            <div class="doc-box" id="box-comp">
+              <div class="doc-icon"><i class="fa-solid fa-house-chimney-user"></i></div>
+              <div class="doc-label">Comprov. Residência</div>
+              <div class="doc-status" id="st-comp">Pendente</div>
+              <input type="file" id="doc-comp" accept="image/*,application/pdf" capture="environment">
+            </div>
+            <div class="doc-box" id="box-banco">
+              <div class="doc-icon"><i class="fa-solid fa-credit-card"></i></div>
+              <div class="doc-label">Cartão Banco (Verso)</div>
+              <div class="doc-status" id="st-banco">Pendente</div>
+              <input type="file" id="doc-banco" accept="image/*,application/pdf" capture="environment">
+            </div>
+          </div>
+
+          </div><!-- /#docs-section -->
+
+          <div class="privacy-consent" id="privacy-consent-box">
+            <details open>
+              <summary>Termo de ciência e autorização para tratamento de dados e documentos</summary>
+              <div class="privacy-text">
+                <p><strong>Quem somos.</strong> A R&amp;T Empregos / Grupo RT atua com recrutamento, seleção, terceirização de mão de obra, encaminhamento de candidatos para vagas, admissão e apoio aos processos de contratação junto a empresas parceiras e áreas internas responsáveis.</p>
+                <p><strong>Para que usamos seus dados.</strong> As informações e documentos enviados neste formulário serão usados para identificar o candidato, avaliar compatibilidade com vagas, manter contato sobre oportunidades, conduzir processos seletivos online ou presenciais, montar ficha cadastral, conferir documentação, encaminhar dados necessários ao Departamento Pessoal e preparar contrato, admissão, integração, pagamentos, benefícios, uniformes e demais rotinas ligadas à prestação de serviços de mão de obra.</p>
+                <p><strong>Quais dados podem ser tratados.</strong> Podemos tratar dados cadastrais, contato, endereço, CPF, RG, PIS/NIS, data de nascimento, filiação, dados bancários/PIX, tamanhos de uniforme, histórico de candidatura, informações de vaga, registros de atendimento e imagens/documentos anexados, como selfie, RG, CPF, PIS/NIS, comprovante de residência e dados bancários, sempre conforme a necessidade do processo.</p>
+                <p><strong>Compartilhamento necessário.</strong> Seus dados poderão ser acessados pela equipe autorizada da R&amp;T Empregos e compartilhados, quando necessário, com empresas parceiras, clientes contratantes, contabilidade, Departamento Pessoal, sistemas de CRM, plataformas de armazenamento, fornecedores de tecnologia e órgãos públicos ou autoridades competentes, exclusivamente para as finalidades informadas, cumprimento de obrigações legais, exercício regular de direitos e execução de procedimentos pré-contratuais ou contratuais.</p>
+                <p><strong>Armazenamento e segurança.</strong> A R&amp;T Empregos poderá manter seus dados em seus sistemas pelo período necessário para processos seletivos, banco de talentos, contratação, cumprimento de obrigações legais, auditoria, prevenção a fraudes e defesa de direitos. Serão adotadas medidas razoáveis de segurança e controle de acesso para reduzir riscos de perda, uso indevido, acesso não autorizado ou divulgação indevida.</p>
+                <p><strong>Seus direitos.</strong> Você pode solicitar confirmação de tratamento, acesso, correção, atualização, eliminação quando aplicável, informação sobre compartilhamentos, oposição a tratamento irregular e revogação do consentimento quando o tratamento depender dele. A revogação pode limitar ou impedir a continuidade em processos seletivos, envio de documentos ao DP ou contratação, quando os dados forem necessários para essas etapas.</p>
+                <p><strong>Declaração.</strong> Ao marcar o aceite, declaro que li e compreendi este termo, que as informações fornecidas são verdadeiras, que autorizo o tratamento dos meus dados e documentos para as finalidades descritas e que estou ciente de que a ausência ou retirada de documentos indispensáveis pode impossibilitar a análise, contratação ou continuidade do processo.</p>
+              </div>
+            </details>
+            <label class="privacy-check" for="f-termo-lgpd">
+              <input type="checkbox" id="f-termo-lgpd" required>
+              <span>Li, compreendi e autorizo a R&amp;T Empregos / Grupo RT a tratar meus dados pessoais e documentos para recrutamento, seleção, banco de talentos, processos presenciais ou online, admissão e contratação, conforme o termo acima.</span>
+            </label>
+          </div>
+
+          <div class="error-msg" id="form-error"></div>
+
+          <button type="submit" class="btn-submit" id="btn-submit">
+            <i class="fa-solid fa-paper-plane"></i> Enviar Cadastro
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Tela de Parabéns (online: banco de talentos / ficha online) -->
+    <div class="parabens-screen" id="parabens-screen">
+      <canvas id="parabens-confetti" class="parabens-confetti"></canvas>
+      <div class="parabens-content">
+        <div class="parabens-icon">🎉</div>
+        <div class="parabens-titulo">Parabéns!</div>
+        <div class="parabens-sub" id="parabens-sub">Você finalizou sua ficha com sucesso.</div>
+        <a id="btn-whatsapp-candidato" href="#" target="_blank" class="btn-whatsapp" style="margin-top:8px;text-decoration:none;">
+          <i class="fa-brands fa-whatsapp" style="font-size:22px;"></i>
+          Clique aqui para falar com o selecionador
+        </a>
+      </div>
+    </div>
+
+    <!-- Tela de sucesso simples (modo continuarPresencial — documentos enviados) -->
+    <div class="success-screen" id="success-screen-presencial" style="display:none;">
+      <div class="success-icon"><i class="fa-solid fa-circle-check"></i></div>
+      <h2 style="color:#22c55e;">Documentos enviados com sucesso!</h2>
+      <p>Aguarde o contato da equipe R&amp;T Empregos em breve.</p>
+    </div>
+
+    <footer class="pub-footer">
+      © 2026 R&amp;T Empregos — Grupo RT. Todos os direitos reservados. Em conformidade com a LGPD.
+    </footer>
+  </div>
+
+<script>
+// ─── Detecção de sexo pelo nome ────────────────────────────────────────────────
+const _NF = new Set('maria,ana,fernanda,camila,beatriz,juliana,mariana,amanda,carla,paula,vanessa,patricia,sandra,renata,claudia,daniela,luciana,adriana,fabiana,leticia,priscila,viviane,simone,tatiana,cristina,natalia,silvia,regina,vera,laura,isabel,isabela,isabella,isadora,bianca,carolina,aline,bruna,jessica,deborah,debora,michele,micheli,larissa,melissa,thais,thamires,giovana,giovanna,helena,livia,luiza,sara,sarah,gabriela,gabrielle,rafaela,raquel,solange,elaine,erica,kelly,keila,gisele,rosana,rosangela,josiane,elizabete,elizabeth,andressa,andrea,angela,denise,catarina,aparecida,conceicao,cleuza,cleide,celia,noemia,zelia,fatima,tereza,teresa,irene,ines,edna,elza,ilda,ieda,iolanda,ivone,ivani,jacira,janete,jaqueline,joana,josefa,lourdes,luzia,marta,neuza,nilza,nilda,odete,olga,ruth,selma,sonia,sueli,suely,valdete,valeria,vilma,wilma,zilda,zenaide,alice,alicia,cecilia,diana,elena,emilia,estela,eunice,filomena,flora,flavia,gilda,gloria,heloisa,yara,yasmin,maya,milena,nina,rebeca,rebecca,sofia,sophia,taina,thalia,thalita,vitoria,wanessa,yolanda,lais,nayara,nathalia,nathalie,nadia,tamires,tainara,taynara,karolina,cintia,graziele,marilene,marli,marlene,marcia,marcela,micaela,michely,monique,monica,pamela,pollyana,poliana,rosilene,roseli,samara,samantha,shirley,silvana,sirlene,socorro,suellen,tamara,tania,telma,veronica,edilene,eliane,elizangela,ingrid,iris,izabela,izabella,joice,karina,katia,luana,ludmila,luzinete,gleice,gleiciane,franciele,franciely,lindalva,naiara,raissa,rayssa,sabrina,soraya,taiane,talita,tayane,thayane,valquiria,vanusa'.split(','));
+const _NM = new Set('joao,jose,carlos,luis,paulo,pedro,marcos,lucas,mateus,matheus,gabriel,rafael,leonardo,felipe,bruno,rodrigo,marcelo,anderson,andre,daniel,diego,eduardo,eric,fabio,fernando,francisco,gilberto,gustavo,henrique,igor,ivo,jorge,julio,leandro,marcio,marco,mario,nelson,nilson,nilton,otavio,patrick,raul,renato,ricardo,roberto,sergio,thiago,victor,vitor,wagner,wesley,william,wilson,alexandre,antonio,arnaldo,arthur,artur,augusto,caio,claudio,cleber,cristiano,davi,david,emerson,ezequiel,flavio,fausto,geraldo,giovanni,guilherme,humberto,iago,ivan,jean,jefferson,jonathas,jonathan,jonatas,jeferson,lauro,luan,luiz,manoel,manuel,mauricio,miguel,milton,murilo,nicolas,oscar,osvaldo,ramon,renan,rui,samuel,saulo,sebastiao,silas,silvio,tarcisio,tadeu,thadeu,tiago,valter,walter,vanderlei,vinicius,yago,yuri,adilson,adriano,alisson,alan,almir,alfredo,benicio,bento,bernardo,caetano,cassio,cezar,clovis,dalton,demetrio,denilson,derik,diogo,domingos,douglas,edmar,edson,ednaldo,eli,elias,eliseu,elton,erico,ernesto,euclides,evandro,everton,fabiano,fabricio,frederico,geovani,geronimo,gerson,gilmar,gilson,glauco,gleison,haroldo,helio,hercules,hermes,hilario,hilton,hugo,inacio,iran,ismael,jadir,jairo,jair,jeronimo,jocimar,joelson,josimar,josue,juan,junior,jurandir,juvenal,lazaro,leonel,luciano,magno,marcelino,marcilio,mauro,moises,natan,natanael,nelio,neto,newton,nildo,odair,olavo,onofre,orlando,osmar,pablo,plinio,raimundo,reinaldo,robson,rodolfo,rogerio,ronaldo,ronildo,rufino,salomao,sandro,saul,sidnei,sidney,silvestre,tarcio,teodoro,tobias,tomas,tulio,ulisses,ubiratan,valentim,valmir,valdecir,valdir,vanderson,vasco,venancio,waldir,wanderlei,wanderson,wendel,wolney,zacarias,zaqueu,luca,nikita,elisha,josias,matias,isaias,tobias,nicolas,thomas,elvis'.split(','));
+function detectarSexoNome(nome) {
+  if (!nome) return '';
+  const n = nome.trim().split(/\s+/)[0].toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  if (_NF.has(n)) return 'F';
+  if (_NM.has(n)) return 'M';
+  if (n.endsWith('a') && !['luca','nikita','elisha','joshua'].includes(n)) return 'F';
+  if (/son$|sao$|aldo$|ildo$|eiro$|inho$|ando$|endo$|ondo$|undo$|isco$|isto$|erto$|orge$|ique$|nior$|imar$|ival$|inei$|elmo$|eron$/.test(n)) return 'M';
+  if (/ela$|ane$|iane$|iene$|aine$|eine$|elle$|elli$|ioni$/.test(n)) return 'F';
+  return '';
+}
+
+// ─── Constantes ───────────────────────────────────────────────────────────────
+const STATE_KEY = 'rt_empregos_data';
+let state = null;
+let recrutadorLinkId = null;
+const modoPresencial = new URLSearchParams(window.location.search).get('presencial') === '1';
+let comoSoubeValue = '';
+
+// Modo completar ficha BT (link gerado pelo sistema para candidato do BT)
+let modoCompletar = false;
+let completarPrefill = null;
+(function() {
+  try {
+    const cp = new URLSearchParams(window.location.search).get('completar');
+    if (cp) {
+      completarPrefill = JSON.parse(decodeURIComponent(escape(atob(cp))));
+      modoCompletar = true;
+    }
+  } catch(e) {}
+})();
+
+// Modo continuar presencial (candidato que já preencheu presencialmente e vai anexar documentos)
+let modoContinuarPresencial = false;
+let continuarPresencialId = null;
+(function() {
+  const cpId = new URLSearchParams(window.location.search).get('continuarPresencial');
+  if (cpId) { modoContinuarPresencial = true; continuarPresencialId = cpId; }
+})();
+
+// ─── Carregar estado do localStorage ─────────────────────────────────────────
+function loadState() {
+  try { state = JSON.parse(localStorage.getItem(STATE_KEY)); } catch { state = null; }
+  if (!state || !state.candidatos) {
+    showError('Sistema ainda não inicializado. Acesse o portal pelo link correto.');
+  }
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STATE_KEY, JSON.stringify(state));
+  } catch(e) {
+    showError('Erro ao salvar: armazenamento local cheio. Tente reduzir o tamanho das fotos (máx recomendado: 1MB por arquivo) ou use outro dispositivo.');
+  }
+}
+
+// ─── Detectar parâmetro ?rec= ─────────────────────────────────────────────────
+function detectRecrutador() {
+  const params = new URLSearchParams(window.location.search);
+  const recId  = params.get('rec');
+  if (!recId || !state) return;
+
+  const banner  = document.getElementById('recruiter-banner');
+  const avatar  = document.getElementById('recruiter-avatar');
+  const msg     = document.getElementById('recruiter-msg');
+
+  if (recId === 'agencia') {
+    recrutadorLinkId = 'agencia';
+    banner.style.display = 'flex';
+    avatar.style.background = '#be123c';
+    avatar.textContent = 'R';
+    msg.textContent = 'Bem-vindo(a)! Você está se candidatando pelo link oficial da R&T Empregos.';
+  } else {
+    const rec = (state.recrutadores || []).find(r => r.id === recId);
+    if (!rec) return;
+    recrutadorLinkId = recId;
+    banner.style.display = 'flex';
+    avatar.style.background = rec.corHex || '#be123c';
+    avatar.textContent = rec.nome[0].toUpperCase();
+    msg.innerHTML = 'Você está se candidatando via link de <strong>' + rec.nome + '</strong>. Será atribuído(a) automaticamente a este(a) recrutador(a).';
+  }
+}
+
+// ─── Validar CPF ─────────────────────────────────────────────────────────────
+function validarCPF(cpf) {
+  cpf = cpf.replace(/\D/g, '');
+  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(cpf[i]) * (10 - i);
+  let r = (sum * 10) % 11; if (r === 10 || r === 11) r = 0;
+  if (r !== parseInt(cpf[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(cpf[i]) * (11 - i);
+  r = (sum * 10) % 11; if (r === 10 || r === 11) r = 0;
+  return r === parseInt(cpf[10]);
+}
+
+// ─── Auto-fill CEP ────────────────────────────────────────────────────────────
+function buscarCep(cep) {
+  cep = cep.replace(/\D/g, '');
+  if (cep.length !== 8) return;
+  fetch('https://viacep.com.br/ws/' + cep + '/json/')
+    .then(r => r.json())
+    .then(d => {
+      if (d.erro) return;
+      const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+      set('f-rua',    d.logradouro);
+      set('f-bairro', d.bairro);
+      set('f-cidade', d.localidade);
+      set('f-estado', d.uf);
+    })
+    .catch(() => {});
+}
+
+// ─── Document upload → base64 ─────────────────────────────────────────────────
+const uploadedDocs = {};
+
+function setupDoc(inputId, boxId, statusId, fieldKey) {
+  const input  = document.getElementById(inputId);
+  const box    = document.getElementById(boxId);
+  const status = document.getElementById(statusId);
+  if (!input) return;
+  input.addEventListener('change', () => {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      status.textContent = 'Arquivo muito grande (máx 10MB)';
+      box.classList.add('error'); box.classList.remove('uploaded');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      uploadedDocs[fieldKey] = e.target.result;
+      status.textContent = 'Enviado ✓';
+      box.classList.add('uploaded'); box.classList.remove('error');
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// ─── Gerar número de fila ─────────────────────────────────────────────────────
+function gerarNumeroFila() {
+  if (!state.proximaFilaNum) state.proximaFilaNum = 1;
+  return state.proximaFilaNum++;
+}
+
+// ─── Mostrar erro ─────────────────────────────────────────────────────────────
+function showError(msg) {
+  const el = document.getElementById('form-error');
+  if (el) { el.textContent = msg; el.style.display = 'block'; el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+}
+
+// ─── Confetti ─────────────────────────────────────────────────────────────────
+function startConfetti() {
+  const canvas = document.getElementById('parabens-confetti');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const colors = ['#be123c','#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#a855f7','#ec4899'];
+  const pieces = [];
+  for (let i = 0; i < 130; i++) {
+    pieces.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height - canvas.height,
+      r: Math.random() * 6 + 4,
+      d: Math.random() * 120 + 60,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      tiltAngle: 0,
+      tiltAngleInc: Math.random() * 0.07 + 0.05,
+    });
+  }
+  let angle = 0;
+  let frame;
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    angle += 0.01;
+    pieces.forEach(p => {
+      p.tiltAngle += p.tiltAngleInc;
+      p.y += (Math.cos(angle + p.d) + 1 + p.r / 2) * 0.8;
+      p.x += Math.sin(angle) * 0.8;
+      const tilt = Math.sin(p.tiltAngle) * 12;
+      ctx.beginPath();
+      ctx.lineWidth = p.r / 2;
+      ctx.strokeStyle = p.color;
+      ctx.moveTo(p.x + tilt + p.r / 4, p.y);
+      ctx.lineTo(p.x + tilt, p.y + tilt + p.r / 4);
+      ctx.stroke();
+      if (p.y > canvas.height) { p.x = Math.random() * canvas.width; p.y = -20; }
+    });
+    frame = requestAnimationFrame(draw);
+  }
+  draw();
+  setTimeout(() => { cancelAnimationFrame(frame); ctx.clearRect(0, 0, canvas.width, canvas.height); }, 6000);
+}
+
+// ─── Submissão do formulário ──────────────────────────────────────────────────
+document.getElementById('form-candidato').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('form-error');
+  if (errEl) errEl.style.display = 'none';
+  const termoLgpdEl = document.getElementById('f-termo-lgpd');
+  const termoLgpdAceito = !!(termoLgpdEl && termoLgpdEl.checked);
+  const termoLgpdVersao = 'termo-lgpd-rt-2026-05-27';
+  const criarRegistroTermo = () => ({
+    aceito: true,
+    versao: termoLgpdVersao,
+    dataAceite: new Date().toISOString(),
+    textoAceite: 'Autorizacao para tratamento de dados pessoais e documentos pela R&T Empregos / Grupo RT para recrutamento, selecao, banco de talentos, processos presenciais ou online, admissao e contratacao.',
+    pagina: window.location.pathname + window.location.search
+  });
+
+  if (!termoLgpdAceito) {
+    showError('Para enviar a ficha, leia e aceite o termo de uso de dados e documentos.');
+    if (termoLgpdEl) termoLgpdEl.focus();
+    return;
+  }
+
+  // === MODO CONTINUAR PRESENCIAL (envio de documentos via link) ===
+  if (modoContinuarPresencial) {
+    if (!state) { showError('Erro: sistema não inicializado.'); return; }
+    const cand = (state.candidatos || []).find(c => c.id === continuarPresencialId);
+    if (!cand) { showError('Link inválido ou expirado. Solicite um novo link ao selecionador.'); return; }
+
+    cand.documentos = cand.documentos || {};
+    if (uploadedDocs.selfie) cand.documentos.selfie               = uploadedDocs.selfie;
+    if (uploadedDocs.rg)     cand.documentos.rgFrente             = uploadedDocs.rg;
+    if (uploadedDocs.pis)    cand.documentos.fotoPis              = uploadedDocs.pis;
+    if (uploadedDocs.cpf)    cand.documentos.cpfDocumento         = uploadedDocs.cpf;
+    if (uploadedDocs.comp)   cand.documentos.comprovanteResidencia = uploadedDocs.comp;
+    if (uploadedDocs.banco)  cand.documentos.cartaoBancoVerso     = uploadedDocs.banco;
+
+    cand.termoLgpd = criarRegistroTermo();
+    cand.documentosPresencialCompletos = true;
+    cand.status = 'em_analise';
+    cand.historico = cand.historico || [];
+    cand.historico.push({
+      data: new Date().toLocaleString('pt-BR'),
+      autor: 'Candidato',
+      acao: 'Documentos enviados via link de continuação presencial com aceite do termo LGPD.',
+    });
+
+    saveState();
+    document.getElementById('form-wrapper').style.display = 'none';
+    document.getElementById('recruiter-banner').style.display = 'none';
+    document.getElementById('success-screen-presencial').style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  const g = id => (document.getElementById(id) || {}).value || '';
+
+  // Validações — marca todos os campos inválidos de uma vez
+  const erros = [];
+  const markErr = (fieldId, msg) => {
+    const el = document.getElementById(fieldId);
+    if (el) el.closest('.form-group') && el.closest('.form-group').classList.add('field-error');
+    erros.push(msg);
+  };
+  const clearErrs = () => document.querySelectorAll('.form-group.field-error').forEach(g => g.classList.remove('field-error'));
+  clearErrs();
+
+  if (!g('f-nome').trim())          markErr('f-nome',        'Nome completo obrigatório.');
+  if (!g('f-email').trim())         markErr('f-email',       'E-mail obrigatório.');
+  if (!validarCPF(g('f-cpf')))      markErr('f-cpf',         'CPF inválido.');
+  if (!g('f-rg').trim())            markErr('f-rg',          'RG obrigatório.');
+  if (!g('f-pis').trim())           markErr('f-pis',         'PIS/NIS obrigatório.');
+  if (!g('f-telefone').trim())      markErr('f-telefone',    'Telefone obrigatório.');
+  if (!g('f-nascimento').trim())    markErr('f-nascimento',  'Data de nascimento obrigatória.');
+  if (!g('f-mae').trim())           markErr('f-mae',         'Nome da mãe obrigatório.');
+  if (!g('f-cep').trim())           markErr('f-cep',         'CEP obrigatório.');
+  if (!g('f-rua').trim())           markErr('f-rua',         'Rua obrigatória.');
+  if (!g('f-numero').trim())        markErr('f-numero',      'Número obrigatório.');
+  if (!g('f-bairro').trim())        markErr('f-bairro',      'Bairro obrigatório.');
+  if (!g('f-cidade').trim())        markErr('f-cidade',      'Cidade obrigatória.');
+  if (!g('f-estado').trim())        markErr('f-estado',      'Estado obrigatório.');
+  if (!g('f-banco').trim())         markErr('f-banco',       'Banco obrigatório.');
+  if (!g('f-tipopix'))              markErr('f-tipopix',     'Tipo de PIX obrigatório.');
+  if (!g('f-chavepix').trim())      markErr('f-chavepix',    'Chave PIX obrigatória.');
+  if (!g('f-camiseta'))             markErr('f-camiseta',    'Tamanho de camiseta obrigatório.');
+  if (!g('f-calca').trim())         markErr('f-calca',       'Tamanho de calça obrigatório.');
+  if (!g('f-bota').trim())          markErr('f-bota',        'Tamanho de bota obrigatório.');
+  if (modoPresencial && !g('f-senha').trim()) markErr('f-senha', 'Número da senha obrigatório.');
+
+  if (erros.length) {
+    const errEl = document.getElementById('form-error');
+    if (errEl) {
+      errEl.textContent = erros.length === 1 ? erros[0] : 'Preencha os campos marcados em vermelho (' + erros.length + ' campos obrigatórios).';
+      errEl.style.display = 'block';
+      const firstErr = document.querySelector('.form-group.field-error input, .form-group.field-error select');
+      if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    return;
+  }
+
+  // Determinar recrutador
+  let recrutadorId = recrutadorLinkId;
+  if (!recrutadorId || recrutadorId === 'agencia') {
+    const ativos = (state.recrutadores || []).filter(r => r.ativo !== false);
+    if (ativos.length > 0) recrutadorId = ativos[Math.floor(Math.random() * ativos.length)].id;
+  }
+
+  const vagaId  = '';
+  const vaga    = null;
+  const numFila = modoPresencial ? (parseInt(g('f-senha').trim()) || gerarNumeroFila()) : gerarNumeroFila();
+  const agora   = new Date().toISOString();
+
+  const novoCand = {
+    id:              'cand-' + Date.now(),
+    numeroFila:      numFila,
+    nome:            g('f-nome').trim(),
+    email:           g('f-email').trim(),
+    cpf:             g('f-cpf').trim(),
+    rg:              g('f-rg').trim(),
+    pis:             g('f-pis').trim(),
+    telefone:        g('f-telefone').trim(),
+    dataNascimento:  g('f-nascimento').trim(),
+    nomeMae:         g('f-mae').trim(),
+    nomePai:         g('f-pai').trim(),
+    cep:             g('f-cep').trim(),
+    rua:             g('f-rua').trim(),
+    numeroCasa:      g('f-numero').trim(),
+    bairro:          g('f-bairro').trim(),
+    cidade:          g('f-cidade').trim(),
+    estado:          g('f-estado').trim(),
+    banco:           g('f-banco').trim(),
+    tipoPix:         g('f-tipopix'),
+    chavePix:        g('f-chavepix').trim(),
+    tamanhoCamiseta: g('f-camiseta'),
+    tamanhoCalca:    g('f-calca').trim(),
+    tamanhoBota:     g('f-bota').trim(),
+    sexo:            g('f-sexo') || detectarSexoNome(g('f-nome')),
+    vagaId:          vagaId,
+    empresaId:       vaga ? vaga.empresaId : '',
+    codigoVaga:      vaga ? (vaga.empresaNome + ' ' + vaga.codigo) : 'Vaga Não Definida',
+    recrutadorId:    recrutadorId,
+    origemLink:      recrutadorLinkId === 'agencia' ? 'agencia_rt'
+                     : recrutadorLinkId ? 'link_' + recrutadorLinkId
+                     : 'formulario_direto',
+    origemCadastro:  modoPresencial ? 'presencial' : (modoCompletar ? 'banco_talentos_link' : 'online'),
+    comoSoube:       modoPresencial ? (comoSoubeValue || null) : null,
+    status:          modoPresencial ? 'aguardando_consulta_cpf' : 'pendente',
+    diasEtapa:       0,
+    dataCadastro:    agora,
+    termoLgpd:       criarRegistroTermo(),
+    observacoesSelecao: '',
+    documentos: {
+      selfie:               uploadedDocs.selfie               || '',
+      rgFrente:             uploadedDocs.rg                   || '',
+      fotoPis:              uploadedDocs.pis                  || '',
+      cpfDocumento:         uploadedDocs.cpf                  || '',
+      comprovanteResidencia:uploadedDocs.comp                 || '',
+      cartaoBancoVerso:     uploadedDocs.banco                || '',
+    },
+    historico: [{
+      data:  new Date().toLocaleString('pt-BR'),
+      autor: 'Sistema (cadastro público)',
+      acao:  'Candidato cadastrado via formulário público' + (recrutadorLinkId ? ' (link: ' + recrutadorLinkId + ')' : '') + '.',
+    }],
+  };
+
+  if (!state.candidatos) state.candidatos = [];
+
+  // Modo completar: atualiza o registro existente em vez de criar novo
+  if (modoCompletar && completarPrefill && completarPrefill.id) {
+    const existing = state.candidatos.find(c => c.id === completarPrefill.id);
+    if (existing) {
+      Object.assign(existing, {
+        nome: novoCand.nome, email: novoCand.email, cpf: novoCand.cpf,
+        rg: novoCand.rg, pis: novoCand.pis, telefone: novoCand.telefone,
+        dataNascimento: novoCand.dataNascimento, nomeMae: novoCand.nomeMae,
+        nomePai: novoCand.nomePai, cep: novoCand.cep, rua: novoCand.rua,
+        numeroCasa: novoCand.numeroCasa, bairro: novoCand.bairro,
+        cidade: novoCand.cidade, estado: novoCand.estado,
+        banco: novoCand.banco, tipoPix: novoCand.tipoPix, chavePix: novoCand.chavePix,
+        tamanhoCamiseta: novoCand.tamanhoCamiseta, tamanhoCalca: novoCand.tamanhoCalca,
+        tamanhoBota: novoCand.tamanhoBota, documentos: novoCand.documentos,
+        termoLgpd: novoCand.termoLgpd,
+        fichaCompletada: true,
+      });
+      existing.historico = existing.historico || [];
+      existing.historico.push({
+        data: new Date().toLocaleString('pt-BR'),
+        autor: 'Candidato',
+        acao: 'Ficha completada pelo candidato via link de preenchimento com aceite do termo LGPD.',
+      });
+      saveState();
+      document.getElementById('form-wrapper').style.display = 'none';
+      document.getElementById('recruiter-banner').style.display = 'none';
+      // Parabéns para BT completado (online)
+      const _recBT = completarPrefill.recrutadorId && state ?
+        (state.recrutadores || []).find(r => r.id === completarPrefill.recrutadorId) : null;
+      const _waBtn   = document.getElementById('btn-whatsapp-candidato');
+      const _paraSub = document.getElementById('parabens-sub');
+      if (_recBT && _recBT.whatsapp) {
+        const _waNum = _recBT.whatsapp.replace(/\D/g, '');
+        const _waMsg = encodeURIComponent('Olá, ' + _recBT.nome.split(' ')[0] + '! Completei minha ficha de candidato na R&T Empregos. Meu nome é ' + existing.nome.split(' ')[0] + '. Gostaria de mais informações.');
+        if (_waBtn) { _waBtn.href = 'https://wa.me/55' + _waNum + '?text=' + _waMsg; _waBtn.style.display = ''; }
+        if (_paraSub) _paraSub.textContent = 'Sua ficha foi atualizada! Fale agora com nosso(a) selecionador(a) para dar continuidade ao processo.';
+      } else {
+        if (_waBtn) _waBtn.style.display = 'none';
+        if (_paraSub) _paraSub.textContent = 'Sua ficha foi atualizada com sucesso! Nossa equipe entrará em contato em breve.';
+      }
+      const _paraTela = document.getElementById('parabens-screen');
+      if (_paraTela) _paraTela.classList.add('active');
+      startConfetti();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    // Fallback: estado não encontrado (dispositivo diferente) → cria novo com anotação
+    novoCand.origemCadastro = 'banco_talentos';
+    novoCand.fichaCompletada = true;
+    novoCand.observacoesSelecao = 'Ficha completada via link. BT ID original: ' + completarPrefill.id;
+  }
+
+  state.candidatos.push(novoCand);
+  saveState();
+
+  document.getElementById('form-wrapper').style.display = 'none';
+  document.getElementById('recruiter-banner').style.display = 'none';
+
+  if (modoPresencial) {
+    // Presencial inicial: tela de sucesso simples
+    document.getElementById('success-screen').style.display = 'block';
+  } else {
+    // Online (ficha direta ou completar BT): tela de parabéns + WhatsApp
+    const finalRecId = modoCompletar ? (completarPrefill && completarPrefill.recrutadorId) : novoCand.recrutadorId;
+    const rec = finalRecId && state ? (state.recrutadores || []).find(r => r.id === finalRecId) : null;
+    const waBtn   = document.getElementById('btn-whatsapp-candidato');
+    const paraSub = document.getElementById('parabens-sub');
+
+    if (rec && rec.whatsapp) {
+      const waNum = rec.whatsapp.replace(/\D/g, '');
+      const waMsg = encodeURIComponent(
+        'Olá, ' + rec.nome.split(' ')[0] + '! Acabei de preencher minha ficha de candidato na R&T Empregos. ' +
+        'Meu nome é ' + novoCand.nome.split(' ')[0] + '. Gostaria de mais informações sobre as vagas disponíveis.'
+      );
+      if (waBtn) { waBtn.href = 'https://wa.me/55' + waNum + '?text=' + waMsg; waBtn.style.display = ''; }
+      if (paraSub) paraSub.textContent = 'Seu cadastro foi enviado! Fale agora com nosso(a) selecionador(a) para dar continuidade ao processo.';
+    } else {
+      if (waBtn) waBtn.style.display = 'none';
+      if (paraSub) paraSub.textContent = 'Seu cadastro foi recebido com sucesso! Nossa equipe entrará em contato em breve.';
+    }
+
+    const parabensTela = document.getElementById('parabens-screen');
+    if (parabensTela) parabensTela.classList.add('active');
+    startConfetti();
+  }
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadState();
+  detectRecrutador();
+
+  // ─── Modo presencial vs online ───────────────────────────────────────────
+  const senhaSection     = document.getElementById('senha-section');
+  const comoSoubeSection = document.getElementById('como-soube-section');
+  const docsSection      = document.getElementById('docs-section');
+  const camposSection    = document.getElementById('campos-ficha-section');
+  const formTitle        = document.querySelector('.pub-title');
+  const formSubtitle     = document.querySelector('.pub-subtitle');
+
+  // ─── Modo Continuar Presencial (só documentos via link) ──────────────────
+  if (modoContinuarPresencial) {
+    if (camposSection) camposSection.style.display = 'none';
+    if (docsSection)   docsSection.style.display   = '';
+
+    const cand = continuarPresencialId && state ?
+      (state.candidatos || []).find(c => c.id === continuarPresencialId) : null;
+
+    if (formTitle) formTitle.textContent = 'Envio de Documentos';
+    if (formSubtitle) formSubtitle.textContent = 'Anexe seus documentos para dar continuidade ao processo seletivo.';
+
+    if (formTitle) {
+      const info = cand ? ' — ' + cand.nome : '';
+      formTitle.insertAdjacentHTML('afterend',
+        '<div class="modo-badge presencial"><i class="fa-solid fa-file-arrow-up"></i> COMPLETAR DOCUMENTOS' + info + '</div>');
+    }
+
+    const btnSubmit = document.getElementById('btn-submit');
+    if (btnSubmit) btnSubmit.innerHTML = '<i class="fa-solid fa-upload"></i> Enviar Documentos';
+
+    if (!cand) {
+      showError('Link inválido ou expirado. Solicite um novo link ao selecionador.');
+      const btnS = document.getElementById('btn-submit');
+      if (btnS) btnS.disabled = true;
+    }
+
+  } else if (modoPresencial) {
+    if (senhaSection)     senhaSection.style.display     = '';
+    if (comoSoubeSection) comoSoubeSection.style.display = '';
+    if (docsSection)      docsSection.style.display      = 'none';
+    if (formTitle) {
+      formTitle.insertAdjacentHTML('afterend', '<div class="modo-badge presencial"><i class="fa-solid fa-building"></i> FICHA PRESENCIAL — Agência R&amp;T</div>');
+    }
+
+  } else {
+    if (formTitle) {
+      formTitle.insertAdjacentHTML('afterend', '<div class="modo-badge online"><i class="fa-solid fa-globe"></i> FICHA ONLINE</div>');
+    }
+  }
+
+  // ─── Modo Completar Ficha ─────────────────────────────────────────────────
+  if (modoCompletar && completarPrefill) {
+    // Esconde modo presencial/online e mostra banner roxo
+    document.querySelectorAll('.modo-badge').forEach(b => b.remove());
+    const ft = document.querySelector('.pub-title');
+    if (ft) {
+      ft.textContent = 'Completar Ficha de Cadastro';
+      ft.insertAdjacentHTML('afterend',
+        '<div class="modo-badge" style="background:rgba(168,85,247,0.15);color:#a855f7;border:1px solid rgba(168,85,247,0.4);">' +
+        '<i class="fa-solid fa-users"></i> Banco de Talentos R&amp;T — Complete seu cadastro</div>');
+    }
+    const ps = document.querySelector('.pub-subtitle');
+    if (ps) ps.textContent = 'Seus dados foram pré-preenchidos. Revise, complete o que falta (bancário, tamanhos, documentos) e envie.';
+
+    // Ocultar senha e como-soube no modo completar
+    if (senhaSection)     senhaSection.style.display = 'none';
+    if (comoSoubeSection) comoSoubeSection.style.display = 'none';
+
+    // Pré-preencher campos
+    const fill = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+    fill('f-nome',       completarPrefill.nome);
+    fill('f-email',      completarPrefill.email);
+    fill('f-cpf',        completarPrefill.cpf);
+    fill('f-rg',         completarPrefill.rg);
+    fill('f-pis',        completarPrefill.pis);
+    fill('f-telefone',   completarPrefill.telefone);
+    fill('f-nascimento', completarPrefill.dataNascimento);
+    fill('f-mae',        completarPrefill.nomeMae);
+    fill('f-pai',        completarPrefill.nomePai);
+    fill('f-cep',        completarPrefill.cep);
+    fill('f-rua',        completarPrefill.rua);
+    fill('f-numero',     completarPrefill.numeroCasa);
+    fill('f-bairro',     completarPrefill.bairro);
+    fill('f-cidade',     completarPrefill.cidade);
+    fill('f-estado',     completarPrefill.estado);
+    fill('f-banco',      completarPrefill.banco);
+    fill('f-tipopix',    completarPrefill.tipoPix);
+    fill('f-chavepix',   completarPrefill.chavePix);
+    fill('f-camiseta',   completarPrefill.tamanhoCamiseta);
+    fill('f-calca',      completarPrefill.tamanhoCalca);
+    fill('f-bota',       completarPrefill.tamanhoBota);
+    fill('f-sexo',       completarPrefill.sexo);
+  }
+
+  // ─── Chips de "como soube" (seleção única) ───────────────────────────────
+  document.querySelectorAll('.cs-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.cs-chip').forEach(c => c.classList.remove('sel'));
+      chip.classList.add('sel');
+      comoSoubeValue = chip.dataset.val;
+    });
+  });
+
+  // Auto-detectar sexo pelo nome
+  const nomeEl = document.getElementById('f-nome');
+  const sexoEl = document.getElementById('f-sexo');
+  if (nomeEl && sexoEl) {
+    nomeEl.addEventListener('blur', () => {
+      if (!sexoEl.value) {
+        const det = detectarSexoNome(nomeEl.value);
+        if (det) sexoEl.value = det;
+      }
+    });
+  }
+
+  // CEP auto-fill
+  const cepEl = document.getElementById('f-cep');
+  if (cepEl) cepEl.addEventListener('blur', () => buscarCep(cepEl.value));
+
+  // CPF mask
+  const cpfEl = document.getElementById('f-cpf');
+  if (cpfEl) cpfEl.addEventListener('input', () => {
+    let v = cpfEl.value.replace(/\D/g,'').slice(0,11);
+    if (v.length > 9) v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4');
+    else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{0,3})/,'$1.$2.$3');
+    else if (v.length > 3) v = v.replace(/(\d{3})(\d{0,3})/,'$1.$2');
+    cpfEl.value = v;
+  });
+
+  // Data de nascimento mask
+  const nascEl = document.getElementById('f-nascimento');
+  if (nascEl) nascEl.addEventListener('input', () => {
+    let v = nascEl.value.replace(/\D/g,'').slice(0,8);
+    if (v.length > 4) v = v.replace(/(\d{2})(\d{2})(\d{0,4})/,'$1/$2/$3');
+    else if (v.length > 2) v = v.replace(/(\d{2})(\d{0,2})/,'$1/$2');
+    nascEl.value = v;
+  });
+
+  // Document uploads
+  setupDoc('doc-selfie','box-selfie','st-selfie','selfie');
+  setupDoc('doc-rg',    'box-rg',    'st-rg',    'rg');
+  setupDoc('doc-pis',   'box-pis',   'st-pis',   'pis');
+  setupDoc('doc-cpf',   'box-cpf',   'st-cpf',   'cpf');
+  setupDoc('doc-comp',  'box-comp',  'st-comp',  'comp');
+  setupDoc('doc-banco', 'box-banco', 'st-banco', 'banco');
+
+  // Limpar erro de campo quando corrigido
+  document.querySelectorAll('#form-candidato input, #form-candidato select').forEach(el => {
+    el.addEventListener('input', () => {
+      const fg = el.closest('.form-group');
+      if (fg && fg.classList.contains('field-error') && (el.value || '').trim()) {
+        fg.classList.remove('field-error');
+      }
+    });
+    el.addEventListener('change', () => {
+      const fg = el.closest('.form-group');
+      if (fg && fg.classList.contains('field-error') && (el.value || '').trim()) {
+        fg.classList.remove('field-error');
+      }
+    });
+  });
+});
+</script>
+</body>
+</html>
