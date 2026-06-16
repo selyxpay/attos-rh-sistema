@@ -37,6 +37,7 @@ window.RTCloud = (function () {
   let onRemote = null;
   let pending = null;
   let pendingMerge = false;
+  let pendingUpsert = [];
   let saveTimer = null;
   let sdkPromise = null;
 
@@ -97,6 +98,7 @@ window.RTCloud = (function () {
     if (!configured) return;
     pending = state;
     pendingMerge = !!(options && options.merge);
+    pendingUpsert = (options && options.upsertIds) ? options.upsertIds.slice() : [];
     clearTimeout(saveTimer);
     saveTimer = setTimeout(flush, SAVE_DEBOUNCE_MS);
   }
@@ -106,7 +108,9 @@ window.RTCloud = (function () {
     if (!configured || !pending) return;
     const state = pending;
     const merge = pendingMerge;
+    const upsert = pendingUpsert;
     pending = null;
+    pendingUpsert = [];
     clearTimeout(saveTimer);
     try {
       await ensureSdk();
@@ -119,7 +123,7 @@ window.RTCloud = (function () {
       let dados = state;
       if (merge) {
         const nuvem = await loadState();
-        dados = mesclarEstado(nuvem || {}, state);
+        dados = mesclarEstado(nuvem || {}, state, upsert);
       }
 
       // 3) Grava a linha única de estado
@@ -132,17 +136,21 @@ window.RTCloud = (function () {
   }
 
   // -- Mescla para páginas públicas: mantém a nuvem e só ADICIONA o novo ----
-  function mesclarEstado(nuvem, local) {
+  function mesclarEstado(nuvem, local, upsertIds) {
+    const ups = {};
+    (upsertIds || []).forEach(function (id) { ups[id] = true; });
     const out = JSON.parse(JSON.stringify(nuvem || {}));
     Object.keys(local || {}).forEach(function (k) {
       const lv = local[k];
       if (Array.isArray(lv)) {
         if (!Array.isArray(out[k])) { out[k] = lv.slice(); return; }
-        const ids = {};
-        out[k].forEach(function (it) { if (it && it.id != null) ids[it.id] = true; });
+        const idx = {};
+        out[k].forEach(function (it, i) { if (it && it.id != null) idx[it.id] = i; });
         lv.forEach(function (it) {
-          if (it && it.id != null) { if (!ids[it.id]) out[k].push(it); }
-          else out[k].push(it);
+          if (it && it.id != null) {
+            if (idx[it.id] === undefined) out[k].push(it);        // novo registro -> adiciona
+            else if (ups[it.id]) out[k][idx[it.id]] = it;         // upsert -> substitui pelo local
+          } else out[k].push(it);
         });
       } else if (k === 'fila' && lv && typeof lv === 'object') {
         out[k] = mesclarFila(out[k] || {}, lv);

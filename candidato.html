@@ -564,6 +564,7 @@ function detectarSexoNome(nome) {
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const STATE_KEY = 'rt_empregos_data';
+let _rtUpsertIds = [];  // ids de candidatos editados nesta página (força upsert na nuvem)
 let state = null;
 let recrutadorLinkId = null;
 const modoPresencial = new URLSearchParams(window.location.search).get('presencial') === '1';
@@ -608,7 +609,7 @@ function saveState() {
     }
   }
   if (window.RTCloud && RTCloud.configured) {
-    RTCloud.saveState(state, { merge: true });
+    RTCloud.saveState(state, { merge: true, upsertIds: _rtUpsertIds });
     RTCloud.flush();
   }
 }
@@ -812,7 +813,9 @@ document.getElementById('form-candidato').addEventListener('submit', function(e)
     cand.termoLgpd = criarRegistroTermo();
     cand.foto3x4Contrato = criarRegistroFoto3x4();
     cand.documentosPresencialCompletos = true;
+    cand.fichaCompletada = true;
     cand.status = 'em_analise';
+    _rtUpsertIds = [cand.id];
     cand.historico = cand.historico || [];
     cand.historico.push({
       data: new Date().toLocaleString('pt-BR'),
@@ -966,6 +969,7 @@ document.getElementById('form-candidato').addEventListener('submit', function(e)
         autor: 'Candidato',
         acao: 'Ficha completada pelo candidato via link de preenchimento com aceite do termo LGPD.',
       });
+      _rtUpsertIds = [existing.id];
       saveState();
       document.getElementById('form-wrapper').style.display = 'none';
       document.getElementById('recruiter-banner').style.display = 'none';
@@ -1015,6 +1019,7 @@ document.getElementById('form-candidato').addEventListener('submit', function(e)
   // Atualiza também o numeroFila do candidato para coincidir com a senha
   novoCand.numeroFila = state.fila.contadores.selecao;
 
+  _rtUpsertIds = [novoCand.id];
   saveState();
 
   document.getElementById('form-wrapper').style.display = 'none';

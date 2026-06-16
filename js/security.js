@@ -84,53 +84,89 @@ function ehHash(str) {
 // Bloqueia por 30s após 5 tentativas falhas.
 // --------------------------------------------------------------------------
 
+// Bloqueio por LOGIN (não global): 3 tentativas -> 30s -> +3 -> 30s -> +3 -> bloqueio administrativo
 const _BRUTE_KEY = 'rt_login_attempts';
-const _MAX_TENTATIVAS = 5;
-const _BLOQUEIO_MS = 30 * 1000; // 30 segundos
+const _MAX_TENTATIVAS_CICLO = 3;   // tentativas por ciclo
+const _MAX_CICLOS = 3;             // após o 3º ciclo, bloqueio permanente
+const _BLOQUEIO_MS = 30 * 1000;    // 30 segundos entre ciclos
 
-/**
- * Retorna o estado atual das tentativas de login.
- * @returns {{ count: number, bloqueadoAte: number }}
- */
-function _getLoginState() {
-  try {
-    const raw = sessionStorage.getItem(_BRUTE_KEY);
-    return raw ? JSON.parse(raw) : { count: 0, bloqueadoAte: 0 };
-  } catch {
-    return { count: 0, bloqueadoAte: 0 };
-  }
+function _bruteAll() {
+  try { return JSON.parse(localStorage.getItem(_BRUTE_KEY)) || {}; } catch { return {}; }
+}
+function _bruteSave(all) {
+  try { localStorage.setItem(_BRUTE_KEY, JSON.stringify(all)); } catch (e) {}
+}
+function _bruteKey(login) {
+  return String(login || '').trim().toLowerCase() || '_anon';
+}
+function _bruteGet(login) {
+  const all = _bruteAll();
+  return all[_bruteKey(login)] || { ciclo: 1, tentativas: 0, bloqueadoAte: 0, permanente: false };
+}
+function _brutePut(login, st) {
+  const all = _bruteAll();
+  all[_bruteKey(login)] = st;
+  _bruteSave(all);
 }
 
 /**
- * Verifica se o login está bloqueado por excesso de tentativas.
- * @returns {{ bloqueado: boolean, segundosRestantes: number }}
+ * Verifica o bloqueio do login informado. Recalcula o tempo a partir do
+ * timestamp salvo (sobrevive a refresh, nunca negativo). Ao expirar o
+ * bloqueio de 30s, libera automaticamente o próximo ciclo.
+ * @param {string} login
+ * @returns {{ bloqueado:boolean, permanente:boolean, segundosRestantes:number, ciclo:number, tentativasRestantes:number }}
  */
-function verificarBloqueio() {
-  const state = _getLoginState();
+function verificarBloqueio(login) {
+  const st = _bruteGet(login);
+  if (st.permanente) {
+    return { bloqueado: true, permanente: true, segundosRestantes: 0, ciclo: st.ciclo, tentativasRestantes: 0 };
+  }
   const agora = Date.now();
-  if (state.bloqueadoAte && agora < state.bloqueadoAte) {
-    const seg = Math.ceil((state.bloqueadoAte - agora) / 1000);
-    return { bloqueado: true, segundosRestantes: seg };
+  if (st.bloqueadoAte && agora < st.bloqueadoAte) {
+    return { bloqueado: true, permanente: false, segundosRestantes: Math.ceil((st.bloqueadoAte - agora) / 1000), ciclo: st.ciclo, tentativasRestantes: 0 };
   }
-  return { bloqueado: false, segundosRestantes: 0 };
+  if (st.bloqueadoAte && agora >= st.bloqueadoAte) {
+    // Bloqueio de 30s terminou -> libera o próximo ciclo
+    st.bloqueadoAte = 0;
+    st.ciclo = Math.min((st.ciclo || 1) + 1, _MAX_CICLOS);
+    st.tentativas = 0;
+    _brutePut(login, st);
+  }
+  return { bloqueado: false, permanente: false, segundosRestantes: 0, ciclo: st.ciclo, tentativasRestantes: Math.max(0, _MAX_TENTATIVAS_CICLO - st.tentativas) };
 }
 
 /**
- * Registra uma tentativa de login falha.
- * Se atingir o limite, define o tempo de bloqueio.
+ * Registra uma tentativa falha para o login e devolve o novo estado.
+ * @param {string} login
  */
-function registrarTentativaFalha() {
-  const state = _getLoginState();
-  const novoCount = (state.count || 0) + 1;
-  const bloqueadoAte = novoCount >= _MAX_TENTATIVAS ? Date.now() + _BLOQUEIO_MS : (state.bloqueadoAte || 0);
-  sessionStorage.setItem(_BRUTE_KEY, JSON.stringify({ count: novoCount, bloqueadoAte }));
+function registrarTentativaFalha(login) {
+  const st = _bruteGet(login);
+  if (st.permanente) return { bloqueado: true, permanente: true, segundosRestantes: 0, ciclo: st.ciclo, tentativasRestantes: 0 };
+  st.tentativas = (st.tentativas || 0) + 1;
+  if (st.tentativas >= _MAX_TENTATIVAS_CICLO) {
+    if ((st.ciclo || 1) >= _MAX_CICLOS) { st.permanente = true; st.bloqueadoAte = 0; }
+    else { st.bloqueadoAte = Date.now() + _BLOQUEIO_MS; }
+  }
+  _brutePut(login, st);
+  const agora = Date.now();
+  return {
+    bloqueado: st.permanente || st.bloqueadoAte > agora,
+    permanente: !!st.permanente,
+    segundosRestantes: st.bloqueadoAte > agora ? Math.ceil((st.bloqueadoAte - agora) / 1000) : 0,
+    ciclo: st.ciclo,
+    tentativasRestantes: Math.max(0, _MAX_TENTATIVAS_CICLO - st.tentativas)
+  };
 }
 
 /**
- * Reseta o contador de tentativas de login (chamado após login bem-sucedido).
+ * Limpa o estado de tentativas. Sem login: limpa tudo (compat).
+ * @param {string} [login]
  */
-function resetarTentativasLogin() {
-  sessionStorage.removeItem(_BRUTE_KEY);
+function resetarTentativasLogin(login) {
+  if (login === undefined) { try { localStorage.removeItem(_BRUTE_KEY); } catch (e) {} return; }
+  const all = _bruteAll();
+  delete all[_bruteKey(login)];
+  _bruteSave(all);
 }
 
 // --------------------------------------------------------------------------

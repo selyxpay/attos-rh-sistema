@@ -223,6 +223,7 @@ function isAbaAutorizada(abaId) {
   if (!loggedUser) return false;
   if (abaId === 'meu-painel') return true;
   if (abaId === 'fila') return true; // todos os logados acessam
+  if (abaId === 'lixeira') return loggedUser.login === 'joaobalaf' || loggedUser.departamento === 'administracao';
   if (loggedUser.login === 'joaobalaf') return true;
   const depto = loggedUser.departamento;
   if (depto === 'administracao') return true;
@@ -233,7 +234,7 @@ function isAbaAutorizada(abaId) {
   }
   // Fallback por departamento para contas antigas sem permissões definidas
   if (depto === 'selecao') {
-    const temVinculo = state && state.recrutadores && state.recrutadores.some(r => r.loginVinculado === loggedUser.login);
+    const temVinculo = state && state.recrutadores && state.recrutadores.some(r => (r.usuarioId && r.usuarioId === loggedUser.id) || (r.loginVinculado && r.loginVinculado === loggedUser.login));
     if (temVinculo) return abaId === 'meu-painel';
     return ['dashboard', 'vagas', 'banco-talentos', 'selecao', 'site', 'meu-painel'].includes(abaId);
   }
@@ -298,7 +299,7 @@ function verificarPermissoesMenu() {
     if (loggedUser.departamento === 'dp') homeAba = 'depto-pessoal';
     else if (loggedUser.departamento === 'comissao') homeAba = 'comissao';
     else if (loggedUser.departamento === 'selecao') {
-      const temVinculo = state && state.recrutadores && state.recrutadores.some(r => r.loginVinculado === loggedUser.login);
+      const temVinculo = state && state.recrutadores && state.recrutadores.some(r => (r.usuarioId && r.usuarioId === loggedUser.id) || (r.loginVinculado && r.loginVinculado === loggedUser.login));
       if (temVinculo) homeAba = 'meu-painel';
     }
     switchAba(homeAba);
@@ -487,6 +488,106 @@ function gerarFichaCadastralTexto(cand) {
   ].join('\n');
 }
 
+// Gera a Ficha do Candidato em Word (.docx) montando OOXML com o JSZip já carregado.
+async function gerarFichaDocx(cand) {
+  const vaga = state.vagas.find(v => v.id === cand.vagaId) || {};
+  const rec  = state.recrutadores.find(r => r.id === cand.recrutadorId);
+  const recNome = rec ? rec.nome : (cand.origemLink === 'agencia_rt' ? 'Agência R&T' : '—');
+  const ben = cand.beneficiosSelecao || {};
+
+  const xmlEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+  const val = (x) => {
+    if (x === null || x === undefined || x === '') return '—';
+    if (typeof x === 'object') return '—';
+    return String(x);
+  };
+  const salario = (vaga && vaga.salario != null && vaga.salario !== '')
+    ? ('R$ ' + Number(vaga.salario).toLocaleString('pt-BR', { minimumFractionDigits: 2 })) : '—';
+
+  function p(text, o) {
+    o = o || {};
+    const rpr = [];
+    if (o.bold) rpr.push('<w:b/>');
+    if (o.color) rpr.push(`<w:color w:val="${o.color}"/>`);
+    if (o.size) rpr.push(`<w:sz w:val="${o.size}"/><w:szCs w:val="${o.size}"/>`);
+    const ppr = [];
+    if (o.align) ppr.push(`<w:jc w:val="${o.align}"/>`);
+    if (o.spaceAfter) ppr.push(`<w:spacing w:after="${o.spaceAfter}"/>`);
+    return `<w:p><w:pPr>${ppr.join('')}</w:pPr><w:r><w:rPr>${rpr.join('')}</w:rPr><w:t xml:space="preserve">${xmlEsc(text)}</w:t></w:r></w:p>`;
+  }
+  function secTitle(text) {
+    return `<w:p><w:pPr><w:spacing w:before="240" w:after="80"/><w:shd w:val="clear" w:fill="F1F5F9"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="0F172A"/><w:sz w:val="24"/></w:rPr><w:t xml:space="preserve">${xmlEsc(text)}</w:t></w:r></w:p>`;
+  }
+  function cellXml(text, w, o) {
+    o = o || {};
+    const rpr = o.bold ? '<w:b/>' : '';
+    const shd = o.fill ? `<w:shd w:val="clear" w:fill="${o.fill}"/>` : '';
+    return `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${shd}</w:tcPr><w:p><w:pPr><w:spacing w:before="20" w:after="20"/></w:pPr><w:r><w:rPr>${rpr}<w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">${xmlEsc(text)}</w:t></w:r></w:p></w:tc>`;
+  }
+  function table(rows) {
+    const borders = `<w:tblBorders><w:top w:val="single" w:sz="4" w:color="E2E8F0"/><w:left w:val="single" w:sz="4" w:color="E2E8F0"/><w:bottom w:val="single" w:sz="4" w:color="E2E8F0"/><w:right w:val="single" w:sz="4" w:color="E2E8F0"/><w:insideH w:val="single" w:sz="4" w:color="E2E8F0"/><w:insideV w:val="single" w:sz="4" w:color="E2E8F0"/></w:tblBorders>`;
+    const trs = rows.map(r => `<w:tr>${cellXml(r[0], 3200, { bold: true, fill: 'F8FAFC' })}${cellXml(r[1], 6300)}</w:tr>`).join('');
+    return `<w:tbl><w:tblPr><w:tblW w:w="9500" w:type="dxa"/>${borders}</w:tblPr>${trs}</w:tbl>`;
+  }
+
+  const body =
+    p('FICHA DO CANDIDATO', { bold: true, size: 40, align: 'center', color: '0F172A' }) +
+    p('Grupo R&T — Departamento Pessoal', { align: 'center', color: '64748B', size: 22, spaceAfter: 120 }) +
+    p(`Exportado em ${new Date().toLocaleString('pt-BR')} por ${loggedUser ? loggedUser.nome : 'Sistema R&T'}`, { align: 'center', color: '94A3B8', size: 16, spaceAfter: 200 }) +
+    secTitle('Seção 1 — Dados Pessoais') +
+    table([
+      ['Nome completo', val(cand.nome)], ['CPF', val(cand.cpf)], ['RG', val(cand.rg)],
+      ['Data de nascimento', val(cand.dataNascimento)], ['Sexo', val(cand.sexo)], ['Estado civil', val(cand.estadoCivil)],
+      ['Nome da mãe', val(cand.nomeMae)], ['Nome do pai', val(cand.nomePai)],
+      ['Telefone', val(cand.telefone)], ['E-mail', val(cand.email)]
+    ]) +
+    secTitle('Seção 2 — Endereço') +
+    table([
+      ['CEP', val(cand.cep)], ['Rua', val(cand.rua)], ['Número', val(cand.numeroCasa)],
+      ['Complemento', val(cand.complemento)], ['Bairro', val(cand.bairro)], ['Cidade', val(cand.cidade)], ['Estado', val(cand.estado)]
+    ]) +
+    secTitle('Seção 3 — Dados Bancários') +
+    table([
+      ['Banco', val(cand.banco)], ['Agência', val(cand.agencia)], ['Conta', val(cand.conta)],
+      ['Tipo de conta', val(cand.tipoConta)], ['Chave PIX', val(cand.chavePix)], ['Tipo de chave PIX', val(cand.tipoPix)]
+    ]) +
+    secTitle('Seção 4 — Dados Profissionais') +
+    table([
+      ['Empresa', val(vaga.empresaNome)], ['Vaga', val(vaga.cargo || cand.codigoVaga)], ['Cargo', val(cand.cargo || vaga.cargo)],
+      ['Salário', salario], ['Data de admissão', val(cand.dataAdmissao || cand.dataContratacao)], ['Turno', val(cand.turnoTrabalho)],
+      ['Recrutado por', val(recNome)], ['Origem do cadastro', cand.origemCadastro === 'presencial' ? 'Presencial (Agência R&T)' : (cand.origemCadastro ? 'Online' : '—')]
+    ]) +
+    secTitle('Seção 5 — Transporte e Benefícios') +
+    table([
+      ['Tipo de transporte', ben.fretado ? 'Fretado' : (ben.passagemIdaVolta ? 'Passagem (VT)' : '—')],
+      ['Valor de VT', val(ben.valorVT)], ['Linha do fretado', val(ben.linhaFretado || cand.linhaFretado)],
+      ['Benefícios', val(ben.qualFretado)], ['Observações', val(cand.observacoesSelecao)]
+    ]) +
+    secTitle('Seção 6 — Uniforme') +
+    table([
+      ['Tamanho da camiseta', val(cand.tamanhoCamiseta)], ['Tamanho da calça', val(cand.tamanhoCalca)], ['Tamanho da bota', val(cand.tamanhoBota)]
+    ]) +
+    secTitle('Seção 7 — Controle do Processo') +
+    table([
+      ['Status', val(cand.status)], ['Data do cadastro', val(cand.dataCadastro ? new Date(cand.dataCadastro).toLocaleString('pt-BR') : '')],
+      ['Data do envio ao DP', val(cand.dataSubiuDP)], ['Selecionadora responsável', val(cand.aprovadorSelecao || recNome)],
+      ['Observações internas', val(cand.observacoesSelecao)]
+    ]);
+
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`;
+  const relsRoot = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+
+  const docx = new JSZip();
+  docx.file('[Content_Types].xml', contentTypes);
+  docx.folder('_rels').file('.rels', relsRoot);
+  docx.folder('word').file('document.xml', documentXml);
+  return await docx.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+}
+
 async function exportarFichaCompletaZip(candidatoId) {
   const cand = state.candidatos.find(c => c.id === candidatoId);
   if (!cand) { alert('Candidato não encontrado.'); return; }
@@ -508,8 +609,9 @@ async function exportarFichaCompletaZip(candidatoId) {
     const zip = new JSZip(); // CDN global
     const folder = zip.folder(cleanName);
 
-    // Arquivo de texto com todos os dados escritos
-    folder.file('dados_do_candidato.txt', gerarFichaCadastralTexto(cand));
+    // Documento Word (.docx) com os dados do candidato, organizado em seções
+    const nomeDocx = cand.nome.replace(/[\\/:*?"<>|]/g, '').trim();
+    folder.file(`Ficha do Candidato - ${nomeDocx}.docx`, await gerarFichaDocx(cand));
 
     // Documentos reais (base64 ou URL remota) — todos em paralelo
     const docs = cand.documentos || {};
@@ -534,7 +636,8 @@ async function exportarFichaCompletaZip(candidatoId) {
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
 
-    registrarAcaoHistorico(cand, 'Exportou ficha completa em ZIP — ' + cleanName + '/ (dados + documentos reais).');
+    registrarAcaoHistorico(cand, 'Exportou pasta completa em ZIP — ' + cleanName + '/ (Ficha em Word .docx + documentos).');
+    registrarLogGlobal(`Exportou a pasta do candidato "${cand.nome}" (Word + documentos).`, 'exportacao');
     saveState();
 
   } catch (err) {
@@ -777,6 +880,28 @@ function initLocalStorage() {
       });
     }
 
+    // ── Campos novos: exclusão lógica, cadastro de funcionário e vínculo ──
+    (state.candidatos || []).concat(state.bancoTalentos || []).forEach(c => {
+      if (c && c.excluido === undefined) { c.excluido = false; alterado = true; }
+    });
+    if (state.funcionarios) {
+      state.funcionarios.forEach(f => {
+        if (f.telefone === undefined) { f.telefone = ''; alterado = true; }
+        if (f.departamentoSolicitado === undefined) { f.departamentoSolicitado = f.departamento || ''; alterado = true; }
+        if (f.dataSolicitacao === undefined) { f.dataSolicitacao = ''; alterado = true; }
+        if (f.bloqueadoLogin === undefined) { f.bloqueadoLogin = false; alterado = true; }
+      });
+    }
+    if (state.recrutadores) {
+      state.recrutadores.forEach(r => {
+        if (r.usuarioId === undefined) {
+          const fv = (state.funcionarios || []).find(fn => fn.login && fn.login === r.loginVinculado);
+          r.usuarioId = fv ? fv.id : null;
+          alterado = true;
+        }
+      });
+    }
+
     if (alterado) {
       saveState();
     }
@@ -796,6 +921,38 @@ function initLocalStorage() {
 function saveState() {
   localStorage.setItem('rt_empregos_data', JSON.stringify(state));
   if (window.RTCloud && RTCloud.configured) RTCloud.saveState(state);
+}
+
+// ── Contador de bloqueio de login (um único intervalo, sem travar) ─────────
+let _bloqueioTimer = null;
+function mostrarErroLogin(msg) {
+  const el = document.getElementById('login-error-msg');
+  if (el) { const sp = el.querySelector('span'); if (sp) sp.textContent = msg; el.style.display = 'flex'; }
+}
+function iniciarContadorBloqueio(login) {
+  const el = document.getElementById('login-error-msg');
+  const form = document.getElementById('login-form');
+  const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
+  if (_bloqueioTimer) { clearInterval(_bloqueioTimer); _bloqueioTimer = null; }
+  function tick() {
+    const b = (typeof verificarBloqueio === 'function') ? verificarBloqueio(login) : { bloqueado: false };
+    if (b.permanente) {
+      if (_bloqueioTimer) { clearInterval(_bloqueioTimer); _bloqueioTimer = null; }
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = '1'; }
+      mostrarErroLogin('Acesso bloqueado por excesso de tentativas. Procure um administrador.');
+      return;
+    }
+    if (b.bloqueado && b.segundosRestantes > 0) {
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = '0.6'; }
+      mostrarErroLogin(`Muitas tentativas incorretas. Aguarde ${b.segundosRestantes}s para tentar novamente.`);
+    } else {
+      if (_bloqueioTimer) { clearInterval(_bloqueioTimer); _bloqueioTimer = null; }
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = '1'; }
+      if (el) el.style.display = 'none';
+    }
+  }
+  tick();
+  _bloqueioTimer = setInterval(tick, 1000);
 }
 
 // 2. SISTEMA DE ABA E ROTEAMENTO SPA
@@ -880,7 +1037,8 @@ function switchAba(abaId) {
     'configuracoes': 'fa-solid fa-sliders',
     'meu-painel': 'fa-solid fa-id-card-clip',
     'fila': 'fa-solid fa-ticket',
-    'documentos': 'fa-solid fa-folder-open'
+    'documentos': 'fa-solid fa-folder-open',
+    'lixeira': 'fa-solid fa-trash-can'
   };
 
   const titleMap = {
@@ -898,7 +1056,8 @@ function switchAba(abaId) {
     'configuracoes': 'R&T EMPREGOS — CONFIGURAÇÕES DO SISTEMA',
     'meu-painel': 'R&T EMPREGOS — MEU PAINEL',
     'fila': 'R&T EMPREGOS — SISTEMA DE SENHAS',
-    'documentos': 'R&T EMPREGOS — DOCUMENTOS NA NUVEM'
+    'documentos': 'R&T EMPREGOS — DOCUMENTOS NA NUVEM',
+    'lixeira': 'R&T EMPREGOS — LIXEIRA'
   };
 
   if (headerIcon) headerIcon.className = `${iconMap[abaId] || 'fa-solid fa-building'} header-icon`;
@@ -955,6 +1114,9 @@ function renderCurrentAba() {
       break;
     case 'documentos':
       renderDocumentos();
+      break;
+    case 'lixeira':
+      renderLixeira();
       break;
   }
 }
@@ -1179,7 +1341,8 @@ function setupEventListeners() {
       } else {
         registrarAcaoHistorico(cand, `Ficha cadastral aprovada na Seleção por ${cand.aprovadorSelecao} e enviada ao DP. Turno: ${turno}`);
       }
-      
+      registrarLogGlobal(`Enviou a ficha de "${cand.nome}" para o Departamento Pessoal.`, 'fluxo');
+
       // Log activity
       if (!loggedUser || loggedUser.login !== 'joaobalaf') {
         state.atividades.unshift({
@@ -1514,15 +1677,18 @@ function setupEventListeners() {
       const loginError = document.getElementById('login-error-msg');
       const submitBtn = loginForm.querySelector('button[type="submit"]');
 
-      // Verificar bloqueio por brute force
+      // Bloqueio administrativo permanente (registrado no funcionário)
+      const fAlvo = state.funcionarios.find(f => f.login === userVal);
+      if (fAlvo && fAlvo.bloqueadoLogin) {
+        mostrarErroLogin('Acesso bloqueado por excesso de tentativas. Procure um administrador.');
+        return;
+      }
+      // Bloqueio por ciclo (30s) — com contador ao vivo, por login
       if (typeof verificarBloqueio === 'function') {
-        const bloqueio = verificarBloqueio();
+        const bloqueio = verificarBloqueio(userVal);
         if (bloqueio.bloqueado) {
-          if (loginError) {
-            loginError.querySelector('span').textContent =
-              `Muitas tentativas incorretas. Aguarde ${bloqueio.segundosRestantes}s para tentar novamente.`;
-            loginError.style.display = 'flex';
-          }
+          if (bloqueio.permanente) mostrarErroLogin('Acesso bloqueado por excesso de tentativas. Procure um administrador.');
+          else iniciarContadorBloqueio(userVal);
           return;
         }
       }
@@ -1562,8 +1728,9 @@ function setupEventListeners() {
             return;
           }
 
-          // Resetar contador de tentativas falhas
-          if (typeof resetarTentativasLogin === 'function') resetarTentativasLogin();
+          // Resetar contador de tentativas falhas deste login
+          if (typeof resetarTentativasLogin === 'function') resetarTentativasLogin(userVal);
+          if (_bloqueioTimer) { clearInterval(_bloqueioTimer); _bloqueioTimer = null; }
 
           // Criar sessão com expiração de 8h
           if (typeof criarSessaoComExpiracao === 'function') {
@@ -1583,20 +1750,28 @@ function setupEventListeners() {
           if (found.departamento === 'dp') homeAba = 'depto-pessoal';
           else if (found.departamento === 'comissao') homeAba = 'comissao';
           else if (found.departamento === 'selecao') {
-            const temVinculo = state.recrutadores && state.recrutadores.some(r => r.loginVinculado === found.login);
+            const temVinculo = state.recrutadores && state.recrutadores.some(r => (r.usuarioId && r.usuarioId === found.id) || (r.loginVinculado && r.loginVinculado === found.login));
             if (temVinculo) homeAba = 'meu-painel';
           }
           switchAba(homeAba);
         } else {
-          // Registrar tentativa falha para controle de brute force
-          if (typeof registrarTentativaFalha === 'function') registrarTentativaFalha();
+          let res = { bloqueado: false };
+          if (typeof registrarTentativaFalha === 'function') res = registrarTentativaFalha(userVal);
 
-          const bloqueioAtual = typeof verificarBloqueio === 'function' ? verificarBloqueio() : { bloqueado: false };
-          if (loginError) {
-            loginError.querySelector('span').textContent = bloqueioAtual.bloqueado
-              ? `Conta temporariamente bloqueada. Aguarde ${bloqueioAtual.segundosRestantes}s.`
-              : 'Usuário ou senha incorretos!';
-            loginError.style.display = 'flex';
+          if (res.permanente) {
+            const fb = state.funcionarios.find(f => f.login === userVal);
+            if (fb) {
+              fb.bloqueadoLogin = true;
+              fb.bloqueioInfo = { data: new Date().toLocaleString('pt-BR'), dispositivo: navigator.userAgent };
+              saveState();
+              registrarLogGlobal(`Acesso de "${fb.nome}" (${fb.login}) bloqueado por excesso de tentativas de login.`, 'seguranca');
+            }
+            mostrarErroLogin('Acesso bloqueado por excesso de tentativas. Procure um administrador.');
+          } else if (res.bloqueado) {
+            iniciarContadorBloqueio(userVal);
+          } else {
+            const rest = (res.tentativasRestantes != null) ? res.tentativasRestantes : null;
+            mostrarErroLogin(rest != null ? `Usuário ou senha incorretos! (${rest} tentativa(s) restante(s))` : 'Usuário ou senha incorretos!');
           }
         }
       } finally {
@@ -1686,6 +1861,7 @@ function setupEventListeners() {
         cand.diasEtapa = 1;
 
         registrarAcaoHistorico(cand, `Ficha devolvida para a Seleção por ${cand.devolvidoPor} (DP). Motivo: ${motivo}`);
+        registrarLogGlobal(`Devolveu a ficha de "${cand.nome}" do DP para a Seleção. Motivo: ${motivo}`, 'fluxo');
 
         saveState();
         document.getElementById('modal-dp-devolver-motivo').classList.remove('active');
@@ -1760,7 +1936,7 @@ function renderDashboardKanban(filtroNome = '') {
   const candidatosAtivos = state.candidatos.filter(c => {
     const matchStatus = colunas.includes(c.status);
     const matchFiltro = filtroNome === '' || c.nome.toLowerCase().includes(filtroNome.toLowerCase());
-    return matchStatus && matchFiltro;
+    return matchStatus && matchFiltro && !c.excluido;
   });
 
   // Contadores
@@ -1977,7 +2153,7 @@ function renderBancoTalentos(filtroNome = '') {
     const candEmpresa = state.candidatos.filter(c => {
       const matchEmp = c.empresaId === emp.id;
       const matchFiltro = filtroNome === '' || c.nome.toLowerCase().includes(filtroNome.toLowerCase());
-      return matchEmp && matchFiltro;
+      return matchEmp && matchFiltro && !c.excluido;
     });
 
     if (candEmpresa.length === 0 && filtroNome !== '') return; // oculta grupo vazio na busca
@@ -2032,7 +2208,7 @@ function renderSelecaoGrid() {
 
   // Filtra quem está nas etapas de Seleção
   const statusSelecao = ['pendente', 'aguardando_consulta_cpf', 'em_analise', 'entrevista'];
-  const candidatosSelecao = state.candidatos.filter(c => statusSelecao.includes(c.status));
+  const candidatosSelecao = state.candidatos.filter(c => statusSelecao.includes(c.status) && !c.excluido);
 
   if (candidatosSelecao.length === 0) {
     container.innerHTML = `<p style="grid-column: span 4; font-size: 13px; color: var(--text-secondary); text-align: center; padding: 48px;">Nenhum candidato aguardando triagem ou em análise na Seleção.</p>`;
@@ -2166,7 +2342,7 @@ function renderDeptoPessoal() {
   // ── Fim seção contratos hoje ───────────────────────────────────────────────
 
   // Filtra candidatos "aprovados"
-  const candidatosAprovados = state.candidatos.filter(c => c.status === 'aprovado');
+  const candidatosAprovados = state.candidatos.filter(c => c.status === 'aprovado' && !c.excluido);
 
   if (candidatosAprovados.length === 0) {
     container.innerHTML = `<p style="grid-column: span 4; font-size: 13px; color: var(--text-secondary); text-align: center; padding: 48px;">Nenhum candidato aprovado aguardando validação final do Departamento Pessoal.</p>`;
@@ -3085,6 +3261,21 @@ function abrirDrawerDetalhes(candidatoId) {
     }
   }
 
+  // ── Botão EXCLUIR FICHA (soft-delete por área + permissão) ──────────────────
+  const btnExcluirCand = document.getElementById('btn-excluir-candidato');
+  if (btnExcluirCand) {
+    const areaAtual = activeAba === 'banco-talentos' ? 'banco_talentos'
+                    : activeAba === 'depto-pessoal'  ? 'dp'
+                    : activeAba === 'selecao'         ? 'selecao' : null;
+    if (areaAtual && podeExcluirArea(areaAtual)) {
+      btnExcluirCand.style.display = 'flex';
+      btnExcluirCand.onclick = () => abrirModalExcluirCandidato(cand.id, areaAtual);
+    } else {
+      btnExcluirCand.style.display = 'none';
+      btnExcluirCand.onclick = null;
+    }
+  }
+
   // ── Botão INAPTO no header + banners de detecção/confirmação ────────────────
   const cpfNoBank = checkCpfInapto(cand.cpf);
   const jaMarcadoInapto = !!cand.inaptidaoInfo;
@@ -3280,6 +3471,7 @@ window.aprovarConsultaCPF = function(candidatoId) {
   cand.statusCpf = 'aprovado';
   cand.status = 'em_analise';
   registrarAcaoHistorico(cand, 'CPF consultado e aprovado pela selecionadora. Candidato liberado para continuar a ficha.');
+  registrarLogGlobal(`Liberou o link de documentação (CPF aprovado) para "${cand.nome}".`, 'fluxo');
   saveState();
   renderSelecaoGrid();
   abrirDrawerDetalhes(candidatoId);
@@ -3432,11 +3624,17 @@ window.salvarBeneficiosSelecao = function() {
 // MÓDULO: BANCO DE TALENTOS POR RECRUTADORA
 // ==========================================================================
 
+let _waLogTimer = null;
 window.salvarWhatsappRecrutadora = function(recrutadorId, valor) {
   const rec = (state.recrutadores || []).find(r => r.id === recrutadorId);
   if (!rec) return;
   rec.whatsapp = valor.replace(/\D/g, '');
   saveState();
+  // Log com debounce (evita registrar a cada tecla digitada)
+  clearTimeout(_waLogTimer);
+  _waLogTimer = setTimeout(() => {
+    registrarLogGlobal(`Atualizou o WhatsApp do perfil "${rec.nome}" para ${rec.whatsapp || '(vazio)'}.`, 'meu_painel');
+  }, 1200);
 };
 
 function getBtNovosPorRecrutadora(recrutadorId) {
@@ -3759,13 +3957,16 @@ function renderFuncionarios() {
 
   const pendentes = state.funcionarios.filter(f => f.status === 'aguardando_aprovacao');
 
+  const pendCountEl = document.getElementById('func-pending-count');
+  if (pendCountEl) pendCountEl.textContent = pendentes.length > 0 ? `${pendentes.length} nova(s)` : '';
+
   if (pendingCard && pendingBody) {
     if (pendentes.length > 0 && podeAprovar) {
       pendingCard.style.display = 'block';
       pendingBody.innerHTML = pendentes.map(f => `
         <tr>
-          <td style="font-weight:600; color:var(--text-primary);">${f.nome}</td>
-          <td>${f.login}</td>
+          <td style="font-weight:600; color:var(--text-primary);">${escapeHTML(f.nome)}<div style="font-size:11px;color:var(--text-secondary);font-weight:400;">${escapeHTML(f.telefone || 'sem telefone')} · ${escapeHTML(deptoLabelSimples(f.departamentoSolicitado || f.departamento))}${f.dataSolicitacao ? ' · ' + escapeHTML(f.dataSolicitacao) : ''}</div></td>
+          <td>${escapeHTML(f.login)}</td>
           <td><span class="badge" style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">Aguardando Aprovação</span></td>
           <td>
             <button class="btn btn-primary btn-sm" onclick="abrirModalGerenciarFuncionario('${f.id}')"
@@ -3777,6 +3978,34 @@ function renderFuncionarios() {
       `).join('');
     } else {
       pendingCard.style.display = 'none';
+    }
+  }
+
+  // --- Card de Acessos Bloqueados (excesso de tentativas) ---
+  const blockedCard = document.getElementById('func-blocked-card');
+  const blockedBody = document.getElementById('lista-bloqueados-body');
+  const podeLiberar = loggedUser && (loggedUser.departamento === 'administracao' || loggedUser.login === 'joaobalaf' || hasPermission('funcionarios', 'aprovar'));
+  const bloqueados = state.funcionarios.filter(f => f.bloqueadoLogin);
+  if (blockedCard && blockedBody) {
+    if (bloqueados.length > 0 && podeLiberar) {
+      blockedCard.style.display = 'block';
+      blockedBody.innerHTML = bloqueados.map(f => {
+        const info = f.bloqueioInfo || {};
+        const disp = info.dispositivo || '—';
+        return `
+        <tr>
+          <td style="font-weight:600;">${escapeHTML(f.nome)}<div style="font-size:11px;color:var(--text-secondary);font-weight:400;">${escapeHTML(f.login)}</div></td>
+          <td style="font-size:12px;">${escapeHTML(info.data || '—')}</td>
+          <td style="font-size:11px;color:var(--text-secondary);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHTML(disp)}">${escapeHTML(disp.slice(0, 42))}</td>
+          <td><span class="badge badge-red">Bloqueado</span></td>
+          <td style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="liberarAcessoLogin('${f.id}')" style="padding:2px 8px;font-size:11px;"><i class="fa-solid fa-unlock"></i> Liberar acesso</button>
+            <button class="btn btn-secondary btn-sm" onclick="renderFuncionarios()" style="padding:2px 8px;font-size:11px;"><i class="fa-solid fa-ban"></i> Manter</button>
+          </td>
+        </tr>`;
+      }).join('');
+    } else {
+      blockedCard.style.display = 'none';
     }
   }
 
@@ -3864,6 +4093,19 @@ function toggleStatusFuncionario(id) {
   renderFuncionarios();
   alert(`Status do funcionário "${func.nome}" atualizado para ${novoStatus.toUpperCase()}.`);
 }
+
+// Libera novas tentativas de login (remove bloqueio administrativo)
+window.liberarAcessoLogin = function(funcId) {
+  const f = state.funcionarios.find(x => x.id === funcId);
+  if (!f) return;
+  f.bloqueadoLogin = false;
+  f.bloqueioInfo = null;
+  if (typeof resetarTentativasLogin === 'function') resetarTentativasLogin(f.login);
+  registrarLogGlobal(`Liberou novas tentativas de login para "${f.nome}" (${f.login}).`, 'seguranca');
+  saveState();
+  renderFuncionarios();
+  alert(`Acesso de "${f.nome}" liberado. Ele já pode tentar entrar novamente.`);
+};
 
 // ==========================================================================
 // EXPORTAR EXATA — gera CSV no formato de importação do sistema Exata
@@ -4050,7 +4292,8 @@ const ABA_PARA_AREA = {
   'funcionarios': 'funcionarios',
   'auditoria': 'sistema',
   'inaptos': 'sistema',
-  'documentos': 'dp'
+  'documentos': 'dp',
+  'lixeira': 'sistema'
 };
 
 function hasPermission(area, acao) {
@@ -4072,6 +4315,141 @@ function criarPermissoesZeradas() {
   });
   return perms;
 }
+
+// ==========================================================================
+// EXCLUSÃO DE CANDIDATOS (soft-delete por área + permissão) + LIXEIRA
+// Reutiliza o modelo de permissão existente: permissoes[area].excluir
+// ==========================================================================
+const _AREA_LABEL_EXC = { banco_talentos: 'Banco de Talentos', selecao: 'Seleção', dp: 'Departamento Pessoal' };
+
+// Quem pode excluir em cada área:
+//  - banco_talentos: João + Administrador RT (administracao) + quem tiver banco_talentos.excluir
+//  - selecao/dp: João + administracao + administrador do próprio depto (representanteDepto) + permissão excluir
+function podeExcluirArea(area) {
+  if (!loggedUser) return false;
+  if (loggedUser.login === 'joaobalaf') return true;
+  if (loggedUser.departamento === 'administracao') return true;
+  if (loggedUser.representanteDepto &&
+      ((area === 'selecao' && loggedUser.departamento === 'selecao') ||
+       (area === 'dp' && loggedUser.departamento === 'dp'))) return true;
+  return hasPermission(area, 'excluir');
+}
+
+function _acharCandidatoQualquer(id) {
+  return (state.candidatos || []).find(c => c.id === id)
+      || (state.bancoTalentos || []).find(c => c.id === id) || null;
+}
+
+function abrirModalExcluirCandidato(id, area) {
+  const cand = _acharCandidatoQualquer(id);
+  if (!cand) return;
+  if (!podeExcluirArea(area)) { alert('Você não tem permissão para excluir nesta área.'); return; }
+  document.getElementById('excluir-cand-id').value = id;
+  document.getElementById('excluir-cand-area').value = area;
+  document.getElementById('excluir-cand-nome').textContent = cand.nome || '(sem nome)';
+  document.getElementById('excluir-cand-area-label').textContent = _AREA_LABEL_EXC[area] || area;
+  document.getElementById('excluir-cand-motivo').value = '';
+  const confWrap  = document.getElementById('excluir-cand-confirm-nome-wrap');
+  const confInput = document.getElementById('excluir-cand-confirm-nome');
+  if (confWrap)  confWrap.style.display = (area === 'banco_talentos') ? 'block' : 'none';
+  if (confInput) confInput.value = '';
+  document.getElementById('modal-excluir-candidato').classList.add('active');
+}
+window.abrirModalExcluirCandidato = abrirModalExcluirCandidato;
+
+function fecharModalExcluirCandidato() {
+  document.getElementById('modal-excluir-candidato').classList.remove('active');
+}
+window.fecharModalExcluirCandidato = fecharModalExcluirCandidato;
+
+function confirmarExcluirCandidato() {
+  const id     = document.getElementById('excluir-cand-id').value;
+  const area   = document.getElementById('excluir-cand-area').value;
+  const motivo = document.getElementById('excluir-cand-motivo').value.trim();
+  const cand   = _acharCandidatoQualquer(id);
+  if (!cand) return;
+  if (!podeExcluirArea(area)) { alert('Sem permissão.'); return; }
+  if (!motivo) { alert('Informe o motivo da exclusão.'); return; }
+  if (area === 'banco_talentos') {
+    const digitado = (document.getElementById('excluir-cand-confirm-nome').value || '').trim().toLowerCase();
+    if (digitado !== (cand.nome || '').trim().toLowerCase()) {
+      alert('Digite exatamente o nome do candidato para confirmar a exclusão.');
+      return;
+    }
+  }
+  cand.excluido      = true;
+  cand.excluidoPor   = loggedUser ? `${loggedUser.nome} (${loggedUser.login})` : 'Sistema';
+  cand.excluidoPorId = loggedUser ? loggedUser.id : null;
+  cand.excluidoEm    = new Date().toLocaleString('pt-BR');
+  cand.motivoExclusao = motivo;
+  cand.areaExclusao  = area;
+  registrarAcaoHistorico(cand, `Ficha excluída do ${_AREA_LABEL_EXC[area] || area}. Motivo: ${motivo}`);
+  registrarLogGlobal(`Excluiu "${cand.nome}" do ${_AREA_LABEL_EXC[area] || area} — motivo: ${motivo}`, 'exclusao');
+  saveState();
+  fecharModalExcluirCandidato();
+  const drawer = document.getElementById('modal-candidato-detalhes');
+  if (drawer) drawer.classList.remove('active');
+  renderCurrentAba();
+}
+window.confirmarExcluirCandidato = confirmarExcluirCandidato;
+
+// ── LIXEIRA (somente admin geral) ─────────────────────────────────────────
+function podeVerLixeira() {
+  return !!(loggedUser && (loggedUser.login === 'joaobalaf' || loggedUser.departamento === 'administracao'));
+}
+function listarExcluidos() {
+  const out = [];
+  (state.candidatos || []).forEach(c => { if (c && c.excluido) out.push(c); });
+  (state.bancoTalentos || []).forEach(c => { if (c && c.excluido && out.indexOf(c) === -1) out.push(c); });
+  return out.sort((a, b) => String(b.excluidoEm || '').localeCompare(String(a.excluidoEm || '')));
+}
+function renderLixeira() {
+  const cont = document.getElementById('lixeira-lista');
+  if (!cont) return;
+  if (!podeVerLixeira()) {
+    cont.innerHTML = '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#b91c1c;padding:16px;border-radius:12px;font-size:13px;"><i class="fa-solid fa-lock"></i> Área restrita ao administrador geral.</div>';
+    return;
+  }
+  const itens = listarExcluidos();
+  if (itens.length === 0) {
+    cont.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:48px 16px;"><i class="fa-solid fa-trash-can" style="font-size:42px;opacity:.4;"></i><p style="margin-top:12px;">Nenhum registro na lixeira.</p></div>';
+    return;
+  }
+  cont.innerHTML = itens.map(c => `
+    <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div style="min-width:220px;">
+        <div style="font-weight:700;font-size:14px;">${escapeHTML(c.nome || '(sem nome)')}</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;">${escapeHTML(_AREA_LABEL_EXC[c.areaExclusao] || c.areaExclusao || '—')} · ${escapeHTML(c.excluidoEm || '')}</div>
+        <div style="font-size:12px;color:var(--text-secondary);">Por: ${escapeHTML(c.excluidoPor || '—')}${c.motivoExclusao ? ' · Motivo: ' + escapeHTML(c.motivoExclusao) : ''}</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="restaurarCandidato('${c.id}')" class="btn btn-secondary btn-sm" style="font-size:12px;gap:5px;"><i class="fa-solid fa-rotate-left"></i> Restaurar</button>
+        <button onclick="excluirDefinitivoCandidato('${c.id}')" class="btn btn-sm" style="font-size:12px;gap:5px;background:#fff1f2;color:#dc2626;border:1px solid #fca5a5;"><i class="fa-solid fa-trash-can"></i> Excluir definitivo</button>
+      </div>
+    </div>`).join('');
+}
+window.restaurarCandidato = function(id) {
+  if (!podeVerLixeira()) return;
+  const cand = _acharCandidatoQualquer(id);
+  if (!cand) return;
+  cand.excluido = false;
+  cand.restauradoEm = new Date().toLocaleString('pt-BR');
+  registrarAcaoHistorico(cand, `Ficha restaurada da lixeira.`);
+  registrarLogGlobal(`Restaurou "${cand.nome}" da lixeira`, 'exclusao');
+  saveState();
+  renderLixeira();
+};
+window.excluirDefinitivoCandidato = function(id) {
+  if (!podeVerLixeira()) return;
+  const cand = _acharCandidatoQualquer(id);
+  if (!cand) return;
+  if (!confirm(`Excluir DEFINITIVAMENTE "${cand.nome}"? Esta ação não pode ser desfeita.`)) return;
+  if (state.candidatos)    state.candidatos = state.candidatos.filter(c => c.id !== id);
+  if (state.bancoTalentos) state.bancoTalentos = state.bancoTalentos.filter(c => c.id !== id);
+  registrarLogGlobal(`Excluiu definitivamente "${cand.nome}"`, 'exclusao');
+  saveState();
+  renderLixeira();
+};
 
 // ==========================================================================
 // MÓDULO 2: LOG GLOBAL DE AUDITORIA
@@ -4130,6 +4508,8 @@ function detectarAutoRegistro() {
       const nome = document.getElementById('reg-nome').value.trim();
       const loginVal = document.getElementById('reg-username').value.trim().toLowerCase();
       const senha = document.getElementById('reg-password').value.trim();
+      const telefone = (document.getElementById('reg-telefone')?.value || '').trim();
+      const deptoSolic = (document.getElementById('reg-departamento')?.value || 'selecao');
 
       const errorMsg = document.getElementById('reg-error-msg');
       const successMsg = document.getElementById('reg-success-msg');
@@ -4183,17 +4563,28 @@ function detectarAutoRegistro() {
         id: `func-${Date.now()}`,
         nome,
         email: '',
+        telefone,
         login: loginVal,
         senha: senhaFinal,
-        departamento: 'selecao',
+        departamento: deptoSolic || 'selecao',
+        departamentoSolicitado: deptoSolic || 'selecao',
         cargo: 'Colaborador em Aprovação',
         status: 'aguardando_aprovacao',
+        dataSolicitacao: new Date().toLocaleString('pt-BR'),
         representanteDepto: false,
+        bloqueadoLogin: false,
         permissoes: criarPermissoesZeradas()
       };
 
       state.funcionarios.push(novoFunc);
-      saveState();
+      // Registra a solicitação no log (sem usar registrarLogGlobal p/ não disparar save não-merge)
+      if (!state.logs) state.logs = [];
+      state.logs.unshift({ id: 'log-' + Date.now(), data: new Date().toLocaleString('pt-BR'), usuario: nome, acao: `Solicitou cadastro de acesso (${loginVal}) — aguardando aprovação.`, categoria: 'funcionarios' });
+      // Gravação merge-safe: como o cadastro ocorre antes do login, evita
+      // sobrescrever dados existentes na nuvem (une por id, só adiciona).
+      try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (e) {}
+      if (window.RTCloud && RTCloud.configured) { RTCloud.saveState(state, { merge: true }); RTCloud.flush(); }
+      else saveState();
 
       if (successMsg) successMsg.style.display = 'flex';
       staffRegForm.reset();
@@ -4648,6 +5039,18 @@ window.abrirModalGerenciarFuncionario = function(funcId) {
   // Garantir permissões definidas
   if (!func.permissoes) func.permissoes = criarPermissoesZeradas();
 
+  // Vínculo de recrutadora (Meu Painel) — somente admin altera
+  const vincSel = document.getElementById('gerenciar-func-vinculo');
+  if (vincSel) {
+    const atual = (state.recrutadores || []).find(r => r.usuarioId === func.id || (r.loginVinculado && r.loginVinculado === func.login));
+    vincSel.innerHTML = '<option value="">— Sem vínculo —</option>' +
+      (state.recrutadores || []).map(r => {
+        const ocupadoPorOutro = !!(r.usuarioId && r.usuarioId !== func.id);
+        const sel = atual && atual.id === r.id ? 'selected' : '';
+        return `<option value="${r.id}" ${sel} ${ocupadoPorOutro ? 'disabled' : ''}>${escapeHTML(r.nome)}${ocupadoPorOutro ? ' (já vinculado)' : ''}</option>`;
+      }).join('');
+  }
+
   renderPermissoesMatrix(func);
   document.getElementById('modal-gerenciar-funcionario').classList.add('active');
 };
@@ -4717,6 +5120,7 @@ function salvarPermissoesFuncionario() {
   const func = state.funcionarios.find(f => f.id === funcId);
   if (!func) return;
 
+  const eraPendente = func.status === 'aguardando_aprovacao';
   const novoDepto = document.getElementById('gerenciar-func-depto').value;
   const novoCargo = document.getElementById('gerenciar-func-cargo').value.trim();
   const novoStatus = document.getElementById('gerenciar-func-status').value;
@@ -4750,13 +5154,36 @@ function salvarPermissoesFuncionario() {
   func.representanteDepto = novoRep;
   func.permissoes = novasPerms;
 
-  registrarLogGlobal(`Permissões e configurações do funcionário "${func.nome}" atualizadas pelo gerente ${loggedUser?.nome}.`, 'funcionarios');
+  // Vínculo de recrutadora (Meu Painel) — define usuarioId no recrutador escolhido
+  const vincSel = document.getElementById('gerenciar-func-vinculo');
+  if (vincSel) {
+    (state.recrutadores || []).forEach(r => {
+      if (r.usuarioId === func.id) { r.usuarioId = null; if (r.loginVinculado === func.login) r.loginVinculado = ''; }
+    });
+    const novoRecId = vincSel.value;
+    if (novoRecId) {
+      const rec = (state.recrutadores || []).find(r => r.id === novoRecId);
+      if (rec) { rec.usuarioId = func.id; rec.loginVinculado = func.login; }
+    }
+  }
+
+  if (eraPendente && novoStatus === 'ativo') {
+    registrarLogGlobal(`Aprovou o cadastro do funcionário "${func.nome}" (${deptoLabelSimples(novoDepto)}).`, 'funcionarios');
+  } else if (novoStatus === 'reprovado') {
+    registrarLogGlobal(`Reprovou/bloqueou o acesso do funcionário "${func.nome}".`, 'funcionarios');
+  } else {
+    registrarLogGlobal(`Permissões e configurações do funcionário "${func.nome}" atualizadas por ${loggedUser?.nome}.`, 'funcionarios');
+  }
   saveState();
 
   document.getElementById('modal-gerenciar-funcionario').classList.remove('active');
   funcAtualGerenciando = null;
   renderFuncionarios();
   alert(`Configurações de "${func.nome}" salvas com sucesso!`);
+}
+
+function deptoLabelSimples(d) {
+  return ({ administracao: 'Administração', selecao: 'Seleção', dp: 'Departamento Pessoal', comissao: 'Comissão' })[d] || d || '—';
 }
 
 // ==========================================================================
@@ -6670,7 +7097,9 @@ function renderMeuPainel() {
   const container = document.getElementById('meu-painel-conteudo');
   if (!container || !loggedUser) return;
   try {
-    const rec = (state.recrutadores || []).find(r => r.loginVinculado === loggedUser.login);
+    // Vínculo automático e seguro pelo ID do usuário logado (fallback por login p/ compat)
+    const rec = (state.recrutadores || []).find(r => r.usuarioId && r.usuarioId === loggedUser.id)
+             || (state.recrutadores || []).find(r => r.loginVinculado && r.loginVinculado === loggedUser.login);
     if (!rec) {
       _renderVinculacaoMeuPainel(container);
     } else {
@@ -6685,26 +7114,15 @@ function renderMeuPainel() {
 }
 
 function _renderVinculacaoMeuPainel(container) {
-  const livres = state.recrutadores.filter(r => !r.loginVinculado);
-  const opcoes = livres.map(r => `<option value="${r.id}">${r.nome}</option>`).join('');
+  // O vínculo agora é feito SOMENTE pelo administrador (não há auto-seleção).
   container.innerHTML = `
     <div style="max-width:460px;margin:40px auto;background:var(--bg-card);border:1px solid var(--border-color);border-radius:16px;padding:36px;text-align:center;">
-      <div style="width:64px;height:64px;border-radius:50%;background:rgba(59,130,246,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:28px;color:#3b82f6;">
+      <div style="width:64px;height:64px;border-radius:50%;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:28px;color:#f59e0b;">
         <i class="fa-solid fa-id-card-clip"></i>
       </div>
-      <h2 style="font-size:18px;font-weight:700;margin-bottom:8px;color:var(--text-primary);">Configure seu Meu Painel</h2>
-      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:24px;line-height:1.6;">Selecione qual perfil de recrutadora é seu. Isso vincula seus links, candidatos e configurações pessoais.</p>
-      <div style="text-align:left;margin-bottom:20px;">
-        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px;">Meu perfil de recrutadora</label>
-        <select id="meu-painel-select-rec" class="form-control" style="width:100%;">
-          <option value="">— Selecione —</option>
-          ${opcoes || '<option disabled>Nenhum perfil disponível no momento</option>'}
-        </select>
-      </div>
-      <button onclick="vincularPerfilRecrutadora()" class="btn btn-primary" style="width:100%;padding:10px;">
-        <i class="fa-solid fa-link"></i> Vincular meu perfil
-      </button>
-      ${!opcoes ? '<p style="font-size:11px;color:#f59e0b;margin-top:12px;"><i class="fa-solid fa-triangle-exclamation"></i> Todos os perfis já estão vinculados. Peça ao administrador para desvincular se necessário.</p>' : ''}
+      <h2 style="font-size:18px;font-weight:700;margin-bottom:8px;color:var(--text-primary);">Painel ainda não vinculado</h2>
+      <p style="font-size:13px;color:var(--text-secondary);line-height:1.6;">Seu usuário ainda não está vinculado a um perfil de recrutadora. Por segurança, esse vínculo é feito pelo administrador.</p>
+      <p style="font-size:12px;color:var(--text-secondary);margin-top:14px;">Peça ao administrador para vincular o seu login (<strong>${_esc(loggedUser ? loggedUser.login : '')}</strong>) ao seu perfil em <em>Funcionários → Permissões</em>.</p>
     </div>`;
 }
 
@@ -6857,7 +7275,7 @@ window.vincularPerfilRecrutadora = function() {
 };
 
 window.desvincularPerfilRecrutadora = function() {
-  const rec = state.recrutadores.find(r => r.loginVinculado === loggedUser.login);
+  const rec = state.recrutadores.find(r => (r.usuarioId && r.usuarioId === loggedUser.id) || (r.loginVinculado && r.loginVinculado === loggedUser.login));
   if (!rec) return;
   if (!confirm(`Desvincular o perfil "${rec.nome}" da sua conta? Você poderá vincular outro.`)) return;
   rec.loginVinculado = '';
