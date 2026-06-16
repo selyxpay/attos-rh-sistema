@@ -661,6 +661,11 @@ document.addEventListener('DOMContentLoaded', () => {
   ativarNuvem();
 });
 
+// Indica que a nuvem já foi carregada e é a fonte principal dos dados.
+// Enquanto for false, o saveState grava SÓ no cache local (não envia à nuvem),
+// para o cache/semente nunca sobrescrever dados mais recentes do servidor.
+let _cloudReady = false;
+
 // Ativa a sincronização na nuvem (Supabase).
 // Só roda se as 2 chaves estiverem configuradas em js/supabase-sync.js;
 // caso contrário, o sistema segue funcionando só com localStorage (como hoje).
@@ -677,15 +682,20 @@ async function ativarNuvem() {
     });
     const nuvem = await RTCloud.loadState();
     if (nuvem) {
+      // A NUVEM é a fonte principal: adota os dados da nuvem (o cache/semente
+      // local não sobrescreve dados mais recentes do servidor).
       state = nuvem;
       try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (e) {}
+      _cloudReady = true;
       renderCurrentAba();
     } else {
-      // Primeira vez: envia o estado atual para inicializar a nuvem
+      // Nuvem vazia (primeiro uso): inicializa a nuvem com o estado atual.
+      _cloudReady = true;
       RTCloud.saveState(state);
     }
   } catch (e) {
     console.error('[RT Nuvem] Não foi possível ativar a sincronização:', e);
+    _cloudReady = true; // fallback: permite que edições tentem sincronizar
   }
 }
 
@@ -919,8 +929,11 @@ function initLocalStorage() {
 }
 
 function saveState() {
+  // localStorage = cache temporário (rápido e offline). A nuvem é a fonte principal.
   localStorage.setItem('rt_empregos_data', JSON.stringify(state));
-  if (window.RTCloud && RTCloud.configured) RTCloud.saveState(state);
+  // Só envia à nuvem depois que ela foi carregada (evita o cache/semente local
+  // sobrescrever dados mais recentes do servidor — ver item 25.7).
+  if (window.RTCloud && RTCloud.configured && _cloudReady) RTCloud.saveState(state);
 }
 
 // ── Contador de bloqueio de login (um único intervalo, sem travar) ─────────
