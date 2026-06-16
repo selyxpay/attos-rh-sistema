@@ -1,0 +1,187 @@
+/* ==========================================================================
+   R&T — CAMADA DE EXPERIÊNCIA (UX) — v1.0
+   Melhorias ADITIVAS de usabilidade e conforto visual.
+   Carregada por último: pode ser removida com segurança (1 <link>) para reverter.
+   Foco: acessibilidade de teclado, conforto de movimento, feedback de clique
+   e pequenos polimentos. Não altera nenhuma regra existente.
+   ========================================================================== */
+
+:root {
+  --ux-focus-ring: 0 0 0 3px rgba(212, 2, 3, 0.35);
+  --ux-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* --------------------------------------------------------------------------
+   1. FOCO VISÍVEL PARA TECLADO (ACESSIBILIDADE)
+   O CSS atual usa "outline: none" em todo lugar — quem usa teclado fica sem
+   referência. :focus-visible só aparece na navegação por teclado (Tab),
+   então NÃO incomoda quem usa mouse.
+   -------------------------------------------------------------------------- */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible,
+.nav-item a:focus-visible,
+.btn:focus-visible,
+.header-btn:focus-visible,
+.kpi-card:focus-visible,
+.vaga-card:focus-visible {
+  outline: 2px solid var(--color-primary) !important;
+  outline-offset: 2px !important;
+  box-shadow: var(--ux-focus-ring) !important;
+  border-radius: var(--radius-sm);
+  z-index: 5;
+}
+
+/* Campos de formulário: anel suave também ao focar com o mouse (mais claro) */
+.form-control:focus-visible,
+.form-control-login:focus-visible {
+  box-shadow: var(--ux-focus-ring) !important;
+}
+
+/* --------------------------------------------------------------------------
+   2. CONFORTO DE MOVIMENTO (prefers-reduced-motion)
+   Respeita quem configurou o sistema para reduzir animações: pausa a onda
+   cintilante e demais animações. Não existia esse suporte antes.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .card-glass::after,
+  .kpi-card::after,
+  .vaga-card::after,
+  .card-form::after,
+  .dashboard-chart-card::after,
+  .dashboard-greeting-banner::after,
+  .table-box::after,
+  .filter-box::after,
+  .destaque-semana-box::after {
+    display: none !important;
+  }
+}
+
+/* Pausa a onda cintilante enquanto o usuário lê/interage com o card
+   (reduz distração sem remover o efeito "premium"). */
+.kpi-card:hover::after,
+.dashboard-chart-card:hover::after,
+.table-box:hover::after,
+.card-form:hover::after,
+.filter-box:hover::after {
+  animation-play-state: paused !important;
+}
+
+/* --------------------------------------------------------------------------
+   3. FEEDBACK DE CLIQUE / MICRO-INTERAÇÕES
+   Pequenas respostas visuais que deixam a interface "viva" e mais intuitiva.
+   -------------------------------------------------------------------------- */
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.btn-success,
+.btn-login-submit,
+.header-btn {
+  transition: transform 0.15s var(--ux-ease),
+              box-shadow 0.2s var(--ux-ease),
+              filter 0.2s var(--ux-ease) !important;
+}
+.btn:hover,
+.btn-primary:hover,
+.btn-secondary:hover,
+.btn-success:hover,
+.btn-login-submit:hover {
+  transform: translateY(-1px);
+}
+.btn:active,
+.btn-primary:active,
+.btn-secondary:active,
+.btn-danger:active,
+.btn-success:active,
+.btn-login-submit:active,
+.header-btn:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* Botões e cards clicáveis mostram a "mãozinha" */
+.kpi-card,
+.vaga-card,
+.nav-item a,
+.btn,
+.user-profile-badge {
+  cursor: pointer;
+}
+
+/* Itens do menu lateral: leve deslize ao passar o mouse (orientação visual) */
+.nav-item a {
+  transition: padding-left 0.18s var(--ux-ease),
+              background-color 0.18s var(--ux-ease),
+              color 0.18s var(--ux-ease) !important;
+}
+.nav-item:not(.active):hover a {
+  padding-left: 22px;
+}
+
+/* --------------------------------------------------------------------------
+   4. POLIMENTO VISUAL
+   -------------------------------------------------------------------------- */
+/* Rolagem suave em âncoras internas */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Barra de rolagem discreta na identidade R&T (navegadores WebKit) */
+.content-viewport,
+.detail-drawer,
+.modal-body,
+.drawer-content-container {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-text-muted) transparent;
+}
+.content-viewport::-webkit-scrollbar,
+.detail-drawer::-webkit-scrollbar,
+.modal-body::-webkit-scrollbar,
+.drawer-content-container::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.content-viewport::-webkit-scrollbar-thumb,
+.detail-drawer::-webkit-scrollbar-thumb,
+.modal-body::-webkit-scrollbar-thumb,
+.drawer-content-container::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.4);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.content-viewport::-webkit-scrollbar-thumb:hover,
+.detail-drawer::-webkit-scrollbar-thumb:hover,
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(100, 116, 139, 0.7);
+  background-clip: content-box;
+}
+
+/* Seleção de texto na cor da marca */
+::selection {
+  background-color: rgba(212, 2, 3, 0.18);
+  color: var(--color-text-title);
+}
+
+/* Alvos de toque maiores no celular (mais fáceis de acertar com o dedo) */
+@media (max-width: 768px) {
+  .nav-item a,
+  .header-btn,
+  .btn {
+    min-height: 44px;
+  }
+  .header-btn {
+    min-width: 44px;
+  }
+}

@@ -774,6 +774,13 @@ const INITIAL_DATA = {
   // Banco de candidatos inaptos (CPFs bloqueados)
   inaptos: [],
 
+  // Sistema de senhas / fila de atendimento
+  fila: {
+    contadores: { selecao: 0, dp: 0, geral: 0 },
+    senhas: [],
+    ultimaChamada: null
+  },
+
   // Histórico Geral de Auditoria Administrativa do Sistema (Logs Globais)
   logs: [
     {

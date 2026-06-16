@@ -13,6 +13,7 @@
         crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/design-system.css">
+  <link rel="stylesheet" href="css/ux-enhancements.css">
   <style>
     body { color: var(--color-text-main); font-family: 'Inter', sans-serif; margin: 0; }
     .pub-header {
@@ -166,6 +167,36 @@
       margin-top: 1px;
       flex-shrink: 0;
       accent-color: var(--color-primary);
+    }
+    .photo-consent-options {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .photo-consent-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #334155;
+    }
+    .photo-consent-option input[type="radio"] {
+      width: 18px;
+      height: 18px;
+      margin-top: 1px;
+      flex-shrink: 0;
+      accent-color: var(--color-primary);
+    }
+    .photo-consent-option strong {
+      display: block;
+      margin-bottom: 2px;
+      color: var(--color-text-main);
     }
     .form-group.field-error input,
     .form-group.field-error select,
@@ -430,6 +461,32 @@
 
           </div><!-- /#docs-section -->
 
+          <div class="privacy-consent" id="foto-3x4-consent-box">
+            <details open>
+              <summary>Foto 3x4 para o contrato</summary>
+              <div class="privacy-text">
+                <p><strong>Uso da foto.</strong> A foto 3x4 será utilizada somente para cadastro, documentação e preparação do contrato.</p>
+                <p><strong>Convênio da empresa.</strong> Caso eu escolha tirar a foto 3x4 pelo convênio da empresa, declaro estar ciente e autorizo o desconto único de R$ 25,00 no meu salário.</p>
+              </div>
+            </details>
+            <div class="photo-consent-options" role="radiogroup" aria-label="Escolha da foto 3x4">
+              <label class="photo-consent-option" for="f-foto3x4-convenio">
+                <input type="radio" id="f-foto3x4-convenio" name="foto3x4Opcao" value="convenio_desconto">
+                <span>
+                  <strong>Sim, quero tirar a foto 3x4 pelo convênio da empresa.</strong>
+                  Autorizo o desconto único de R$ 25,00 no meu salário.
+                </span>
+              </label>
+              <label class="photo-consent-option" for="f-foto3x4-propria">
+                <input type="radio" id="f-foto3x4-propria" name="foto3x4Opcao" value="providenciar_propria">
+                <span>
+                  <strong>Não, vou providenciar a foto 3x4 por conta própria.</strong>
+                  Estou ciente de que preciso entregar a foto para finalizar o contrato.
+                </span>
+              </label>
+            </div>
+          </div>
+
           <div class="privacy-consent" id="privacy-consent-box">
             <details open>
               <summary>Termo de ciência e autorização para tratamento de dados e documentos</summary>
@@ -465,6 +522,11 @@
         <div class="parabens-icon">🎉</div>
         <div class="parabens-titulo">Parabéns!</div>
         <div class="parabens-sub" id="parabens-sub">Você finalizou sua ficha com sucesso.</div>
+        <div id="parabens-senha-box" style="display:none;margin:16px 0;">
+          <div style="font-size:12px;color:#94a3b8;letter-spacing:2px;font-weight:600;margin-bottom:6px;">SUA SENHA DE ATENDIMENTO</div>
+          <div id="parabens-senha-num" style="font-size:52px;font-weight:900;color:#6366f1;line-height:1;"></div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Aguarde ser chamado(a) no painel de senhas</div>
+        </div>
         <a id="btn-whatsapp-candidato" href="#" target="_blank" class="btn-whatsapp" style="margin-top:8px;text-decoration:none;">
           <i class="fa-brands fa-whatsapp" style="font-size:22px;"></i>
           Clique aqui para falar com o selecionador
@@ -484,6 +546,7 @@
     </footer>
   </div>
 
+<script src="js/supabase-sync.js"></script>
 <script>
 // ─── Detecção de sexo pelo nome ────────────────────────────────────────────────
 const _NF = new Set('maria,ana,fernanda,camila,beatriz,juliana,mariana,amanda,carla,paula,vanessa,patricia,sandra,renata,claudia,daniela,luciana,adriana,fabiana,leticia,priscila,viviane,simone,tatiana,cristina,natalia,silvia,regina,vera,laura,isabel,isabela,isabella,isadora,bianca,carolina,aline,bruna,jessica,deborah,debora,michele,micheli,larissa,melissa,thais,thamires,giovana,giovanna,helena,livia,luiza,sara,sarah,gabriela,gabrielle,rafaela,raquel,solange,elaine,erica,kelly,keila,gisele,rosana,rosangela,josiane,elizabete,elizabeth,andressa,andrea,angela,denise,catarina,aparecida,conceicao,cleuza,cleide,celia,noemia,zelia,fatima,tereza,teresa,irene,ines,edna,elza,ilda,ieda,iolanda,ivone,ivani,jacira,janete,jaqueline,joana,josefa,lourdes,luzia,marta,neuza,nilza,nilda,odete,olga,ruth,selma,sonia,sueli,suely,valdete,valeria,vilma,wilma,zilda,zenaide,alice,alicia,cecilia,diana,elena,emilia,estela,eunice,filomena,flora,flavia,gilda,gloria,heloisa,yara,yasmin,maya,milena,nina,rebeca,rebecca,sofia,sophia,taina,thalia,thalita,vitoria,wanessa,yolanda,lais,nayara,nathalia,nathalie,nadia,tamires,tainara,taynara,karolina,cintia,graziele,marilene,marli,marlene,marcia,marcela,micaela,michely,monique,monica,pamela,pollyana,poliana,rosilene,roseli,samara,samantha,shirley,silvana,sirlene,socorro,suellen,tamara,tania,telma,veronica,edilene,eliane,elizangela,ingrid,iris,izabela,izabella,joice,karina,katia,luana,ludmila,luzinete,gleice,gleiciane,franciele,franciely,lindalva,naiara,raissa,rayssa,sabrina,soraya,taiane,talita,tayane,thayane,valquiria,vanusa'.split(','));
@@ -539,7 +602,14 @@ function saveState() {
   try {
     localStorage.setItem(STATE_KEY, JSON.stringify(state));
   } catch(e) {
-    showError('Erro ao salvar: armazenamento local cheio. Tente reduzir o tamanho das fotos (máx recomendado: 1MB por arquivo) ou use outro dispositivo.');
+    // Com a nuvem ligada, as fotos vão para o Storage — o limite local não trava o envio.
+    if (!(window.RTCloud && RTCloud.configured)) {
+      showError('Erro ao salvar: armazenamento local cheio. Tente reduzir o tamanho das fotos (máx recomendado: 1MB por arquivo) ou use outro dispositivo.');
+    }
+  }
+  if (window.RTCloud && RTCloud.configured) {
+    RTCloud.saveState(state, { merge: true });
+    RTCloud.flush();
   }
 }
 
@@ -690,6 +760,9 @@ document.getElementById('form-candidato').addEventListener('submit', function(e)
   if (errEl) errEl.style.display = 'none';
   const termoLgpdEl = document.getElementById('f-termo-lgpd');
   const termoLgpdAceito = !!(termoLgpdEl && termoLgpdEl.checked);
+  const foto3x4OpcaoEl = document.querySelector('input[name="foto3x4Opcao"]:checked');
+  const foto3x4Opcao = foto3x4OpcaoEl ? foto3x4OpcaoEl.value : '';
+  const foto3x4Obrigatoria = modoPresencial || modoContinuarPresencial;
   const termoLgpdVersao = 'termo-lgpd-rt-2026-05-27';
   const criarRegistroTermo = () => ({
     aceito: true,
@@ -698,10 +771,27 @@ document.getElementById('form-candidato').addEventListener('submit', function(e)
     textoAceite: 'Autorizacao para tratamento de dados pessoais e documentos pela R&T Empregos / Grupo RT para recrutamento, selecao, banco de talentos, processos presenciais ou online, admissao e contratacao.',
     pagina: window.location.pathname + window.location.search
   });
+  const criarRegistroFoto3x4 = () => ({
+    opcao: foto3x4Opcao,
+    usaConvenioEmpresa: foto3x4Opcao === 'convenio_desconto',
+    providenciaPorContaPropria: foto3x4Opcao === 'providenciar_propria',
+    valorDesconto: foto3x4Opcao === 'convenio_desconto' ? 25 : 0,
+    autorizadoDescontoFolha: foto3x4Opcao === 'convenio_desconto',
+    dataResposta: new Date().toISOString(),
+    textoAceite: foto3x4Opcao === 'convenio_desconto'
+      ? 'Candidato autorizou tirar foto 3x4 pelo convenio da empresa, com desconto unico de R$ 25,00 no salario.'
+      : 'Candidato informou que vai providenciar a foto 3x4 por conta propria.'
+  });
 
   if (!termoLgpdAceito) {
     showError('Para enviar a ficha, leia e aceite o termo de uso de dados e documentos.');
     if (termoLgpdEl) termoLgpdEl.focus();
+    return;
+  }
+  if (foto3x4Obrigatoria && !foto3x4Opcao) {
+    showError('Selecione se deseja tirar a foto 3x4 pelo convênio da empresa ou se vai providenciar por conta própria.');
+    const primeiraOpcaoFoto = document.querySelector('input[name="foto3x4Opcao"]');
+    if (primeiraOpcaoFoto) primeiraOpcaoFoto.focus();
     return;
   }
 
@@ -720,6 +810,7 @@ document.getElementById('form-candidato').addEventListener('submit', function(e)
     if (uploadedDocs.banco)  cand.documentos.cartaoBancoVerso     = uploadedDocs.banco;
 
     cand.termoLgpd = criarRegistroTermo();
+    cand.foto3x4Contrato = criarRegistroFoto3x4();
     cand.documentosPresencialCompletos = true;
     cand.status = 'em_analise';
     cand.historico = cand.historico || [];
@@ -832,6 +923,7 @@ document.getElementById('form-candidato').addEventListener('submit', function(e)
     diasEtapa:       0,
     dataCadastro:    agora,
     termoLgpd:       criarRegistroTermo(),
+    foto3x4Contrato: foto3x4Opcao ? criarRegistroFoto3x4() : null,
     observacoesSelecao: '',
     documentos: {
       selfie:               uploadedDocs.selfie               || '',
@@ -865,6 +957,7 @@ document.getElementById('form-candidato').addEventListener('submit', function(e)
         tamanhoCamiseta: novoCand.tamanhoCamiseta, tamanhoCalca: novoCand.tamanhoCalca,
         tamanhoBota: novoCand.tamanhoBota, documentos: novoCand.documentos,
         termoLgpd: novoCand.termoLgpd,
+        foto3x4Contrato: novoCand.foto3x4Contrato,
         fichaCompletada: true,
       });
       existing.historico = existing.historico || [];
@@ -903,14 +996,44 @@ document.getElementById('form-candidato').addEventListener('submit', function(e)
   }
 
   state.candidatos.push(novoCand);
+
+  // Gera senha na fila de seleção automaticamente
+  if (!state.fila) state.fila = { contadores: { selecao: 0, dp: 0, geral: 0 }, senhas: [], ultimaChamada: null };
+  if (!state.fila.contadores) state.fila.contadores = { selecao: 0, dp: 0, geral: 0 };
+  state.fila.contadores.selecao = (state.fila.contadores.selecao || 0) + 1;
+  const _numSenha = 'S-' + String(state.fila.contadores.selecao).padStart(3, '0');
+  state.fila.senhas.push({
+    id: 'senha-' + Date.now(),
+    numero: _numSenha,
+    tipo: 'selecao',
+    nome: novoCand.nome,
+    candidatoId: novoCand.id,
+    geradaEm: Date.now(),
+    status: 'aguardando',
+    chamadaEm: null
+  });
+  // Atualiza também o numeroFila do candidato para coincidir com a senha
+  novoCand.numeroFila = state.fila.contadores.selecao;
+
   saveState();
 
   document.getElementById('form-wrapper').style.display = 'none';
   document.getElementById('recruiter-banner').style.display = 'none';
 
   if (modoPresencial) {
-    // Presencial inicial: tela de sucesso simples
-    document.getElementById('success-screen').style.display = 'block';
+    // Presencial inicial: tela de sucesso com senha
+    const ssEl = document.getElementById('success-screen');
+    if (ssEl) {
+      ssEl.innerHTML = `
+        <div style="text-align:center;">
+          <div style="font-size:48px;color:#22c55e;margin-bottom:12px;"><i class="fa-solid fa-circle-check"></i></div>
+          <h2 style="color:#22c55e;font-size:22px;margin-bottom:8px;">Cadastro realizado!</h2>
+          <p style="color:#64748b;font-size:15px;margin-bottom:24px;">Aguarde ser chamado(a) pelo número:</p>
+          <div style="display:inline-block;background:#6366f1;color:#fff;font-size:56px;font-weight:900;padding:16px 40px;border-radius:16px;letter-spacing:2px;margin-bottom:16px;">${_numSenha}</div>
+          <p style="color:#64748b;font-size:13px;">Acompanhe o painel de senhas na recepção</p>
+        </div>`;
+      ssEl.style.display = 'block';
+    }
   } else {
     // Online (ficha direta ou completar BT): tela de parabéns + WhatsApp
     const finalRecId = modoCompletar ? (completarPrefill && completarPrefill.recrutadorId) : novoCand.recrutadorId;
@@ -931,6 +1054,12 @@ document.getElementById('form-candidato').addEventListener('submit', function(e)
       if (paraSub) paraSub.textContent = 'Seu cadastro foi recebido com sucesso! Nossa equipe entrará em contato em breve.';
     }
 
+    // Exibir número de senha na tela de parabéns
+    const senhaEl = document.getElementById('parabens-senha-num');
+    if (senhaEl) senhaEl.textContent = _numSenha;
+    const senhaBox = document.getElementById('parabens-senha-box');
+    if (senhaBox) senhaBox.style.display = 'block';
+
     const parabensTela = document.getElementById('parabens-screen');
     if (parabensTela) parabensTela.classList.add('active');
     startConfetti();
@@ -940,7 +1069,15 @@ document.getElementById('form-candidato').addEventListener('submit', function(e)
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  // Nuvem: puxa o estado mais recente antes de iniciar (se configurado)
+  if (window.RTCloud && RTCloud.configured) {
+    try {
+      await RTCloud.init({ onRemoteUpdate: (d) => { if (d) { state = d; try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); } catch(e){} } } });
+      const nuvem = await RTCloud.loadState();
+      if (nuvem) { state = nuvem; try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); } catch(e){} }
+    } catch (e) { console.error('[RT Nuvem]', e); }
+  }
   loadState();
   detectRecrutador();
 
@@ -949,8 +1086,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const comoSoubeSection = document.getElementById('como-soube-section');
   const docsSection      = document.getElementById('docs-section');
   const camposSection    = document.getElementById('campos-ficha-section');
+  const foto3x4Section   = document.getElementById('foto-3x4-consent-box');
   const formTitle        = document.querySelector('.pub-title');
   const formSubtitle     = document.querySelector('.pub-subtitle');
+  if (foto3x4Section) foto3x4Section.style.display = (modoPresencial || modoContinuarPresencial) ? '' : 'none';
 
   // ─── Modo Continuar Presencial (só documentos via link) ──────────────────
   if (modoContinuarPresencial) {

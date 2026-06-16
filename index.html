@@ -26,6 +26,8 @@
     <link rel="stylesheet" href="css/style.css">
     <!-- R&T Design System CSS -->
     <link rel="stylesheet" href="css/design-system.css">
+    <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
+    <link rel="stylesheet" href="css/ux-enhancements.css">
 </head>
 <body>
 
@@ -151,8 +153,17 @@
                     <li class="nav-item" data-aba="inaptos" id="nav-item-inaptos" style="display: none;">
                         <a href="#"><i class="fa-solid fa-ban"></i> <span>Inaptos</span></a>
                     </li>
+                    <li class="nav-item" data-aba="configuracoes" id="nav-item-configuracoes" style="display: none;">
+                        <a href="#"><i class="fa-solid fa-sliders"></i> <span>Configurações</span></a>
+                    </li>
                     <li class="nav-item" data-aba="meu-painel">
                         <a href="#"><i class="fa-solid fa-id-card-clip"></i> <span>Meu Painel</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="fila">
+                        <a href="#"><i class="fa-solid fa-ticket"></i> <span>Senhas</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="documentos">
+                        <a href="#"><i class="fa-solid fa-folder-open"></i> <span>Documentos</span></a>
                     </li>
                 </ul>
             </nav>
@@ -1031,6 +1042,103 @@
                     </div>
                 </section>
 
+                <!-- ABA: SISTEMA DE SENHAS -->
+                <section id="aba-fila" class="aba-content">
+                    <div style="max-width:1100px;margin:0 auto;padding:0 0 40px;">
+                        <div id="fila-conteudo">
+                            <!-- renderizado por renderFila() -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ABA: DOCUMENTOS (validade na nuvem) -->
+                <section id="aba-documentos" class="aba-content">
+                    <div style="max-width:1100px;margin:0 auto;padding:0 0 40px;">
+                        <div style="margin-bottom:18px;">
+                            <h2 style="margin:0;font-size:22px;"><i class="fa-solid fa-folder-open" style="color:var(--primary);"></i> Documentos na Nuvem</h2>
+                            <p style="color:var(--text-secondary);font-size:13px;margin:6px 0 0;max-width:680px;">Arquivos enviados pelos candidatos (RG, CPF, comprovantes), guardados permanentemente na nuvem. Clique em "Abrir" para ver ou baixar cada documento.</p>
+                        </div>
+                        <div id="docs-resumo" style="margin-bottom:14px;font-size:13px;color:var(--text-secondary);"></div>
+                        <div id="docs-lista"></div>
+                    </div>
+                </section>
+
+                <!-- ABA: CONFIGURAÇÕES (SOMENTE ADMIN) -->
+                <section id="aba-configuracoes" class="aba-content">
+                    <div style="max-width: 980px; margin: 0 auto; padding: 0 0 60px;">
+                        <div class="page-title-section">
+                            <h1><i class="fa-solid fa-sliders" style="color: var(--primary);"></i> Configurações do Sistema</h1>
+                            <p class="page-subtitle">Personalize os campos do formulário de vagas e gerencie dados avançados de clientes</p>
+                        </div>
+
+                        <!-- BLOCO 1: Renomear Labels dos Campos de Vaga -->
+                        <div class="table-box bg-glass" style="margin-bottom: 28px;">
+                            <div class="table-header-area">
+                                <h3><i class="fa-solid fa-pen-to-square" style="color: var(--primary);"></i> Renomear Campos do Formulário de Nova Vaga</h3>
+                                <button class="btn btn-primary btn-sm" id="btn-salvar-renomes" style="display:flex;align-items:center;gap:6px;">
+                                    <i class="fa-solid fa-floppy-disk"></i> Salvar Nomes
+                                </button>
+                            </div>
+                            <div style="padding: 20px;">
+                                <p style="font-size:12px; color:var(--text-secondary); margin-bottom:16px;"><i class="fa-solid fa-circle-info"></i> Altere o nome que aparece nos campos do formulário "Criar Nova Vaga". As alterações afetam todos os usuários.</p>
+                                <div id="renomes-campos-lista" style="display:flex; flex-direction:column; gap:12px;">
+                                    <!-- Gerado por JS -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BLOCO 2: Adicionar Campo Personalizado -->
+                        <div class="table-box bg-glass" style="margin-bottom: 28px;">
+                            <div class="table-header-area">
+                                <h3><i class="fa-solid fa-plus-circle" style="color: #10b981;"></i> Adicionar Novo Campo ao Formulário de Vaga</h3>
+                            </div>
+                            <div style="padding: 20px;">
+                                <p style="font-size:12px; color:var(--text-secondary); margin-bottom:16px;"><i class="fa-solid fa-circle-info"></i> Crie campos extras que aparecerão no final do formulário de "Criar Nova Vaga". Os dados ficam salvos na vaga.</p>
+                                <div class="form-group-grid" style="grid-template-columns:1fr 1fr; gap:14px;">
+                                    <div class="form-group">
+                                        <label for="novo-campo-label">Nome do Campo (Label) *</label>
+                                        <input type="text" id="novo-campo-label" class="form-control" placeholder="Ex: Tomador de Serviço, Código SAP...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="novo-campo-tipo">Tipo do Campo *</label>
+                                        <select id="novo-campo-tipo" class="form-control" onchange="atualizarPreviewNovoCampo()">
+                                            <option value="text">Texto (campo livre)</option>
+                                            <option value="number">Número</option>
+                                            <option value="textarea">Texto Longo (área)</option>
+                                            <option value="select">Seleção (dropdown)</option>
+                                            <option value="date">Data</option>
+                                            <option value="checkbox-group">Múltipla Escolha (checkboxes)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group mt-3" id="novo-campo-opcoes-box" style="display:none;">
+                                    <label for="novo-campo-opcoes">Opções do campo <span style="font-weight:400;color:var(--text-secondary)">(uma por linha)</span></label>
+                                    <textarea id="novo-campo-opcoes" class="form-control" rows="4" placeholder="Ex:&#10;Intermitente&#10;Diária&#10;CLT&#10;Temporário&#10;Jovem Aprendiz"></textarea>
+                                </div>
+                                <div class="form-group mt-3">
+                                    <label>
+                                        <input type="checkbox" id="novo-campo-obrigatorio" style="margin-right:6px;">
+                                        Campo obrigatório
+                                    </label>
+                                </div>
+                                <button class="btn btn-primary mt-3" id="btn-adicionar-campo-vaga" style="display:flex;align-items:center;gap:8px;">
+                                    <i class="fa-solid fa-plus"></i> Adicionar Campo
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- BLOCO 3: Campos Adicionados -->
+                        <div class="table-box bg-glass">
+                            <div class="table-header-area">
+                                <h3><i class="fa-solid fa-list-check" style="color: #3b82f6;"></i> Campos Extras Cadastrados</h3>
+                                <span id="campos-extras-count-badge" style="background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700;"></span>
+                            </div>
+                            <div style="padding: 16px 20px;" id="campos-extras-lista">
+                                <!-- Gerado por JS -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
 
             </main>
         </div>
@@ -1124,7 +1232,7 @@
                     <h4><i class="fa-solid fa-link"></i> Link para Continuar a Ficha</h4>
                     <p style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;">CPF aprovado! Copie o link abaixo e envie ao candidato pelo WhatsApp para que ele complete os documentos:</p>
                     <div class="link-continuacao-url" id="link-continuacao-url">—</div>
-                    <button id="btn-copiar-link-presencial" style="padding:7px 14px;border-radius:7px;border:none;background:#22c55e;color:#fff;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                    <button id="btn-copiar-link-continuacao" style="padding:7px 14px;border-radius:7px;border:none;background:#22c55e;color:#fff;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
                         <i class="fa-solid fa-copy"></i> Copiar link
                     </button>
                 </div>
@@ -1188,6 +1296,13 @@
                                 <label for="det-email-input">E-mail</label>
                                 <input type="email" id="det-email-input" class="form-control">
                             </div>
+                        </div>
+                    </div>
+
+                    <div class="drawer-section">
+                        <h4>Foto 3x4 do Contrato</h4>
+                        <div id="det-foto3x4-contrato" style="font-size:13px; font-weight:600; color:var(--text-primary); padding:10px 12px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:8px;">
+                            Não informado
                         </div>
                     </div>
 
@@ -1446,7 +1561,10 @@
                 
                 <!-- Painel de Ações Especiais do DP (Somente Leitura) -->
                 <div class="drawer-footer-dp" id="drawer-footer-dp-actions" style="width: 100%; display: none; flex-direction: column; gap: 8px; margin-top: 8px;">
-                    <button class="btn btn-primary" id="btn-dp-exportar" style="width: 100%; background-color: #3b82f6; color: white; border: none; padding: 10px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;"><i class="fa-solid fa-file-zipper"></i> EXPORTAR FICHA COMPLETA</button>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
+                        <button class="btn btn-primary" id="btn-dp-exportar" style="background-color: #3b82f6; color: white; border: none; padding: 10px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px;"><i class="fa-solid fa-file-zipper"></i> EXPORTAR PASTA</button>
+                        <button class="btn" id="btn-dp-exportar-exata" style="background-color: #7c3aed; color: white; border: none; padding: 10px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px;"><i class="fa-solid fa-file-export"></i> EXPORTAR EXATA</button>
+                    </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%;">
                         <button class="btn btn-success" id="btn-dp-contrato" style="width: 100%; background-color: #10b981; color: white; border: none; padding: 10px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;"><i class="fa-solid fa-circle-check"></i> CONTRATO FEITO</button>
                         <button class="btn btn-danger" id="btn-dp-devolver" style="width: 100%; background-color: #ef4444; color: white; border: none; padding: 10px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;"><i class="fa-solid fa-circle-left"></i> DEVOLVER</button>
@@ -1687,17 +1805,32 @@
 
     <!-- MODAL: CADASTRAR NOVO CLIENTE (EMPRESA PARCEIRA) -->
     <div id="modal-novo-cliente" class="modal-overlay">
-        <div class="modal-box">
+        <div class="modal-box" style="max-width: 720px; width: 95%;">
             <div class="modal-header" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;">
                 <h3 style="color:#fff;"><i class="fa-solid fa-building-circle-arrow-right" style="margin-right:8px;"></i>Cadastrar Novo Cliente</h3>
                 <button class="btn-close-modal" onclick="fecharModalNovoCliente()" style="color:#fff;"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <form id="form-novo-cliente">
-                <div class="modal-body">
+                <div class="modal-body" style="max-height:78vh; overflow-y:auto;">
+
+                    <!-- SEÇÃO: Identificação da Empresa -->
+                    <div style="font-size:11px; font-weight:700; color:#059669; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-building"></i> Identificação da Empresa
+                    </div>
                     <div class="form-group-grid">
                         <div class="form-group" style="grid-column:1/-1;">
                             <label for="cli-nome">Nome da Empresa *</label>
                             <input type="text" id="cli-nome" required class="form-control" placeholder="Ex: DHL Express, Total Express, Correios..." oninput="autoSiglaCliente()">
+                        </div>
+                    </div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="cli-tomador">Tomador / Responsável *</label>
+                            <input type="text" id="cli-tomador" required class="form-control" placeholder="Nome do responsável da empresa">
+                        </div>
+                        <div class="form-group">
+                            <label for="cli-cnpj">CNPJ *</label>
+                            <input type="text" id="cli-cnpj" required class="form-control" placeholder="00.000.000/0000-00" maxlength="18" oninput="mascaraCNPJ(this)">
                         </div>
                     </div>
                     <div class="form-group-grid">
@@ -1709,8 +1842,35 @@
                             <label for="cli-cor">Cor da Marca</label>
                             <div style="display:flex;gap:8px;align-items:center;">
                                 <input type="color" id="cli-cor" value="#6366f1" class="form-control" style="padding:4px;height:38px;width:60px;cursor:pointer;">
-                                <span style="font-size:12px;color:var(--text-secondary);">Cor usada no badge da empresa</span>
+                                <span style="font-size:12px;color:var(--text-secondary);">Cor usada no badge</span>
                             </div>
+                        </div>
+                    </div>
+
+                    <hr style="border:none; border-top:1px solid var(--border-color); margin:18px 0;">
+
+                    <!-- SEÇÃO: Endereço -->
+                    <div style="font-size:11px; font-weight:700; color:#059669; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-map-location-dot"></i> Endereço da Empresa
+                    </div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="cli-cep">CEP *</label>
+                            <input type="text" id="cli-cep" required class="form-control" placeholder="00000-000" maxlength="9" oninput="mascaraCEPCliente(this)">
+                        </div>
+                        <div class="form-group">
+                            <label for="cli-rua">Rua / Av. *</label>
+                            <input type="text" id="cli-rua" required class="form-control" placeholder="Ex: Av. das Nações">
+                        </div>
+                    </div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="cli-numero-end">Número *</label>
+                            <input type="text" id="cli-numero-end" required class="form-control" placeholder="Ex: 1000">
+                        </div>
+                        <div class="form-group">
+                            <label for="cli-bairro">Bairro *</label>
+                            <input type="text" id="cli-bairro" required class="form-control" placeholder="Ex: Gato Preto">
                         </div>
                     </div>
                     <div class="form-group-grid">
@@ -1729,9 +1889,74 @@
                     </div>
                     <input type="hidden" id="cli-lat">
                     <input type="hidden" id="cli-lng">
-                    <p style="font-size:11px;color:var(--text-secondary);margin:0;">
+
+                    <hr style="border:none; border-top:1px solid var(--border-color); margin:18px 0;">
+
+                    <!-- SEÇÃO: Informações das Vagas -->
+                    <div style="font-size:11px; font-weight:700; color:#059669; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-briefcase"></i> Informações das Vagas
+                    </div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="cli-centro-custo">Centro de Custo</label>
+                            <input type="text" id="cli-centro-custo" class="form-control" placeholder="Ex: CC-001, 1234-SP">
+                        </div>
+                        <div class="form-group">
+                            <label for="cli-data-entrada">Data de Entrada do Cliente</label>
+                            <input type="date" id="cli-data-entrada" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="cli-data-saida">Data de Saída / Encerramento</label>
+                            <input type="date" id="cli-data-saida" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="cli-categoria-vaga">Categoria da Vaga</label>
+                            <select id="cli-categoria-vaga" class="form-control">
+                                <option value="">Selecione...</option>
+                                <option value="CLT">CLT</option>
+                                <option value="Temporário">Temporário</option>
+                                <option value="Intermitente">Intermitente</option>
+                                <option value="Diária">Diária</option>
+                                <option value="Jovem Aprendiz">Jovem Aprendiz</option>
+                                <option value="Estágio">Estágio</option>
+                                <option value="PJ">PJ (Pessoa Jurídica)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cli-funcoes">Funções Disponíveis <span style="font-weight:400;color:var(--text-secondary)">(uma por linha)</span></label>
+                        <textarea id="cli-funcoes" class="form-control" rows="3" placeholder="Ex:&#10;Operador de Logística&#10;Auxiliar de Armazém&#10;Separador de Mercadorias"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cli-escalas">Escalas de Trabalho <span style="font-weight:400;color:var(--text-secondary)">(uma por linha)</span></label>
+                        <textarea id="cli-escalas" class="form-control" rows="3" placeholder="Ex:&#10;5x2 (Seg-Sex)&#10;6x1&#10;12x36"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Dias de Trabalho Disponíveis</label>
+                        <div style="display:flex; flex-wrap:wrap; gap:10px; padding:12px; background:var(--bg-main); border:1px solid var(--border-color); border-radius:8px;">
+                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="cli-dia-seg" value="Segunda"> Segunda</label>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="cli-dia-ter" value="Terça"> Terça</label>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="cli-dia-qua" value="Quarta"> Quarta</label>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="cli-dia-qui" value="Quinta"> Quinta</label>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="cli-dia-sex" value="Sexta"> Sexta</label>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="cli-dia-sab" value="Sábado"> Sábado</label>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="cli-dia-dom" value="Domingo"> Domingo</label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cli-horarios">Horários Disponíveis <span style="font-weight:400;color:var(--text-secondary)">(um por linha)</span></label>
+                        <textarea id="cli-horarios" class="form-control" rows="3" placeholder="Ex:&#10;1º Turno: 06h00 – 14h00&#10;2º Turno: 14h00 – 22h00&#10;3º Turno: 22h00 – 06h00"></textarea>
+                    </div>
+
+                    <p style="font-size:11px;color:var(--text-secondary);margin:8px 0 0;">
                         <i class="fa-solid fa-circle-info"></i>
-                        Se a cidade estiver no nosso banco de dados, a localização é preenchida automaticamente para cálculo de proximidade.
+                        Se a cidade estiver no nosso banco de dados, a localização é preenchida automaticamente.
                     </p>
                 </div>
                 <div class="modal-footer">
@@ -2210,6 +2435,7 @@
 
     <!-- Core App Scripts -->
     <script src="js/security.js"></script>
+    <script src="js/supabase-sync.js"></script>
     <script src="js/data.js"></script>
     <script src="js/app.js"></script>
 </body>

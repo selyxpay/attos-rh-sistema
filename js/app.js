@@ -222,6 +222,7 @@ function verificarSessao() {
 function isAbaAutorizada(abaId) {
   if (!loggedUser) return false;
   if (abaId === 'meu-painel') return true;
+  if (abaId === 'fila') return true; // todos os logados acessam
   if (loggedUser.login === 'joaobalaf') return true;
   const depto = loggedUser.departamento;
   if (depto === 'administracao') return true;
@@ -280,6 +281,16 @@ function verificarPermissoesMenu() {
       loggedUser.departamento === 'administracao'
     );
     navInaptos.style.display = podeInaptos ? '' : 'none';
+  }
+
+  // Controle do menu Configurações (somente admin)
+  const navConfig = document.getElementById('nav-item-configuracoes');
+  if (navConfig) {
+    const podeConfig = loggedUser && (
+      loggedUser.login === 'joaobalaf' ||
+      loggedUser.departamento === 'administracao'
+    );
+    navConfig.style.display = podeConfig ? '' : 'none';
   }
 
   if (!isAbaAutorizada(activeAba)) {
@@ -380,6 +391,12 @@ function gerarFichaCadastralTexto(cand) {
   const recNome = rec
     ? rec.nome
     : (cand.origemLink === 'agencia_rt' ? 'Agência R&T' : 'Não definido');
+  const foto3x4 = cand.foto3x4Contrato || {};
+  const foto3x4Resumo = foto3x4.opcao === 'convenio_desconto'
+    ? 'Sim, vai tirar pelo convênio da empresa. Autorizou desconto único de R$ 25,00 no salário.'
+    : foto3x4.opcao === 'providenciar_propria'
+      ? 'Não, vai providenciar a foto 3x4 por conta própria.'
+      : 'Não informado';
 
   const linha = (label, valor) => `${label}: ${valor || 'Não informado'}`;
 
@@ -425,6 +442,9 @@ function gerarFichaCadastralTexto(cand) {
     linha('Tamanho da camiseta',  cand.tamanhoCamiseta),
     linha('Tamanho da calça',     cand.tamanhoCalca),
     linha('Tamanho da bota',      cand.tamanhoBota),
+    '',
+    '[ FOTO 3X4 DO CONTRATO ]',
+    linha('Opção escolhida',      foto3x4Resumo),
     '',
     '[ VAGA & EMPRESA ]',
     linha('Vaga',                 vaga ? vaga.cargo : cand.codigoVaga),
@@ -535,7 +555,36 @@ document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   initNewModules();
   renderCurrentAba();
+  ativarNuvem();
 });
+
+// Ativa a sincronização na nuvem (Supabase).
+// Só roda se as 2 chaves estiverem configuradas em js/supabase-sync.js;
+// caso contrário, o sistema segue funcionando só com localStorage (como hoje).
+async function ativarNuvem() {
+  if (!(window.RTCloud && RTCloud.configured)) return;
+  try {
+    await RTCloud.init({
+      onRemoteUpdate: (dados) => {
+        if (!dados) return;
+        state = dados;
+        try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (e) {}
+        renderCurrentAba();
+      }
+    });
+    const nuvem = await RTCloud.loadState();
+    if (nuvem) {
+      state = nuvem;
+      try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (e) {}
+      renderCurrentAba();
+    } else {
+      // Primeira vez: envia o estado atual para inicializar a nuvem
+      RTCloud.saveState(state);
+    }
+  } catch (e) {
+    console.error('[RT Nuvem] Não foi possível ativar a sincronização:', e);
+  }
+}
 
 // 1. GERENCIAMENTO DE ESTADO E LOCALSTORAGE
 function initLocalStorage() {
@@ -629,6 +678,12 @@ function initLocalStorage() {
       alterado = true;
     }
 
+    // Garantir configuração do formulário de vagas (campos personalizáveis)
+    if (!state.vagaFormConfig) {
+      state.vagaFormConfig = { renomes: {}, camposExtras: [] };
+      alterado = true;
+    }
+
     // Garantir contador de fila
     if (!state.proximaFilaNum) {
       state.proximaFilaNum = (state.candidatos ? state.candidatos.length : 0) + 1;
@@ -661,6 +716,14 @@ function initLocalStorage() {
         if (!r.disparosLog) { r.disparosLog = []; alterado = true; }
       });
     }
+
+    // Garantir sistema de fila
+    if (!state.fila) {
+      state.fila = { contadores: { selecao: 0, dp: 0, geral: 0 }, senhas: [], ultimaChamada: null };
+      alterado = true;
+    }
+    if (!state.fila.contadores) { state.fila.contadores = { selecao: 0, dp: 0, geral: 0 }; alterado = true; }
+    if (!state.fila.senhas)     { state.fila.senhas = []; alterado = true; }
 
     // Garantir campos novos nos candidatos
     if (state.candidatos) {
@@ -732,6 +795,7 @@ function initLocalStorage() {
 
 function saveState() {
   localStorage.setItem('rt_empregos_data', JSON.stringify(state));
+  if (window.RTCloud && RTCloud.configured) RTCloud.saveState(state);
 }
 
 // 2. SISTEMA DE ABA E ROTEAMENTO SPA
@@ -813,7 +877,10 @@ function switchAba(abaId) {
     'funcionarios': 'fa-solid fa-user-gear',
     'auditoria': 'fa-solid fa-clock-rotate-left',
     'inaptos': 'fa-solid fa-ban',
-    'meu-painel': 'fa-solid fa-id-card-clip'
+    'configuracoes': 'fa-solid fa-sliders',
+    'meu-painel': 'fa-solid fa-id-card-clip',
+    'fila': 'fa-solid fa-ticket',
+    'documentos': 'fa-solid fa-folder-open'
   };
 
   const titleMap = {
@@ -828,7 +895,10 @@ function switchAba(abaId) {
     'funcionarios': 'R&T EMPREGOS — GESTÃO DE COLABORADORES',
     'auditoria': 'R&T EMPREGOS — AUDITORIA ADMINISTRATIVA',
     'inaptos': 'R&T EMPREGOS — INAPTOS',
-    'meu-painel': 'R&T EMPREGOS — MEU PAINEL'
+    'configuracoes': 'R&T EMPREGOS — CONFIGURAÇÕES DO SISTEMA',
+    'meu-painel': 'R&T EMPREGOS — MEU PAINEL',
+    'fila': 'R&T EMPREGOS — SISTEMA DE SENHAS',
+    'documentos': 'R&T EMPREGOS — DOCUMENTOS NA NUVEM'
   };
 
   if (headerIcon) headerIcon.className = `${iconMap[abaId] || 'fa-solid fa-building'} header-icon`;
@@ -874,10 +944,79 @@ function renderCurrentAba() {
     case 'inaptos':
       renderInaptos();
       break;
+    case 'configuracoes':
+      renderConfiguracoes();
+      break;
     case 'meu-painel':
       renderMeuPainel();
       break;
+    case 'fila':
+      renderFila();
+      break;
+    case 'documentos':
+      renderDocumentos();
+      break;
   }
+}
+
+// ÁREA DE DOCUMENTOS NA NUVEM (documentos guardados permanentemente)
+const ROTULO_DOC = {
+  selfie: 'Selfie', rgFrente: 'RG (frente)', rgVerso: 'RG (verso)', fotoPis: 'PIS',
+  cpfDocumento: 'CPF', comprovanteResidencia: 'Comprovante de residência',
+  cartaoBancoVerso: 'Cartão do banco', foto3x4: 'Foto 3x4', ctps: 'Carteira de Trabalho',
+  certidao: 'Certidão', comprovanteEscolaridade: 'Escolaridade'
+};
+function rotuloDocumento(campo) {
+  return ROTULO_DOC[campo] || (campo ? campo.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()) : 'Documento');
+}
+
+function renderDocumentos() {
+  const lista  = document.getElementById('docs-lista');
+  const resumo = document.getElementById('docs-resumo');
+  if (!lista) return;
+
+  if (!(window.RTCloud && RTCloud.configured)) {
+    if (resumo) resumo.innerHTML = '';
+    lista.innerHTML = '<div style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);color:#b45309;padding:16px 18px;border-radius:12px;font-size:13px;"><i class="fa-solid fa-circle-info"></i> A sincronização na nuvem ainda não foi configurada. Os documentos enviados pelos candidatos aparecerão aqui assim que o Supabase estiver ligado (cole as chaves em <strong>js/supabase-sync.js</strong>).</div>';
+    return;
+  }
+
+  const docs = RTCloud.listarDocumentos(state);
+
+  if (docs.length === 0) {
+    if (resumo) resumo.innerHTML = '';
+    lista.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:48px 16px;"><i class="fa-solid fa-folder-open" style="font-size:42px;opacity:.4;"></i><p style="margin-top:12px;">Nenhum documento na nuvem ainda. Quando os candidatos enviarem as fotos, elas aparecem aqui.</p></div>';
+    return;
+  }
+
+  if (resumo) {
+    resumo.innerHTML = 'Total: <strong>' + docs.length + '</strong> documento(s) guardado(s).';
+  }
+
+  // Agrupa por pessoa
+  const grupos = {};
+  docs.forEach(d => {
+    const chave = (d.pessoaId || '') + '|' + (d.pessoa || '—');
+    (grupos[chave] = grupos[chave] || { pessoa: d.pessoa || '—', itens: [] }).itens.push(d);
+  });
+
+  lista.innerHTML = Object.keys(grupos).map(chave => {
+    const g = grupos[chave];
+    const cards = g.itens.map(d => {
+      const data = d.enviadoEm ? new Date(d.enviadoEm).toLocaleDateString('pt-BR') : '';
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:9px;margin-bottom:7px;">' +
+        '<span style="font-size:13px;font-weight:600;"><i class="fa-solid fa-file-lines" style="color:var(--primary);margin-right:6px;"></i>' + escapeHTML(rotuloDocumento(d.campo)) + '</span>' +
+        '<span style="display:flex;align-items:center;gap:10px;">' +
+          (data ? '<span style="font-size:11px;color:var(--text-secondary);white-space:nowrap;"><i class="fa-regular fa-calendar"></i> ' + data + '</span>' : '') +
+          '<a href="' + escapeHTML(d.url) + '" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px;">Abrir</a>' +
+        '</span>' +
+      '</div>';
+    }).join('');
+    return '<div style="margin-bottom:18px;">' +
+      '<div style="font-weight:700;font-size:14px;margin-bottom:8px;"><i class="fa-solid fa-user" style="color:var(--text-secondary);margin-right:6px;"></i>' + escapeHTML(g.pessoa) + ' <span style="font-weight:500;color:var(--text-secondary);font-size:12px;">(' + g.itens.length + ')</span></div>' +
+      cards +
+    '</div>';
+  }).join('');
 }
 
 // 3. LISTENERS GLOBAIS
@@ -1079,6 +1218,8 @@ function setupEventListeners() {
         selectEmpresaModal.innerHTML = state.empresas.map(e => `<option value="${e.id}">${e.nome}</option>`).join('');
       }
       document.getElementById('modal-nova-vaga').classList.add('active');
+      // Injeta campos extras configurados pelo admin
+      setTimeout(() => injetarCamposExtrasNoForm(), 50);
     });
   }
   if (btnNovoCliente) {
@@ -1094,6 +1235,7 @@ function setupEventListeners() {
       e.preventDefault();
       const empresaId = document.getElementById('vaga-add-empresa').value;
       const empresa = state.empresas.find(emp => emp.id === empresaId);
+      const cfg = state.vagaFormConfig || { renomes: {}, camposExtras: [] };
       const cargo = document.getElementById('vaga-add-cargo').value;
       const codigo = document.getElementById('vaga-add-codigo').value;
       const salario = parseFloat(document.getElementById('vaga-add-salario').value);
@@ -1109,6 +1251,19 @@ function setupEventListeners() {
       const turnosRaw = (document.getElementById('vaga-add-turnos') || {}).value || '';
       const turnos = turnosRaw.split('\n').map(l => l.trim()).filter(Boolean);
 
+      // Capturar campos extras configurados pelo admin
+      const camposExtras = {};
+      (cfg.camposExtras || []).forEach(campo => {
+        const el = document.getElementById(`vaga-extra-${campo.id}`);
+        if (!el) return;
+        if (campo.tipo === 'checkbox-group') {
+          const checks = document.querySelectorAll(`[name="vaga-extra-${campo.id}"]`);
+          camposExtras[campo.id] = Array.from(checks).filter(c => c.checked).map(c => c.value);
+        } else {
+          camposExtras[campo.id] = el.value;
+        }
+      });
+
       const novaVaga = {
         id: `vaga-${Date.now()}`,
         empresaId,
@@ -1122,7 +1277,8 @@ function setupEventListeners() {
         escala,
         turnos,
         localTrabalho: local,
-        descricao
+        descricao,
+        camposExtras
       };
 
       state.vagas.push(novaVaga);
@@ -1138,20 +1294,43 @@ function setupEventListeners() {
   if (formNovoCliente) {
     formNovoCliente.addEventListener('submit', (e) => {
       e.preventDefault();
-      const nome   = document.getElementById('cli-nome').value.trim();
-      const sigla  = document.getElementById('cli-sigla').value.trim().toUpperCase();
-      const cor    = document.getElementById('cli-cor').value;
-      const cidade = document.getElementById('cli-cidade').value.trim();
-      const estado = document.getElementById('cli-estado').value.trim().toUpperCase() || 'SP';
-      const lat    = parseFloat(document.getElementById('cli-lat').value) || null;
-      const lng    = parseFloat(document.getElementById('cli-lng').value) || null;
+      const nome        = document.getElementById('cli-nome').value.trim();
+      const tomador     = document.getElementById('cli-tomador')?.value.trim() || '';
+      const cnpj        = document.getElementById('cli-cnpj')?.value.trim() || '';
+      const sigla       = document.getElementById('cli-sigla').value.trim().toUpperCase();
+      const cor         = document.getElementById('cli-cor').value;
+      const cep         = document.getElementById('cli-cep')?.value.trim() || '';
+      const rua         = document.getElementById('cli-rua')?.value.trim() || '';
+      const numeroEnd   = document.getElementById('cli-numero-end')?.value.trim() || '';
+      const bairro      = document.getElementById('cli-bairro')?.value.trim() || '';
+      const cidade      = document.getElementById('cli-cidade').value.trim();
+      const estado      = document.getElementById('cli-estado').value.trim().toUpperCase() || 'SP';
+      const lat         = parseFloat(document.getElementById('cli-lat').value) || null;
+      const lng         = parseFloat(document.getElementById('cli-lng').value) || null;
+      const centroCusto = document.getElementById('cli-centro-custo')?.value.trim() || '';
+      const dataEntrada = document.getElementById('cli-data-entrada')?.value || '';
+      const dataSaida   = document.getElementById('cli-data-saida')?.value || '';
+      const categoria   = document.getElementById('cli-categoria-vaga')?.value || '';
+      const funcoesRaw  = document.getElementById('cli-funcoes')?.value || '';
+      const funcoes     = funcoesRaw.split('\n').map(l => l.trim()).filter(Boolean);
+      const escalasRaw  = document.getElementById('cli-escalas')?.value || '';
+      const escalas     = escalasRaw.split('\n').map(l => l.trim()).filter(Boolean);
+      const horariosRaw = document.getElementById('cli-horarios')?.value || '';
+      const horarios    = horariosRaw.split('\n').map(l => l.trim()).filter(Boolean);
+      const diasIds     = ['seg','ter','qua','qui','sex','sab','dom'];
+      const dias        = diasIds.map(d => document.getElementById(`cli-dia-${d}`)).filter(el => el && el.checked).map(el => el.value);
 
       const id = sigla.toLowerCase().replace(/\s+/g, '') + '-' + Date.now();
-      if (state.empresas.find(e => e.sigla === sigla)) {
+      if (state.empresas.find(emp => emp.sigla === sigla)) {
         alert('Já existe um cliente com essa sigla. Use uma sigla diferente.');
         return;
       }
-      const novaEmpresa = { id, nome, sigla, cor, cidade, estado, lat, lng };
+      const novaEmpresa = {
+        id, nome, tomador, cnpj, sigla, cor,
+        cep, rua, numeroEnd, bairro, cidade, estado, lat, lng,
+        centroCusto, dataEntrada, dataSaida, categoria,
+        funcoes, escalas, dias, horarios
+      };
       state.empresas.push(novaEmpresa);
       saveState();
       fecharModalNovoCliente();
@@ -1443,6 +1622,13 @@ function setupEventListeners() {
       if (currentCandidateId) {
         exportarFichaCompletaZip(currentCandidateId);
       }
+    });
+  }
+
+  const btnDpExportarExata = document.getElementById('btn-dp-exportar-exata');
+  if (btnDpExportarExata) {
+    btnDpExportarExata.addEventListener('click', () => {
+      if (currentCandidateId) exportarExata(currentCandidateId);
     });
   }
 
@@ -2518,6 +2704,17 @@ function abrirDrawerDetalhes(candidatoId) {
   setSafeText('det-email', cand.email);
   setSafeText('det-endereco', cand.endereco || 'Endereço não informado');
   setSafeText('det-data-cadastro', cand.dataCadastro ? new Date(cand.dataCadastro).toLocaleDateString('pt-BR') : '');
+  const foto3x4El = document.getElementById('det-foto3x4-contrato');
+  if (foto3x4El) {
+    const foto3x4 = cand.foto3x4Contrato || {};
+    if (foto3x4.opcao === 'convenio_desconto') {
+      foto3x4El.innerHTML = '<i class="fa-solid fa-circle-check" style="color:#22c55e;margin-right:6px;"></i>Sim, vai tirar pelo convênio da empresa. Desconto autorizado: R$ 25,00 no salário.';
+    } else if (foto3x4.opcao === 'providenciar_propria') {
+      foto3x4El.innerHTML = '<i class="fa-solid fa-circle-xmark" style="color:#f59e0b;margin-right:6px;"></i>Não. O candidato vai providenciar a foto 3x4 por conta própria.';
+    } else {
+      foto3x4El.textContent = 'Não informado';
+    }
+  }
 
   // Badge Status
   const badgeStatus = document.getElementById('det-status-badge');
@@ -2995,7 +3192,7 @@ function abrirDrawerDetalhes(candidatoId) {
       const linkUrl = gerarLinkContinuarPresencial(cand.id);
       const urlEl = document.getElementById('link-continuacao-url');
       if (urlEl) urlEl.textContent = linkUrl;
-      const btnCopiarLink = document.getElementById('btn-copiar-link-presencial');
+      const btnCopiarLink = document.getElementById('btn-copiar-link-continuacao');
       if (btnCopiarLink) {
         btnCopiarLink.onclick = () => {
           navigator.clipboard.writeText(linkUrl).then(() => {
@@ -3669,6 +3866,143 @@ function toggleStatusFuncionario(id) {
 }
 
 // ==========================================================================
+// EXPORTAR EXATA — gera CSV no formato de importação do sistema Exata
+// ==========================================================================
+function exportarExata(candidatoId) {
+  const cand = state.candidatos.find(c => c.id === candidatoId);
+  if (!cand) { alert('Candidato não encontrado.'); return; }
+
+  const vaga = cand.vagaId ? (state.vagas || []).find(v => v.id === cand.vagaId) : null;
+
+  // Sanitiza valor: remove ponto-e-vírgula e normaliza undefined/null
+  const s = (val) => String(val == null ? '' : val).replace(/;/g, ',');
+
+  // Mapeamento dos campos do sistema → colunas do Exata (ordem exata do modelo)
+  const cabecalho = [
+    'tipo_contrato','vinculo','id','nome','email',
+    'tel_residencial','tel_celular','nome_pai','nome_mae',
+    'ctps','ctps_tipo','ctps_serie','ctps_uf','ctps_data_expedicao',
+    'data_admissao','data_rescisao','data_vencimento','data_prorrogacao',
+    'id_empresa_exata','funcao','funcao_cbo',
+    'pis','cpf','rg',
+    'titulo','titulo_zona','titulo_secao','titulo_emissao',
+    'endereco_cep','endereco','endereco_numero','endereco_complemento',
+    'endereco_estado','endereco_cidade','endereco_bairro',
+    'salario','salario_tipo',
+    'data_nascimento','estado_civil','sexo','raca',
+    'escolaridade','escolaridade_status',
+    'contratacao_finalidade','contratacao_justificativa',
+    'banco','agencia','agencia_digito','conta','conta_digito','conta_tipo',
+    'dep1_nome','dep1_data_nascimento','dep1_cpf','dep1_parentesco',
+    'dep2_nome','dep2_data_nascimento','dep2_cpf','dep2_parentesco',
+    'dep3_nome','dep3_data_nascimento','dep3_cpf','dep3_parentesco',
+    'dep4_nome','dep4_data_nascimento','dep4_cpf','dep4_parentesco',
+    'dep5_nome','dep5_data_nascimento','dep5_cpf','dep5_parentesco',
+    'vt1_ida_tipo','vt1_ida_valor','vt2_ida_tipo','vt2_ida_valor','vt3_ida_tipo','vt3_ida_valor',
+    'vt1_volta_tipo','vt1_volta_valor','vt2_volta_tipo','vt2_volta_valor','vt3_volta_tipo','vt3_volta_valor',
+    'rg_expedicao','rg_uf','pais_nascimento','estado_nascimento','cidade_nascimento',
+    'previsao_contrato_dias','taxa'
+  ];
+
+  const valores = [
+    s(cand.tipoContrato),              // tipo_contrato
+    s(cand.vinculo),                   // vinculo
+    '',                                // id (Exata gera internamente)
+    s(cand.nome),                      // nome
+    s(cand.email),                     // email
+    '',                                // tel_residencial
+    s(cand.telefone),                  // tel_celular
+    s(cand.nomePai),                   // nome_pai
+    s(cand.nomeMae),                   // nome_mae
+    s(cand.ctps),                      // ctps
+    s(cand.ctpsTipo),                  // ctps_tipo
+    s(cand.ctpsSerie),                 // ctps_serie
+    s(cand.ctpsUf),                    // ctps_uf
+    s(cand.ctpsDataExpedicao),         // ctps_data_expedicao
+    s(cand.dataAdmissao),              // data_admissao
+    '',                                // data_rescisao
+    '',                                // data_vencimento
+    '',                                // data_prorrogacao
+    '',                                // id_empresa_exata
+    s(vaga ? vaga.cargo : cand.codigoVaga), // funcao
+    '',                                // funcao_cbo
+    s(cand.pis),                       // pis
+    s(cand.cpf),                       // cpf
+    s(cand.rg),                        // rg
+    '',                                // titulo
+    '',                                // titulo_zona
+    '',                                // titulo_secao
+    '',                                // titulo_emissao
+    s(cand.cep),                       // endereco_cep
+    s(cand.rua),                       // endereco
+    s(cand.numeroCasa),                // endereco_numero
+    s(cand.complemento),               // endereco_complemento
+    s(cand.estado),                    // endereco_estado
+    s(cand.cidade),                    // endereco_cidade
+    s(cand.bairro),                    // endereco_bairro
+    s(vaga ? vaga.salario : cand.salario), // salario
+    '',                                // salario_tipo
+    s(cand.dataNascimento),            // data_nascimento
+    s(cand.estadoCivil),               // estado_civil
+    s(cand.sexo),                      // sexo
+    s(cand.raca),                      // raca
+    s(cand.escolaridade),              // escolaridade
+    '',                                // escolaridade_status
+    '',                                // contratacao_finalidade
+    '',                                // contratacao_justificativa
+    s(cand.banco),                     // banco
+    s(cand.agenciaBanco),              // agencia
+    s(cand.agenciaDigito),             // agencia_digito
+    s(cand.contaBanco),                // conta
+    s(cand.contaDigito),               // conta_digito
+    s(cand.contaTipo),                 // conta_tipo
+    // Dependentes (até 5 — campos não existem ainda, ficam vazios)
+    '','','','',
+    '','','','',
+    '','','','',
+    '','','','',
+    '','','','',
+    // VT (não gerenciado individualmente, fica vazio)
+    '','','','','','',
+    '','','','','','',
+    // RG extra, nascimento
+    s(cand.rgExpedicao),               // rg_expedicao
+    s(cand.rgUf),                      // rg_uf
+    'BR',                              // pais_nascimento
+    s(cand.estadoNascimento),          // estado_nascimento
+    s(cand.cidadeNascimento),          // cidade_nascimento
+    '',                                // previsao_contrato_dias
+    ''                                 // taxa
+  ];
+
+  const csvContent = cabecalho.join(';') + '\r\n' + valores.join(';');
+
+  // Nome do arquivo: NOME_CPF.txt
+  const nomeArq = (cand.nome || 'CANDIDATO')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9\s]/g, '')
+    .trim()
+    .replace(/\s+/g, '_');
+  const cpfArq = (cand.cpf || '').replace(/[^0-9]/g, '');
+  const filename = `${nomeArq}_${cpfArq}.txt`;
+
+  // BOM UTF-8 para abrir corretamente no Excel/Notepad
+  const blob = new Blob(['﻿' + csvContent], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  registrarAcaoHistorico(cand, `Exportou ficha no formato Exata — ${filename}`);
+  saveState();
+}
+
+// ==========================================================================
 // EXPOSIÇÃO DE FUNÇÕES GLOBAIS (necessário para onclick inline no HTML)
 // ==========================================================================
 window.toggleStatusFuncionario = toggleStatusFuncionario;
@@ -3683,6 +4017,7 @@ window.finalizarContratacao = finalizarContratacao;
 window.irParaInscricaoSite = irParaInscricaoSite;
 window.filtrarRelatorioPorPill = filtrarRelatorioPorPill;
 window.exportarFichaCompletaZip = exportarFichaCompletaZip;
+window.exportarExata = exportarExata;
 
 // ==========================================================================
 // MÓDULO 1: SISTEMA DE PERMISSÕES GRANULARES (12 ÁREAS x 8 AÇÕES)
@@ -3714,7 +4049,8 @@ const ABA_PARA_AREA = {
   'site': 'candidatos',
   'funcionarios': 'funcionarios',
   'auditoria': 'sistema',
-  'inaptos': 'sistema'
+  'inaptos': 'sistema',
+  'documentos': 'dp'
 };
 
 function hasPermission(area, acao) {
@@ -6003,6 +6339,306 @@ window.autoLatLngCliente = function() {
 };
 
 // ==========================================================================
+// MÓDULO: SISTEMA DE SENHAS / FILA
+// ==========================================================================
+
+const FILA_TIPO_LABEL = { selecao: 'Seleção', dp: 'Depto. Pessoal', geral: 'Geral' };
+const FILA_TIPO_COR   = { selecao: '#6366f1', dp: '#10b981', geral: '#f59e0b' };
+const FILA_TIPO_PREFX = { selecao: 'S', dp: 'D', geral: 'G' };
+
+// Gera número formatado: S-001
+function _filaNumero(tipo, contador) {
+  return (FILA_TIPO_PREFX[tipo] || 'G') + '-' + String(contador).padStart(3, '0');
+}
+
+// Voz — usa Web Speech API
+function _falarSenha(numero, nome, tipo) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const dept = tipo === 'selecao' ? 'balcão de Seleção' :
+               tipo === 'dp'      ? 'Departamento Pessoal' : 'atendimento geral';
+  const texto = nome
+    ? `Senha ${numero.replace('-', ' ')}.  ${nome}, por favor, dirija-se ao ${dept}.`
+    : `Senha ${numero.replace('-', ' ')}.  Por favor, dirija-se ao ${dept}.`;
+  const u = new SpeechSynthesisUtterance(texto);
+  u.lang = 'pt-BR'; u.rate = 0.88; u.pitch = 1; u.volume = 1;
+  const vozes = window.speechSynthesis.getVoices();
+  const voz = vozes.find(v => v.lang === 'pt-BR') || vozes.find(v => v.lang.startsWith('pt'));
+  if (voz) u.voice = voz;
+  window.speechSynthesis.speak(u);
+  setTimeout(() => window.speechSynthesis.speak(u), 3500);
+}
+
+// Gera uma nova senha e salva no estado
+window.gerarSenhaFila = function(tipo) {
+  if (!state.fila) state.fila = { contadores: { selecao: 0, dp: 0, geral: 0 }, senhas: [], ultimaChamada: null };
+  if (!state.fila.contadores[tipo] && state.fila.contadores[tipo] !== 0) state.fila.contadores[tipo] = 0;
+  state.fila.contadores[tipo]++;
+  const numero = _filaNumero(tipo, state.fila.contadores[tipo]);
+  const senha = {
+    id:        'senha-' + Date.now(),
+    numero,
+    tipo,
+    nome:      '',
+    candidatoId: null,
+    geradaEm:  Date.now(),
+    status:    'aguardando',
+    chamadaEm: null
+  };
+  state.fila.senhas.push(senha);
+  saveState();
+  renderFila();
+  // Abre impressão automática
+  _imprimirTicket(senha);
+  return senha;
+};
+
+// Chama a próxima senha de um departamento
+window.chamarProximaSenha = function(tipo) {
+  const proxima = (state.fila.senhas || []).find(s => s.tipo === tipo && s.status === 'aguardando');
+  if (!proxima) { alert('Não há senhas aguardando para ' + (FILA_TIPO_LABEL[tipo] || tipo) + '.'); return; }
+  proxima.status    = 'chamada';
+  proxima.chamadaEm = Date.now();
+  state.fila.ultimaChamada = { numero: proxima.numero, tipo: proxima.tipo, nome: proxima.nome, chamadaEm: proxima.chamadaEm };
+  saveState();
+  renderFila();
+  _falarSenha(proxima.numero, proxima.nome, proxima.tipo);
+};
+
+// Chama uma senha específica pelo ID
+window.chamarSenhaEspecifica = function(senhaId) {
+  const senha = (state.fila.senhas || []).find(s => s.id === senhaId);
+  if (!senha) return;
+  senha.status    = 'chamada';
+  senha.chamadaEm = Date.now();
+  state.fila.ultimaChamada = { numero: senha.numero, tipo: senha.tipo, nome: senha.nome, chamadaEm: senha.chamadaEm };
+  saveState();
+  renderFila();
+  _falarSenha(senha.numero, senha.nome, senha.tipo);
+};
+
+// Marca senha como atendida
+window.finalizarSenha = function(senhaId) {
+  const senha = (state.fila.senhas || []).find(s => s.id === senhaId);
+  if (!senha) return;
+  senha.status = 'atendida';
+  saveState();
+  renderFila();
+};
+
+// Cancela/remove senha da fila
+window.cancelarSenha = function(senhaId) {
+  if (!confirm('Cancelar essa senha?')) return;
+  state.fila.senhas = (state.fila.senhas || []).filter(s => s.id !== senhaId);
+  saveState();
+  renderFila();
+};
+
+// Limpa toda a fila (mantém contadores e histórico)
+window.limparFilaCompleta = function() {
+  if (!confirm('Limpar toda a fila atual? As senhas serão apagadas e os contadores reiniciados.')) return;
+  state.fila.senhas = [];
+  state.fila.contadores = { selecao: 0, dp: 0, geral: 0 };
+  state.fila.ultimaChamada = null;
+  saveState();
+  renderFila();
+};
+
+// Impressão do ticket
+function _imprimirTicket(senha) {
+  const agora = new Date();
+  const dataHora = agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+  const cor = FILA_TIPO_COR[senha.tipo] || '#6366f1';
+  const dept = FILA_TIPO_LABEL[senha.tipo] || senha.tipo;
+  const win = window.open('', '_blank', 'width=400,height=500');
+  if (!win) { alert('Permita pop-ups para imprimir o ticket.'); return; }
+  win.document.write(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Senha ${senha.numero}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',sans-serif; background:#fff; display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  .ticket { width:280px; border:2px solid #e2e8f0; border-radius:16px; overflow:hidden; }
+  .ticket-header { background:${cor}; padding:18px; text-align:center; color:#fff; }
+  .ticket-header .empresa { font-size:13px; font-weight:800; letter-spacing:2px; opacity:.9; }
+  .ticket-header .dept { font-size:11px; margin-top:4px; opacity:.75; }
+  .ticket-body { padding:24px 20px; text-align:center; }
+  .ticket-label { font-size:11px; color:#94a3b8; letter-spacing:2px; font-weight:600; text-transform:uppercase; margin-bottom:8px; }
+  .ticket-num { font-size:72px; font-weight:900; color:${cor}; line-height:1; }
+  .ticket-footer { border-top:1px dashed #e2e8f0; padding:14px 20px; text-align:center; }
+  .ticket-footer p { font-size:11px; color:#64748b; margin-bottom:4px; }
+  .ticket-footer .data { font-size:10px; color:#94a3b8; }
+  @media print { body { background:#fff; } .no-print { display:none; } }
+</style>
+</head>
+<body>
+<div class="ticket">
+  <div class="ticket-header">
+    <div class="empresa">R&amp;T EMPREGOS</div>
+    <div class="dept">${dept}</div>
+  </div>
+  <div class="ticket-body">
+    <div class="ticket-label">Sua Senha</div>
+    <div class="ticket-num">${senha.numero}</div>
+  </div>
+  <div class="ticket-footer">
+    <p>Aguarde ser chamado(a)</p>
+    <p>Acompanhe o painel de senhas</p>
+    <div class="data">${dataHora}</div>
+  </div>
+</div>
+<script>window.onload = function(){ window.print(); setTimeout(()=>window.close(),1500); }<\/script>
+</body>
+</html>`);
+  win.document.close();
+}
+
+window.imprimirSenhaNovamente = function(senhaId) {
+  const senha = (state.fila.senhas || []).find(s => s.id === senhaId);
+  if (senha) _imprimirTicket(senha);
+};
+
+// Render principal da aba Fila
+function renderFila() {
+  const container = document.getElementById('fila-conteudo');
+  if (!container) return;
+
+  const fila = state.fila || { contadores: {}, senhas: [], ultimaChamada: null };
+  const senhas = fila.senhas || [];
+  const aguardando = senhas.filter(s => s.status === 'aguardando');
+  const chamadas   = senhas.filter(s => s.status === 'chamada');
+  const atendidas  = senhas.filter(s => s.status === 'atendida');
+
+  const podeChamar = loggedUser && (loggedUser.departamento === 'selecao' || loggedUser.departamento === 'dp' || loggedUser.departamento === 'administracao' || loggedUser.login === 'joaobalaf');
+  const podeGerar  = loggedUser;
+
+  const _esc2 = (v) => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  // Últimas chamadas na ordem
+  const historico = [...senhas].filter(s => s.status !== 'aguardando').sort((a,b) => (b.chamadaEm||0)-(a.chamadaEm||0)).slice(0,8);
+
+  container.innerHTML = `
+  <div class="page-title-section" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+    <div>
+      <h1 style="display:flex;align-items:center;gap:10px;"><i class="fa-solid fa-ticket" style="color:#6366f1;"></i> Sistema de Senhas</h1>
+      <p class="page-subtitle">Gerencie e chame senhas de atendimento para cada departamento</p>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <a href="fila-display.html" target="_blank"
+        style="padding:8px 16px;border-radius:10px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);color:#6366f1;text-decoration:none;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;">
+        <i class="fa-solid fa-tv"></i> Abrir Painel TV
+      </a>
+      <button onclick="limparFilaCompleta()"
+        style="padding:8px 14px;border-radius:10px;border:1px solid var(--border-color);background:transparent;color:var(--text-secondary);cursor:pointer;font-size:12px;font-family:inherit;">
+        <i class="fa-solid fa-rotate"></i> Limpar Fila
+      </button>
+    </div>
+  </div>
+
+  <!-- CARDS DE GERAÇÃO / CHAMADA -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:24px;">
+    ${['selecao','dp','geral'].map(tipo => {
+      const cor  = FILA_TIPO_COR[tipo];
+      const label = FILA_TIPO_LABEL[tipo];
+      const qtd  = aguardando.filter(s => s.tipo === tipo).length;
+      const prox = aguardando.find(s => s.tipo === tipo);
+      const cont = fila.contadores[tipo] || 0;
+      return `
+      <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:16px;overflow:hidden;">
+        <div style="height:5px;background:${cor};"></div>
+        <div style="padding:20px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div style="font-size:14px;font-weight:700;color:var(--text-primary);">${label}</div>
+            <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;background:${cor}22;color:${cor};border:1px solid ${cor}44;">
+              ${qtd} aguardando
+            </span>
+          </div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:14px;">
+            Próxima: <strong style="color:var(--text-primary);">${prox ? prox.numero : '—'}</strong>
+            &nbsp;·&nbsp; Total emitidas: <strong>${cont}</strong>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            ${podeGerar ? `
+            <button onclick="gerarSenhaFila('${tipo}')"
+              style="flex:1;padding:9px 12px;border-radius:9px;border:none;background:${cor};color:#fff;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;">
+              <i class="fa-solid fa-plus"></i> Gerar Senha
+            </button>` : ''}
+            ${podeChamar ? `
+            <button onclick="chamarProximaSenha('${tipo}')"
+              style="flex:1;padding:9px 12px;border-radius:9px;border:1px solid ${cor}55;background:${cor}18;color:${cor};cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;">
+              <i class="fa-solid fa-bell"></i> Chamar Próxima
+            </button>` : ''}
+          </div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+
+  <!-- FILA AGUARDANDO + HISTÓRICO -->
+  <div style="display:grid;grid-template-columns:1fr 360px;gap:18px;align-items:start;">
+
+    <!-- Fila aguardando -->
+    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:14px;padding:20px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <i class="fa-solid fa-hourglass-half" style="color:#f59e0b;"></i> Fila de Espera
+        <span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(245,158,11,0.12);color:#f59e0b;">${aguardando.length} na fila</span>
+      </div>
+      ${aguardando.length === 0 ? `<p style="font-size:12px;color:var(--text-secondary);text-align:center;padding:24px 0;"><i class="fa-regular fa-circle-check" style="font-size:24px;display:block;margin-bottom:8px;opacity:.3;"></i>Fila vazia</p>` :
+        `<div style="display:flex;flex-direction:column;gap:6px;">
+          ${aguardando.map(s => {
+            const cor = FILA_TIPO_COR[s.tipo] || '#6366f1';
+            return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--bg-main);border:1px solid var(--border-color);">
+              <div style="font-size:16px;font-weight:800;color:${cor};min-width:54px;">${_esc2(s.numero)}</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:11px;font-weight:600;color:var(--text-secondary);">${FILA_TIPO_LABEL[s.tipo] || s.tipo}</div>
+                <div style="font-size:10px;color:var(--text-secondary);opacity:.6;">${new Date(s.geradaEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+              </div>
+              <div style="display:flex;gap:5px;">
+                ${podeChamar ? `<button onclick="chamarSenhaEspecifica('${s.id}')" title="Chamar agora"
+                  style="padding:5px 9px;border-radius:7px;border:none;background:${cor};color:#fff;cursor:pointer;font-size:11px;font-family:inherit;">
+                  <i class="fa-solid fa-bell"></i>
+                </button>` : ''}
+                <button onclick="imprimirSenhaNovamente('${s.id}')" title="Reimprimir"
+                  style="padding:5px 9px;border-radius:7px;border:1px solid var(--border-color);background:transparent;color:var(--text-secondary);cursor:pointer;font-size:11px;font-family:inherit;">
+                  <i class="fa-solid fa-print"></i>
+                </button>
+                <button onclick="cancelarSenha('${s.id}')" title="Cancelar"
+                  style="padding:5px 9px;border-radius:7px;border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.08);color:#ef4444;cursor:pointer;font-size:11px;font-family:inherit;">
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`}
+    </div>
+
+    <!-- Histórico de chamadas -->
+    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:14px;padding:20px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;">
+        <i class="fa-solid fa-clock-rotate-left" style="color:#6366f1;"></i> Chamadas Recentes
+      </div>
+      ${historico.length === 0 ? `<p style="font-size:12px;color:var(--text-secondary);text-align:center;padding:16px 0;">Nenhuma chamada ainda</p>` :
+        historico.map(s => {
+          const cor = FILA_TIPO_COR[s.tipo] || '#6366f1';
+          const hora = s.chamadaEm ? new Date(s.chamadaEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '—';
+          return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-color);">
+            <div style="font-size:14px;font-weight:800;color:${cor};min-width:50px;">${_esc2(s.numero)}</div>
+            <div style="flex:1;">
+              <div style="font-size:10px;font-weight:600;color:var(--text-secondary);">${FILA_TIPO_LABEL[s.tipo] || s.tipo}</div>
+            </div>
+            <div style="font-size:10px;color:var(--text-secondary);">${hora}</div>
+            <span style="font-size:9px;padding:2px 6px;border-radius:6px;${s.status==='atendida' ? 'background:rgba(16,185,129,0.12);color:#10b981;' : 'background:rgba(99,102,241,0.1);color:#6366f1;'}">
+              ${s.status === 'atendida' ? 'Atendida' : 'Chamada'}
+            </span>
+          </div>`;
+        }).join('')}
+    </div>
+  </div>`;
+}
+
+// ==========================================================================
 // BLOQUEIO DE FICHA DP
 // ==========================================================================
 
@@ -6234,4 +6870,301 @@ window.toggleQrMeuPainel = function(id) {
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 };
 
+// ==========================================================================
+// ABA: CONFIGURAÇÕES DO SISTEMA (SOMENTE ADMIN)
+// ==========================================================================
+
+// Definição dos campos padrão do formulário de Nova Vaga (para renomear labels)
+const CAMPOS_PADRAO_VAGA = [
+  { id: 'empresa',    label: 'Empresa Parceira',                      obrigatorio: true  },
+  { id: 'cargo',      label: 'Cargo / Ocupação',                      obrigatorio: true  },
+  { id: 'codigo',     label: 'Código da Unidade / Filial',            obrigatorio: true  },
+  { id: 'salario',    label: 'Salário (R$)',                          obrigatorio: true  },
+  { id: 'quantidade', label: 'Quantidade de Vagas Disponíveis',       obrigatorio: true  },
+  { id: 'local',      label: 'Local de Trabalho',                     obrigatorio: true  },
+  { id: 'beneficios', label: 'Benefícios (Separados por vírgula)',    obrigatorio: true  },
+  { id: 'fretado',    label: 'Linhas de Fretado',                     obrigatorio: false },
+  { id: 'escala',     label: 'Escala da Vaga',                        obrigatorio: false },
+  { id: 'turnos',     label: 'Turnos disponíveis',                    obrigatorio: false },
+  { id: 'desc',       label: 'Descrição Breve da Oportunidade',       obrigatorio: true  },
+];
+
+function renderConfiguracoes() {
+  if (!loggedUser || (loggedUser.departamento !== 'administracao' && loggedUser.login !== 'joaobalaf')) return;
+
+  const cfg = state.vagaFormConfig || { renomes: {}, camposExtras: [] };
+
+  // ── Bloco 1: Renomear labels dos campos padrão ────────────────────────
+  const listaRenomes = document.getElementById('renomes-campos-lista');
+  if (listaRenomes) {
+    listaRenomes.innerHTML = CAMPOS_PADRAO_VAGA.map(campo => {
+      const valorAtual = cfg.renomes[campo.id] || campo.label;
+      return `
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:center; padding:10px 14px; background:var(--bg-main); border:1px solid var(--border-color); border-radius:8px;">
+          <div>
+            <div style="font-size:11px; font-weight:700; color:var(--text-secondary); margin-bottom:2px; text-transform:uppercase; letter-spacing:.5px;">Nome Padrão</div>
+            <div style="font-size:13px; color:var(--text-primary); font-weight:500;">${campo.label} ${campo.obrigatorio ? '<span style="color:#ef4444;">*</span>' : ''}</div>
+          </div>
+          <div>
+            <div style="font-size:11px; font-weight:700; color:var(--text-secondary); margin-bottom:4px; text-transform:uppercase; letter-spacing:.5px;">Nome Personalizado</div>
+            <input type="text" id="renome-campo-${campo.id}" class="form-control" value="${valorAtual}" placeholder="${campo.label}" style="font-size:13px;">
+          </div>
+        </div>`;
+    }).join('');
+
+    // Listener do botão salvar renomes
+    const btnSalvar = document.getElementById('btn-salvar-renomes');
+    if (btnSalvar) {
+      // Remove listener anterior se houver
+      const novo = btnSalvar.cloneNode(true);
+      btnSalvar.parentNode.replaceChild(novo, btnSalvar);
+      novo.addEventListener('click', salvarRenomesVaga);
+    }
+  }
+
+  // ── Bloco 2: Adicionar novo campo ──────────────────────────────────────
+  const btnAdicionar = document.getElementById('btn-adicionar-campo-vaga');
+  if (btnAdicionar) {
+    const novo = btnAdicionar.cloneNode(true);
+    btnAdicionar.parentNode.replaceChild(novo, btnAdicionar);
+    novo.addEventListener('click', adicionarCampoVaga);
+  }
+
+  // ── Bloco 3: Listar campos extras já adicionados ───────────────────────
+  renderListaCamposExtras();
+}
+
+function salvarRenomesVaga() {
+  const cfg = state.vagaFormConfig || { renomes: {}, camposExtras: [] };
+  CAMPOS_PADRAO_VAGA.forEach(campo => {
+    const el = document.getElementById(`renome-campo-${campo.id}`);
+    if (el) cfg.renomes[campo.id] = el.value.trim() || campo.label;
+  });
+  state.vagaFormConfig = cfg;
+  saveState();
+  // Atualizar labels no modal de nova vaga dinamicamente
+  atualizarLabelsModalVaga();
+  mostrarToastSucesso('Nomes dos campos salvos com sucesso!');
+}
+
+function atualizarLabelsModalVaga() {
+  const cfg = state.vagaFormConfig || { renomes: {} };
+  const map = {
+    'empresa':    '[for="vaga-add-empresa"]',
+    'cargo':      '[for="vaga-add-cargo"]',
+    'codigo':     '[for="vaga-add-codigo"]',
+    'salario':    '[for="vaga-add-salario"]',
+    'quantidade': '[for="vaga-add-quantidade"]',
+    'local':      '[for="vaga-add-local"]',
+    'beneficios': '[for="vaga-add-beneficios"]',
+    'fretado':    '[for="vaga-add-linhas-fretado"]',
+    'escala':     '[for="vaga-add-escala"]',
+    'turnos':     '[for="vaga-add-turnos"]',
+    'desc':       '[for="vaga-add-desc"]',
+  };
+  CAMPOS_PADRAO_VAGA.forEach(campo => {
+    const el = document.querySelector(map[campo.id]);
+    if (el && cfg.renomes[campo.id]) {
+      // Preserva o asterisco de obrigatorio se houver
+      const obrStr = campo.obrigatorio ? ' *' : '';
+      el.textContent = cfg.renomes[campo.id] + obrStr;
+    }
+  });
+}
+
+function adicionarCampoVaga() {
+  const labelEl = document.getElementById('novo-campo-label');
+  const tipoEl  = document.getElementById('novo-campo-tipo');
+  const optsEl  = document.getElementById('novo-campo-opcoes');
+  const obrEl   = document.getElementById('novo-campo-obrigatorio');
+
+  const label = labelEl ? labelEl.value.trim() : '';
+  const tipo  = tipoEl  ? tipoEl.value           : 'text';
+
+  if (!label) { alert('Digite o nome do campo antes de adicionar.'); return; }
+
+  const cfg = state.vagaFormConfig || { renomes: {}, camposExtras: [] };
+  const id  = 'ce_' + Date.now();
+
+  const novoCampo = {
+    id,
+    label,
+    tipo,
+    obrigatorio: obrEl ? obrEl.checked : false,
+    opcoes: (tipo === 'select' || tipo === 'checkbox-group')
+      ? (optsEl ? optsEl.value.split('\n').map(o => o.trim()).filter(Boolean) : [])
+      : []
+  };
+
+  cfg.camposExtras.push(novoCampo);
+  state.vagaFormConfig = cfg;
+  saveState();
+
+  // Limpar formulário
+  if (labelEl) labelEl.value = '';
+  if (optsEl)  optsEl.value  = '';
+  if (obrEl)   obrEl.checked = false;
+
+  renderListaCamposExtras();
+  injetarCamposExtrasNoForm();
+  mostrarToastSucesso(`Campo "${novoCampo.label}" adicionado com sucesso!`);
+}
+
+function removerCampoVaga(campoId) {
+  const cfg = state.vagaFormConfig || { renomes: {}, camposExtras: [] };
+  const campo = cfg.camposExtras.find(c => c.id === campoId);
+  if (!campo) return;
+  if (!confirm(`Remover o campo "${campo.label}"? Esta ação não pode ser desfeita.`)) return;
+  cfg.camposExtras = cfg.camposExtras.filter(c => c.id !== campoId);
+  state.vagaFormConfig = cfg;
+  saveState();
+  renderListaCamposExtras();
+  injetarCamposExtrasNoForm();
+  mostrarToastSucesso('Campo removido.');
+}
+window.removerCampoVaga = removerCampoVaga;
+
+function renderListaCamposExtras() {
+  const cfg      = state.vagaFormConfig || { renomes: {}, camposExtras: [] };
+  const lista    = document.getElementById('campos-extras-lista');
+  const badge    = document.getElementById('campos-extras-count-badge');
+  const count    = cfg.camposExtras.length;
+
+  if (badge) badge.textContent = `${count} campo${count !== 1 ? 's' : ''} extra${count !== 1 ? 's' : ''}`;
+
+  if (!lista) return;
+
+  if (count === 0) {
+    lista.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-secondary); font-size:13px;">
+      <i class="fa-solid fa-inbox" style="font-size:28px; margin-bottom:8px; display:block; opacity:.4;"></i>
+      Nenhum campo extra adicionado ainda. Use o formulário acima para criar novos campos.
+    </div>`;
+    return;
+  }
+
+  const tipoLabels = { text: 'Texto', number: 'Número', textarea: 'Texto Longo', select: 'Seleção', date: 'Data', 'checkbox-group': 'Múltipla Escolha' };
+
+  lista.innerHTML = cfg.camposExtras.map((campo, idx) => `
+    <div style="display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; padding:12px 14px; background:var(--bg-main); border:1px solid var(--border-color); border-radius:8px; margin-bottom:8px;">
+      <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+        <div style="width:28px; height:28px; border-radius:8px; background:rgba(59,130,246,0.12); color:#3b82f6; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">${idx + 1}</div>
+        <div>
+          <div style="font-size:13px; font-weight:700; color:var(--text-primary);">${campo.label} ${campo.obrigatorio ? '<span style="color:#ef4444; font-size:11px;">*Obrigatório</span>' : '<span style="color:var(--text-secondary); font-size:11px;">Opcional</span>'}</div>
+          <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">
+            Tipo: <strong>${tipoLabels[campo.tipo] || campo.tipo}</strong>
+            ${campo.opcoes && campo.opcoes.length ? ` · ${campo.opcoes.length} opção(ões)` : ''}
+          </div>
+        </div>
+      </div>
+      <button onclick="removerCampoVaga('${campo.id}')"
+        style="padding:6px 12px; border-radius:7px; border:1px solid rgba(239,68,68,0.3); background:rgba(239,68,68,0.08); color:#ef4444; font-size:12px; cursor:pointer; white-space:nowrap; font-family:inherit; display:flex; align-items:center; gap:5px;">
+        <i class="fa-solid fa-trash-can"></i> Remover
+      </button>
+    </div>
+  `).join('');
+}
+
+// Injeta os campos extras no formulário de nova vaga (antes de abrir)
+function injetarCamposExtrasNoForm() {
+  const cfg  = state.vagaFormConfig || { renomes: {}, camposExtras: [] };
+  const form = document.getElementById('form-nova-vaga');
+  if (!form) return;
+
+  // Remove campos extras já injetados
+  form.querySelectorAll('.campo-extra-injetado').forEach(el => el.remove());
+
+  // Atualiza os labels dos campos padrão com os renomes salvos
+  atualizarLabelsModalVaga();
+
+  if (!cfg.camposExtras || cfg.camposExtras.length === 0) return;
+
+  // Ponto de inserção: antes do modal-footer
+  const footer = form.querySelector('.modal-footer');
+  if (!footer) return;
+
+  cfg.camposExtras.forEach(campo => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'form-group campo-extra-injetado';
+    wrapper.style.marginBottom = '14px';
+
+    const obrigStr = campo.obrigatorio ? ' *' : '';
+    let inputHtml = '';
+
+    if (campo.tipo === 'textarea') {
+      inputHtml = `<textarea id="vaga-extra-${campo.id}" class="form-control" rows="3" ${campo.obrigatorio ? 'required' : ''} placeholder="Preencha ${campo.label}..."></textarea>`;
+    } else if (campo.tipo === 'select') {
+      const opts = campo.opcoes.map(o => `<option value="${o}">${o}</option>`).join('');
+      inputHtml = `<select id="vaga-extra-${campo.id}" class="form-control" ${campo.obrigatorio ? 'required' : ''}>
+        <option value="">Selecione...</option>${opts}
+      </select>`;
+    } else if (campo.tipo === 'checkbox-group') {
+      const checks = campo.opcoes.map(o =>
+        `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+          <input type="checkbox" name="vaga-extra-${campo.id}" value="${o}"> ${o}
+        </label>`
+      ).join('');
+      inputHtml = `<div style="display:flex;flex-wrap:wrap;gap:10px;padding:12px;background:var(--bg-main);border:1px solid var(--border-color);border-radius:8px;">${checks}</div>`;
+    } else {
+      inputHtml = `<input type="${campo.tipo}" id="vaga-extra-${campo.id}" class="form-control" ${campo.obrigatorio ? 'required' : ''} placeholder="Preencha ${campo.label}...">`;
+    }
+
+    wrapper.innerHTML = `
+      <label for="vaga-extra-${campo.id}" style="display:flex;align-items:center;gap:6px;">
+        <span style="background:rgba(59,130,246,0.1);color:#3b82f6;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:700;">EXTRA</span>
+        ${campo.label}${obrigStr}
+      </label>
+      ${inputHtml}`;
+
+    form.querySelector('.modal-body').insertBefore(wrapper, footer);
+  });
+}
+
+// Mostra/oculta a caixa de opções para select e checkbox-group
+function atualizarPreviewNovoCampo() {
+  const tipo = document.getElementById('novo-campo-tipo')?.value;
+  const box  = document.getElementById('novo-campo-opcoes-box');
+  if (box) box.style.display = (tipo === 'select' || tipo === 'checkbox-group') ? 'block' : 'none';
+}
+
+// Helper toast reutilizável
+function mostrarToastSucesso(msg) {
+  const toast = document.getElementById('modern-toast');
+  const txt   = document.getElementById('modern-toast-text');
+  if (!toast) return;
+  if (txt) txt.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// Máscara CNPJ: 00.000.000/0000-00
+function mascaraCNPJ(input) {
+  let v = input.value.replace(/\D/g, '').slice(0, 14);
+  v = v.replace(/^(\d{2})(\d)/, '$1.$2');
+  v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+  v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
+  v = v.replace(/(\d{4})(\d)/, '$1-$2');
+  input.value = v;
+}
+window.mascaraCNPJ = mascaraCNPJ;
+
+// Máscara CEP: 00000-000
+function mascaraCEPCliente(input) {
+  let v = input.value.replace(/\D/g, '').slice(0, 8);
+  v = v.replace(/^(\d{5})(\d)/, '$1-$2');
+  input.value = v;
+}
+window.mascaraCEPCliente = mascaraCEPCliente;
+
+// Injetar campos ao abrir o modal de nova vaga
+(function patchBtnNovaVaga() {
+  const orig = window.fecharModalVaga;
+  // Patch no evento de abertura do botão nova vaga (chamado em setupEventListeners)
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('#btn-nova-vaga');
+    if (btn) {
+      // Aguarda o modal abrir e injeta campos
+      requestAnimationFrame(() => injetarCamposExtrasNoForm());
+    }
+  }, true);
+})();
 

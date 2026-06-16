@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>R&T EMPREGOS — Painel de Senhas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --red:   #cc1034;
+      --red2:  #ff1744;
+      --dark:  #0d0d0d;
+      --mid:   #1e1e2e;
+      --white: #ffffff;
+      --off:   #f7f8fc;
+      --muted: #94a3b8;
+      --sel:   #7c3aed;
+      --dp:    #0284c7;
+      --gen:   #d97706;
+      --border:#e2e8f0;
+    }
+
+    html, body {
+      height: 100%; width: 100%; overflow: hidden;
+      font-family: 'Poppins', 'Segoe UI', sans-serif;
+      background: var(--off);
+    }
+
+    /* ══════════════════════════════════════════════════
+       HEADER
+    ══════════════════════════════════════════════════ */
+    header {
+      height: 100px;
+      background: var(--white);
+      border-bottom: 4px solid var(--red);
+      display: flex;
+      align-items: center;
+      padding: 0 40px;
+      gap: 24px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+      z-index: 10;
+      position: relative;
+    }
+
+    .logo-img {
+      height: 76px;
+      width: auto;
+      object-fit: contain;
+      flex-shrink: 0;
+      filter: drop-shadow(0 2px 6px rgba(204,16,52,.2));
+    }
+
+    .h-sep { width: 2px; height: 52px; background: var(--border); flex-shrink: 0; }
+
+    .h-brand { flex: 1; }
+    .h-name {
+      font-size: 22px; font-weight: 900; color: var(--dark);
+      letter-spacing: -.3px; line-height: 1.1;
+    }
+    .h-name em { color: var(--red); font-style: normal; }
+    .h-sub {
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      letter-spacing: 2.5px; text-transform: uppercase; margin-top: 3px;
+    }
+
+    .h-clock-wrap { text-align: right; flex-shrink: 0; }
+    .h-clock {
+      font-size: 46px; font-weight: 800; color: var(--dark);
+      font-variant-numeric: tabular-nums; line-height: 1;
+    }
+    .h-date {
+      font-size: 11px; font-weight: 500; color: var(--muted);
+      margin-top: 2px; text-transform: capitalize;
+    }
+
+    /* ══════════════════════════════════════════════════
+       BODY
+    ══════════════════════════════════════════════════ */
+    .body {
+      display: flex;
+      height: calc(100vh - 100px - 52px);
+    }
+
+    /* ══════════════════════════════════════════════════
+       PAINEL ESQUERDO — SENHA ATUAL
+    ══════════════════════════════════════════════════ */
+    .left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      background: var(--white);
+      overflow: hidden;
+    }
+
+    /* Círculo decorativo atrás do card */
+    .left::before {
+      content: '';
+      position: absolute;
+      width: 700px; height: 700px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(204,16,52,.06) 0%, transparent 70%);
+      top: 50%; left: 50%;
+      transform: translate(-50%, -55%);
+      pointer-events: none;
+    }
+    .left::after {
+      content: '';
+      position: absolute;
+      width: 380px; height: 380px;
+      border-radius: 50%;
+      border: 2px dashed rgba(204,16,52,.08);
+      top: 50%; left: 50%;
+      transform: translate(-50%, -52%);
+      pointer-events: none;
+      animation: spin 40s linear infinite;
+    }
+
+    .atendendo-label {
+      font-size: 12px; font-weight: 700;
+      letter-spacing: 5px; text-transform: uppercase;
+      color: var(--red); margin-bottom: 28px;
+      display: flex; align-items: center; gap: 14px;
+      position: relative; z-index: 1;
+    }
+    .atendendo-label::before,
+    .atendendo-label::after {
+      content: '';
+      display: block; height: 2px; width: 48px;
+      background: linear-gradient(to right, transparent, var(--red));
+    }
+    .atendendo-label::after {
+      background: linear-gradient(to left, transparent, var(--red));
+    }
+
+    /* Card principal da senha */
+    .ticket-card {
+      position: relative; z-index: 1;
+      background: var(--white);
+      border-radius: 32px;
+      padding: 36px 80px 32px;
+      box-shadow:
+        0 0 0 3px var(--red),
+        0 20px 80px rgba(204,16,52,.18),
+        0 4px 20px rgba(0,0,0,.06);
+      text-align: center;
+      animation: popIn .5s cubic-bezier(.175,.885,.32,1.275) both;
+      min-width: 420px;
+    }
+    .ticket-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 6px;
+      background: linear-gradient(to right, var(--red), #ff4d6d);
+      border-radius: 32px 32px 0 0;
+    }
+
+    .tc-dept {
+      font-size: 11px; font-weight: 700; letter-spacing: 3px;
+      text-transform: uppercase; color: var(--red); margin-bottom: 4px;
+    }
+    .tc-num {
+      font-size: clamp(88px, 15vw, 172px);
+      font-weight: 900; line-height: .95;
+      color: var(--dark); letter-spacing: -6px;
+    }
+    .tc-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 14px; padding: 7px 22px;
+      border-radius: 50px; font-size: 12px; font-weight: 700;
+      letter-spacing: 1.5px; text-transform: uppercase;
+    }
+    .b-sel { background:#ede9fe; color:#5b21b6; border:1.5px solid #c4b5fd; }
+    .b-dp  { background:#e0f2fe; color:#075985; border:1.5px solid #7dd3fc; }
+    .b-gen { background:#fef3c7; color:#92400e; border:1.5px solid #fcd34d; }
+    .b-red { background:rgba(204,16,52,.1); color:var(--red); border:1.5px solid rgba(204,16,52,.3); }
+
+    .tc-nome {
+      margin-top: 18px;
+      font-size: clamp(18px, 2.8vw, 34px);
+      font-weight: 700; color: #334155;
+      max-width: 480px; line-height: 1.2;
+    }
+
+    .idle-wrap {
+      text-align: center; color: var(--muted);
+      position: relative; z-index: 1;
+    }
+    .idle-wrap .idle-ring {
+      width: 120px; height: 120px; border-radius: 50%;
+      border: 3px solid var(--border); display: flex;
+      align-items: center; justify-content: center;
+      margin: 0 auto 20px; font-size: 48px; color: var(--border);
+      animation: breathe 3s ease-in-out infinite;
+    }
+    .idle-txt { font-size: 18px; font-weight: 600; letter-spacing: 2px; color: var(--muted); }
+
+    /* ══════════════════════════════════════════════════
+       PAINEL DIREITO
+    ══════════════════════════════════════════════════ */
+    .right {
+      width: 340px;
+      background: var(--off);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .r-section {
+      padding: 16px 18px 10px;
+      flex-shrink: 0;
+    }
+    .r-title {
+      font-size: 9px; font-weight: 700;
+      letter-spacing: 3px; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 10px;
+      display: flex; align-items: center; gap: 7px;
+    }
+    .r-title i { font-size: 10px; }
+
+    /* Lista da fila */
+    .fila-list {
+      flex: 1; overflow-y: auto; padding: 0 18px 10px;
+      scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+    }
+    .fila-list::-webkit-scrollbar { width: 4px; }
+    .fila-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .fi {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-left-width: 4px;
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 6px;
+      animation: slideIn .3s ease both;
+      transition: transform .2s;
+    }
+    .fi:hover { transform: translateX(-3px); }
+    .fi-sel  { border-left-color: var(--sel); }
+    .fi-dp   { border-left-color: var(--dp); }
+    .fi-gen  { border-left-color: var(--gen); }
+
+    .fi-info { flex: 1; min-width: 0; }
+    .fi-nome {
+      font-size: 11px; font-weight: 600; color: var(--dark);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .fi-dept { font-size: 9px; color: var(--muted); margin-top: 1px; }
+    .fi-num  { font-size: 16px; font-weight: 800; color: var(--dark); flex-shrink: 0; }
+    .fi-time { font-size: 9px; color: var(--muted); flex-shrink: 0; }
+
+    /* Divisor */
+    .r-sep { height: 1px; background: var(--border); margin: 4px 0; flex-shrink: 0; }
+
+    /* Histórico */
+    .hist-list {
+      padding: 0 18px 12px;
+      overflow-y: auto; max-height: 200px;
+      scrollbar-width: none;
+    }
+    .hist-list::-webkit-scrollbar { display: none; }
+    .hi {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 0; border-bottom: 1px solid var(--border);
+      font-size: 11px;
+    }
+    .hi:last-child { border-bottom: none; }
+    .hi-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .hi-num { font-weight: 800; color: var(--dark); min-width: 48px; font-size: 12px; }
+    .hi-nome { flex: 1; color: var(--muted); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hi-hr { font-size: 10px; color: var(--muted); flex-shrink: 0; }
+    .hi-ok { font-size: 9px; padding: 2px 7px; border-radius: 50px; background: #dcfce7; color: #166534; flex-shrink: 0; }
+    .hi-call { font-size: 9px; padding: 2px 7px; border-radius: 50px; background: #ede9fe; color: #5b21b6; flex-shrink: 0; }
+
+    .empty-msg {
+      text-align: center; color: var(--muted);
+      font-size: 11px; padding: 20px 0;
+    }
+    .empty-msg i { display: block; font-size: 22px; margin-bottom: 6px; opacity: .4; }
+
+    /* ══════════════════════════════════════════════════
+       FOOTER TICKER
+    ══════════════════════════════════════════════════ */
+    footer {
+      height: 52px; flex-shrink: 0;
+      background: var(--dark);
+      display: flex; align-items: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .ft-badge {
+      flex-shrink: 0;
+      background: var(--red);
+      height: 100%;
+      display: flex; align-items: center;
+      padding: 0 24px;
+      font-size: 11px; font-weight: 700;
+      color: #fff; letter-spacing: 2px;
+      text-transform: uppercase; white-space: nowrap;
+    }
+
+    .ft-ticker {
+      flex: 1;
+      overflow: hidden;
+      padding: 0 20px;
+      height: 100%;
+      display: flex; align-items: center;
+    }
+    .ft-inner {
+      display: flex; gap: 40px; align-items: center;
+      animation: ticker 20s linear infinite;
+      white-space: nowrap;
+    }
+    .ft-inner:hover { animation-play-state: paused; }
+    .ft-item {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; color: rgba(255,255,255,.5);
+    }
+    .ft-item strong { color: rgba(255,255,255,.85); font-weight: 700; }
+    .ft-dot { width: 5px; height: 5px; border-radius: 50%; }
+
+    /* ══════════════════════════════════════════════════
+       ANIMAÇÕES
+    ══════════════════════════════════════════════════ */
+    @keyframes popIn {
+      0%   { opacity: 0; transform: scale(.8) translateY(30px); }
+      70%  { transform: scale(1.03) translateY(-4px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(18px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes spin {
+      from { transform: translate(-50%,-52%) rotate(0deg); }
+      to   { transform: translate(-50%,-52%) rotate(360deg); }
+    }
+    @keyframes breathe {
+      0%,100% { transform: scale(1); opacity: .6; }
+      50%     { transform: scale(1.06); opacity: 1; }
+    }
+    @keyframes ticker {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    @keyframes glow {
+      0%,100% { box-shadow: 0 0 0 3px var(--red), 0 20px 80px rgba(204,16,52,.18); }
+      50%     { box-shadow: 0 0 0 3px var(--red), 0 20px 100px rgba(204,16,52,.4), 0 0 60px rgba(204,16,52,.2); }
+    }
+    .card-glow { animation: popIn .5s cubic-bezier(.175,.885,.32,1.275) both, glow 2.2s ease .6s 3; }
+
+    /* cores dots */
+    .d-sel { background: var(--sel); }
+    .d-dp  { background: var(--dp); }
+    .d-gen { background: var(--gen); }
+    .d-red { background: var(--red); }
+  </style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══════════════════════════════════════════════════════ -->
+<header>
+  <img src="img/logo-rt.png" alt="R&T Empregos" class="logo-img">
+  <div class="h-sep"></div>
+  <div class="h-brand">
+    <div class="h-name">R<em>&</em>T EMPREGOS</div>
+    <div class="h-sub">Painel de Atendimento</div>
+  </div>
+  <div class="h-clock-wrap">
+    <div class="h-clock" id="disp-clock">--:--</div>
+    <div class="h-date" id="disp-date"></div>
+  </div>
+</header>
+
+<!-- ═══ BODY ══════════════════════════════════════════════════════════ -->
+<div class="body">
+
+  <!-- Senha atual -->
+  <div class="left" id="left-area">
+    <div class="idle-wrap">
+      <div class="idle-ring"><i class="fa-regular fa-clock"></i></div>
+      <div class="idle-txt">Aguardando chamadas</div>
+    </div>
+  </div>
+
+  <!-- Painel da fila -->
+  <div class="right">
+    <div class="r-section">
+      <div class="r-title"><i class="fa-solid fa-hourglass-half"></i> Em Espera</div>
+    </div>
+
+    <div class="fila-list" id="fila-list">
+      <div class="empty-msg"><i class="fa-regular fa-circle-check"></i>Fila vazia</div>
+    </div>
+
+    <div class="r-sep"></div>
+
+    <div class="r-section" style="padding-bottom:6px;">
+      <div class="r-title"><i class="fa-solid fa-clock-rotate-left"></i> Chamadas Recentes</div>
+    </div>
+
+    <div class="hist-list" id="hist-list">
+      <div class="empty-msg">Nenhuma chamada</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ FOOTER TICKER ═════════════════════════════════════════════════ -->
+<footer>
+  <div class="ft-badge"><i class="fa-solid fa-ticket" style="margin-right:8px;"></i>R&T SENHAS</div>
+  <div class="ft-ticker">
+    <div class="ft-inner" id="ft-inner">
+      <div class="ft-item"><span style="color:rgba(255,255,255,.3);">—</span></div>
+    </div>
+  </div>
+</footer>
+
+<script src="js/supabase-sync.js"></script>
+<script>
+  /* ── Relógio ─────────────────────────────────────────────────── */
+  function tick() {
+    const n = new Date();
+    document.getElementById('disp-clock').textContent =
+      n.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('disp-date').textContent =
+      n.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  }
+  tick(); setInterval(tick, 1000);
+
+  /* ── Carregar estado ──────────────────────────────────────────── */
+  function load() {
+    try { const r=localStorage.getItem('rt_empregos_data'); return r?JSON.parse(r):null; }
+    catch { return null; }
+  }
+
+  /* ── Voz ─────────────────────────────────────────────────────── */
+  let _lid = null;
+  function speak(num, nome, tipo) {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const dept = tipo==='selecao'?'balcão de Seleção':tipo==='dp'?'Departamento Pessoal':'atendimento';
+    const txt = nome
+      ? `Senha ${num.replace('-',' ')}. ${nome}. Por favor, dirija-se ao ${dept}.`
+      : `Senha ${num.replace('-',' ')}. Por favor, dirija-se ao ${dept}.`;
+    function say() {
+      const u = new SpeechSynthesisUtterance(txt);
+      u.lang='pt-BR'; u.rate=.88; u.pitch=1; u.volume=1;
+      const vs = window.speechSynthesis.getVoices();
+      const v = vs.find(x=>x.lang==='pt-BR')||vs.find(x=>x.lang.startsWith('pt'));
+      if (v) u.voice=v;
+      window.speechSynthesis.speak(u);
+    }
+    say(); setTimeout(say, 3800);
+  }
+
+  /* ── Labels / classes ─────────────────────────────────────────── */
+  const LBL  = {selecao:'Seleção', dp:'Depto. Pessoal', geral:'Geral'};
+  const LLBL = {selecao:'SELEÇÃO', dp:'DEPTO. PESSOAL', geral:'GERAL'};
+  const BCLS = {selecao:'b-sel', dp:'b-dp', geral:'b-gen'};
+  const FICLS= {selecao:'fi-sel', dp:'fi-dp', geral:'fi-gen'};
+  const DCLS = {selecao:'d-sel', dp:'d-dp',  geral:'d-gen'};
+  const COR  = {selecao:'#7c3aed', dp:'#0284c7', geral:'#d97706'};
+
+  /* ── Render ───────────────────────────────────────────────────── */
+  function render(state) {
+    if (!state?.fila) return;
+    const f = state.fila;
+    const uc = f.ultimaChamada;
+    const pending = (f.senhas||[]).filter(s=>s.status==='aguardando');
+    const done    = [...(f.senhas||[])].filter(s=>s.status!=='aguardando')
+                    .sort((a,b)=>(b.chamadaEm||0)-(a.chamadaEm||0)).slice(0,10);
+
+    /* Senha atual */
+    const left = document.getElementById('left-area');
+    if (uc?.numero) {
+      const bc = BCLS[uc.tipo]||'b-red';
+      const nm = uc.nome ? `<div class="tc-nome">${uc.nome}</div>` : '';
+      left.innerHTML = `
+        <div class="atendendo-label">
+          <i class="fa-solid fa-bell" style="animation:breathe 1s ease-in-out 4;"></i>
+          Agora Atendendo
+        </div>
+        <div class="ticket-card card-glow">
+          <div class="tc-dept">${LLBL[uc.tipo]||uc.tipo}</div>
+          <div class="tc-num">${uc.numero}</div>
+          <span class="tc-badge ${bc}">
+            <i class="fa-solid fa-circle-dot" style="font-size:8px;"></i>
+            ${LBL[uc.tipo]||uc.tipo}
+          </span>
+          ${nm}
+        </div>`;
+    } else {
+      left.innerHTML = `
+        <div class="idle-wrap">
+          <div class="idle-ring"><i class="fa-regular fa-clock"></i></div>
+          <div class="idle-txt">Aguardando chamadas</div>
+        </div>`;
+    }
+
+    /* Fila de espera */
+    const fl = document.getElementById('fila-list');
+    if (pending.length === 0) {
+      fl.innerHTML = '<div class="empty-msg"><i class="fa-regular fa-circle-check"></i>Fila vazia</div>';
+    } else {
+      fl.innerHTML = pending.slice(0,14).map((s,i) => {
+        const hr = new Date(s.geradaEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+        return `<div class="fi ${FICLS[s.tipo]||'fi-sel'}" style="animation-delay:${i*40}ms">
+          <div class="fi-info">
+            <div class="fi-nome">${s.nome||'—'}</div>
+            <div class="fi-dept">${LBL[s.tipo]||s.tipo}</div>
+          </div>
+          <div class="fi-time">${hr}</div>
+          <div class="fi-num">${s.numero}</div>
+        </div>`;
+      }).join('');
+    }
+
+    /* Histórico */
+    const hl = document.getElementById('hist-list');
+    if (done.length === 0) {
+      hl.innerHTML = '<div class="empty-msg">Nenhuma chamada</div>';
+    } else {
+      hl.innerHTML = done.map(s => {
+        const hr = s.chamadaEm ? new Date(s.chamadaEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '—';
+        const st = s.status==='atendida'
+          ? '<span class="hi-ok">Atendido</span>'
+          : '<span class="hi-call">Chamado</span>';
+        return `<div class="hi">
+          <div class="hi-dot ${DCLS[s.tipo]||'d-red'}"></div>
+          <div class="hi-num">${s.numero}</div>
+          <div class="hi-nome">${s.nome||LBL[s.tipo]||'—'}</div>
+          <div class="hi-hr">${hr}</div>
+          ${st}
+        </div>`;
+      }).join('');
+    }
+
+    /* Footer ticker */
+    const all = [...pending, ...done.slice(0,6)];
+    if (all.length > 0) {
+      const items = [...all, ...all].map(s => {
+        const cor = COR[s.tipo]||'#cc1034';
+        return `<div class="ft-item">
+          <div class="ft-dot" style="background:${cor};"></div>
+          <strong>${s.numero}</strong>
+          ${s.nome ? '· ' + s.nome.split(' ').slice(0,2).join(' ') : ''}
+          <span style="opacity:.4;margin-left:4px;">${LBL[s.tipo]||''}</span>
+        </div>
+        <span style="color:rgba(255,255,255,.12);font-size:18px;line-height:1;">·</span>`;
+      }).join('');
+      document.getElementById('ft-inner').innerHTML = items;
+    } else {
+      document.getElementById('ft-inner').innerHTML =
+        '<div class="ft-item" style="opacity:.3;">Nenhuma senha na fila no momento</div>';
+    }
+  }
+
+  /* ── Detectar nova chamada ────────────────────────────────────── */
+  function check(state) {
+    const uc = state?.fila?.ultimaChamada;
+    if (!uc) return;
+    const id = uc.numero+'_'+(uc.chamadaEm||'');
+    if (id !== _lid) { _lid=id; speak(uc.numero, uc.nome, uc.tipo); }
+  }
+
+  /* ── Loop de atualização ─────────────────────────────────────── */
+  let _hash = '';
+  function refresh() {
+    const s = load(); if (!s) return;
+    const h = JSON.stringify(s.fila);
+    if (h !== _hash) { _hash=h; check(s); render(s); }
+  }
+
+  window.addEventListener('storage', e => { if(e.key==='rt_empregos_data') refresh(); });
+  refresh();
+  setInterval(refresh, 1500);
+
+  // Nuvem: recebe a fila em tempo real e atualiza o painel automaticamente
+  if (window.RTCloud && RTCloud.configured) {
+    RTCloud.init({ onRemoteUpdate: (d) => {
+      if (!d) return;
+      try { localStorage.setItem('rt_empregos_data', JSON.stringify(d)); } catch(e){}
+      refresh();
+    }}).then(async () => {
+      const nuvem = await RTCloud.loadState();
+      if (nuvem) { try { localStorage.setItem('rt_empregos_data', JSON.stringify(nuvem)); } catch(e){} refresh(); }
+    }).catch(e => console.error('[RT Nuvem]', e));
+  }
+  if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = ()=>{};
+</script>
+</body>
+</html>
