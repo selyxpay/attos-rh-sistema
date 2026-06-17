@@ -2640,168 +2640,171 @@ function aoMudarEmpresaVaga() {
 window.aoMudarEmpresaVaga = aoMudarEmpresaVaga;
 
 // ── Painel admin: Cadastros Exata (tipos de contratação) ──────────────────
+// ── Cadastro Exata = CONFIGURADOR POR VAGA (seleciona a vaga e configura os 90 campos) ──
 function renderCadastrosExata() {
   const cont = document.getElementById('cadastros-exata-conteudo');
   if (!cont) return;
   const ehAdmin = loggedUser && (loggedUser.login === 'joaobalaf' || loggedUser.departamento === 'administracao');
   if (!ehAdmin) { cont.innerHTML = '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#b91c1c;padding:16px;border-radius:12px;font-size:13px;"><i class="fa-solid fa-lock"></i> Área restrita ao administrador.</div>'; return; }
   const soJoao = !!(loggedUser && loggedUser.login === 'joaobalaf');
-  const linhas = getTiposContratacao().map(t => `
-    <tr>
-      <td style="font-weight:600;">${escapeHTML(t.nome)}</td>
-      <td>${escapeHTML(t.codigoTipoContrato || t.vinculo)}</td>
-      <td>${escapeHTML(t.vinculo)}</td>
-      <td>${escapeHTML(t.filial || '—')}</td>
-      <td>${t.diasVencimento || 0}</td>
-      <td>${t.diasProrrogacao || 0}</td>
-      <td style="display:flex;gap:6px;">
-        ${soJoao
-          ? `<button class="btn btn-secondary btn-sm" onclick="editarTipoContratacao('${t.id}')"><i class="fa-solid fa-pen"></i></button><button class="btn btn-sm" style="background:#fff1f2;color:#dc2626;border:1px solid #fca5a5;" onclick="excluirTipoContratacao('${t.id}')"><i class="fa-solid fa-trash"></i></button>`
-          : '<span style="font-size:11px;color:var(--text-secondary);">só João altera</span>'}
-      </td>
-    </tr>`).join('');
 
-  // ── Painel completo: todos os campos do TXT do Exata + tabelas de/para ──
-  const dom = getExataDominios();
+  const vagas = (state.vagas || []).filter(v => !v.excluido);
+  const vagaSel = vagas.find(v => v.id === _cadExataVagaSel) || null;
+  const vagaOpts = '<option value="">— selecione uma vaga —</option>' + vagas.map(v => `<option value="${v.id}" ${v.id === _cadExataVagaSel ? 'selected' : ''}>${escapeHTML(v.empresaNome || '')} — ${escapeHTML(v.cargo || '')}</option>`).join('');
+
   const badge = (origem) => {
     const m = {
-      tipos: ['Tipos de Contratação', '#6d28d9', '#ede9fe'],
-      vaga: ['Vaga/Seleção', '#047857', '#d1fae5'],
+      tipos: ['Vaga (contratação)', '#6d28d9', '#ede9fe'],
+      vaga: ['Configurável na vaga', '#047857', '#d1fae5'],
       ficha: ['Ficha do candidato', '#475569', '#e2e8f0'],
       auto: ['Automático', '#b45309', '#fef3c7'],
-      dominio: ['Configurável (de/para)', '#1d4ed8', '#dbeafe']
+      fichaopt: ['Ficha (opções)', '#1d4ed8', '#dbeafe']
     };
     const x = m[origem] || ['—', '#475569', '#e2e8f0'];
     return `<span style="background:${x[2]};color:${x[1]};padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;white-space:nowrap;">${x[0]}</span>`;
   };
+
+  const cfg = (vagaSel && vagaSel.exataCampos) || {};
   const mapaLinhas = EXATA_CAMPOS_INFO.map(c => {
-    let extra = '';
-    if (c.origem === 'dominio') {
-      const k = c.dominioKey || c.key;
-      extra = `<a href="#depara-${k}" style="font-size:11px;color:#1d4ed8;font-weight:600;">${(dom[k] || []).length} opção(ões) ▸</a>`;
+    const configuravel = (c.origem === 'tipos' || c.origem === 'vaga');
+    let conf = '';
+    if (configuravel && !vagaSel) {
+      conf = '<span style="font-size:11px;color:var(--text-secondary);">selecione a vaga acima</span>';
+    } else if (configuravel) {
+      const cur = cfg[c.key] || {};
+      conf = `<div style="display:flex;gap:6px;">
+        <input class="form-control" style="flex:1;font-size:12px;padding:5px 8px;" placeholder="Nome (só p/ ver)" value="${escapeHTML(cur.nome || '')}" id="cadx-nome-${c.key}">
+        <input class="form-control" style="flex:1;font-size:12px;padding:5px 8px;" placeholder="Código (vai no TXT)" value="${escapeHTML(cur.codigo || '')}" id="cadx-cod-${c.key}">
+      </div>`;
+    } else if (c.origem === 'fichaopt') {
+      conf = '<span style="font-size:11px;color:#1d4ed8;">vem da ficha (opções abaixo)</span>';
+    } else if (c.origem === 'ficha') {
+      conf = '<span style="font-size:11px;color:var(--text-secondary);">vem da ficha do candidato</span>';
+    } else {
+      conf = '<span style="font-size:11px;color:var(--text-secondary);">automático</span>';
     }
     return `<tr>
       <td style="color:var(--text-secondary);font-size:11px;">${c.pos}</td>
       <td><code style="font-size:11px;">${escapeHTML(c.key)}</code><br><span style="font-size:11px;color:var(--text-secondary);">${escapeHTML(c.titulo)}</span></td>
-      <td style="font-size:11px;">${escapeHTML(c.desc)}</td>
       <td>${badge(c.origem)}</td>
-      <td>${extra}</td>
+      <td style="min-width:240px;">${conf}</td>
     </tr>`;
   }).join('');
-  const vistos = {};
-  const deparaCards = EXATA_CAMPOS_INFO.filter(c => c.origem === 'dominio').filter(c => {
-    const k = c.dominioKey || c.key; if (vistos[k]) return false; vistos[k] = true; return true;
-  }).map(c => {
-    const k = c.dominioKey || c.key;
-    const lista = dom[k] || [];
-    const linhasDp = lista.length ? lista.map((o, idx) => `
-      <tr>
+
+  const fichaCards = [['sexo', 'Sexo'], ['raca', 'Raça/Cor'], ['escolaridade', 'Escolaridade']].map(([k, titulo]) => {
+    const opts = getOpcoesFicha(k);
+    const linhas = opts.length ? opts.map((o, idx) => `
+      <tr style="${o.ativo === false ? 'opacity:.5;' : ''}">
         <td>${escapeHTML(o.de)}</td>
-        <td style="font-weight:700;">${escapeHTML(o.codigo)}</td>
-        <td>${soJoao ? `<button class="btn btn-sm" style="background:#fff1f2;color:#dc2626;border:1px solid #fca5a5;" onclick="excluirDeParaExata('${k}',${idx})"><i class="fa-solid fa-trash"></i></button>` : '<span style="font-size:10px;color:var(--text-secondary)">só João</span>'}</td>
-      </tr>`).join('') : '<tr><td colspan="3" style="color:var(--text-secondary);font-size:12px;">Nenhuma opção cadastrada ainda.</td></tr>';
-    return `
-    <details id="depara-${k}" style="border:1px solid var(--border-color,#e2e8f0);border-radius:10px;padding:10px 12px;margin-bottom:10px;">
-      <summary style="cursor:pointer;font-weight:700;font-size:13px;">${escapeHTML(c.titulo)} <span style="font-weight:400;color:var(--text-secondary);font-size:11px;">(campo ${escapeHTML(k)}${lista.length ? ' · ' + lista.length : ''})</span></summary>
-      <p style="font-size:11px;color:var(--text-secondary);margin:8px 0;">À esquerda, o texto como está na ficha/sistema (ex.: <b>Masculino</b>). À direita, o <b>código</b> que vai no TXT do Exata.</p>
+        <td style="font-weight:700;">${escapeHTML(o.codigo || '—')}</td>
+        <td style="display:flex;gap:5px;">
+          <button class="btn btn-sm" title="${o.ativo === false ? 'Ativar' : 'Desativar'}" style="background:${o.ativo === false ? '#dcfce7' : '#fef9c3'};border:1px solid #e2e8f0;" onclick="toggleOpcaoFicha('${k}',${idx})"><i class="fa-solid fa-${o.ativo === false ? 'toggle-off' : 'toggle-on'}"></i></button>
+          <button class="btn btn-sm" title="Editar" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;" onclick="editarOpcaoFicha('${k}',${idx})"><i class="fa-solid fa-pen"></i></button>
+          ${soJoao ? `<button class="btn btn-sm" title="Excluir" style="background:#fff1f2;border:1px solid #fca5a5;color:#dc2626;" onclick="excluirOpcaoFicha('${k}',${idx})"><i class="fa-solid fa-trash"></i></button>` : ''}
+        </td>
+      </tr>`).join('') : '<tr><td colspan="3" style="color:var(--text-secondary);font-size:12px;">Sem opções.</td></tr>';
+    return `<details style="border:1px solid var(--border-color,#e2e8f0);border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+      <summary style="cursor:pointer;font-weight:700;font-size:13px;">${titulo} <span style="font-weight:400;color:var(--text-secondary);font-size:11px;">(${opts.length})</span></summary>
+      <p style="font-size:11px;color:var(--text-secondary);margin:8px 0;">Opções que aparecem na ficha do candidato. À direita, o código que vai no Exata.</p>
       <div class="table-scroll-container"><table class="excel-table" style="width:100%;">
-        <thead><tr><th>Na ficha (texto)</th><th>Código no Exata</th><th></th></tr></thead>
-        <tbody>${linhasDp}</tbody></table></div>
+        <thead><tr><th>Opção (na ficha)</th><th>Código Exata</th><th></th></tr></thead>
+        <tbody>${linhas}</tbody></table></div>
       <div class="form-group-grid" style="margin-top:8px;">
-        <div class="form-group"><label>Texto na ficha</label><input id="depara-de-${k}" class="form-control" placeholder="Ex: Masculino"></div>
-        <div class="form-group"><label>Código no Exata</label><input id="depara-cod-${k}" class="form-control" placeholder="Ex: 1"></div>
+        <div class="form-group"><label>Opção (ex.: Masculino)</label><input id="opf-de-${k}" class="form-control"></div>
+        <div class="form-group"><label>Código no Exata</label><input id="opf-cod-${k}" class="form-control"></div>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="salvarDeParaExata('${k}')"><i class="fa-solid fa-plus"></i> Adicionar opção</button>
+      <button class="btn btn-primary btn-sm" onclick="salvarOpcaoFicha('${k}')"><i class="fa-solid fa-plus"></i> Adicionar / atualizar opção</button>
     </details>`;
   }).join('');
 
   cont.innerHTML = `
+    <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+      <label for="cad-exata-vaga" style="font-weight:700;font-size:13px;color:#6d28d9;display:block;margin-bottom:6px;"><i class="fa-solid fa-briefcase"></i> Selecionar vaga</label>
+      <select id="cad-exata-vaga" class="form-control" onchange="aoSelecionarVagaExata()">${vagaOpts}</select>
+      ${vagaSel ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:6px;">Configurando: <b>${escapeHTML(vagaSel.empresaNome || '')} — ${escapeHTML(vagaSel.cargo || '')}</b>. Os códigos abaixo ficam salvos NESTA vaga.</div>` : '<div style="font-size:11px;color:var(--text-secondary);margin-top:6px;">Escolha uma vaga para configurar os códigos enviados ao Exata.</div>'}
+    </div>
+
     <div style="background:var(--card-bg,#fff);border:1px solid var(--border-color,#e2e8f0);border-radius:12px;padding:16px;margin-bottom:16px;">
-      <h4 style="margin:0 0 10px;font-size:14px;"><i class="fa-solid fa-briefcase"></i> Tipos de Contratação</h4>
-      <div class="table-scroll-container"><table class="excel-table" style="width:100%;">
-        <thead><tr><th>Tipo</th><th>Cód. contrato</th><th>Vínculo</th><th>Filial</th><th>Dias venc.</th><th>Dias prorr.</th><th>Ações</th></tr></thead>
-        <tbody>${linhas}</tbody></table></div>
-      <p style="font-size:11px;color:var(--text-secondary);margin-top:8px;">Ao criar a vaga e escolher o tipo, o sistema preenche vínculo + filial automaticamente. Para temporário, calcula vencimento/prorrogação pelos dias acima.</p>
-    </div>
-    <div style="background:var(--card-bg,#fff);border:1px solid var(--border-color,#e2e8f0);border-radius:12px;padding:16px;">
-      <h4 id="tc-form-titulo" style="margin:0 0 10px;font-size:14px;">Adicionar tipo de contratação</h4>
-      <input type="hidden" id="tc-edit-id">
-      <div class="form-group-grid">
-        <div class="form-group"><label for="tc-nome">Nome (tipo de contratação)</label><input id="tc-nome" class="form-control" placeholder="Ex: Temporário"></div>
-        <div class="form-group"><label for="tc-codigo-tipo">Código do tipo de contrato <span style="font-weight:400;color:var(--text-secondary)">(vai no TXT)</span></label><input id="tc-codigo-tipo" class="form-control" placeholder="Ex: 106"></div>
-      </div>
-      <div class="form-group-grid">
-        <div class="form-group"><label for="tc-vinculo">Código do vínculo</label><input id="tc-vinculo" class="form-control" placeholder="Ex: 106"></div>
-        <div class="form-group"><label for="tc-filial">Filial</label><input id="tc-filial" class="form-control" placeholder="Ex: 00 ou 01"></div>
-      </div>
-      <div class="form-group-grid">
-        <div class="form-group"><label for="tc-venc">Dias até vencimento (0 = sem)</label><input id="tc-venc" type="number" class="form-control" value="0"></div>
-        <div class="form-group"><label for="tc-prorr">Dias de prorrogação (0 = sem)</label><input id="tc-prorr" type="number" class="form-control" value="0"></div>
-      </div>
-      <div style="display:flex;gap:8px;"><button class="btn btn-primary btn-sm" onclick="salvarTipoContratacao()">Salvar</button><button class="btn btn-secondary btn-sm" onclick="limparFormTipoContratacao()">Limpar</button></div>
-    </div>
-
-    <div style="background:var(--card-bg,#fff);border:1px solid var(--border-color,#e2e8f0);border-radius:12px;padding:16px;margin-top:16px;">
       <h4 style="margin:0 0 4px;font-size:14px;"><i class="fa-solid fa-list-check"></i> Campos enviados ao Exata (TXT) — os 90 campos</h4>
-      <p style="font-size:12px;color:var(--text-secondary);margin:0 0 10px;">Tudo que sai no arquivo. Os campos <b>azuis</b> (Configurável) você define o <b>de/para</b> (texto da ficha → código). Os <b>cinza</b> (Ficha) já vêm preenchidos do cadastro da pessoa. Os <b>laranja</b> são automáticos.</p>
-      <div class="table-scroll-container" style="max-height:360px;overflow:auto;"><table class="excel-table" style="width:100%;">
-        <thead><tr><th>#</th><th>Campo</th><th>O que é</th><th>De onde vem</th><th></th></tr></thead>
+      <p style="font-size:12px;color:var(--text-secondary);margin:0 0 10px;">Para cada campo da VAGA, preencha <b>Nome</b> (só para você ver) e <b>Código</b> (o que vai no TXT). <b>Cinza</b> = vem da ficha do candidato; <b>laranja</b> = automático; <b>azul</b> = vem das opções da ficha (abaixo).</p>
+      <div class="table-scroll-container" style="max-height:430px;overflow:auto;"><table class="excel-table" style="width:100%;">
+        <thead><tr><th>#</th><th>Campo</th><th>Origem</th><th>Configuração (Nome / Código)</th></tr></thead>
         <tbody>${mapaLinhas}</tbody></table></div>
+      ${vagaSel ? '<div style="margin-top:12px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" onclick="salvarCamposExataVaga()"><i class="fa-solid fa-floppy-disk"></i> Salvar configuração da vaga</button></div>' : ''}
     </div>
 
-    <div style="background:var(--card-bg,#fff);border:1px solid var(--border-color,#e2e8f0);border-radius:12px;padding:16px;margin-top:16px;">
-      <h4 style="margin:0 0 4px;font-size:14px;"><i class="fa-solid fa-right-left"></i> Códigos configuráveis (de/para)</h4>
-      <p style="font-size:12px;color:var(--text-secondary);margin:0 0 12px;">Para cada campo abaixo, cadastre as opções: o que aparece na ficha e o <b>código</b> correspondente que o Exata espera. Na hora de exportar, o sistema troca o texto pelo código automaticamente.</p>
-      ${deparaCards}
+    <div style="background:var(--card-bg,#fff);border:1px solid var(--border-color,#e2e8f0);border-radius:12px;padding:16px;">
+      <h4 style="margin:0 0 4px;font-size:14px;"><i class="fa-solid fa-id-card"></i> Opções da ficha do candidato</h4>
+      <p style="font-size:12px;color:var(--text-secondary);margin:0 0 12px;">Sexo, Raça/Cor e Escolaridade aparecem como lista na ficha. Aqui você adiciona / edita / ativa / desativa as opções e define o código que vai no Exata.</p>
+      ${fichaCards}
     </div>`;
 }
-window.editarTipoContratacao = function (id) {
-  const t = getTipoContratacao(id); if (!t) return;
-  const s = (i, v) => { const e = document.getElementById(i); if (e) e.value = v; };
-  s('tc-edit-id', t.id); s('tc-nome', t.nome); s('tc-codigo-tipo', t.codigoTipoContrato || t.vinculo); s('tc-vinculo', t.vinculo); s('tc-filial', t.filial); s('tc-venc', t.diasVencimento || 0); s('tc-prorr', t.diasProrrogacao || 0);
-  const tit = document.getElementById('tc-form-titulo'); if (tit) tit.textContent = 'Editar tipo de contratação';
+window.aoSelecionarVagaExata = function () {
+  const sel = document.getElementById('cad-exata-vaga');
+  _cadExataVagaSel = sel ? sel.value : '';
+  renderCadastrosExata();
 };
-window.limparFormTipoContratacao = function () {
-  ['tc-edit-id', 'tc-nome', 'tc-codigo-tipo', 'tc-vinculo', 'tc-filial'].forEach(i => { const e = document.getElementById(i); if (e) e.value = ''; });
-  ['tc-venc', 'tc-prorr'].forEach(i => { const e = document.getElementById(i); if (e) e.value = '0'; });
-  const tit = document.getElementById('tc-form-titulo'); if (tit) tit.textContent = 'Adicionar tipo de contratação';
+window.salvarCamposExataVaga = function () {
+  const v = (state.vagas || []).find(x => x.id === _cadExataVagaSel);
+  if (!v) { alert('Selecione uma vaga.'); return; }
+  const campos = {};
+  EXATA_CAMPOS_INFO.forEach(c => {
+    if (c.origem !== 'tipos' && c.origem !== 'vaga') return;
+    const nome = ((document.getElementById('cadx-nome-' + c.key) || {}).value || '').trim();
+    const cod = ((document.getElementById('cadx-cod-' + c.key) || {}).value || '').trim();
+    if (nome || cod) campos[c.key] = { nome, codigo: cod };
+  });
+  v.exataCampos = campos;
+  if (campos.funcao && campos.funcao.codigo) v.funcaoCodigo = campos.funcao.codigo;
+  if (campos.funcao_cbo && campos.funcao_cbo.codigo) v.cbo = campos.funcao_cbo.codigo;
+  if (campos.id_empresa_exata && campos.id_empresa_exata.codigo) v.idEmpresaExata = campos.id_empresa_exata.codigo;
+  if (campos.vinculo && campos.vinculo.codigo) v.vinculo = campos.vinculo.codigo;
+  if (campos.tipo_contrato && campos.tipo_contrato.codigo) v.codigoTipoContrato = campos.tipo_contrato.codigo;
+  registrarLogGlobal(`Configurou Exata da vaga "${v.cargo} — ${v.empresaNome}".`, 'exata');
+  saveState();
+  alert('Configuração Exata salva nesta vaga. ✅');
 };
-window.salvarTipoContratacao = function () {
-  const g = i => ((document.getElementById(i) || {}).value || '');
-  const nome = g('tc-nome').trim(), vinc = g('tc-vinculo').trim(), fil = g('tc-filial').trim();
-  if (!nome || !vinc) { alert('Informe o nome e o código do vínculo.'); return; }
-  const editId = g('tc-edit-id');
-  if (editId && !(loggedUser && loggedUser.login === 'joaobalaf')) { alert('Somente o administrador João Balear pode alterar tipos existentes.'); return; }
-  const dados = { nome, vinculo: vinc, codigoTipoContrato: g('tc-codigo-tipo').trim() || vinc, filial: fil, diasVencimento: Number(g('tc-venc')) || 0, diasProrrogacao: Number(g('tc-prorr')) || 0, ativo: true };
-  const tipos = getTiposContratacao();
-  if (editId) { const t = tipos.find(x => x.id === editId); if (t) Object.assign(t, dados); registrarLogGlobal(`Editou tipo de contratação "${nome}".`, 'exata'); }
-  else { dados.id = 'tc-' + Date.now(); tipos.push(dados); registrarLogGlobal(`Adicionou tipo de contratação "${nome}".`, 'exata'); }
-  saveState(); limparFormTipoContratacao(); renderCadastrosExata();
-};
-window.excluirTipoContratacao = function (id) {
-  if (!(loggedUser && loggedUser.login === 'joaobalaf')) { alert('Somente o administrador João Balear pode excluir.'); return; }
-  if (!confirm('Excluir este tipo de contratação?')) return;
-  state.tiposContratacao = getTiposContratacao().filter(t => t.id !== id);
-  registrarLogGlobal('Excluiu um tipo de contratação.', 'exata');
+
+// ── Opções da ficha (Sexo / Raça / Escolaridade) — editáveis, com código p/ Exata ──
+function _opcoesFichaDefault(key) {
+  const d = {
+    sexo: ['Masculino', 'Feminino'],
+    raca: ['Branco', 'Pardo', 'Negro', 'Amarelo', 'Indígena'],
+    escolaridade: ['Fundamental Completo', 'Fundamental Incompleto', 'Ensino Médio Completo', 'Ensino Médio Incompleto', 'Superior Completo', 'Superior Incompleto']
+  };
+  return (d[key] || []).map(de => ({ de, codigo: '', ativo: true }));
+}
+function getOpcoesFicha(key) {
+  const dom = getExataDominios();
+  if (!dom[key] || !dom[key].length) dom[key] = _opcoesFichaDefault(key);
+  dom[key].forEach(o => { if (o.ativo === undefined) o.ativo = true; });
+  return dom[key];
+}
+function _opcoesFichaAtivas(key) { return getOpcoesFicha(key).filter(o => o.ativo !== false); }
+window.salvarOpcaoFicha = function (key) {
+  const de = ((document.getElementById('opf-de-' + key) || {}).value || '').trim();
+  const cod = ((document.getElementById('opf-cod-' + key) || {}).value || '').trim();
+  if (!de) { alert('Informe a opção (ex.: Masculino).'); return; }
+  const lista = getOpcoesFicha(key);
+  const i = lista.findIndex(o => String(o.de || '').trim().toLowerCase() === de.toLowerCase());
+  if (i >= 0) lista[i].codigo = cod; else lista.push({ de, codigo: cod, ativo: true });
+  registrarLogGlobal(`Opção da ficha "${key}": "${de}" → "${cod}".`, 'exata');
   saveState(); renderCadastrosExata();
 };
-// de/para dos campos configuráveis: texto da ficha -> código no Exata
-window.salvarDeParaExata = function (key) {
-  const de = ((document.getElementById('depara-de-' + key) || {}).value || '').trim();
-  const cod = ((document.getElementById('depara-cod-' + key) || {}).value || '').trim();
-  if (!de) { alert('Informe o texto como aparece na ficha (ex.: Masculino).'); return; }
-  const dom = getExataDominios();
-  if (!dom[key]) dom[key] = [];
-  const i = dom[key].findIndex(o => String(o.de || '').trim().toLowerCase() === de.toLowerCase());
-  if (i >= 0) dom[key][i].codigo = cod; else dom[key].push({ de, codigo: cod });
-  registrarLogGlobal(`Exata de/para "${key}": "${de}" → "${cod}".`, 'exata');
-  saveState(); renderCadastrosExata();
-  setTimeout(() => { const d = document.getElementById('depara-' + key); if (d) d.open = true; }, 0);
+window.editarOpcaoFicha = function (key, idx) {
+  const o = getOpcoesFicha(key)[idx]; if (!o) return;
+  const d = document.getElementById('opf-de-' + key); const c = document.getElementById('opf-cod-' + key);
+  if (d) d.value = o.de; if (c) c.value = o.codigo || '';
 };
-window.excluirDeParaExata = function (key, idx) {
+window.excluirOpcaoFicha = function (key, idx) {
   if (!(loggedUser && loggedUser.login === 'joaobalaf')) { alert('Somente o administrador João Balear pode excluir.'); return; }
-  const dom = getExataDominios();
-  if (dom[key]) { dom[key].splice(idx, 1); registrarLogGlobal(`Exata de/para "${key}": removeu uma opção.`, 'exata'); saveState(); renderCadastrosExata(); setTimeout(() => { const d = document.getElementById('depara-' + key); if (d) d.open = true; }, 0); }
+  const lista = getOpcoesFicha(key); lista.splice(idx, 1);
+  registrarLogGlobal(`Opção da ficha "${key}": removeu uma opção.`, 'exata');
+  saveState(); renderCadastrosExata();
+};
+window.toggleOpcaoFicha = function (key, idx) {
+  const lista = getOpcoesFicha(key); if (lista[idx]) lista[idx].ativo = lista[idx].ativo === false;
+  saveState(); renderCadastrosExata();
 };
 
 // ── EDIÇÃO de vaga já criada (reusa o mesmo formulário de "Criar Nova Vaga") ──
@@ -3019,144 +3022,12 @@ window.excluirVaga = function(vagaId) {
   renderVagasGrid();
 };
 
-// ── CONFIGURAÇÃO EXATA POR VAGA (os códigos ficam salvos NA VAGA) ──────────
-let _cfgExataVagaId = null;
-let _cfgExataExtras = [];
-let _cfgExataFuncao = { codigo: '', cbo: '', nome: '' };
-
+// ── Atalho: botão "Configurar Exata" abre a aba Cadastro Exata com a vaga já selecionada
+let _cadExataVagaSel = '';
 window.abrirConfigExata = function (vagaId) {
-  const v = (state.vagas || []).find(x => x.id === vagaId);
-  if (!v) { alert('Vaga não encontrada.'); return; }
-  _cfgExataVagaId = vagaId;
-  _cfgExataExtras = (v.exataExtras || []).map(x => ({ id: x.id || ('ex-' + Math.random().toString(36).slice(2)), campo: x.campo || '', valor: x.valor || '', ativo: x.ativo !== false }));
-  _cfgExataFuncao = { codigo: v.funcaoCodigo || '', cbo: v.cbo || '', nome: v.funcaoNome || '' };
-  _renderConfigExata(v);
-  document.getElementById('modal-config-exata').classList.add('active');
-};
-window.fecharConfigExata = function () {
-  const m = document.getElementById('modal-config-exata'); if (m) m.classList.remove('active');
-  _cfgExataVagaId = null;
-};
-
-function _renderConfigExata(v) {
-  const body = document.getElementById('config-exata-body');
-  if (!body) return;
-  const tipos = getTiposContratacao().filter(t => t.ativo !== false);
-  const tipoSelId = v.tipoContratacaoId || _tipoIdPorVinculo(v.vinculo) || '';
-  const tipoOpts = '<option value="">Selecione…</option>' + tipos.map(t => `<option value="${t.id}" ${t.id === tipoSelId ? 'selected' : ''}>${escapeHTML(t.nome)} — vínculo ${escapeHTML(t.vinculo)}</option>`).join('');
-  const funcDatalist = (window.EXATA_FUNCOES || []).map(f => `<option value="${escapeHTML(labelFuncaoExata(f))}"></option>`).join('');
-  const headerDatalist = EXATA_HEADER.map(h => `<option value="${h}"></option>`).join('');
-  const funcF = _cfgExataFuncao.codigo ? getFuncaoExata(_cfgExataFuncao.codigo) : null;
-  const funcBuscaVal = funcF ? labelFuncaoExata(funcF) : (_cfgExataFuncao.codigo || '');
-  body.innerHTML = `
-    <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:10px 12px;margin-bottom:14px;">
-      <div style="font-weight:700;font-size:14px;color:#6d28d9;">${escapeHTML(v.empresaNome || '')} — ${escapeHTML(v.cargo || '')}</div>
-      <div style="font-size:11px;color:var(--text-secondary);">Estes códigos ficam salvos NA VAGA e valem para todos os candidatos aprovados nela. Dados pessoais (nome, CPF, RG…) vêm da ficha do candidato na exportação.</div>
-    </div>
-
-    <div class="vaga-sec-title" style="margin:4px 0 10px;font-weight:700;font-size:13px;color:var(--primary);border-bottom:1px solid var(--border);padding-bottom:5px;"><i class="fa-solid fa-file-signature"></i> Códigos principais</div>
-    <div class="form-group">
-      <label for="cfg-exata-tipo">Tipo de contratação</label>
-      <select id="cfg-exata-tipo" class="form-control" onchange="aoMudarTipoConfigExata()">${tipoOpts}</select>
-    </div>
-    <div class="form-group-grid">
-      <div class="form-group"><label>Código tipo_contrato (vai no TXT)</label><input id="cfg-exata-codtipo" class="form-control" readonly placeholder="—"></div>
-      <div class="form-group"><label>Vínculo</label><input id="cfg-exata-vinculo" class="form-control" readonly placeholder="—"></div>
-    </div>
-    <div class="form-group-grid">
-      <div class="form-group"><label>Filial</label><input id="cfg-exata-filial" class="form-control" readonly placeholder="—"></div>
-      <div class="form-group"><label for="cfg-exata-tomador">Tomador (id_empresa_exata)</label><input id="cfg-exata-tomador" class="form-control" placeholder="Ex: 17" value="${escapeHTML(v.idEmpresaExata || '')}"></div>
-    </div>
-    <div class="form-group">
-      <label for="cfg-exata-funcao-busca">Função (catálogo) — código, descrição ou CBO</label>
-      <input id="cfg-exata-funcao-busca" class="form-control" list="cfg-exata-funcao-datalist" autocomplete="off" placeholder="Ex: 0002 · AUX DE PRODUCAO · 784205" oninput="aoSelecionarFuncaoConfigExata()" value="${escapeHTML(funcBuscaVal)}">
-      <datalist id="cfg-exata-funcao-datalist">${funcDatalist}</datalist>
-    </div>
-    <div class="form-group-grid">
-      <div class="form-group"><label>Função (código)</label><input id="cfg-exata-funcao-cod" class="form-control" readonly placeholder="—" value="${escapeHTML(_cfgExataFuncao.codigo)}"></div>
-      <div class="form-group"><label>CBO</label><input id="cfg-exata-cbo" class="form-control" readonly placeholder="—" value="${escapeHTML(_cfgExataFuncao.cbo)}"></div>
-    </div>
-    <div class="form-group-grid">
-      <div class="form-group"><label for="cfg-exata-dias-venc">Dias até vencimento (0 = sem)</label><input id="cfg-exata-dias-venc" type="number" class="form-control" value="${Number(v.diasVencimento) || 0}"></div>
-      <div class="form-group"><label for="cfg-exata-dias-prorr">Dias de prorrogação (0 = sem)</label><input id="cfg-exata-dias-prorr" type="number" class="form-control" value="${Number(v.diasProrrogacao) || 0}"></div>
-    </div>
-
-    <div class="vaga-sec-title" style="margin:14px 0 8px;font-weight:700;font-size:13px;color:var(--primary);border-bottom:1px solid var(--border);padding-bottom:5px;"><i class="fa-solid fa-code"></i> Outros códigos exigidos pela Exata (opcional)</div>
-    <p style="font-size:11px;color:var(--text-secondary);margin:0 0 8px;">Fixe qualquer outro campo do TXT só para esta vaga (ex.: <code>categoria</code>, <code>contratacao_finalidade</code>…). O <b>campo</b> deve ser um dos 90 nomes do cabeçalho. Sobrepõe o valor padrão na exportação.</p>
-    <datalist id="cfg-exata-campos-datalist">${headerDatalist}</datalist>
-    <div id="cfg-exata-extras"></div>
-    <button type="button" class="btn btn-secondary btn-sm" onclick="cfgExtraAdd()"><i class="fa-solid fa-plus"></i> Adicionar código</button>
-
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
-      <button type="button" class="btn btn-secondary" onclick="fecharConfigExata()">Cancelar</button>
-      <button type="button" class="btn btn-primary" onclick="salvarConfigExata()"><i class="fa-solid fa-floppy-disk"></i> Salvar configuração</button>
-    </div>`;
-  _preencherCodigosTipoConfig(false); // preenche cód/vínculo/filial sem mexer nos dias salvos
-  _renderCfgExtras();
-}
-
-function _preencherCodigosTipoConfig(atualizarDias) {
-  const sel = document.getElementById('cfg-exata-tipo');
-  const t = sel ? getTipoContratacao(sel.value) : null;
-  const set = (id, val) => { const e = document.getElementById(id); if (e) e.value = (val == null ? '' : val); };
-  set('cfg-exata-codtipo', t ? (t.codigoTipoContrato || t.vinculo) : '');
-  set('cfg-exata-vinculo', t ? t.vinculo : '');
-  set('cfg-exata-filial', t ? t.filial : '');
-  if (atualizarDias && t) { set('cfg-exata-dias-venc', Number(t.diasVencimento) || 0); set('cfg-exata-dias-prorr', Number(t.diasProrrogacao) || 0); }
-}
-window.aoMudarTipoConfigExata = function () { _preencherCodigosTipoConfig(true); };
-
-window.aoSelecionarFuncaoConfigExata = function () {
-  const inp = document.getElementById('cfg-exata-funcao-busca');
-  if (!inp) return;
-  const termo = (inp.value || '').trim();
-  const code = termo.split(/[\s·—-]+/)[0];
-  const f = getFuncaoExata(code) || (window.EXATA_FUNCOES || []).find(x => labelFuncaoExata(x) === termo) || null;
-  _cfgExataFuncao = { codigo: f ? f.code : '', cbo: f ? f.cbo : '', nome: f ? f.description : '' };
-  const set = (id, val) => { const e = document.getElementById(id); if (e) e.value = (val == null ? '' : val); };
-  set('cfg-exata-funcao-cod', _cfgExataFuncao.codigo);
-  set('cfg-exata-cbo', _cfgExataFuncao.cbo);
-};
-
-function _renderCfgExtras() {
-  const box = document.getElementById('cfg-exata-extras');
-  if (!box) return;
-  if (!_cfgExataExtras.length) { box.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);margin:0 0 8px;">Nenhum código extra. (Os principais acima já bastam para a maioria das vagas.)</p>'; return; }
-  box.innerHTML = _cfgExataExtras.map((x, i) => `
-    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;${x.ativo === false ? 'opacity:.5;' : ''}">
-      <input class="form-control" list="cfg-exata-campos-datalist" style="flex:1.3;" placeholder="campo (ex: categoria)" value="${escapeHTML(x.campo || '')}" onchange="cfgExtraSet(${i},'campo',this.value)">
-      <input class="form-control" style="flex:1;" placeholder="código/valor" value="${escapeHTML(x.valor || '')}" onchange="cfgExtraSet(${i},'valor',this.value)">
-      <button type="button" class="btn btn-sm" title="${x.ativo === false ? 'Ativar' : 'Desativar'}" style="background:${x.ativo === false ? '#dcfce7' : '#fef9c3'};border:1px solid #e2e8f0;" onclick="cfgExtraToggle(${i})"><i class="fa-solid fa-${x.ativo === false ? 'toggle-off' : 'toggle-on'}"></i></button>
-      <button type="button" class="btn btn-sm" title="Duplicar" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;" onclick="cfgExtraDup(${i})"><i class="fa-solid fa-copy"></i></button>
-      <button type="button" class="btn btn-sm" title="Excluir" style="background:#fff1f2;border:1px solid #fca5a5;color:#dc2626;" onclick="cfgExtraDel(${i})"><i class="fa-solid fa-trash"></i></button>
-    </div>`).join('');
-}
-window.cfgExtraAdd = function () { _cfgExataExtras.push({ id: 'ex-' + Math.random().toString(36).slice(2), campo: '', valor: '', ativo: true }); _renderCfgExtras(); };
-window.cfgExtraSet = function (i, campo, val) { if (_cfgExataExtras[i]) _cfgExataExtras[i][campo] = val; };
-window.cfgExtraToggle = function (i) { if (_cfgExataExtras[i]) { _cfgExataExtras[i].ativo = _cfgExataExtras[i].ativo === false; _renderCfgExtras(); } };
-window.cfgExtraDup = function (i) { const o = _cfgExataExtras[i]; if (o) { _cfgExataExtras.splice(i + 1, 0, { id: 'ex-' + Math.random().toString(36).slice(2), campo: o.campo, valor: o.valor, ativo: o.ativo }); _renderCfgExtras(); } };
-window.cfgExtraDel = function (i) { _cfgExataExtras.splice(i, 1); _renderCfgExtras(); };
-
-window.salvarConfigExata = function () {
-  const v = (state.vagas || []).find(x => x.id === _cfgExataVagaId);
-  if (!v) { alert('Vaga não encontrada.'); return; }
-  const g = id => ((document.getElementById(id) || {}).value || '').trim();
-  const t = getTipoContratacao(g('cfg-exata-tipo'));
-  if (t) {
-    v.tipoContratacaoId = t.id; v.vinculo = t.vinculo; v.codigoTipoContrato = t.codigoTipoContrato || t.vinculo;
-    v.employmentLabel = t.nome; v.exataEmploymentCode = t.vinculo; v.tipoContrato = t.nome;
-    v.filial = t.filial; v.branchCode = t.filial;
-  }
-  v.idEmpresaExata = g('cfg-exata-tomador');
-  if (_cfgExataFuncao.codigo) { v.funcaoCodigo = _cfgExataFuncao.codigo; v.cbo = _cfgExataFuncao.cbo; v.funcaoNome = _cfgExataFuncao.nome; v.exataJobFunctionId = _cfgExataFuncao.codigo; }
-  v.diasVencimento = Number(g('cfg-exata-dias-venc')) || 0;
-  v.diasProrrogacao = Number(g('cfg-exata-dias-prorr')) || 0;
-  v.exataExtras = _cfgExataExtras.filter(x => (x.campo || '').trim()).map(x => ({ id: x.id, campo: (x.campo || '').trim(), valor: (x.valor || '').trim(), ativo: x.ativo !== false }));
-  registrarLogGlobal(`Configurou Exata da vaga "${v.cargo} — ${v.empresaNome}".`, 'exata');
-  saveState();
-  fecharConfigExata();
-  if (typeof renderVagasGrid === 'function') renderVagasGrid();
-  alert('Configuração Exata salva na vaga. ✅');
+  _cadExataVagaSel = vagaId || '';
+  if (typeof switchAba === 'function') switchAba('cadastros-exata');
+  if (typeof renderCadastrosExata === 'function') renderCadastrosExata();
 };
 
 window.toggleVagaQuente = function(vagaId) {
@@ -4105,6 +3976,19 @@ function abrirDrawerDetalhes(candidatoId) {
     el.onchange = () => { cand[prop] = el.value.trim(); saveState(); };
   });
 
+  // Sexo / Raça / Escolaridade: dropdowns com opções configuráveis (Cadastro Exata)
+  [['det-sexo', 'sexo'], ['det-raca', 'raca'], ['det-escolaridade', 'escolaridade']].forEach(([id, key]) => {
+    const sel = document.getElementById(id);
+    if (!sel || typeof _opcoesFichaAtivas !== 'function') return;
+    const atual = cand[key] || '';
+    const ativas = _opcoesFichaAtivas(key).map(o => o.de);
+    if (atual && !ativas.some(d => String(d).toLowerCase() === atual.toLowerCase())) ativas.unshift(atual);
+    const titulo = key === 'sexo' ? 'Sexo' : (key === 'raca' ? 'Raça/Cor' : 'Escolaridade');
+    sel.innerHTML = `<option value="">${titulo}…</option>` + ativas.map(d => `<option value="${escapeHTML(d)}" ${d === atual ? 'selected' : ''}>${escapeHTML(d)}</option>`).join('');
+    sel.value = atual;
+    sel.onchange = () => { cand[key] = sel.value; saveState(); };
+  });
+
   // Exibe escala da vaga no drawer
   const escalaBox = document.getElementById('vaga-escala-box');
   const escalaValor = document.getElementById('vaga-escala-valor');
@@ -4822,7 +4706,8 @@ function aplicarSnapshotVaga(cand, vagaId) {
     previsaoDias: vaga.previsaoDias || '', taxa: vaga.taxa || '',
     salario: vaga.salario, salarioTipo: vaga.salarioTipo || 'mensal',
     beneficios: vaga.beneficios || [], endereco: vaga.endereco || {}, localTrabalho: vaga.localTrabalho || '', cargo: vaga.cargo || '',
-    exataExtras: (vaga.exataExtras || []).map(x => ({ id: x.id, campo: x.campo, valor: x.valor, ativo: x.ativo !== false }))
+    exataExtras: (vaga.exataExtras || []).map(x => ({ id: x.id, campo: x.campo, valor: x.valor, ativo: x.ativo !== false })),
+    exataCampos: JSON.parse(JSON.stringify(vaga.exataCampos || {}))
   };
 }
 function aplicarHorarioVaga(cand, horarioValor) {
@@ -5270,7 +5155,7 @@ const EXATA_CAMPOS_INFO = (function () {
     F('nome_pai', 'Nome do pai', 'ficha', 'Vem da ficha.'),
     F('nome_mae', 'Nome da mãe', 'ficha', 'Vem da ficha.'),
     F('ctps', 'CTPS (número)', 'auto', 'Automático: 7 primeiros dígitos do CPF.'),
-    F('ctps_tipo', 'CTPS - tipo', 'dominio', 'Código do tipo de CTPS (de/para).'),
+    F('ctps_tipo', 'CTPS - tipo', 'ficha', 'Vem da ficha.'),
     F('ctps_serie', 'CTPS - série', 'auto', 'Automático: 4 últimos dígitos do CPF.'),
     F('ctps_uf', 'CTPS - UF', 'ficha', 'Vem da ficha (UF do documento).'),
     F('ctps_data_expedicao', 'CTPS - expedição', 'auto', 'Não enviado (em branco).'),
@@ -5296,31 +5181,31 @@ const EXATA_CAMPOS_INFO = (function () {
     F('endereco_cidade', 'Cidade', 'ficha', 'Vem da ficha.'),
     F('endereco_bairro', 'Bairro', 'ficha', 'Vem da ficha.'),
     F('salario', 'Salário', 'vaga', 'Vem da vaga.'),
-    F('salario_tipo', 'Salário - tipo', 'dominio', 'Código do tipo de salário (de/para).'),
+    F('salario_tipo', 'Salário - tipo', 'vaga', 'Configurável na vaga (Nome/Código).'),
     F('data_nascimento', 'Data de nascimento', 'ficha', 'Vem da ficha.'),
-    F('estado_civil', 'Estado civil', 'dominio', 'Código do estado civil (de/para).'),
-    F('sexo', 'Sexo', 'dominio', 'Código do sexo (de/para).'),
-    F('raca', 'Raça/cor', 'dominio', 'Código da raça/cor (de/para).'),
-    F('escolaridade', 'Escolaridade', 'dominio', 'Código da escolaridade (de/para).'),
-    F('escolaridade_status', 'Escolaridade - status', 'dominio', 'Código do status de escolaridade (de/para).'),
-    F('contratacao_finalidade', 'Finalidade da contratação', 'dominio', 'Código da finalidade (de/para).'),
-    F('contratacao_justificativa', 'Justificativa da contratação', 'dominio', 'Código da justificativa (de/para).'),
-    F('banco', 'Banco', 'dominio', 'Código do banco (de/para).'),
+    F('estado_civil', 'Estado civil', 'ficha', 'Vem da ficha.'),
+    F('sexo', 'Sexo', 'fichaopt', 'Vem da ficha (opções configuráveis abaixo).'),
+    F('raca', 'Raça/cor', 'fichaopt', 'Vem da ficha (opções configuráveis abaixo).'),
+    F('escolaridade', 'Escolaridade', 'fichaopt', 'Vem da ficha (opções configuráveis abaixo).'),
+    F('escolaridade_status', 'Escolaridade - status', 'ficha', 'Vem da ficha.'),
+    F('contratacao_finalidade', 'Finalidade da contratação', 'vaga', 'Configurável na vaga (Nome/Código).'),
+    F('contratacao_justificativa', 'Justificativa da contratação', 'vaga', 'Configurável na vaga (Nome/Código).'),
+    F('banco', 'Banco', 'ficha', 'Vem da ficha.'),
     F('agencia', 'Agência', 'ficha', 'Vem da ficha.'),
     F('agencia_digito', 'Agência - dígito', 'ficha', 'Vem da ficha.'),
     F('conta', 'Conta', 'ficha', 'Vem da ficha.'),
     F('conta_digito', 'Conta - dígito', 'ficha', 'Vem da ficha.'),
-    F('conta_tipo', 'Conta - tipo', 'dominio', 'Código do tipo de conta (de/para).')
+    F('conta_tipo', 'Conta - tipo', 'ficha', 'Vem da ficha.')
   ];
   for (let i = 1; i <= 5; i++) {
     base.push(F('dep' + i + '_nome', 'Dependente ' + i + ' - nome', 'ficha', 'Vem da ficha.'));
     base.push(F('dep' + i + '_data_nascimento', 'Dependente ' + i + ' - nascimento', 'ficha', 'Vem da ficha.'));
     base.push(F('dep' + i + '_cpf', 'Dependente ' + i + ' - CPF', 'ficha', 'Vem da ficha.'));
-    base.push(F('dep' + i + '_parentesco', 'Dependente ' + i + ' - parentesco', 'dominio', 'Código do parentesco (de/para).', 'parentesco'));
+    base.push(F('dep' + i + '_parentesco', 'Dependente ' + i + ' - parentesco', 'ficha', 'Vem da ficha.'));
   }
   ['ida', 'volta'].forEach(dir => {
     for (let i = 1; i <= 3; i++) {
-      base.push(F('vt' + i + '_' + dir + '_tipo', 'VT ' + dir + ' ' + i + ' - tipo', 'dominio', 'Código do tipo de VT (de/para).', 'vt_tipo'));
+      base.push(F('vt' + i + '_' + dir + '_tipo', 'VT ' + dir + ' ' + i + ' - tipo', 'ficha', 'Vem da ficha.'));
       base.push(F('vt' + i + '_' + dir + '_valor', 'VT ' + dir + ' ' + i + ' - valor', 'ficha', 'Vem da ficha.'));
     }
   });
@@ -5341,7 +5226,7 @@ function _validarCamposExata() {
     total: a.length,
     okLen: a.length === EXATA_HEADER.length,
     okOrder: a.every((k, i) => k === EXATA_HEADER[i]),
-    dominiosOk: EXATA_CAMPOS_INFO.filter(c => c.origem === 'dominio').every(c => EXATA_HEADER.indexOf(c.key) >= 0)
+    dominiosOk: EXATA_CAMPOS_INFO.filter(c => c.origem === 'fichaopt').every(c => EXATA_HEADER.indexOf(c.key) >= 0)
   };
 }
 if (typeof window !== 'undefined') window._validarCamposExata = _validarCamposExata;
@@ -5359,11 +5244,11 @@ function _traduzirDominioValor(key, valor, dom) {
   const hit = lista.find(o => String(o.de || '').trim().toLowerCase() === alvo);
   return hit ? hit.codigo : valor;
 }
-// Aplica as tabelas de/para nos campos marcados como 'dominio' (sem alterar os demais)
+// Traduz o texto da ficha (sexo/raça/escolaridade) pelo código configurado nas opções
 function _aplicarDominiosExata(arr) {
   const dom = getExataDominios();
   EXATA_CAMPOS_INFO.forEach(c => {
-    if (c.origem !== 'dominio') return;
+    if (c.origem !== 'fichaopt') return;
     const i = EXATA_HEADER.indexOf(c.key);
     if (i < 0) return;
     arr[i] = _traduzirDominioValor(c.dominioKey || c.key, arr[i], dom);
@@ -5377,6 +5262,18 @@ function _aplicarExtrasVaga(arr, vs) {
     if (!x || x.ativo === false) return;
     const i = EXATA_HEADER.indexOf(String(x.campo || '').trim());
     if (i >= 0) arr[i] = x.valor;
+  });
+  return arr;
+}
+// Configuração por VAGA: cada campo com {nome, codigo}. O CÓDIGO é o que vai no TXT.
+function _aplicarCamposVaga(arr, vs) {
+  const campos = (vs && vs.exataCampos) || {};
+  Object.keys(campos).forEach(key => {
+    const c = campos[key]; if (!c) return;
+    const cod = String(c.codigo == null ? '' : c.codigo).trim();
+    if (cod === '') return; // vazio = não configurado, mantém o valor base
+    const i = EXATA_HEADER.indexOf(key);
+    if (i >= 0) arr[i] = cod;
   });
   return arr;
 }
@@ -5518,8 +5415,8 @@ function mapearExata(cand, vs) {
     vs.previsaoDias,                              // 89 previsao_contrato_dias (vaga)
     vs.taxa                                       // 90 taxa (vaga)
   ];
-  // 1) traduz texto->código (de/para) · 2) aplica códigos extras fixados na vaga
-  return _aplicarExtrasVaga(_aplicarDominiosExata(arr), vs);
+  // 1) traduz texto->código (de/para da ficha) · 2) extras legado · 3) config por campo da vaga (vence)
+  return _aplicarCamposVaga(_aplicarExtrasVaga(_aplicarDominiosExata(arr), vs), vs);
 }
 
 // Validação dos campos obrigatórios antes de exportar (item 19)

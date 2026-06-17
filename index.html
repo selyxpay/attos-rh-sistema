@@ -1667,6 +1667,14 @@
                             <input type="text" id="det-rg-numero" class="form-control" placeholder="Número do RG">
                         </div>
                     </div>
+                    <div style="width:100%; background:rgba(124,58,237,0.06); border:1px solid rgba(124,58,237,0.25); border-radius:8px; padding:8px 10px;">
+                        <label style="font-size:11px; font-weight:700; color:#6d28d9; display:flex; align-items:center; gap:5px; margin-bottom:6px;"><i class="fa-solid fa-user-tag"></i> SEXO / RAÇA / ESCOLARIDADE (usado no Exata)</label>
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
+                            <select id="det-sexo" class="form-control"></select>
+                            <select id="det-raca" class="form-control"></select>
+                            <select id="det-escolaridade" class="form-control"></select>
+                        </div>
+                    </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
                         <button class="btn btn-primary" id="btn-dp-exportar" style="background-color: #3b82f6; color: white; border: none; padding: 10px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px;"><i class="fa-solid fa-file-zipper"></i> EXPORTAR PASTA</button>
                         <button class="btn" id="btn-dp-exportar-exata" style="background-color: #7c3aed; color: white; border: none; padding: 10px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px;"><i class="fa-solid fa-file-export"></i> EXPORTAR EXATA</button>
@@ -1793,17 +1801,6 @@
     </div>
 
     <!-- MODAL: CRIAR NOVA VAGA -->
-    <!-- Configuração Exata por VAGA (códigos que ficam salvos na vaga) -->
-    <div id="modal-config-exata" class="modal-overlay">
-        <div class="modal-box" style="max-width:780px;">
-            <div class="modal-header">
-                <h3><i class="fa-solid fa-file-invoice"></i> Configuração Exata da Vaga</h3>
-                <button class="btn-close-modal" onclick="fecharConfigExata()"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="modal-body" id="config-exata-body" style="max-height:78vh;overflow:auto;"></div>
-        </div>
-    </div>
-
     <div id="modal-nova-vaga" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header">
