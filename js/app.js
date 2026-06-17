@@ -211,6 +211,8 @@ function verificarSessao() {
 
     // Aplicar regras de menu (RBAC)
     verificarPermissoesMenu();
+    // Controle de acesso por horário (cobre o painel se estiver fora do horário)
+    if (typeof aplicarGateHorario === 'function') aplicarGateHorario();
   } else {
     loggedUser = null;
     if (loginScreen) loginScreen.style.display = 'flex';
@@ -224,6 +226,7 @@ function isAbaAutorizada(abaId) {
   if (abaId === 'meu-painel') return true;
   if (abaId === 'fila') return true; // todos os logados acessam
   if (abaId === 'lixeira') return loggedUser.login === 'joaobalaf' || loggedUser.departamento === 'administracao';
+  if (abaId === 'controle-acesso') return podeGerenciarHorarios();
   if (loggedUser.login === 'joaobalaf') return true;
   const depto = loggedUser.departamento;
   if (depto === 'administracao') return true;
@@ -659,6 +662,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initNewModules();
   renderCurrentAba();
   ativarNuvem();
+  iniciarControleAcesso();
 });
 
 // Indica que a nuvem já foi carregada e é a fonte principal dos dados.
@@ -912,6 +916,9 @@ function initLocalStorage() {
       });
     }
 
+    // Controle de acesso por horário (começa desligado — não muda o comportamento atual)
+    if (!state.controleAcesso) { state.controleAcesso = controleAcessoDefault(); alterado = true; }
+
     if (alterado) {
       saveState();
     }
@@ -935,6 +942,357 @@ function saveState() {
   // sobrescrever dados mais recentes do servidor — ver item 25.7).
   if (window.RTCloud && RTCloud.configured && _cloudReady) RTCloud.saveState(state);
 }
+
+// ==========================================================================
+// CONTROLE DE ACESSO POR HORÁRIO (usuários internos) — motor
+// Só afeta o index.html (interno). As páginas públicas não usam isto.
+// ==========================================================================
+const _DIAS_CA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+
+function controleAcessoDefault() {
+  const diaUtil = { ativo: true, periodos: [{ inicio: '08:00', fim: '18:00' }], obs: '' };
+  return {
+    ativo: false,                 // começa DESLIGADO (não muda o comportamento atual)
+    fuso: 'America/Sao_Paulo',
+    horarioSemanal: {
+      dom: { ativo: false, periodos: [], obs: '' },
+      seg: JSON.parse(JSON.stringify(diaUtil)), ter: JSON.parse(JSON.stringify(diaUtil)),
+      qua: JSON.parse(JSON.stringify(diaUtil)), qui: JSON.parse(JSON.stringify(diaUtil)),
+      sex: JSON.parse(JSON.stringify(diaUtil)),
+      sab: { ativo: true, periodos: [{ inicio: '08:00', fim: '12:00' }], obs: '' }
+    },
+    bloqueioManual: { ativo: false, motivo: '', por: '', em: '' },
+    liberacaoTemporaria: { ativa: false, ate: 0, semPrazo: false, por: '', motivo: '', em: '' },
+    liberacoesUsuario: [],
+    liberacoesDepto: [],
+    horariosIndividuais: [],
+    datasEspeciais: [],
+    excecoesPermanentes: [],
+    mensagens: {
+      foraHorario: 'Seu acesso ao sistema interno está indisponível neste momento.',
+      bloqueioManual: 'O acesso interno foi temporariamente bloqueado pela administração.',
+      liberacaoEncerrada: 'Sua liberação temporária terminou. Procure o administrador caso precise continuar.',
+      usuarioBloqueado: 'Seu usuário está sem autorização de acesso neste momento.'
+    }
+  };
+}
+
+function getControleAcesso() {
+  if (!state.controleAcesso) state.controleAcesso = controleAcessoDefault();
+  return state.controleAcesso;
+}
+
+// Quem pode gerenciar horários (inicialmente só João + admin geral)
+function podeGerenciarHorarios() {
+  if (!loggedUser) return false;
+  if (loggedUser.login === 'joaobalaf') return true;
+  if (loggedUser.departamento === 'administracao') return true;
+  return !!(loggedUser.permissoesEspeciais && loggedUser.permissoesEspeciais.podeGerenciarHorariosAcesso);
+}
+
+// ── Hora confiável (offset do servidor Firebase) ──────────────────────────
+let _horaOffset = 0, _horaFonte = 'local';
+async function sincronizarHora() {
+  try {
+    if (window.RTCloud && RTCloud.horaServidor) {
+      const r = await RTCloud.horaServidor();
+      _horaOffset = r.offset || 0; _horaFonte = r.fonte || 'local';
+    }
+  } catch (e) { _horaOffset = 0; _horaFonte = 'local'; }
+}
+function horaConfiavel() { return new Date(Date.now() + _horaOffset); }
+
+function _partesDataFuso(dt, fuso) {
+  try {
+    const f = new Intl.DateTimeFormat('en-CA', { timeZone: fuso, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+    const p = {}; f.formatToParts(dt).forEach(x => p[x.type] = x.value);
+    const wd = new Intl.DateTimeFormat('en-US', { timeZone: fuso, weekday: 'short' }).format(dt);
+    const map = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    let hh = p.hour === '24' ? '00' : p.hour;
+    return { diaSemana: map[wd] != null ? map[wd] : dt.getDay(), hhmm: `${hh}:${p.minute}`, dataISO: `${p.year}-${p.month}-${p.day}` };
+  } catch (e) {
+    return { diaSemana: dt.getDay(), hhmm: dt.toTimeString().slice(0, 5), dataISO: dt.toISOString().slice(0, 10) };
+  }
+}
+
+function _proximaAbertura(cfg, diaSemana, hhmmAtual) {
+  const nomes = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+  for (let off = 0; off < 8; off++) {
+    const di = (diaSemana + off) % 7;
+    const d = cfg.horarioSemanal[_DIAS_CA[di]];
+    if (d && d.ativo && (d.periodos || []).length) {
+      for (const p of d.periodos) {
+        if (off === 0 && hhmmAtual && p.inicio <= hhmmAtual) continue;
+        return (off === 0 ? 'hoje' : off === 1 ? 'amanhã' : nomes[di]) + ' às ' + p.inicio;
+      }
+    }
+  }
+  return '—';
+}
+
+// Avaliação central: o usuário pode acessar AGORA? (hierarquia do item 20)
+function acessoPermitidoAgora(user) {
+  const cfg = getControleAcesso();
+  if (!cfg.ativo) return { permitido: true, motivo: 'controle-desligado' };
+  if (!user) return { permitido: false, motivo: 'sem-usuario', mensagem: cfg.mensagens.foraHorario };
+
+  const agora = horaConfiavel();
+  const agoraMs = agora.getTime();
+  const { diaSemana, hhmm, dataISO } = _partesDataFuso(agora, cfg.fuso || 'America/Sao_Paulo');
+  const vig = (ate) => ate && agoraMs < ate;
+  const ctx = { hhmm, dataISO, proximaLiberacao: _proximaAbertura(cfg, diaSemana, hhmm) };
+
+  // 1) Exceção permanente (João/admin/exceção) -> libera, mas marca p/ registro
+  const ehAdmin = user.login === 'joaobalaf' || user.departamento === 'administracao';
+  if (ehAdmin || (cfg.excecoesPermanentes || []).includes(user.id)) {
+    return Object.assign({ permitido: true, motivo: 'excecao', registrarFora: cfg.bloqueioManual.ativo }, ctx);
+  }
+  // 2) Liberação individual
+  if ((cfg.liberacoesUsuario || []).some(l => l.usuarioId === user.id && (l.permanente || vig(l.ate))))
+    return Object.assign({ permitido: true, motivo: 'liberacao-usuario' }, ctx);
+  // 3) Liberação por departamento
+  if ((cfg.liberacoesDepto || []).some(l => l.depto === user.departamento && vig(l.ate)))
+    return Object.assign({ permitido: true, motivo: 'liberacao-depto' }, ctx);
+  // 4) Liberação temporária geral
+  if (cfg.liberacaoTemporaria && cfg.liberacaoTemporaria.ativa && (cfg.liberacaoTemporaria.semPrazo || vig(cfg.liberacaoTemporaria.ate)))
+    return Object.assign({ permitido: true, motivo: 'liberacao-geral' }, ctx);
+  // 5) Bloqueio manual geral
+  if (cfg.bloqueioManual && cfg.bloqueioManual.ativo)
+    return Object.assign({ permitido: false, motivo: 'bloqueio-manual', mensagem: cfg.bloqueioManual.motivo || cfg.mensagens.bloqueioManual }, ctx);
+  // 6) Datas especiais (prevalecem sobre o semanal)
+  const esp = (cfg.datasEspeciais || []).find(d => d.data === dataISO);
+  if (esp) {
+    if (esp.bloqueado) return Object.assign({ permitido: false, motivo: 'data-especial', mensagem: esp.obs || cfg.mensagens.foraHorario }, ctx);
+    if (esp.liberadoAte) return Object.assign(hhmm <= esp.liberadoAte ? { permitido: true, motivo: 'data-especial' } : { permitido: false, motivo: 'data-especial', mensagem: cfg.mensagens.foraHorario }, ctx);
+  }
+  // 7) Horário individual (se houver e vigente) senão semanal
+  const ind = (cfg.horariosIndividuais || []).find(h => h.usuarioId === user.id && h.ativo
+    && (!h.dataInicial || dataISO >= h.dataInicial) && (!h.dataFinal || dataISO <= h.dataFinal)
+    && (!h.dias || !h.dias.length || h.dias.includes(_DIAS_CA[diaSemana])));
+  if (ind) {
+    return Object.assign(hhmm >= ind.inicio && hhmm <= ind.fim
+      ? { permitido: true, motivo: 'horario-individual' }
+      : { permitido: false, motivo: 'fora-horario', mensagem: cfg.mensagens.foraHorario, proximaLiberacao: ind.inicio }, ctx);
+  }
+  const dia = cfg.horarioSemanal[_DIAS_CA[diaSemana]];
+  if (!dia || !dia.ativo || !(dia.periodos || []).length)
+    return Object.assign({ permitido: false, motivo: 'dia-inativo', mensagem: cfg.mensagens.foraHorario }, ctx);
+  const dentro = (dia.periodos || []).some(p => hhmm >= p.inicio && hhmm <= p.fim);
+  return Object.assign(dentro ? { permitido: true, motivo: 'horario-semanal' } : { permitido: false, motivo: 'fora-horario', mensagem: cfg.mensagens.foraHorario }, ctx);
+}
+
+// ── Gate visual + encerramento de sessão ──────────────────────────────────
+let _caTimer = null;
+let _caAvisos = { 10: false, 5: false, 1: false };
+
+function mostrarOverlayHorario(res) {
+  const ov = document.getElementById('overlay-horario');
+  if (!ov) return;
+  const cfg = getControleAcesso();
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  set('oh-mensagem', res.mensagem || cfg.mensagens.foraHorario);
+  set('oh-hora', horaConfiavel().toLocaleString('pt-BR', { timeZone: cfg.fuso }));
+  set('oh-proxima', res.proximaLiberacao || '—');
+  set('oh-depto', loggedUser ? (loggedUser.departamento || '—') : '—');
+  ov.style.display = 'flex';
+}
+function esconderOverlayHorario() {
+  const ov = document.getElementById('overlay-horario');
+  if (ov) ov.style.display = 'none';
+}
+// Aplica o bloqueio visual; retorna true se permitido
+function aplicarGateHorario() {
+  if (!loggedUser) { esconderOverlayHorario(); return true; }
+  const res = acessoPermitidoAgora(loggedUser);
+  if (res.permitido) { esconderOverlayHorario(); return true; }
+  mostrarOverlayHorario(res);
+  registrarLogGlobal(`Acesso interno negado por horário (${res.motivo}) para "${loggedUser.nome}".`, 'acesso');
+  return false;
+}
+// Inicia o controle: sincroniza a hora confiável, aplica o gate e liga 1 timer
+async function iniciarControleAcesso() {
+  await sincronizarHora();
+  if (loggedUser) aplicarGateHorario();
+  if (_caTimer) clearInterval(_caTimer);
+  let ticks = 0;
+  _caTimer = setInterval(() => {
+    ticks++;
+    if (ticks % 20 === 0) sincronizarHora(); // re-sincroniza o offset a cada ~10 min
+    if (!loggedUser) return;
+    if (!getControleAcesso().ativo) { esconderOverlayHorario(); return; }
+    const res = acessoPermitidoAgora(loggedUser);
+    if (!res.permitido) {
+      mostrarOverlayHorario(res);
+      registrarLogGlobal(`Sessão encerrada por horário para "${loggedUser.nome}".`, 'acesso');
+      return;
+    }
+    avisarFimDeJanela();
+  }, 30000);
+}
+function avisarFimDeJanela() {
+  const cfg = getControleAcesso();
+  const { diaSemana, hhmm } = _partesDataFuso(horaConfiavel(), cfg.fuso);
+  const dia = cfg.horarioSemanal[_DIAS_CA[diaSemana]];
+  if (!dia || !(dia.periodos || []).length) return;
+  const per = (dia.periodos || []).find(p => hhmm >= p.inicio && hhmm <= p.fim);
+  if (!per) return;
+  const [fh, fm] = per.fim.split(':').map(Number);
+  const [nh, nm] = hhmm.split(':').map(Number);
+  const min = (fh * 60 + fm) - (nh * 60 + nm);
+  if (min > 10) { _caAvisos = { 10: false, 5: false, 1: false }; return; }
+  [10, 5, 1].forEach(m => {
+    if (min === m && !_caAvisos[m]) {
+      _caAvisos[m] = true;
+      const msg = `Seu acesso será encerrado em ${m} minuto(s) devido ao fim do horário autorizado.`;
+      if (typeof showToast === 'function') showToast(msg, 'warning'); else alert(msg);
+    }
+  });
+}
+
+// ── Painel administrativo do Controle de Acesso ───────────────────────────
+function _caAteMs(min) { return horaConfiavel().getTime() + min * 60000; }
+function _caFimDoDiaMs() { const d = horaConfiavel(); d.setHours(23, 59, 59, 999); return d.getTime(); }
+function _caRestante(ate) {
+  const ms = ate - horaConfiavel().getTime();
+  if (ms <= 0) return 'expirado';
+  const min = Math.ceil(ms / 60000);
+  return min < 60 ? min + ' min' : Math.floor(min / 60) + 'h' + (min % 60 ? ' ' + (min % 60) + 'min' : '');
+}
+function _caLog(acao) { registrarLogGlobal(acao, 'acesso'); }
+const _CA_DIAS_LBL = { dom: 'Domingo', seg: 'Segunda', ter: 'Terça', qua: 'Quarta', qui: 'Quinta', sex: 'Sexta', sab: 'Sábado' };
+
+function renderControleAcesso() {
+  const cont = document.getElementById('controle-acesso-conteudo');
+  if (!cont) return;
+  if (!podeGerenciarHorarios()) {
+    cont.innerHTML = '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#b91c1c;padding:16px;border-radius:12px;font-size:13px;"><i class="fa-solid fa-lock"></i> Área restrita ao administrador geral (João).</div>';
+    return;
+  }
+  const cfg = getControleAcesso();
+  const res = loggedUser ? acessoPermitidoAgora(loggedUser) : { permitido: true };
+  const statusCor = !cfg.ativo ? '#94a3b8' : (cfg.bloqueioManual.ativo ? '#ef4444' : (cfg.liberacaoTemporaria.ativa ? '#f59e0b' : '#22c55e'));
+  const statusTxt = !cfg.ativo ? 'Controle DESLIGADO — todos os internos acessam normalmente'
+    : (cfg.bloqueioManual.ativo ? 'BLOQUEIO MANUAL ATIVO' : (cfg.liberacaoTemporaria.ativa ? 'Liberação temporária ativa' : 'Controlado pelo horário semanal'));
+  const agoraStr = horaConfiavel().toLocaleString('pt-BR', { timeZone: cfg.fuso });
+  const funcs = (state.funcionarios || []).filter(f => f.status === 'ativo');
+  const box = (inner) => `<div style="background:var(--card-bg,#fff);border:1px solid var(--border-color,#e2e8f0);border-radius:12px;padding:16px;margin-bottom:14px;">${inner}</div>`;
+  const dur = (fn) => `
+    <button class="btn btn-secondary btn-sm" onclick="${fn}(15)">15 min</button>
+    <button class="btn btn-secondary btn-sm" onclick="${fn}(30)">30 min</button>
+    <button class="btn btn-secondary btn-sm" onclick="${fn}(60)">1 h</button>
+    <button class="btn btn-secondary btn-sm" onclick="${fn}(120)">2 h</button>
+    <button class="btn btn-secondary btn-sm" onclick="${fn}(-1)">Fim do dia</button>`;
+
+  let html = '';
+  // Status + liga/desliga + fuso/hora
+  html += box(`
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <div>
+        <div style="font-size:12px;color:var(--text-secondary);">Status atual</div>
+        <div style="font-weight:800;color:${statusCor};font-size:15px;">${statusTxt}</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Hora confiável: <strong>${escapeHTML(agoraStr)}</strong> · Fuso: ${escapeHTML(cfg.fuso)} · fonte: ${_horaFonte}</div>
+        <div style="font-size:12px;color:var(--text-secondary);">Seu acesso agora: <strong style="color:${res.permitido ? '#22c55e' : '#ef4444'}">${res.permitido ? 'permitido' : 'bloqueado'}</strong>${res.proximaLiberacao ? ' · próxima abertura: ' + escapeHTML(res.proximaLiberacao) : ''}</div>
+      </div>
+      <button class="btn ${cfg.ativo ? 'btn-danger' : 'btn-primary'}" onclick="caToggleAtivo()">${cfg.ativo ? 'Desligar controle' : 'Ligar controle de horário'}</button>
+    </div>`);
+
+  // Bloqueio / liberação manual geral
+  html += box(`
+    <h4 style="margin:0 0 10px;font-size:14px;"><i class="fa-solid fa-lock"></i> Bloqueio e liberação manual</h4>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      ${cfg.bloqueioManual.ativo
+        ? `<span style="color:#ef4444;font-weight:700;">Bloqueado: ${escapeHTML(cfg.bloqueioManual.motivo || '—')}</span> <button class="btn btn-primary btn-sm" onclick="caCancelarBloqueio()">Liberar sistema</button>`
+        : `<button class="btn btn-danger btn-sm" onclick="caBloquearAgora()"><i class="fa-solid fa-ban"></i> Bloquear sistema interno agora</button>`}
+    </div>
+    <div style="margin-top:12px;">
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">Liberar todos temporariamente${cfg.liberacaoTemporaria.ativa ? ` (ativa — termina em ${cfg.liberacaoTemporaria.semPrazo ? 'sem prazo' : _caRestante(cfg.liberacaoTemporaria.ate)})` : ''}:</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">${dur('caLiberarTemp')}
+        <button class="btn btn-secondary btn-sm" onclick="caLiberarTemp(0)">Sem prazo</button>
+        ${cfg.liberacaoTemporaria.ativa ? '<button class="btn btn-danger btn-sm" onclick="caCancelarLiberacao()">Cancelar liberação</button>' : ''}
+      </div>
+    </div>`);
+
+  // Horário semanal
+  html += box(`
+    <h4 style="margin:0 0 10px;font-size:14px;"><i class="fa-solid fa-calendar-week"></i> Horário semanal</h4>
+    ${_DIAS_CA.map(d => {
+      const dd = cfg.horarioSemanal[d]; const p = (dd.periodos && dd.periodos[0]) || { inicio: '', fim: '' };
+      return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:5px;min-width:120px;font-size:13px;"><input type="checkbox" id="ca-${d}-ativo" ${dd.ativo ? 'checked' : ''}> ${_CA_DIAS_LBL[d]}</label>
+        <input type="time" class="form-control" style="max-width:120px;" id="ca-${d}-ini" value="${p.inicio || ''}">
+        <span>às</span>
+        <input type="time" class="form-control" style="max-width:120px;" id="ca-${d}-fim" value="${p.fim || ''}">
+        <button class="btn btn-secondary btn-sm" onclick="caSalvarDia('${d}')">Salvar</button>
+      </div>`;
+    }).join('')}`);
+
+  // Liberar usuário específico
+  html += box(`
+    <h4 style="margin:0 0 10px;font-size:14px;"><i class="fa-solid fa-user-clock"></i> Liberar usuário específico</h4>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      <select id="ca-lib-usuario" class="form-control" style="max-width:240px;">${funcs.map(f => `<option value="${f.id}">${escapeHTML(f.nome)} (${escapeHTML(f.login)})</option>`).join('')}</select>
+      ${dur('caLiberarUsuario')}
+      <button class="btn btn-secondary btn-sm" onclick="caLiberarUsuario(0)">Permanente</button>
+    </div>
+    ${(cfg.liberacoesUsuario || []).length ? '<div style="margin-top:8px;font-size:12px;">' + cfg.liberacoesUsuario.map((l, i) => {
+      const f = (state.funcionarios || []).find(x => x.id === l.usuarioId);
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">${escapeHTML(f ? f.nome : l.usuarioId)} — ${l.permanente ? 'permanente' : _caRestante(l.ate)} <button class="btn btn-danger btn-sm" onclick="caCancelarLibUsuario(${i})">Cancelar</button></div>`;
+    }).join('') + '</div>' : ''}`);
+
+  // Liberar departamento
+  html += box(`
+    <h4 style="margin:0 0 10px;font-size:14px;"><i class="fa-solid fa-users-gear"></i> Liberar por departamento</h4>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      <select id="ca-lib-depto" class="form-control" style="max-width:200px;">
+        <option value="selecao">Seleção</option><option value="dp">Departamento Pessoal</option>
+        <option value="administracao">Administração</option><option value="comissao">Comissão</option>
+      </select>
+      ${dur('caLiberarDepto')}
+    </div>
+    ${(cfg.liberacoesDepto || []).length ? '<div style="margin-top:8px;font-size:12px;">' + cfg.liberacoesDepto.map((l, i) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">${escapeHTML(l.depto)} — ${_caRestante(l.ate)} <button class="btn btn-danger btn-sm" onclick="caCancelarLibDepto(${i})">Cancelar</button></div>`).join('') + '</div>' : ''}`);
+
+  // Datas especiais
+  html += box(`
+    <h4 style="margin:0 0 10px;font-size:14px;"><i class="fa-solid fa-calendar-day"></i> Datas especiais</h4>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      <input type="date" id="ca-esp-data" class="form-control" style="max-width:160px;">
+      <select id="ca-esp-tipo" class="form-control" style="max-width:200px;"><option value="bloqueado">Bloqueado o dia todo</option><option value="liberado">Liberado até…</option></select>
+      <input type="time" id="ca-esp-ate" class="form-control" style="max-width:120px;" placeholder="até">
+      <input type="text" id="ca-esp-obs" class="form-control" style="max-width:200px;" placeholder="observação">
+      <button class="btn btn-secondary btn-sm" onclick="caAddDataEspecial()">Adicionar</button>
+    </div>
+    ${(cfg.datasEspeciais || []).length ? '<div style="margin-top:8px;font-size:12px;">' + cfg.datasEspeciais.map((d, i) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">${escapeHTML(d.data)} — ${d.bloqueado ? 'bloqueado' : 'liberado até ' + escapeHTML(d.liberadoAte || '')}${d.obs ? ' · ' + escapeHTML(d.obs) : ''} <button class="btn btn-danger btn-sm" onclick="caRemoveDataEspecial(${i})">Remover</button></div>`).join('') + '</div>' : ''}`);
+
+  // Exceções permanentes + histórico
+  html += box(`
+    <h4 style="margin:0 0 10px;font-size:14px;"><i class="fa-solid fa-shield"></i> Exceções permanentes (ignoram bloqueio)</h4>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:12px;">
+      ${funcs.map(f => `<label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" ${(cfg.excecoesPermanentes || []).includes(f.id) ? 'checked' : ''} onchange="caToggleExcecao('${f.id}')"> ${escapeHTML(f.nome)}</label>`).join('')}
+    </div>
+    <div style="margin-top:12px;"><button class="btn btn-secondary btn-sm" onclick="switchAba('auditoria')"><i class="fa-solid fa-clock-rotate-left"></i> Ver histórico (auditoria)</button></div>`);
+
+  cont.innerHTML = html;
+}
+
+window.caToggleAtivo = function () { const c = getControleAcesso(); c.ativo = !c.ativo; _caLog(`Controle de horário ${c.ativo ? 'LIGADO' : 'DESLIGADO'}.`); saveState(); renderControleAcesso(); if (loggedUser) aplicarGateHorario(); };
+window.caBloquearAgora = function () { const m = prompt('Motivo do bloqueio (opcional):', 'Sistema bloqueado pela administração.') || ''; const c = getControleAcesso(); c.ativo = true; c.bloqueioManual = { ativo: true, motivo: m, por: loggedUser ? loggedUser.nome : '', em: horaConfiavel().toLocaleString('pt-BR') }; _caLog(`Bloqueio manual ativado. Motivo: ${m}`); saveState(); renderControleAcesso(); };
+window.caCancelarBloqueio = function () { const c = getControleAcesso(); c.bloqueioManual = { ativo: false, motivo: '', por: '', em: '' }; _caLog('Bloqueio manual cancelado.'); saveState(); renderControleAcesso(); };
+window.caLiberarTemp = function (min) { const c = getControleAcesso(); c.ativo = true; c.liberacaoTemporaria = { ativa: true, semPrazo: min === 0, ate: min === -1 ? _caFimDoDiaMs() : (min > 0 ? _caAteMs(min) : 0), por: loggedUser ? loggedUser.nome : '', motivo: '', em: horaConfiavel().toLocaleString('pt-BR') }; _caLog(`Liberação geral por ${min === 0 ? 'sem prazo' : min === -1 ? 'fim do dia' : min + ' min'}.`); saveState(); renderControleAcesso(); };
+window.caCancelarLiberacao = function () { const c = getControleAcesso(); c.liberacaoTemporaria = { ativa: false, ate: 0, semPrazo: false, por: '', motivo: '', em: '' }; _caLog('Liberação geral cancelada.'); saveState(); renderControleAcesso(); };
+window.caSalvarDia = function (d) {
+  const c = getControleAcesso();
+  const ativo = document.getElementById(`ca-${d}-ativo`).checked;
+  const ini = document.getElementById(`ca-${d}-ini`).value, fim = document.getElementById(`ca-${d}-fim`).value;
+  c.horarioSemanal[d] = { ativo, periodos: (ativo && ini && fim) ? [{ inicio: ini, fim }] : (ativo ? (c.horarioSemanal[d].periodos || []) : []), obs: c.horarioSemanal[d].obs || '' };
+  _caLog(`Horário de ${_CA_DIAS_LBL[d]} salvo: ${ativo ? ini + '–' + fim : 'inativo'}.`); saveState(); renderControleAcesso();
+};
+window.caLiberarUsuario = function (min) { const c = getControleAcesso(); const uid = document.getElementById('ca-lib-usuario').value; if (!uid) return; c.liberacoesUsuario = (c.liberacoesUsuario || []).filter(l => l.usuarioId !== uid); c.liberacoesUsuario.push({ usuarioId: uid, permanente: min === 0, ate: min === -1 ? _caFimDoDiaMs() : (min > 0 ? _caAteMs(min) : 0), por: loggedUser ? loggedUser.nome : '' }); const f = (state.funcionarios || []).find(x => x.id === uid); _caLog(`Liberou o usuário "${f ? f.nome : uid}" por ${min === 0 ? 'permanente' : min === -1 ? 'fim do dia' : min + ' min'}.`); saveState(); renderControleAcesso(); };
+window.caCancelarLibUsuario = function (i) { const c = getControleAcesso(); c.liberacoesUsuario.splice(i, 1); _caLog('Cancelou liberação de usuário.'); saveState(); renderControleAcesso(); };
+window.caLiberarDepto = function (min) { const c = getControleAcesso(); const dep = document.getElementById('ca-lib-depto').value; c.liberacoesDepto = (c.liberacoesDepto || []).filter(l => l.depto !== dep); c.liberacoesDepto.push({ depto: dep, ate: min === -1 ? _caFimDoDiaMs() : _caAteMs(min), por: loggedUser ? loggedUser.nome : '' }); _caLog(`Liberou o departamento "${dep}" por ${min === -1 ? 'fim do dia' : min + ' min'}.`); saveState(); renderControleAcesso(); };
+window.caCancelarLibDepto = function (i) { const c = getControleAcesso(); c.liberacoesDepto.splice(i, 1); _caLog('Cancelou liberação de departamento.'); saveState(); renderControleAcesso(); };
+window.caAddDataEspecial = function () { const c = getControleAcesso(); const data = document.getElementById('ca-esp-data').value; if (!data) { alert('Informe a data.'); return; } const tipo = document.getElementById('ca-esp-tipo').value; const ate = document.getElementById('ca-esp-ate').value; const obs = document.getElementById('ca-esp-obs').value; c.datasEspeciais = (c.datasEspeciais || []).filter(d => d.data !== data); c.datasEspeciais.push({ data, bloqueado: tipo === 'bloqueado', liberadoAte: tipo === 'liberado' ? ate : '', obs }); _caLog(`Data especial ${data}: ${tipo === 'bloqueado' ? 'bloqueada' : 'liberada até ' + ate}.`); saveState(); renderControleAcesso(); };
+window.caRemoveDataEspecial = function (i) { const c = getControleAcesso(); c.datasEspeciais.splice(i, 1); _caLog('Removeu data especial.'); saveState(); renderControleAcesso(); };
+window.caToggleExcecao = function (fid) { const c = getControleAcesso(); c.excecoesPermanentes = c.excecoesPermanentes || []; const i = c.excecoesPermanentes.indexOf(fid); if (i >= 0) c.excecoesPermanentes.splice(i, 1); else c.excecoesPermanentes.push(fid); _caLog('Alterou exceções permanentes de acesso.'); saveState(); renderControleAcesso(); };
 
 // ── Contador de bloqueio de login (um único intervalo, sem travar) ─────────
 let _bloqueioTimer = null;
@@ -976,6 +1334,8 @@ function setupNavigation() {
       e.preventDefault();
       const aba = item.getAttribute('data-aba');
       switchAba(aba);
+      // No celular, fecha a gaveta do menu após escolher uma área
+      if (window.innerWidth <= 768) document.body.classList.remove('menu-mobile-aberto');
     });
   });
 
@@ -984,6 +1344,11 @@ function setupNavigation() {
   const sidebar = document.querySelector('.sidebar');
   if (sidebarBtn && sidebar) {
     sidebarBtn.addEventListener('click', () => {
+      // No celular o botão abre/fecha a gaveta off-canvas (sem mexer na largura)
+      if (window.innerWidth <= 768) {
+        document.body.classList.toggle('menu-mobile-aberto');
+        return;
+      }
       sidebar.classList.toggle('collapsed');
       if (sidebar.classList.contains('collapsed')) {
         sidebar.style.width = '0px';
@@ -1051,7 +1416,8 @@ function switchAba(abaId) {
     'meu-painel': 'fa-solid fa-id-card-clip',
     'fila': 'fa-solid fa-ticket',
     'documentos': 'fa-solid fa-folder-open',
-    'lixeira': 'fa-solid fa-trash-can'
+    'lixeira': 'fa-solid fa-trash-can',
+    'controle-acesso': 'fa-solid fa-business-time'
   };
 
   const titleMap = {
@@ -1070,7 +1436,8 @@ function switchAba(abaId) {
     'meu-painel': 'R&T EMPREGOS — MEU PAINEL',
     'fila': 'R&T EMPREGOS — SISTEMA DE SENHAS',
     'documentos': 'R&T EMPREGOS — DOCUMENTOS NA NUVEM',
-    'lixeira': 'R&T EMPREGOS — LIXEIRA'
+    'lixeira': 'R&T EMPREGOS — LIXEIRA',
+    'controle-acesso': 'R&T EMPREGOS — CONTROLE DE ACESSO'
   };
 
   if (headerIcon) headerIcon.className = `${iconMap[abaId] || 'fa-solid fa-building'} header-icon`;
@@ -1130,6 +1497,9 @@ function renderCurrentAba() {
       break;
     case 'lixeira':
       renderLixeira();
+      break;
+    case 'controle-acesso':
+      renderControleAcesso();
       break;
   }
 }
@@ -1760,7 +2130,11 @@ function setupEventListeners() {
             const temVinculo = state.recrutadores && state.recrutadores.some(r => (r.usuarioId && r.usuarioId === found.id) || (r.loginVinculado && r.loginVinculado === found.login));
             if (temVinculo) homeAba = 'meu-painel';
           }
-          switchAba(homeAba);
+          // Controle de horário: só abre o painel se o acesso estiver autorizado agora.
+          // verificarSessao() (acima) já exibe o overlay de bloqueio quando aplicável.
+          if (typeof acessoPermitidoAgora !== 'function' || acessoPermitidoAgora(found).permitido) {
+            switchAba(homeAba);
+          }
         } else {
           let res = { bloqueado: false };
           if (typeof registrarTentativaFalha === 'function') res = registrarTentativaFalha(userVal);
@@ -4595,7 +4969,8 @@ const ABA_PARA_AREA = {
   'auditoria': 'sistema',
   'inaptos': 'sistema',
   'documentos': 'dp',
-  'lixeira': 'sistema'
+  'lixeira': 'sistema',
+  'controle-acesso': 'sistema'
 };
 
 function hasPermission(area, acao) {

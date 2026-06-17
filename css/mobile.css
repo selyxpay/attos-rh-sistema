@@ -1,0 +1,106 @@
+/* ==========================================================================
+   R&T VAGAS IA — RESPONSIVO MOBILE/TABLET (sistema interno)
+   Carregado por ÚLTIMO. Tudo dentro de @media — o desktop (>1024px) NÃO muda.
+   ========================================================================== */
+
+/* ---------- TABLET: 768px a 1024px ---------- */
+@media (max-width: 1024px) {
+  .form-group-grid:not(.manter-grid) { grid-template-columns: 1fr 1fr; }
+  .charts-grid, .dashboard-charts-grid, .kanban-wrapper { grid-template-columns: 1fr !important; }
+}
+
+/* ---------- CELULAR: até 768px ---------- */
+@media (max-width: 768px) {
+
+  /* Sidebar vira gaveta off-canvas (controlada por body.menu-mobile-aberto) */
+  .sidebar {
+    position: fixed !important;
+    top: 0; left: 0; bottom: 0;
+    width: 270px !important;
+    max-width: 82vw;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    z-index: 1200;
+    overflow-y: auto;
+    box-shadow: 4px 0 24px rgba(0,0,0,.35);
+  }
+  body.menu-mobile-aberto .sidebar { transform: translateX(0); }
+
+  /* Overlay escuro atrás do menu aberto */
+  #mobile-menu-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5);
+    z-index: 1150; display: none;
+  }
+  body.menu-mobile-aberto #mobile-menu-overlay { display: block; }
+
+  .main-layout { width: 100%; min-width: 0; }
+  .app-container { display: block; }
+
+  /* Header compacto */
+  .app-header { padding: 10px 12px; position: sticky; top: 0; z-index: 90; }
+  .header-app-name { font-size: 13px; }
+  #sidebar-toggle { display: inline-flex !important; font-size: 20px; padding: 6px 10px; }
+
+  /* Conteúdo: sem rolagem horizontal, padding menor */
+  .aba-content, .main-content, .content-area { padding-left: 12px !important; padding-right: 12px !important; }
+  body, .main-layout { overflow-x: hidden; }
+
+  /* Grades em coluna única */
+  .form-group-grid, .form-group-grid.col-3, .func-layout-grid { grid-template-columns: 1fr !important; }
+  .charts-grid, .dashboard-charts-grid, .kanban-wrapper, .site-stats-container { grid-template-columns: 1fr !important; }
+  .vagas-grid, .selecao-grid, .banco-grid { grid-template-columns: 1fr !important; }
+
+  /* Títulos de página + botões empilhados */
+  .page-title-section.title-with-btn { flex-direction: column; align-items: stretch; gap: 10px; }
+  .page-title-section.title-with-btn > div:last-child { flex-direction: column; }
+  .page-title-section .btn { width: 100%; justify-content: center; }
+
+  /* Campos e botões confortáveis ao toque */
+  .form-control, input.form-control, select.form-control, textarea.form-control,
+  .form-control-login { min-height: 44px; font-size: 15px; }
+  .btn { min-height: 44px; padding: 10px 14px; }
+  label { font-size: 13px; }
+
+  /* Modais ocupam a tela inteira (rolagem interna, rodapé visível) */
+  .modal-overlay { padding: 0 !important; align-items: stretch !important; }
+  .modal-box {
+    max-width: 100% !important; width: 100% !important;
+    max-height: 100% !important; height: 100vh; height: 100dvh;
+    border-radius: 0 !important; display: flex; flex-direction: column;
+  }
+  .modal-body { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .modal-footer { position: sticky; bottom: 0; background: var(--card-bg, #fff); border-top: 1px solid var(--border-color, #e2e8f0); }
+  .modal-footer .btn { flex: 1; }
+
+  /* Drawer da ficha (Seleção/DP) em tela cheia */
+  .drawer-candidato {
+    width: 100% !important; max-width: 100% !important;
+    height: 100vh; height: 100dvh; border-radius: 0 !important;
+  }
+  .drawer-footer { position: sticky; bottom: 0; }
+  .drawer-footer .drawer-footer-row { grid-template-columns: 1fr 1fr; }
+
+  /* Tabelas: rolagem horizontal controlada (não quebra a página) */
+  .table-scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+  .table-scroll-container table, .excel-table { min-width: 560px; }
+
+  /* Cards de candidato/vaga: largura total e toque maior */
+  .selecao-card, .vaga-card, .banco-candidato-card { width: 100%; }
+  .selecao-card .btn, .vaga-card .btn { min-height: 40px; }
+
+  /* Login em tela cheia confortável */
+  .login-glass-box { width: 92%; max-width: 420px; padding: 24px 20px; }
+
+  /* Evita textos minúsculos */
+  .vaga-desc, .banco-cand-sub { font-size: 13px; }
+}
+
+/* ---------- Celulares bem pequenos: até 380px ---------- */
+@media (max-width: 380px) {
+  .drawer-footer .drawer-footer-row { grid-template-columns: 1fr; }
+  .header-app-name { display: none; } /* mantém só o logo no header */
+}
+
+/* O botão hambúrguer (#sidebar-toggle) já existe; no desktop ele continua
+   com o comportamento atual. A classe utilitária abaixo o esconde >1024px
+   só se for marcado como exclusivo de mobile (não aplicado por padrão). */

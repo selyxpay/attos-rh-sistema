@@ -240,6 +240,25 @@ window.RTCloud = (function () {
     }).sort(function (a, b) { return (b.enviadoEm || 0) - (a.enviadoEm || 0); });
   }
 
+  // -- Hora confiável do servidor (resiste a relógio adulterado) -------------
+  // Grava e lê um serverTimestamp no Firestore e devolve o offset servidor-local.
+  async function horaServidor() {
+    if (!configured) return { epoch: Date.now(), offset: 0, fonte: 'local' };
+    try {
+      await ensureSdk();
+      ensureClient();
+      const ref = db.collection(COLLECTION).doc('_serverclock');
+      await ref.set({ t: window.firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      const snap = await ref.get();
+      const t = snap.exists && snap.data() ? snap.data().t : null;
+      const serverMs = (t && t.toMillis) ? t.toMillis() : Date.now();
+      return { epoch: serverMs, offset: serverMs - Date.now(), fonte: 'firebase' };
+    } catch (e) {
+      console.warn('[RT Nuvem] horaServidor falhou, usando relógio local:', e && e.message);
+      return { epoch: Date.now(), offset: 0, fonte: 'local' };
+    }
+  }
+
   return {
     configured: configured,
     backend: 'firebase',
@@ -247,6 +266,7 @@ window.RTCloud = (function () {
     loadState: loadState,
     saveState: saveState,
     flush: flush,
-    listarDocumentos: listarDocumentos
+    listarDocumentos: listarDocumentos,
+    horaServidor: horaServidor
   };
 })();

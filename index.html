@@ -28,6 +28,8 @@
     <link rel="stylesheet" href="css/design-system.css">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
     <link rel="stylesheet" href="css/ux-enhancements.css">
+    <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
+    <link rel="stylesheet" href="css/mobile.css">
 </head>
 <body>
 
@@ -122,6 +124,21 @@
         </div>
     </div>
 
+    <!-- Tela de bloqueio por horário (controle de acesso interno) -->
+    <div id="overlay-horario" style="display:none;position:fixed;inset:0;z-index:3000;background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:24px;">
+        <div style="max-width:460px;width:100%;">
+            <i class="fa-solid fa-clock" style="font-size:48px;color:#f59e0b;margin-bottom:16px;"></i>
+            <h2 style="font-size:22px;margin-bottom:10px;">Acesso indisponível fora do horário autorizado</h2>
+            <p id="oh-mensagem" style="color:#cbd5e1;font-size:14px;margin-bottom:18px;line-height:1.5;"></p>
+            <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;text-align:left;font-size:13px;line-height:2;">
+                <div><strong>Horário atual:</strong> <span id="oh-hora">—</span></div>
+                <div><strong>Próxima liberação:</strong> <span id="oh-proxima">—</span></div>
+                <div><strong>Departamento:</strong> <span id="oh-depto">—</span></div>
+            </div>
+            <button onclick="try{localStorage.removeItem('rt_logged_user')}catch(e){};location.reload();" style="margin-top:20px;background:#ef4444;color:#fff;border:none;padding:12px 24px;border-radius:8px;font-weight:700;cursor:pointer;"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
+        </div>
+    </div>
+
     <!-- Layout Wrapper -->
     <div class="app-container">
         
@@ -183,6 +200,9 @@
                     <li class="nav-item" data-aba="lixeira" id="nav-item-lixeira" style="display:none;">
                         <a href="#"><i class="fa-solid fa-trash-can"></i> <span>Lixeira</span></a>
                     </li>
+                    <li class="nav-item" data-aba="controle-acesso" id="nav-item-controle-acesso" style="display:none;">
+                        <a href="#"><i class="fa-solid fa-business-time"></i> <span>Controle de Acesso</span></a>
+                    </li>
                 </ul>
             </nav>
             
@@ -191,7 +211,10 @@
                 <span class="sidebar-version">v1.4.0</span>
             </div>
         </aside>
-        
+
+        <!-- Overlay do menu mobile (fecha a gaveta ao tocar fora) -->
+        <div id="mobile-menu-overlay" onclick="document.body.classList.remove('menu-mobile-aberto')"></div>
+
         <!-- AREA DE CONTEÚDO PRINCIPAL (Main Area) -->
         <div class="main-layout">
             
@@ -1298,6 +1321,17 @@
                             <p style="color:var(--text-secondary);font-size:13px;margin:6px 0 0;max-width:680px;">Fichas excluídas (exclusão lógica). Você pode <strong>restaurar</strong> ou <strong>excluir definitivamente</strong>. Área restrita ao administrador geral.</p>
                         </div>
                         <div id="lixeira-lista"></div>
+                    </div>
+                </section>
+
+                <!-- ABA: CONTROLE DE ACESSO POR HORÁRIO (só admin geral) -->
+                <section id="aba-controle-acesso" class="aba-content">
+                    <div style="max-width:1100px;margin:0 auto;padding:0 0 40px;">
+                        <div style="margin-bottom:18px;">
+                            <h2 style="margin:0;font-size:22px;"><i class="fa-solid fa-business-time" style="color:var(--primary);"></i> Controle de Acesso por Horário</h2>
+                            <p style="color:var(--text-secondary);font-size:13px;margin:6px 0 0;max-width:720px;">Defina os horários de acesso dos usuários internos, bloqueie ou libere o sistema. Os candidatos (formulários públicos) <strong>nunca</strong> são afetados.</p>
+                        </div>
+                        <div id="controle-acesso-conteudo"></div>
                     </div>
                 </section>
 
