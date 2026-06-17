@@ -1827,6 +1827,7 @@ function setupEventListeners() {
         categoriaUtilizado: g('vaga-add-categoria-utilizado'),
         tipoContrato: tipoContr ? tipoContr.nome : g('vaga-add-tipo-contrato'),
         vinculo: vincCode,                          // código do vínculo -> campo TXT 'vinculo'
+        codigoTipoContrato: tipoContr ? (tipoContr.codigoTipoContrato || tipoContr.vinculo) : '',
         tipoContratacaoId: tipoContr ? tipoContr.id : '',
         employmentType: tipoContr ? tipoContr.id : '',
         employmentLabel: tipoContr ? tipoContr.nome : '',
@@ -2600,9 +2601,9 @@ window.trocarFuncaoExata = trocarFuncaoExata;
 // ── Tipos de Contratação (configuráveis pelo admin) ───────────────────────
 function tiposContratacaoDefault() {
   return [
-    { id: 'tc-efetivo', nome: 'Efetivo (CLT)', vinculo: '101', filial: '01', diasVencimento: 0, diasProrrogacao: 0, ativo: true },
-    { id: 'tc-temporario', nome: 'Temporário', vinculo: '106', filial: '00', diasVencimento: 180, diasProrrogacao: 90, ativo: true },
-    { id: 'tc-intermitente', nome: 'Intermitente', vinculo: '111', filial: '', diasVencimento: 0, diasProrrogacao: 0, ativo: true }
+    { id: 'tc-efetivo', nome: 'Efetivo (CLT)', vinculo: '101', codigoTipoContrato: '101', filial: '01', diasVencimento: 0, diasProrrogacao: 0, ativo: true },
+    { id: 'tc-temporario', nome: 'Temporário', vinculo: '106', codigoTipoContrato: '106', filial: '00', diasVencimento: 180, diasProrrogacao: 90, ativo: true },
+    { id: 'tc-intermitente', nome: 'Intermitente', vinculo: '111', codigoTipoContrato: '111', filial: '', diasVencimento: 0, diasProrrogacao: 0, ativo: true }
   ];
 }
 function getTiposContratacao() {
@@ -2648,6 +2649,7 @@ function renderCadastrosExata() {
   const linhas = getTiposContratacao().map(t => `
     <tr>
       <td style="font-weight:600;">${escapeHTML(t.nome)}</td>
+      <td>${escapeHTML(t.codigoTipoContrato || t.vinculo)}</td>
       <td>${escapeHTML(t.vinculo)}</td>
       <td>${escapeHTML(t.filial || '—')}</td>
       <td>${t.diasVencimento || 0}</td>
@@ -2662,7 +2664,7 @@ function renderCadastrosExata() {
     <div style="background:var(--card-bg,#fff);border:1px solid var(--border-color,#e2e8f0);border-radius:12px;padding:16px;margin-bottom:16px;">
       <h4 style="margin:0 0 10px;font-size:14px;"><i class="fa-solid fa-briefcase"></i> Tipos de Contratação</h4>
       <div class="table-scroll-container"><table class="excel-table" style="width:100%;">
-        <thead><tr><th>Tipo</th><th>Vínculo</th><th>Filial</th><th>Dias venc.</th><th>Dias prorr.</th><th>Ações</th></tr></thead>
+        <thead><tr><th>Tipo</th><th>Cód. contrato</th><th>Vínculo</th><th>Filial</th><th>Dias venc.</th><th>Dias prorr.</th><th>Ações</th></tr></thead>
         <tbody>${linhas}</tbody></table></div>
       <p style="font-size:11px;color:var(--text-secondary);margin-top:8px;">Ao criar a vaga e escolher o tipo, o sistema preenche vínculo + filial automaticamente. Para temporário, calcula vencimento/prorrogação pelos dias acima.</p>
     </div>
@@ -2671,24 +2673,27 @@ function renderCadastrosExata() {
       <input type="hidden" id="tc-edit-id">
       <div class="form-group-grid">
         <div class="form-group"><label for="tc-nome">Nome (tipo de contratação)</label><input id="tc-nome" class="form-control" placeholder="Ex: Temporário"></div>
-        <div class="form-group"><label for="tc-vinculo">Código do vínculo</label><input id="tc-vinculo" class="form-control" placeholder="Ex: 106"></div>
+        <div class="form-group"><label for="tc-codigo-tipo">Código do tipo de contrato <span style="font-weight:400;color:var(--text-secondary)">(vai no TXT)</span></label><input id="tc-codigo-tipo" class="form-control" placeholder="Ex: 106"></div>
       </div>
       <div class="form-group-grid">
+        <div class="form-group"><label for="tc-vinculo">Código do vínculo</label><input id="tc-vinculo" class="form-control" placeholder="Ex: 106"></div>
         <div class="form-group"><label for="tc-filial">Filial</label><input id="tc-filial" class="form-control" placeholder="Ex: 00 ou 01"></div>
-        <div class="form-group"><label for="tc-venc">Dias até vencimento (0 = sem)</label><input id="tc-venc" type="number" class="form-control" value="0"></div>
       </div>
-      <div class="form-group"><label for="tc-prorr">Dias de prorrogação (0 = sem)</label><input id="tc-prorr" type="number" class="form-control" value="0"></div>
+      <div class="form-group-grid">
+        <div class="form-group"><label for="tc-venc">Dias até vencimento (0 = sem)</label><input id="tc-venc" type="number" class="form-control" value="0"></div>
+        <div class="form-group"><label for="tc-prorr">Dias de prorrogação (0 = sem)</label><input id="tc-prorr" type="number" class="form-control" value="0"></div>
+      </div>
       <div style="display:flex;gap:8px;"><button class="btn btn-primary btn-sm" onclick="salvarTipoContratacao()">Salvar</button><button class="btn btn-secondary btn-sm" onclick="limparFormTipoContratacao()">Limpar</button></div>
     </div>`;
 }
 window.editarTipoContratacao = function (id) {
   const t = getTipoContratacao(id); if (!t) return;
   const s = (i, v) => { const e = document.getElementById(i); if (e) e.value = v; };
-  s('tc-edit-id', t.id); s('tc-nome', t.nome); s('tc-vinculo', t.vinculo); s('tc-filial', t.filial); s('tc-venc', t.diasVencimento || 0); s('tc-prorr', t.diasProrrogacao || 0);
+  s('tc-edit-id', t.id); s('tc-nome', t.nome); s('tc-codigo-tipo', t.codigoTipoContrato || t.vinculo); s('tc-vinculo', t.vinculo); s('tc-filial', t.filial); s('tc-venc', t.diasVencimento || 0); s('tc-prorr', t.diasProrrogacao || 0);
   const tit = document.getElementById('tc-form-titulo'); if (tit) tit.textContent = 'Editar tipo de contratação';
 };
 window.limparFormTipoContratacao = function () {
-  ['tc-edit-id', 'tc-nome', 'tc-vinculo', 'tc-filial'].forEach(i => { const e = document.getElementById(i); if (e) e.value = ''; });
+  ['tc-edit-id', 'tc-nome', 'tc-codigo-tipo', 'tc-vinculo', 'tc-filial'].forEach(i => { const e = document.getElementById(i); if (e) e.value = ''; });
   ['tc-venc', 'tc-prorr'].forEach(i => { const e = document.getElementById(i); if (e) e.value = '0'; });
   const tit = document.getElementById('tc-form-titulo'); if (tit) tit.textContent = 'Adicionar tipo de contratação';
 };
@@ -2698,7 +2703,7 @@ window.salvarTipoContratacao = function () {
   if (!nome || !vinc) { alert('Informe o nome e o código do vínculo.'); return; }
   const editId = g('tc-edit-id');
   if (editId && !(loggedUser && loggedUser.login === 'joaobalaf')) { alert('Somente o administrador João Balear pode alterar tipos existentes.'); return; }
-  const dados = { nome, vinculo: vinc, filial: fil, diasVencimento: Number(g('tc-venc')) || 0, diasProrrogacao: Number(g('tc-prorr')) || 0, ativo: true };
+  const dados = { nome, vinculo: vinc, codigoTipoContrato: g('tc-codigo-tipo').trim() || vinc, filial: fil, diasVencimento: Number(g('tc-venc')) || 0, diasProrrogacao: Number(g('tc-prorr')) || 0, ativo: true };
   const tipos = getTiposContratacao();
   if (editId) { const t = tipos.find(x => x.id === editId); if (t) Object.assign(t, dados); registrarLogGlobal(`Editou tipo de contratação "${nome}".`, 'exata'); }
   else { dados.id = 'tc-' + Date.now(); tipos.push(dados); registrarLogGlobal(`Adicionou tipo de contratação "${nome}".`, 'exata'); }
@@ -4578,7 +4583,7 @@ function aplicarSnapshotVaga(cand, vagaId) {
     funcaoNome: vaga.funcaoNome || '', funcaoCodigo: vaga.funcaoCodigo || '', cbo: vaga.cbo || '',
     exataFuncaoArea: vaga.exataFuncaoArea || '', exataJobFunctionId: vaga.exataJobFunctionId || '',
     employmentLabel: vaga.employmentLabel || '', exataEmploymentCode: vaga.exataEmploymentCode || '', filial: vaga.filial || vaga.branchCode || '',
-    tipoContratacaoId: vaga.tipoContratacaoId || '', diasVencimento: vaga.diasVencimento || 0, diasProrrogacao: vaga.diasProrrogacao || 0,
+    tipoContratacaoId: vaga.tipoContratacaoId || '', codigoTipoContrato: vaga.codigoTipoContrato || vaga.vinculo || '', diasVencimento: vaga.diasVencimento || 0, diasProrrogacao: vaga.diasProrrogacao || 0,
     categoria: vaga.categoria || '', categoriaCodigo: vaga.categoriaCodigo || '', categoriaUtilizado: vaga.categoriaUtilizado || '',
     tipoContrato: vaga.tipoContrato || '', vinculo: vaga.vinculo || '',
     finalidade: vaga.finalidade || '', justificativa: vaga.justificativa || '',
@@ -5088,8 +5093,8 @@ function mapearExata(cand, vs) {
   const ctpsUf = cand.ctpsUf || cand.rgUf || cand.estado || '';
   const rgUfFinal = cand.rgOrgaoEmissor || cand.rgUf || '';
   return [
-    vs.tipoContrato,                              // 1 tipo_contrato (vaga)
-    vs.vinculo,                                   // 2 vinculo (vaga)
+    vs.codigoTipoContrato || vs.vinculo,          // 1 tipo_contrato (CÓDIGO, não o nome)
+    vs.vinculo,                                   // 2 vinculo (código do vínculo)
     cand.id,                                      // 3 id (ID interno do candidato)
     cand.nome,                                    // 4 nome
     cand.email,                                   // 5 email
