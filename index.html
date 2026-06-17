@@ -203,6 +203,9 @@
                     <li class="nav-item" data-aba="controle-acesso" id="nav-item-controle-acesso" style="display:none;">
                         <a href="#"><i class="fa-solid fa-business-time"></i> <span>Controle de Acesso</span></a>
                     </li>
+                    <li class="nav-item" data-aba="cadastros-exata" id="nav-item-cadastros-exata" style="display:none;">
+                        <a href="#"><i class="fa-solid fa-file-invoice"></i> <span>Cadastros Exata</span></a>
+                    </li>
                 </ul>
             </nav>
             
@@ -1141,6 +1144,17 @@
                     </div>
                 </section>
 
+                <!-- ABA: CADASTROS EXATA (tipos de contratação) -->
+                <section id="aba-cadastros-exata" class="aba-content">
+                    <div style="max-width:1000px;margin:0 auto;padding:0 0 40px;">
+                        <div style="margin-bottom:18px;">
+                            <h2 style="margin:0;font-size:22px;"><i class="fa-solid fa-file-invoice" style="color:var(--primary);"></i> Cadastros Exata</h2>
+                            <p style="color:var(--text-secondary);font-size:13px;margin:6px 0 0;max-width:720px;">Tipos de contratação (vínculo + filial + regras de prazo) usados na criação da vaga e na exportação do TXT.</p>
+                        </div>
+                        <div id="cadastros-exata-conteudo"></div>
+                    </div>
+                </section>
+
                 <!-- ABA: CONFIGURAÇÕES (SOMENTE ADMIN) -->
                 <section id="aba-configuracoes" class="aba-content">
                     <div style="max-width: 980px; margin: 0 auto; padding: 0 0 60px;">
@@ -1644,6 +1658,15 @@
                         <input type="date" id="det-data-admissao" class="form-control" style="width:100%;">
                         <span style="font-size:10px; color:var(--text-secondary);">Preenche com a data de hoje automaticamente; clique para editar.</span>
                     </div>
+                    <div style="width:100%; background:rgba(124,58,237,0.06); border:1px solid rgba(124,58,237,0.25); border-radius:8px; padding:8px 10px;">
+                        <label style="font-size:11px; font-weight:700; color:#6d28d9; display:flex; align-items:center; gap:5px; margin-bottom:6px;"><i class="fa-solid fa-id-card"></i> RG / EXPEDIÇÃO (usado no Exata)</label>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                            <input type="text" id="det-rg-orgao" class="form-control" placeholder="Órgão emissor (ex: SSP/SP)">
+                            <input type="text" id="det-rg-uf" class="form-control" placeholder="UF do RG (ex: SP)" maxlength="2">
+                            <input type="text" id="det-rg-expedicao" class="form-control" placeholder="Data de expedição (DD/MM/AAAA)">
+                            <input type="text" id="det-rg-numero" class="form-control" placeholder="Número do RG">
+                        </div>
+                    </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
                         <button class="btn btn-primary" id="btn-dp-exportar" style="background-color: #3b82f6; color: white; border: none; padding: 10px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px;"><i class="fa-solid fa-file-zipper"></i> EXPORTAR PASTA</button>
                         <button class="btn" id="btn-dp-exportar-exata" style="background-color: #7c3aed; color: white; border: none; padding: 10px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px;"><i class="fa-solid fa-file-export"></i> EXPORTAR EXATA</button>
@@ -1782,7 +1805,7 @@
                     <div class="vaga-sec-title" style="margin:4px 0 10px;font-weight:700;font-size:13px;color:var(--primary);border-bottom:1px solid var(--border);padding-bottom:5px;"><i class="fa-solid fa-building"></i> Empresa e identificação da vaga</div>
                     <div class="form-group">
                         <label for="vaga-add-empresa">Empresa Parceira *</label>
-                        <select id="vaga-add-empresa" required class="form-control"><!-- Empresas --></select>
+                        <select id="vaga-add-empresa" required class="form-control" onchange="aoMudarEmpresaVaga()"><!-- Empresas --></select>
                     </div>
                     <div class="form-group-grid">
                         <div class="form-group">
@@ -2153,6 +2176,10 @@
                     <div class="form-group">
                         <label for="cli-cnpj">CNPJ *</label>
                         <input type="text" id="cli-cnpj" required class="form-control" placeholder="00.000.000/0000-00" maxlength="18" oninput="mascaraCNPJ(this)">
+                    </div>
+                    <div class="form-group">
+                        <label for="cli-id-exata">ID Empresa Exata (tomador) <span style="font-weight:400;color:var(--text-secondary)">— opcional</span></label>
+                        <input type="text" id="cli-id-exata" class="form-control" placeholder="Preenche o id_empresa_exata no TXT">
                     </div>
                     <p style="font-size:11px;color:var(--text-secondary);margin:10px 0 0;line-height:1.5;">
                         <i class="fa-solid fa-circle-info"></i>

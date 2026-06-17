@@ -1817,7 +1817,9 @@ h1, h2, h3, h4, h5, h6 {
     position: absolute;
     top: 0;
     right: 0;
-    width: 860px;
+    width: 62vw;
+    min-width: 820px;
+    max-width: 1200px;
     height: 100%;
     background-color: var(--card-bg);
     box-shadow: -10px 0 30px rgba(0,0,0,0.08);

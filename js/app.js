@@ -227,6 +227,7 @@ function isAbaAutorizada(abaId) {
   if (abaId === 'fila') return true; // todos os logados acessam
   if (abaId === 'lixeira') return loggedUser.login === 'joaobalaf' || loggedUser.departamento === 'administracao';
   if (abaId === 'controle-acesso') return podeGerenciarHorarios();
+  if (abaId === 'cadastros-exata') return loggedUser.login === 'joaobalaf' || loggedUser.departamento === 'administracao';
   if (loggedUser.login === 'joaobalaf') return true;
   const depto = loggedUser.departamento;
   if (depto === 'administracao') return true;
@@ -918,6 +919,8 @@ function initLocalStorage() {
 
     // Controle de acesso por horário (começa desligado — não muda o comportamento atual)
     if (!state.controleAcesso) { state.controleAcesso = controleAcessoDefault(); alterado = true; }
+    // Tipos de contratação (vínculo/filial/regras) configuráveis pelo admin
+    if (!state.tiposContratacao || !state.tiposContratacao.length) { state.tiposContratacao = tiposContratacaoDefault(); alterado = true; }
 
     if (alterado) {
       saveState();
@@ -1418,7 +1421,8 @@ function switchAba(abaId) {
     'fila': 'fa-solid fa-ticket',
     'documentos': 'fa-solid fa-folder-open',
     'lixeira': 'fa-solid fa-trash-can',
-    'controle-acesso': 'fa-solid fa-business-time'
+    'controle-acesso': 'fa-solid fa-business-time',
+    'cadastros-exata': 'fa-solid fa-file-invoice'
   };
 
   const titleMap = {
@@ -1438,7 +1442,8 @@ function switchAba(abaId) {
     'fila': 'R&T EMPREGOS — SISTEMA DE SENHAS',
     'documentos': 'R&T EMPREGOS — DOCUMENTOS NA NUVEM',
     'lixeira': 'R&T EMPREGOS — LIXEIRA',
-    'controle-acesso': 'R&T EMPREGOS — CONTROLE DE ACESSO'
+    'controle-acesso': 'R&T EMPREGOS — CONTROLE DE ACESSO',
+    'cadastros-exata': 'R&T EMPREGOS — CADASTROS EXATA'
   };
 
   if (headerIcon) headerIcon.className = `${iconMap[abaId] || 'fa-solid fa-building'} header-icon`;
@@ -1501,6 +1506,9 @@ function renderCurrentAba() {
       break;
     case 'controle-acesso':
       renderControleAcesso();
+      break;
+    case 'cadastros-exata':
+      renderCadastrosExata();
       break;
   }
 }
@@ -1780,13 +1788,13 @@ function setupEventListeners() {
 
       // Vínculo (código oficial) + função do catálogo + validação Exata
       const vincSel = document.getElementById('vaga-add-vinculo');
-      const vincOpt = (vincSel && vincSel.selectedIndex >= 0) ? vincSel.options[vincSel.selectedIndex] : null;
-      const vincCode = (vincOpt && vincOpt.getAttribute('data-code')) || '';
+      const tipoContr = getTipoContratacao(vincSel ? vincSel.value : '');
+      const vincCode = tipoContr ? tipoContr.vinculo : '';
       const funcExata = getFuncaoExata(g('vaga-add-funcao-codigo'));
       const erXata = [];
       if (!g('vaga-add-funcao-codigo') || !funcExata) erXata.push('Selecione uma função válida do catálogo do Exata.');
       else if (!funcExata.cbo) erXata.push('O CBO da função não foi identificado.');
-      if (!vincCode) erXata.push('Selecione o tipo de contratação (vínculo).');
+      if (!tipoContr) erXata.push('Selecione o tipo de contratação.');
       if (erXata.length) { alert('Verifique as Informações para o Exata:\n\n• ' + erXata.join('\n• ')); return; }
 
       const novaVaga = {
@@ -1803,7 +1811,7 @@ function setupEventListeners() {
         tomadorNome: g('vaga-add-tomador-nome'),
         tomadorCodigo: g('vaga-add-tomador-codigo'),
         tomadorCnpj: g('vaga-add-tomador-cnpj'),
-        idEmpresaExata: g('vaga-add-exata-id'),
+        idEmpresaExata: g('vaga-add-exata-id') || (empresa.idEmpresaExata || ''),
         centroCusto: g('vaga-add-centro-custo'),
         siglaCentroCusto: g('vaga-add-centro-sigla'),
         endereco: {
@@ -1817,14 +1825,16 @@ function setupEventListeners() {
         categoria: g('vaga-add-categoria'),
         categoriaCodigo: g('vaga-add-categoria-codigo'),
         categoriaUtilizado: g('vaga-add-categoria-utilizado'),
-        tipoContrato: g('vaga-add-tipo-contrato'),
-        vinculo: vincCode,                          // código oficial (101/106/111) -> campo TXT 'vinculo'
-        employmentType: vincSel ? vincSel.value : '',
-        employmentLabel: vincOpt ? vincOpt.textContent.trim() : '',
+        tipoContrato: tipoContr ? tipoContr.nome : g('vaga-add-tipo-contrato'),
+        vinculo: vincCode,                          // código do vínculo -> campo TXT 'vinculo'
+        tipoContratacaoId: tipoContr ? tipoContr.id : '',
+        employmentType: tipoContr ? tipoContr.id : '',
+        employmentLabel: tipoContr ? tipoContr.nome : '',
         exataEmploymentCode: vincCode,
-        filial: _filialPorVinculo(vincCode),        // automática: 101->01 (CLT) · 106->00 (Temporário)
-        branchCode: _filialPorVinculo(vincCode),
-        branchLabel: g('vaga-add-filial'),
+        filial: tipoContr ? tipoContr.filial : '',  // automática pelo tipo de contratação
+        branchCode: tipoContr ? tipoContr.filial : '',
+        diasVencimento: tipoContr ? (tipoContr.diasVencimento || 0) : 0,
+        diasProrrogacao: tipoContr ? (tipoContr.diasProrrogacao || 0) : 0,
         exataJobFunctionId: g('vaga-exata-id') || g('vaga-add-funcao-codigo'),
         exataFuncaoArea: g('vaga-exata-area'),
         finalidade: g('vaga-add-finalidade'),
@@ -1893,6 +1903,7 @@ function setupEventListeners() {
       const novaEmpresa = {
         id: 'emp-' + Date.now(),
         nome, cnpj, sigla, cor,
+        idEmpresaExata: (document.getElementById('cli-id-exata')?.value || '').trim(),
         status: 'ativo',
         criadoEm: new Date().toLocaleString('pt-BR'),
         criadoPor: loggedUser ? loggedUser.nome : 'Sistema'
@@ -2586,16 +2597,120 @@ function trocarFuncaoExata() {
 }
 window.trocarFuncaoExata = trocarFuncaoExata;
 
-// Filial é automática pelo vínculo (101->Filial 01 CLT · 106->Filial 00 Temporário)
+// ── Tipos de Contratação (configuráveis pelo admin) ───────────────────────
+function tiposContratacaoDefault() {
+  return [
+    { id: 'tc-efetivo', nome: 'Efetivo (CLT)', vinculo: '101', filial: '01', diasVencimento: 0, diasProrrogacao: 0, ativo: true },
+    { id: 'tc-temporario', nome: 'Temporário', vinculo: '106', filial: '00', diasVencimento: 180, diasProrrogacao: 90, ativo: true },
+    { id: 'tc-intermitente', nome: 'Intermitente', vinculo: '111', filial: '', diasVencimento: 0, diasProrrogacao: 0, ativo: true }
+  ];
+}
+function getTiposContratacao() {
+  if (!state.tiposContratacao || !state.tiposContratacao.length) state.tiposContratacao = tiposContratacaoDefault();
+  return state.tiposContratacao;
+}
+function getTipoContratacao(id) { return getTiposContratacao().find(t => t.id === id) || null; }
+function _tipoIdPorVinculo(vinc) { const t = getTiposContratacao().find(x => x.vinculo === String(vinc)); return t ? t.id : ''; }
+function popularSelectVinculo(selectedId) {
+  const sel = document.getElementById('vaga-add-vinculo');
+  if (!sel) return;
+  const tipos = getTiposContratacao().filter(t => t.ativo !== false);
+  sel.innerHTML = '<option value="">Selecione…</option>' + tipos.map(t =>
+    `<option value="${t.id}" data-filial="${escapeHTML(t.filial)}">${escapeHTML(t.nome)} — vínculo ${escapeHTML(t.vinculo)}</option>`).join('');
+  if (selectedId) sel.value = selectedId;
+}
+// Filial é automática pelo tipo de contratação selecionado
 function aoMudarVinculoVaga() {
   const sel = document.getElementById('vaga-add-vinculo');
   const opt = (sel && sel.selectedIndex >= 0) ? sel.options[sel.selectedIndex] : null;
-  const code = (opt && opt.getAttribute('data-code')) || '';
-  const fil = _filialPorVinculo(code);
+  const fil = (opt && opt.getAttribute('data-filial')) || '';
   const inp = document.getElementById('vaga-add-filial');
-  if (inp) inp.value = fil ? (fil + (fil === '01' ? ' — CLT Efetivo' : fil === '00' ? ' — Temporário' : '')) : '';
+  if (inp) inp.value = fil ? ('Filial ' + fil) : '';
 }
 window.aoMudarVinculoVaga = aoMudarVinculoVaga;
+
+// Ao escolher a empresa/tomador na vaga, puxa o id_empresa_exata do cadastro
+function aoMudarEmpresaVaga() {
+  const sel = document.getElementById('vaga-add-empresa');
+  const emp = (state.empresas || []).find(e => e.id === (sel ? sel.value : ''));
+  const inp = document.getElementById('vaga-add-exata-id');
+  if (inp && emp && emp.idEmpresaExata && !inp.value) inp.value = emp.idEmpresaExata;
+}
+window.aoMudarEmpresaVaga = aoMudarEmpresaVaga;
+
+// ── Painel admin: Cadastros Exata (tipos de contratação) ──────────────────
+function renderCadastrosExata() {
+  const cont = document.getElementById('cadastros-exata-conteudo');
+  if (!cont) return;
+  const ehAdmin = loggedUser && (loggedUser.login === 'joaobalaf' || loggedUser.departamento === 'administracao');
+  if (!ehAdmin) { cont.innerHTML = '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#b91c1c;padding:16px;border-radius:12px;font-size:13px;"><i class="fa-solid fa-lock"></i> Área restrita ao administrador.</div>'; return; }
+  const soJoao = !!(loggedUser && loggedUser.login === 'joaobalaf');
+  const linhas = getTiposContratacao().map(t => `
+    <tr>
+      <td style="font-weight:600;">${escapeHTML(t.nome)}</td>
+      <td>${escapeHTML(t.vinculo)}</td>
+      <td>${escapeHTML(t.filial || '—')}</td>
+      <td>${t.diasVencimento || 0}</td>
+      <td>${t.diasProrrogacao || 0}</td>
+      <td style="display:flex;gap:6px;">
+        ${soJoao
+          ? `<button class="btn btn-secondary btn-sm" onclick="editarTipoContratacao('${t.id}')"><i class="fa-solid fa-pen"></i></button><button class="btn btn-sm" style="background:#fff1f2;color:#dc2626;border:1px solid #fca5a5;" onclick="excluirTipoContratacao('${t.id}')"><i class="fa-solid fa-trash"></i></button>`
+          : '<span style="font-size:11px;color:var(--text-secondary);">só João altera</span>'}
+      </td>
+    </tr>`).join('');
+  cont.innerHTML = `
+    <div style="background:var(--card-bg,#fff);border:1px solid var(--border-color,#e2e8f0);border-radius:12px;padding:16px;margin-bottom:16px;">
+      <h4 style="margin:0 0 10px;font-size:14px;"><i class="fa-solid fa-briefcase"></i> Tipos de Contratação</h4>
+      <div class="table-scroll-container"><table class="excel-table" style="width:100%;">
+        <thead><tr><th>Tipo</th><th>Vínculo</th><th>Filial</th><th>Dias venc.</th><th>Dias prorr.</th><th>Ações</th></tr></thead>
+        <tbody>${linhas}</tbody></table></div>
+      <p style="font-size:11px;color:var(--text-secondary);margin-top:8px;">Ao criar a vaga e escolher o tipo, o sistema preenche vínculo + filial automaticamente. Para temporário, calcula vencimento/prorrogação pelos dias acima.</p>
+    </div>
+    <div style="background:var(--card-bg,#fff);border:1px solid var(--border-color,#e2e8f0);border-radius:12px;padding:16px;">
+      <h4 id="tc-form-titulo" style="margin:0 0 10px;font-size:14px;">Adicionar tipo de contratação</h4>
+      <input type="hidden" id="tc-edit-id">
+      <div class="form-group-grid">
+        <div class="form-group"><label for="tc-nome">Nome (tipo de contratação)</label><input id="tc-nome" class="form-control" placeholder="Ex: Temporário"></div>
+        <div class="form-group"><label for="tc-vinculo">Código do vínculo</label><input id="tc-vinculo" class="form-control" placeholder="Ex: 106"></div>
+      </div>
+      <div class="form-group-grid">
+        <div class="form-group"><label for="tc-filial">Filial</label><input id="tc-filial" class="form-control" placeholder="Ex: 00 ou 01"></div>
+        <div class="form-group"><label for="tc-venc">Dias até vencimento (0 = sem)</label><input id="tc-venc" type="number" class="form-control" value="0"></div>
+      </div>
+      <div class="form-group"><label for="tc-prorr">Dias de prorrogação (0 = sem)</label><input id="tc-prorr" type="number" class="form-control" value="0"></div>
+      <div style="display:flex;gap:8px;"><button class="btn btn-primary btn-sm" onclick="salvarTipoContratacao()">Salvar</button><button class="btn btn-secondary btn-sm" onclick="limparFormTipoContratacao()">Limpar</button></div>
+    </div>`;
+}
+window.editarTipoContratacao = function (id) {
+  const t = getTipoContratacao(id); if (!t) return;
+  const s = (i, v) => { const e = document.getElementById(i); if (e) e.value = v; };
+  s('tc-edit-id', t.id); s('tc-nome', t.nome); s('tc-vinculo', t.vinculo); s('tc-filial', t.filial); s('tc-venc', t.diasVencimento || 0); s('tc-prorr', t.diasProrrogacao || 0);
+  const tit = document.getElementById('tc-form-titulo'); if (tit) tit.textContent = 'Editar tipo de contratação';
+};
+window.limparFormTipoContratacao = function () {
+  ['tc-edit-id', 'tc-nome', 'tc-vinculo', 'tc-filial'].forEach(i => { const e = document.getElementById(i); if (e) e.value = ''; });
+  ['tc-venc', 'tc-prorr'].forEach(i => { const e = document.getElementById(i); if (e) e.value = '0'; });
+  const tit = document.getElementById('tc-form-titulo'); if (tit) tit.textContent = 'Adicionar tipo de contratação';
+};
+window.salvarTipoContratacao = function () {
+  const g = i => ((document.getElementById(i) || {}).value || '');
+  const nome = g('tc-nome').trim(), vinc = g('tc-vinculo').trim(), fil = g('tc-filial').trim();
+  if (!nome || !vinc) { alert('Informe o nome e o código do vínculo.'); return; }
+  const editId = g('tc-edit-id');
+  if (editId && !(loggedUser && loggedUser.login === 'joaobalaf')) { alert('Somente o administrador João Balear pode alterar tipos existentes.'); return; }
+  const dados = { nome, vinculo: vinc, filial: fil, diasVencimento: Number(g('tc-venc')) || 0, diasProrrogacao: Number(g('tc-prorr')) || 0, ativo: true };
+  const tipos = getTiposContratacao();
+  if (editId) { const t = tipos.find(x => x.id === editId); if (t) Object.assign(t, dados); registrarLogGlobal(`Editou tipo de contratação "${nome}".`, 'exata'); }
+  else { dados.id = 'tc-' + Date.now(); tipos.push(dados); registrarLogGlobal(`Adicionou tipo de contratação "${nome}".`, 'exata'); }
+  saveState(); limparFormTipoContratacao(); renderCadastrosExata();
+};
+window.excluirTipoContratacao = function (id) {
+  if (!(loggedUser && loggedUser.login === 'joaobalaf')) { alert('Somente o administrador João Balear pode excluir.'); return; }
+  if (!confirm('Excluir este tipo de contratação?')) return;
+  state.tiposContratacao = getTiposContratacao().filter(t => t.id !== id);
+  registrarLogGlobal('Excluiu um tipo de contratação.', 'exata');
+  saveState(); renderCadastrosExata();
+};
 
 // ── EDIÇÃO de vaga já criada (reusa o mesmo formulário de "Criar Nova Vaga") ──
 let _vagaEditId = null;
@@ -2631,8 +2746,8 @@ window.editarVaga = function (vagaId) {
     setV('vaga-add-funcao-codigo', v.funcaoCodigo); setV('vaga-add-cbo', v.cbo); setV('vaga-add-funcao-nome', v.funcaoNome);
     const av = document.getElementById('vaga-exata-aviso'); if (av) { av.style.display = 'block'; av.textContent = 'Função não encontrada no catálogo atual. Selecione novamente antes de exportar para o Exata.'; }
   }
-  setV('vaga-add-vinculo', v.employmentType || '');
-  aoMudarVinculoVaga(); // recalcula a filial automática pelo vínculo
+  popularSelectVinculo(v.tipoContratacaoId || _tipoIdPorVinculo(v.vinculo));
+  aoMudarVinculoVaga(); // recalcula a filial automática pelo tipo
   setV('vaga-add-categoria', v.categoria); setV('vaga-add-categoria-codigo', v.categoriaCodigo); setV('vaga-add-categoria-utilizado', v.categoriaUtilizado);
   setV('vaga-add-tipo-contrato', v.tipoContrato); setV('vaga-add-finalidade', v.finalidade); setV('vaga-add-justificativa', v.justificativa);
   setV('vaga-add-previsao-dias', v.previsaoDias); setV('vaga-add-taxa', v.taxa);
@@ -2713,6 +2828,8 @@ function atualizarBotoesVagas() {
         }
         resetarHorariosVaga();
         popularDatalistExata();
+        popularSelectVinculo();
+        aoMudarVinculoVaga();
         trocarFuncaoExata();
         document.getElementById('modal-nova-vaga').classList.add('active');
         setTimeout(() => injetarCamposExtrasNoForm(), 50);
@@ -3739,6 +3856,18 @@ function abrirDrawerDetalhes(candidatoId) {
     };
   }
 
+  // RG / expedição (usado no Exata) — preenche da ficha e salva ao editar
+  const rgCampos = [
+    ['det-rg-orgao', 'rgOrgaoEmissor'], ['det-rg-uf', 'rgUf'],
+    ['det-rg-expedicao', 'rgExpedicao'], ['det-rg-numero', 'rg']
+  ];
+  rgCampos.forEach(([id, prop]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = cand[prop] || '';
+    el.onchange = () => { cand[prop] = el.value.trim(); saveState(); };
+  });
+
   // Exibe escala da vaga no drawer
   const escalaBox = document.getElementById('vaga-escala-box');
   const escalaValor = document.getElementById('vaga-escala-valor');
@@ -4449,6 +4578,7 @@ function aplicarSnapshotVaga(cand, vagaId) {
     funcaoNome: vaga.funcaoNome || '', funcaoCodigo: vaga.funcaoCodigo || '', cbo: vaga.cbo || '',
     exataFuncaoArea: vaga.exataFuncaoArea || '', exataJobFunctionId: vaga.exataJobFunctionId || '',
     employmentLabel: vaga.employmentLabel || '', exataEmploymentCode: vaga.exataEmploymentCode || '', filial: vaga.filial || vaga.branchCode || '',
+    tipoContratacaoId: vaga.tipoContratacaoId || '', diasVencimento: vaga.diasVencimento || 0, diasProrrogacao: vaga.diasProrrogacao || 0,
     categoria: vaga.categoria || '', categoriaCodigo: vaga.categoriaCodigo || '', categoriaUtilizado: vaga.categoriaUtilizado || '',
     tipoContrato: vaga.tipoContrato || '', vinculo: vaga.vinculo || '',
     finalidade: vaga.finalidade || '', justificativa: vaga.justificativa || '',
@@ -4950,10 +5080,11 @@ function mapearExata(cand, vs) {
   const vtv = (i) => (cand.vtVolta && cand.vtVolta[i]) || {};
   // Cálculos automáticos
   const ctpsAuto = _ctpsDoCpf(cand.cpf);
-  const ehTemporario = String(vs.vinculo) === '106';
   const dataAdm = formatarDataExata(cand.dataAdmissao);
-  const dataVenc = ehTemporario ? _somarDiasExata(cand.dataAdmissao, 180) : '';
-  const dataProrr = ehTemporario ? _somarDiasExata(dataVenc, 90) : '';
+  const _diasV = Number(vs.diasVencimento) || 0;   // regra cadastrada no tipo de contratação
+  const _diasP = Number(vs.diasProrrogacao) || 0;
+  const dataVenc = _diasV > 0 ? _somarDiasExata(cand.dataAdmissao, _diasV) : '';
+  const dataProrr = (_diasV > 0 && _diasP > 0) ? _somarDiasExata(dataVenc, _diasP) : '';
   const ctpsUf = cand.ctpsUf || cand.rgUf || cand.estado || '';
   const rgUfFinal = cand.rgOrgaoEmissor || cand.rgUf || '';
   return [
@@ -5155,7 +5286,8 @@ const ABA_PARA_AREA = {
   'inaptos': 'sistema',
   'documentos': 'dp',
   'lixeira': 'sistema',
-  'controle-acesso': 'sistema'
+  'controle-acesso': 'sistema',
+  'cadastros-exata': 'sistema'
 };
 
 function hasPermission(area, acao) {
