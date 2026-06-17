@@ -1854,12 +1854,19 @@ function setupEventListeners() {
         semExperiencia: !!(document.getElementById('vaga-add-sem-experiencia') && document.getElementById('vaga-add-sem-experiencia').checked)
       };
 
-      state.vagas.push(novaVaga);
+      const eraEdicao = !!_vagaEditId;
+      if (eraEdicao) {
+        const idx = state.vagas.findIndex(x => x.id === _vagaEditId);
+        if (idx >= 0) { novaVaga.id = _vagaEditId; state.vagas[idx] = Object.assign({}, state.vagas[idx], novaVaga); }
+        registrarLogGlobal(`Editou a vaga "${novaVaga.cargo}" (${novaVaga.empresaNome}).`, 'vagas');
+      } else {
+        state.vagas.push(novaVaga);
+        registrarLogGlobal(`Criou a vaga "${novaVaga.cargo}" para ${novaVaga.empresaNome}.`, 'vagas');
+      }
       saveState();
-      registrarLogGlobal(`Criou a vaga "${novaVaga.cargo}" para ${novaVaga.empresaNome}.`, 'vagas');
       fecharModalVaga();
       renderVagasGrid();
-      alert('Vaga cadastrada com sucesso!');
+      alert(eraEdicao ? 'Vaga atualizada com sucesso!' : 'Vaga cadastrada com sucesso!');
     });
   }
 
@@ -2580,6 +2587,66 @@ function trocarFuncaoExata() {
 }
 window.trocarFuncaoExata = trocarFuncaoExata;
 
+// ── EDIÇÃO de vaga já criada (reusa o mesmo formulário de "Criar Nova Vaga") ──
+let _vagaEditId = null;
+function resetarFormVagaParaCriar() {
+  _vagaEditId = null;
+  const t = document.querySelector('#modal-nova-vaga .modal-header h3'); if (t) t.textContent = 'Criar Nova Vaga de Emprego';
+  const b = document.querySelector('#form-nova-vaga button[type="submit"]'); if (b) b.textContent = 'Publicar Vaga';
+}
+window.editarVaga = function (vagaId) {
+  const v = (state.vagas || []).find(x => x.id === vagaId);
+  if (!v) { alert('Vaga não encontrada.'); return; }
+  _vagaEditId = vagaId;
+  const setV = (id, val) => { const e = document.getElementById(id); if (e) e.value = (val == null ? '' : val); };
+  const setChk = (id, on) => { const e = document.getElementById(id); if (e) e.checked = !!on; };
+
+  const empSel = document.getElementById('vaga-add-empresa');
+  if (empSel) { empSel.innerHTML = (state.empresas || []).map(e => `<option value="${e.id}">${escapeHTML(e.nome)}</option>`).join(''); empSel.value = v.empresaId || ''; }
+
+  setV('vaga-add-cargo', v.cargo); setV('vaga-add-codigo', v.codigo); setV('vaga-add-operacao', v.operacaoNome);
+  setV('vaga-add-quantidade', v.vagasDisponiveis); setV('vaga-add-status', v.statusVaga || 'ativa'); setV('vaga-add-validade', v.validade);
+  setV('vaga-add-tomador-nome', v.tomadorNome); setV('vaga-add-tomador-codigo', v.tomadorCodigo); setV('vaga-add-tomador-cnpj', v.tomadorCnpj);
+  setV('vaga-add-exata-id', v.idEmpresaExata); setV('vaga-add-centro-custo', v.centroCusto); setV('vaga-add-centro-sigla', v.siglaCentroCusto);
+  const end = v.endereco || {};
+  setV('vaga-add-cep', end.cep); setV('vaga-add-rua', end.rua); setV('vaga-add-numero', end.numero); setV('vaga-add-complemento', end.complemento);
+  setV('vaga-add-bairro', end.bairro); setV('vaga-add-cidade', end.cidade); setV('vaga-add-estado', end.estado);
+
+  // Função do catálogo
+  popularDatalistExata();
+  const f = getFuncaoExata(v.funcaoCodigo);
+  if (f) { _setFuncaoExataCampos(f); const busca = document.getElementById('vaga-exata-busca'); if (busca) busca.value = labelFuncaoExata(f); }
+  else {
+    _setFuncaoExataCampos(null);
+    setV('vaga-add-funcao-codigo', v.funcaoCodigo); setV('vaga-add-cbo', v.cbo); setV('vaga-add-funcao-nome', v.funcaoNome);
+    const av = document.getElementById('vaga-exata-aviso'); if (av) { av.style.display = 'block'; av.textContent = 'Função não encontrada no catálogo atual. Selecione novamente antes de exportar para o Exata.'; }
+  }
+  setV('vaga-add-vinculo', v.employmentType || '');
+  setV('vaga-add-filial', v.filial || v.branchCode || '');
+  setV('vaga-add-categoria', v.categoria); setV('vaga-add-categoria-codigo', v.categoriaCodigo); setV('vaga-add-categoria-utilizado', v.categoriaUtilizado);
+  setV('vaga-add-tipo-contrato', v.tipoContrato); setV('vaga-add-finalidade', v.finalidade); setV('vaga-add-justificativa', v.justificativa);
+  setV('vaga-add-previsao-dias', v.previsaoDias); setV('vaga-add-taxa', v.taxa);
+  setV('vaga-add-salario', v.salario); setV('vaga-add-salario-tipo', v.salarioTipo || 'mensal');
+  setV('vaga-add-beneficios', (v.beneficios || []).join(', '));
+  setV('vaga-add-vt', v.valeTransporte); setV('vaga-add-refeicao', v.refeicao); setV('vaga-add-va', v.valeAlimentacao);
+  setChk('vaga-add-fretado', v.fretado); setV('vaga-add-linhas-fretado', (v.linhasFretado || []).join('\n'));
+  setV('vaga-add-outros', v.outrosBeneficios); setV('vaga-add-obs', v.observacoes); setV('vaga-add-desc', v.descricao);
+  setChk('vaga-add-publicar', v.publicarPortal); setChk('vaga-add-quente', v.vagaQuente); setChk('vaga-add-inicio-imediato', v.inicioImediato);
+  setChk('vaga-add-muitas-oportunidades', v.muitasOportunidades); setChk('vaga-add-sem-experiencia', v.semExperiencia);
+
+  _vagaHorarios = JSON.parse(JSON.stringify(v.horarios || []));
+  renderHorariosVaga();
+
+  const t = document.querySelector('#modal-nova-vaga .modal-header h3'); if (t) t.textContent = 'Editar Vaga';
+  const b = document.querySelector('#form-nova-vaga button[type="submit"]'); if (b) b.textContent = 'Salvar Alterações';
+  document.getElementById('modal-nova-vaga').classList.add('active');
+  setTimeout(() => {
+    injetarCamposExtrasNoForm();
+    const ce = v.camposExtras || {};
+    Object.keys(ce).forEach(k => { const el = document.getElementById('vaga-extra-' + k); if (el && !Array.isArray(ce[k])) el.value = ce[k]; });
+  }, 60);
+};
+
 // Migração (item 22): copia dados operacionais legados que estavam no CLIENTE
 // para as VAGAS daquela empresa, sem apagar nada. Roda uma única vez.
 function migrarOperacionalClientesParaVagas() {
@@ -2627,6 +2694,9 @@ function atualizarBotoesVagas() {
     if (!btnNovaVaga.dataset.wired) {
       btnNovaVaga.dataset.wired = '1';
       btnNovaVaga.addEventListener('click', () => {
+        const form = document.getElementById('form-nova-vaga');
+        if (form) form.reset();
+        resetarFormVagaParaCriar();         // modo CRIAR (zera _vagaEditId + título/botão)
         const selectEmpresaModal = document.getElementById('vaga-add-empresa');
         if (selectEmpresaModal) {
           selectEmpresaModal.innerHTML = state.empresas.map(e => `<option value="${e.id}">${e.nome}</option>`).join('');
@@ -2657,6 +2727,8 @@ function renderVagasGrid() {
   if (!container) return;
 
   const podeExcluir = loggedUser?.permissoes?.vagas?.excluir === true;
+  const podeEditarVaga = loggedUser?.login === 'joaobalaf' || loggedUser?.departamento === 'administracao'
+    || loggedUser?.permissoes?.vagas?.editar === true || loggedUser?.permissoes?.vagas?.criar === true;
 
   if (!state.vagas.length) {
     container.innerHTML = '<p style="color:var(--text-secondary);font-size:14px;text-align:center;padding:40px 0;">Nenhuma vaga cadastrada. Clique em "Criar Nova Vaga" para começar.</p>';
@@ -2680,6 +2752,10 @@ function renderVagasGrid() {
 
     const badgeQuente = isQuente ? `<span style="background:#ffedd5; color:#ea580c; border:1px solid #fed7aa; font-size:9px; font-weight:700; padding:2px 8px; border-radius:12px; display:inline-flex; align-items:center; gap:4px; margin-left:auto;"><i class="fa-solid fa-fire"></i> QUENTE</span>` : '';
 
+    const btnEditar = podeEditarVaga
+      ? `<button onclick="editarVaga('${v.id}')" style="margin-top:10px;padding:7px 14px;border-radius:7px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background 0.15s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'"><i class="fa-solid fa-pen-to-square"></i> Editar Vaga</button>`
+      : '';
+
     return `
       <div class="vaga-card" style="${isQuente ? 'border-color:#f97316; box-shadow:0 0 10px rgba(249,115,22,0.15);' : ''}">
         <div class="vaga-card-header">
@@ -2701,6 +2777,7 @@ function renderVagasGrid() {
           <button class="btn btn-primary btn-vaga-inscrever" onclick="irParaInscricaoSite('${v.id}')" style="flex:1;">
             <i class="fa-solid fa-arrow-up-right-from-square"></i> Cadastrar-se
           </button>
+          ${btnEditar}
           ${btnQuente}
           ${btnExcluir}
         </div>
@@ -4602,6 +4679,7 @@ function fecharModalVaga() {
   document.getElementById('modal-nova-vaga').classList.remove('active');
   document.getElementById('form-nova-vaga').reset();
   resetarHorariosVaga();
+  resetarFormVagaParaCriar();
 }
 
 // GESTÃO DE COLABORADORES INTERNOS (CRUD)
