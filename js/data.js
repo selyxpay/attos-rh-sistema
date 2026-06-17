@@ -14,6 +14,7 @@ const INITIAL_DATA = {
       cargo: 'Administrador Geral',
       status: 'ativo',
       representanteDepto: false,
+      podeEditarPortalPublico: true,
       permissoes: {
         dashboard: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
         vagas: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
@@ -114,6 +115,7 @@ const INITIAL_DATA = {
       cargo: 'Administrador Geral',
       status: 'ativo',
       representanteDepto: false,
+      podeEditarPortalPublico: true,
       permissoes: {
         dashboard: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
         vagas: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
@@ -166,7 +168,12 @@ const INITIAL_DATA = {
       historicoAjustes: [],
       beneficios: ['VT', 'VR', 'Convênio Médico', 'Seguro de Vida'],
       localTrabalho: 'Cajamar, Cajamar, Itapecerica da Serra, Osasco e região',
-      descricao: 'Excelente oportunidade para atuação em operações logísticas com a maior empresa de e-commerce da América Latina.'
+      descricao: 'Excelente oportunidade para atuação em operações logísticas com a maior empresa de e-commerce da América Latina.',
+      publicarPortal: true,
+      vagaQuente: true,
+      inicioImediato: true,
+      muitasOportunidades: true,
+      semExperiencia: false
     },
     {
       id: 'vaga-az-aux',
@@ -184,7 +191,12 @@ const INITIAL_DATA = {
       historicoAjustes: [],
       beneficios: ['VT', 'VA', 'Convênio Médico'],
       localTrabalho: 'Barueri, Cajamar, Itapecerica da Serra, Osasco e região',
-      descricao: 'Venha fazer parte de uma das maiores empresas de tecnologia e logística do mundo.'
+      descricao: 'Venha fazer parte de uma das maiores empresas de tecnologia e logística do mundo.',
+      publicarPortal: true,
+      vagaQuente: false,
+      inicioImediato: true,
+      muitasOportunidades: false,
+      semExperiencia: true
     },
     {
       id: 'vaga-sp-sep',
@@ -202,7 +214,12 @@ const INITIAL_DATA = {
       historicoAjustes: [],
       beneficios: ['VT', 'VR', 'PLR'],
       localTrabalho: 'Osasco, Cajamar, Itapecerica da Serra, Osasco e região',
-      descricao: 'Oportunidade para atuar em um dos marketplaces que mais cresce no Brasil.'
+      descricao: 'Oportunidade para atuar em um dos marketplaces que mais cresce no Brasil.',
+      publicarPortal: true,
+      vagaQuente: false,
+      inicioImediato: false,
+      muitasOportunidades: false,
+      semExperiencia: true
     },
     {
       id: 'vaga-mg-aux',
@@ -220,7 +237,12 @@ const INITIAL_DATA = {
       historicoAjustes: [],
       beneficios: ['VT', 'VA', 'Convênio', 'PPR'],
       localTrabalho: 'Itapecerica da Serra, Cajamar, Itapecerica da Serra, Osasco e região',
-      descricao: 'Faça parte de uma das varejistas mais inovadoras do Brasil, referência em transformação digital.'
+      descricao: 'Faça parte de uma das varejistas mais inovadoras do Brasil, referência em transformação digital.',
+      publicarPortal: true,
+      vagaQuente: false,
+      inicioImediato: false,
+      muitasOportunidades: false,
+      semExperiencia: false
     },
     {
       id: 'vaga-dh-op',
@@ -238,7 +260,12 @@ const INITIAL_DATA = {
       historicoAjustes: [],
       beneficios: ['VT', 'VR', 'Convênio Médico', 'Odonto'],
       localTrabalho: 'Santana de Parnaíba, Cajamar, Itapecerica da Serra, Osasco e região',
-      descricao: 'Atue em uma das maiores empresas de logística expressa do mundo, líder global em entregas.'
+      descricao: 'Atue em uma das maiores empresas de logística expressa do mundo, líder global em entregas.',
+      publicarPortal: true,
+      vagaQuente: false,
+      inicioImediato: true,
+      muitasOportunidades: false,
+      semExperiencia: false
     }
   ],
 
@@ -811,5 +838,109 @@ const INITIAL_DATA = {
       acao: 'Exportou dossiê digital completo (Ficha e Documentos) de João Silva',
       categoria: 'exportacoes'
     }
-  ]
+  ],
+  portalSettings: {
+    tituloPrincipal: "Sua próxima oportunidade começa aqui.",
+    subtituloPrincipal: "Encontre vagas de logística, operação e serviços em diferentes regiões.",
+    banners: [
+      {
+        id: "banner-1",
+        titulo: "Sua próxima oportunidade começa aqui.",
+        subtitulo: "Encontre vagas de logística, operação e serviços em diferentes regiões.",
+        botaoTexto: "Ver vagas abertas"
+      },
+      {
+        id: "banner-2",
+        titulo: "Mais de 300 oportunidades disponíveis",
+        subtitulo: "Contratação rápida, diferentes turnos e possibilidade de início imediato.",
+        botaoTexto: "Quero me cadastrar"
+      },
+      {
+        id: "banner-3",
+        titulo: "Vem trabalhar nas grandes operações do Brasil",
+        subtitulo: "Processos simples, atendimento humanizado e oportunidades reais.",
+        botaoTexto: "Encontrar oportunidade"
+      }
+    ],
+    quemSomos: {
+      titulo: "Mais do que empregos, conectamos pessoas a novas oportunidades.",
+      texto: "A R&T Empregos faz parte do Grupo R&T e atua conectando profissionais às oportunidades de grandes operações em diferentes regiões do Brasil.\n\nSomos especializados em processos de recrutamento ágeis, organizados e humanizados, com forte atuação nos setores de logística, e-commerce, armazenagem, transporte, indústria, varejo e serviços.\n\nNossa estrutura conta com equipes treinadas, processos próprios e tecnologia para atender desde contratações individuais até grandes demandas em curto espaço de tempo, sempre com responsabilidade, qualidade e atenção às pessoas.\n\nPara nós, cada candidato representa uma história, uma família e uma nova possibilidade de crescimento. Por isso, buscamos tornar o processo de contratação mais simples, rápido, transparente e acessível.\n\nNa R&T, a qualidade encontra a agilidade.",
+      fraseFinal: "Vem ser R&T. Sua próxima oportunidade pode começar aqui."
+    },
+    missao: {
+      titulo: "Nossa missão",
+      texto: "Conectar profissionais às oportunidades adequadas, oferecendo processos de contratação ágeis, organizados e humanizados, ao mesmo tempo em que atendemos as necessidades de grandes operações com qualidade, responsabilidade e precisão."
+    },
+    compromisso: {
+      titulo: "Compromisso com pessoas e oportunidades",
+      texto: "Na R&T, entendemos que por trás de cada cadastro existe uma pessoa buscando uma nova oportunidade. Nosso compromisso é oferecer processos mais simples, comunicação clara e atendimento próximo, ajudando candidatos a encontrarem vagas compatíveis com seu perfil, sua região e sua disponibilidade.",
+      frase: "Onde a qualidade encontra a agilidade."
+    },
+    diferenciais: [
+      "Contratações ágeis",
+      "Atendimento humanizado",
+      "Processos simplificados",
+      "Vagas em grandes operações",
+      "Diferentes turnos",
+      "Oportunidades em diversas regiões",
+      "Comunicação clara",
+      "Tecnologia no recrutamento",
+      "Acompanhamento do candidato",
+      "Possibilidade de início rápido",
+      "Pagamentos organizados e pontuais (Com possibilidade de antecipar processos ou pagamentos em certas operações conforme as condições permitirem)"
+    ],
+    contadores: [
+      { id: "cnt-1", numero: "+300", texto: "oportunidades disponíveis" },
+      { id: "cnt-2", numero: "15+", texto: "regiões atendidas" },
+      { id: "cnt-3", numero: "50+", texto: "grandes operações parceiras" },
+      { id: "cnt-4", numero: "1000+", texto: "processos seletivos todos os meses" }
+    ],
+    contatos: {
+      whatsapp: "1136434848",
+      telefone: "(11) 3643-4848",
+      email: "contato@vemserrt.com.br",
+      instagram: "rtempregos",
+      endereco: "Rua Dronsfield, 255 — Lapa — São Paulo/SP",
+      horarios: "Segunda a Sexta, das 08:00 às 17:48"
+    },
+    perguntasFrequentes: [
+      { id: "faq-1", pergunta: "Como faço para me candidatar?", resposta: "Você pode se candidatar diretamente pelo nosso portal selecionando a vaga desejada e preenchendo o formulário de inscrição." },
+      { id: "faq-2", pergunta: "Preciso pagar alguma taxa?", resposta: "A R&T não cobra do candidato para participar dos processos seletivos. O processo é 100% gratuito." },
+      { id: "faq-3", pergunta: "A R&T cobra para participar?", resposta: "Não, a participação em qualquer processo seletivo da R&T é totalmente gratuita." },
+      { id: "faq-4", pergunta: "Preciso ter experiência?", resposta: "Temos oportunidades tanto para profissionais experientes quanto vagas que não exigem experiência anterior." },
+      { id: "faq-5", pergunta: "Como saberei se fui chamado?", resposta: "Nossa equipe entrará em contato diretamente por WhatsApp, telefone ou e-mail cadastrado." },
+      { id: "faq-6", pergunta: "Posso me candidatar a mais de uma vaga?", resposta: "Sim, porém recomendamos focar nas oportunidades compatíveis com seu perfil e localidade." },
+      { id: "faq-7", pergunta: "A entrevista é online ou presencial?", resposta: "Dependendo da vaga, a entrevista pode ser online ou presencial em uma de nossas unidades." },
+      { id: "faq-8", pergunta: "Quais documentos são necessários?", resposta: "Geralmente são solicitados RG, CPF, PIS/NIS, comprovante de residência e dados bancários." },
+      { id: "faq-9", pergunta: "Como funciona o fretado?", resposta: "Para vagas em logística com fretado disponível, o transporte é oferecido a partir de pontos predeterminados na região." },
+      { id: "faq-10", pergunta: "Como atualizo meus dados?", resposta: "Você pode entrar em contato com nossa equipe de suporte pelo WhatsApp do portal." },
+      { id: "faq-11", pergunta: "Como falo com a equipe?", resposta: "Utilize nossos canais oficiais de contato (telefone, e-mail ou botão de WhatsApp do site)." }
+    ],
+    secoesVisiveis: {
+      banner: true,
+      busca: true,
+      vagasQuentes: true,
+      vagasAbertas: true,
+      comoFunciona: true,
+      diferenciais: true,
+      numeros: true,
+      quemSomos: true,
+      areasAtuacao: true,
+      perguntasFrequentes: true,
+      contato: true
+    },
+    secoesOrdem: [
+      "banner",
+      "busca",
+      "vagasQuentes",
+      "vagasAbertas",
+      "comoFunciona",
+      "diferenciais",
+      "numeros",
+      "quemSomos",
+      "areasAtuacao",
+      "perguntasFrequentes",
+      "contato"
+    ]
+  }
 };

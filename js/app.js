@@ -1389,25 +1389,14 @@ function setupEventListeners() {
   if (formNovaVaga) {
     formNovaVaga.addEventListener('submit', (e) => {
       e.preventDefault();
-      const empresaId = document.getElementById('vaga-add-empresa').value;
-      const empresa = state.empresas.find(emp => emp.id === empresaId);
+      const g = id => ((document.getElementById(id) || {}).value || '').toString();
+      const empresaId = g('vaga-add-empresa');
+      const empresa = state.empresas.find(emp => emp.id === empresaId) || {};
       const cfg = state.vagaFormConfig || { renomes: {}, camposExtras: [] };
-      const cargo = document.getElementById('vaga-add-cargo').value;
-      const codigo = document.getElementById('vaga-add-codigo').value;
-      const salario = parseFloat(document.getElementById('vaga-add-salario').value);
-      const quantidade = parseInt(document.getElementById('vaga-add-quantidade').value);
-      const local = document.getElementById('vaga-add-local').value;
-      const beneficios = document.getElementById('vaga-add-beneficios').value.split(',').map(b => b.trim());
-      const descricao = document.getElementById('vaga-add-desc').value;
-      const linhasFretadoRaw = (document.getElementById('vaga-add-linhas-fretado') || {}).value || '';
-      const linhasFretado = linhasFretadoRaw.split('\n').map(l => l.trim()).filter(Boolean);
-      const escalaVal = (document.getElementById('vaga-add-escala') || {}).value || '';
-      const escalaCustom = ((document.getElementById('vaga-add-escala-custom') || {}).value || '').trim();
-      const escala = escalaVal === 'personalizada' ? escalaCustom : escalaVal;
-      const turnosRaw = (document.getElementById('vaga-add-turnos') || {}).value || '';
-      const turnos = turnosRaw.split('\n').map(l => l.trim()).filter(Boolean);
+      const cidade = g('vaga-add-cidade'), estado = g('vaga-add-estado');
+      const localTrabalho = [cidade, estado].filter(Boolean).join(' - ') || g('vaga-add-local');
 
-      // Capturar campos extras configurados pelo admin
+      // Campos extras configurados pelo admin (mantido)
       const camposExtras = {};
       (cfg.camposExtras || []).forEach(campo => {
         const el = document.getElementById(`vaga-extra-${campo.id}`);
@@ -1415,30 +1404,68 @@ function setupEventListeners() {
         if (campo.tipo === 'checkbox-group') {
           const checks = document.querySelectorAll(`[name="vaga-extra-${campo.id}"]`);
           camposExtras[campo.id] = Array.from(checks).filter(c => c.checked).map(c => c.value);
-        } else {
-          camposExtras[campo.id] = el.value;
-        }
+        } else camposExtras[campo.id] = el.value;
       });
 
       const novaVaga = {
         id: `vaga-${Date.now()}`,
         empresaId,
-        empresaNome: empresa.nome,
-        cargo,
-        codigo,
-        salario,
-        vagasDisponiveis: quantidade,
-        beneficios,
-        linhasFretado,
-        escala,
-        turnos,
-        localTrabalho: local,
-        descricao,
-        camposExtras
+        empresaNome: empresa.nome || '',
+        empresaCnpj: empresa.cnpj || '',
+        cargo: g('vaga-add-cargo'),
+        codigo: g('vaga-add-codigo'),
+        operacaoNome: g('vaga-add-operacao'),
+        vagasDisponiveis: parseInt(g('vaga-add-quantidade')) || 0,
+        statusVaga: g('vaga-add-status') || 'ativa',
+        validade: g('vaga-add-validade'),
+        tomadorNome: g('vaga-add-tomador-nome'),
+        tomadorCodigo: g('vaga-add-tomador-codigo'),
+        tomadorCnpj: g('vaga-add-tomador-cnpj'),
+        idEmpresaExata: g('vaga-add-exata-id'),
+        centroCusto: g('vaga-add-centro-custo'),
+        siglaCentroCusto: g('vaga-add-centro-sigla'),
+        endereco: {
+          cep: g('vaga-add-cep'), rua: g('vaga-add-rua'), numero: g('vaga-add-numero'),
+          complemento: g('vaga-add-complemento'), bairro: g('vaga-add-bairro'), cidade, estado
+        },
+        localTrabalho,
+        funcaoNome: g('vaga-add-funcao-nome'),
+        funcaoCodigo: g('vaga-add-funcao-codigo'),
+        cbo: g('vaga-add-cbo'),
+        categoria: g('vaga-add-categoria'),
+        categoriaCodigo: g('vaga-add-categoria-codigo'),
+        categoriaUtilizado: g('vaga-add-categoria-utilizado'),
+        tipoContrato: g('vaga-add-tipo-contrato'),
+        vinculo: g('vaga-add-vinculo'),
+        finalidade: g('vaga-add-finalidade'),
+        justificativa: g('vaga-add-justificativa'),
+        previsaoDias: g('vaga-add-previsao-dias'),
+        taxa: g('vaga-add-taxa'),
+        salario: parseFloat(g('vaga-add-salario')) || 0,
+        salarioTipo: g('vaga-add-salario-tipo') || 'mensal',
+        beneficios: g('vaga-add-beneficios').split(',').map(b => b.trim()).filter(Boolean),
+        valeTransporte: g('vaga-add-vt'),
+        refeicao: g('vaga-add-refeicao'),
+        valeAlimentacao: g('vaga-add-va'),
+        fretado: !!(document.getElementById('vaga-add-fretado') && document.getElementById('vaga-add-fretado').checked),
+        linhasFretado: g('vaga-add-linhas-fretado').split('\n').map(l => l.trim()).filter(Boolean),
+        outrosBeneficios: g('vaga-add-outros'),
+        observacoes: g('vaga-add-obs'),
+        descricao: g('vaga-add-desc'),
+        horarios: (_vagaHorarios || []).slice(),
+        escala: '',
+        turnos: (_vagaHorarios || []).map(h => h.descricao).filter(Boolean),
+        camposExtras,
+        publicarPortal: !!(document.getElementById('vaga-add-publicar') && document.getElementById('vaga-add-publicar').checked),
+        vagaQuente: !!(document.getElementById('vaga-add-quente') && document.getElementById('vaga-add-quente').checked),
+        inicioImediato: !!(document.getElementById('vaga-add-inicio-imediato') && document.getElementById('vaga-add-inicio-imediato').checked),
+        muitasOportunidades: !!(document.getElementById('vaga-add-muitas-oportunidades') && document.getElementById('vaga-add-muitas-oportunidades').checked),
+        semExperiencia: !!(document.getElementById('vaga-add-sem-experiencia') && document.getElementById('vaga-add-sem-experiencia').checked)
       };
 
       state.vagas.push(novaVaga);
       saveState();
+      registrarLogGlobal(`Criou a vaga "${novaVaga.cargo}" para ${novaVaga.empresaNome}.`, 'vagas');
       fecharModalVaga();
       renderVagasGrid();
       alert('Vaga cadastrada com sucesso!');
@@ -1450,45 +1477,32 @@ function setupEventListeners() {
   if (formNovoCliente) {
     formNovoCliente.addEventListener('submit', (e) => {
       e.preventDefault();
-      const nome        = document.getElementById('cli-nome').value.trim();
-      const tomador     = document.getElementById('cli-tomador')?.value.trim() || '';
-      const cnpj        = document.getElementById('cli-cnpj')?.value.trim() || '';
-      const sigla       = document.getElementById('cli-sigla').value.trim().toUpperCase();
-      const cor         = document.getElementById('cli-cor').value;
-      const cep         = document.getElementById('cli-cep')?.value.trim() || '';
-      const rua         = document.getElementById('cli-rua')?.value.trim() || '';
-      const numeroEnd   = document.getElementById('cli-numero-end')?.value.trim() || '';
-      const bairro      = document.getElementById('cli-bairro')?.value.trim() || '';
-      const cidade      = document.getElementById('cli-cidade').value.trim();
-      const estado      = document.getElementById('cli-estado').value.trim().toUpperCase() || 'SP';
-      const lat         = parseFloat(document.getElementById('cli-lat').value) || null;
-      const lng         = parseFloat(document.getElementById('cli-lng').value) || null;
-      const centroCusto = document.getElementById('cli-centro-custo')?.value.trim() || '';
-      const dataEntrada = document.getElementById('cli-data-entrada')?.value || '';
-      const dataSaida   = document.getElementById('cli-data-saida')?.value || '';
-      const categoria   = document.getElementById('cli-categoria-vaga')?.value || '';
-      const funcoesRaw  = document.getElementById('cli-funcoes')?.value || '';
-      const funcoes     = funcoesRaw.split('\n').map(l => l.trim()).filter(Boolean);
-      const escalasRaw  = document.getElementById('cli-escalas')?.value || '';
-      const escalas     = escalasRaw.split('\n').map(l => l.trim()).filter(Boolean);
-      const horariosRaw = document.getElementById('cli-horarios')?.value || '';
-      const horarios    = horariosRaw.split('\n').map(l => l.trim()).filter(Boolean);
-      const diasIds     = ['seg','ter','qua','qui','sex','sab','dom'];
-      const dias        = diasIds.map(d => document.getElementById(`cli-dia-${d}`)).filter(el => el && el.checked).map(el => el.value);
+      // Cliente = empresa parceira. Só nome + CNPJ (dados operacionais ficam na vaga).
+      const nome  = (document.getElementById('cli-nome')?.value || '').trim();
+      const cnpj  = (document.getElementById('cli-cnpj')?.value || '').trim();
+      const sigla = ((document.getElementById('cli-sigla')?.value || '').trim().toUpperCase())
+                    || nome.replace(/[^A-Za-zÀ-ú]/g, '').slice(0, 4).toUpperCase();
+      const cor   = (document.getElementById('cli-cor')?.value) || '#6366f1';
 
-      const id = sigla.toLowerCase().replace(/\s+/g, '') + '-' + Date.now();
-      if (state.empresas.find(emp => emp.sigla === sigla)) {
-        alert('Já existe um cliente com essa sigla. Use uma sigla diferente.');
-        return;
-      }
+      if (!nome || !cnpj) { alert('Informe o nome da empresa e o CNPJ.'); return; }
+
+      // Não duplicar empresa (mesmo CNPJ ou mesmo nome)
+      const cnpjNorm = cnpj.replace(/\D/g, '');
+      const jaExiste = state.empresas.find(emp =>
+        (cnpjNorm && emp.cnpj && emp.cnpj.replace(/\D/g, '') === cnpjNorm) ||
+        (emp.nome && emp.nome.trim().toLowerCase() === nome.toLowerCase()));
+      if (jaExiste) { alert('Já existe um cliente com esse nome ou CNPJ.'); return; }
+
       const novaEmpresa = {
-        id, nome, tomador, cnpj, sigla, cor,
-        cep, rua, numeroEnd, bairro, cidade, estado, lat, lng,
-        centroCusto, dataEntrada, dataSaida, categoria,
-        funcoes, escalas, dias, horarios
+        id: 'emp-' + Date.now(),
+        nome, cnpj, sigla, cor,
+        status: 'ativo',
+        criadoEm: new Date().toLocaleString('pt-BR'),
+        criadoPor: loggedUser ? loggedUser.nome : 'Sistema'
       };
       state.empresas.push(novaEmpresa);
       saveState();
+      registrarLogGlobal(`Cadastrou o cliente "${nome}".`, 'clientes');
       fecharModalNovoCliente();
       renderVagasGrid();
       alert(`Cliente "${nome}" cadastrado com sucesso!`);
@@ -2071,6 +2085,99 @@ function setupDragAndDrop() {
 }
 
 // ABA 2: VAGAS (VITRINE DE VAGAS)
+// ── Horários da vaga (seção 4.6) — gerenciados em memória durante o cadastro ──
+let _vagaHorarios = [];
+const _DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+function renderHorariosVaga() {
+  const cont = document.getElementById('vaga-horarios-list');
+  if (!cont) return;
+  if (_vagaHorarios.length === 0) {
+    cont.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);margin:4px 0;">Nenhum horário adicionado ainda.</p>';
+    return;
+  }
+  cont.innerHTML = _vagaHorarios.map((h, i) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <strong style="font-size:12px;">Horário ${i + 1}</strong>
+        <button type="button" onclick="removerHorarioVaga(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:13px;"><i class="fa-solid fa-trash"></i></button>
+      </div>
+      <div class="form-group-grid">
+        <input class="form-control" placeholder="Descrição (ex: Primeiro turno)" value="${escapeHTML(h.descricao || '')}" oninput="_setHorario(${i},'descricao',this.value)">
+        <input class="form-control" placeholder="Escala (ex: 6x1)" value="${escapeHTML(h.escala || '')}" oninput="_setHorario(${i},'escala',this.value)">
+      </div>
+      <div class="form-group-grid">
+        <input class="form-control" type="time" value="${escapeHTML(h.entrada || '')}" oninput="_setHorario(${i},'entrada',this.value)" title="Entrada">
+        <input class="form-control" type="time" value="${escapeHTML(h.saida || '')}" oninput="_setHorario(${i},'saida',this.value)" title="Saída">
+      </div>
+      <div class="form-group-grid">
+        <input class="form-control" placeholder="Intervalo" value="${escapeHTML(h.intervalo || '')}" oninput="_setHorario(${i},'intervalo',this.value)">
+        <input class="form-control" placeholder="Carga semanal (h)" value="${escapeHTML(h.cargaSemanal || '')}" oninput="_setHorario(${i},'cargaSemanal',this.value)">
+      </div>
+      <div class="form-group-grid">
+        <input class="form-control" placeholder="Carga mensal (h)" value="${escapeHTML(h.cargaMensal || '')}" oninput="_setHorario(${i},'cargaMensal',this.value)">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:8px;"><input type="checkbox" ${h.adicionalNoturno ? 'checked' : ''} onchange="_setHorario(${i},'adicionalNoturno',this.checked)"> Adicional noturno</label>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin:8px 0;font-size:11px;">
+        ${_DIAS_SEMANA.map(d => `<label style="display:flex;align-items:center;gap:3px;"><input type="checkbox" ${(h.dias || []).includes(d) ? 'checked' : ''} onchange="_toggleDiaHorario(${i},'${d}',this.checked)"> ${d}</label>`).join('')}
+      </div>
+      <input class="form-control" placeholder="Observação" value="${escapeHTML(h.obs || '')}" oninput="_setHorario(${i},'obs',this.value)">
+    </div>`).join('');
+}
+window.adicionarHorarioVaga = function () {
+  _vagaHorarios.push({ id: 'hor-' + Date.now() + '-' + _vagaHorarios.length, descricao: '', entrada: '', saida: '', intervalo: '', escala: '', dias: [], cargaSemanal: '', cargaMensal: '', adicionalNoturno: false, obs: '' });
+  renderHorariosVaga();
+};
+window.removerHorarioVaga = function (i) { _vagaHorarios.splice(i, 1); renderHorariosVaga(); };
+window._setHorario = function (i, campo, val) { if (_vagaHorarios[i]) _vagaHorarios[i][campo] = val; };
+window._toggleDiaHorario = function (i, dia, on) {
+  if (!_vagaHorarios[i]) return;
+  _vagaHorarios[i].dias = _vagaHorarios[i].dias || [];
+  const idx = _vagaHorarios[i].dias.indexOf(dia);
+  if (on && idx < 0) _vagaHorarios[i].dias.push(dia);
+  if (!on && idx >= 0) _vagaHorarios[i].dias.splice(idx, 1);
+};
+function resetarHorariosVaga() { _vagaHorarios = []; renderHorariosVaga(); }
+// CEP da vaga (reusa o buscarCep já existente)
+function buscarCepVaga(cep) {
+  if (typeof buscarCep === 'function') buscarCep(cep, { rua: 'vaga-add-rua', bairro: 'vaga-add-bairro', cidade: 'vaga-add-cidade', estado: 'vaga-add-estado' });
+}
+window.buscarCepVaga = buscarCepVaga;
+
+// Migração (item 22): copia dados operacionais legados que estavam no CLIENTE
+// para as VAGAS daquela empresa, sem apagar nada. Roda uma única vez.
+function migrarOperacionalClientesParaVagas() {
+  if (!state || state.migracaoOperacionalFeita) return;
+  let copiados = 0, marcados = 0;
+  (state.empresas || []).forEach(emp => {
+    const temOperacional = emp.tomador || emp.cep || emp.centroCusto || emp.categoria ||
+      (emp.funcoes && emp.funcoes.length) || (emp.horarios && emp.horarios.length);
+    if (!temOperacional) return;
+    const vagasDaEmpresa = (state.vagas || []).filter(v => v.empresaId === emp.id && !v.excluido);
+    if (vagasDaEmpresa.length === 0) return; // sem vaga p/ receber: mantém no cliente (revisão)
+    const ambiguo = vagasDaEmpresa.length > 1;
+    vagasDaEmpresa.forEach(v => {
+      if (!v.tomadorNome && emp.tomador)     v.tomadorNome = emp.tomador;
+      if (!v.centroCusto && emp.centroCusto) v.centroCusto = emp.centroCusto;
+      if (!v.categoria && emp.categoria)     v.categoria = emp.categoria;
+      v.endereco = v.endereco || {};
+      if (!v.endereco.cep && emp.cep)          v.endereco.cep = emp.cep;
+      if (!v.endereco.rua && emp.rua)          v.endereco.rua = emp.rua;
+      if (!v.endereco.numero && emp.numeroEnd) v.endereco.numero = emp.numeroEnd;
+      if (!v.endereco.bairro && emp.bairro)    v.endereco.bairro = emp.bairro;
+      if (!v.endereco.cidade && emp.cidade)    v.endereco.cidade = emp.cidade;
+      if (!v.endereco.estado && emp.estado)    v.endereco.estado = emp.estado;
+      if (ambiguo) v.revisaoMigracao = true; // não dá p/ saber a vaga certa -> revisão
+      copiados++;
+    });
+    if (ambiguo) marcados++;
+    // NÃO apaga os dados do cliente (preserva o original)
+  });
+  state.migracaoOperacionalFeita = true;
+  if (!state.logs) state.logs = [];
+  state.logs.unshift({ id: 'log-' + Date.now(), data: new Date().toLocaleString('pt-BR'), usuario: 'Sistema R&T', acao: `Migração de dados operacionais: ${copiados} vaga(s) atualizada(s)${marcados ? ` · ${marcados} empresa(s) com várias vagas marcadas p/ revisão` : ''}.`, categoria: 'migracao' });
+  saveState();
+}
+
 // Aplica a visibilidade dos botões de Vagas por permissão e anexa os listeners
 // uma única vez (guard dataset.wired). Chamado no setup, no login e a cada render.
 function atualizarBotoesVagas() {
@@ -2087,6 +2194,7 @@ function atualizarBotoesVagas() {
         if (selectEmpresaModal) {
           selectEmpresaModal.innerHTML = state.empresas.map(e => `<option value="${e.id}">${e.nome}</option>`).join('');
         }
+        resetarHorariosVaga();
         document.getElementById('modal-nova-vaga').classList.add('active');
         setTimeout(() => injetarCamposExtrasNoForm(), 50);
       });
@@ -2105,6 +2213,7 @@ function atualizarBotoesVagas() {
 
 function renderVagasGrid() {
   atualizarBotoesVagas();
+  migrarOperacionalClientesParaVagas();
   const container = document.getElementById('vagas-cards-container');
   if (!container) return;
 
@@ -2120,19 +2229,27 @@ function renderVagasGrid() {
     const cor = emp?.cor || '#6366f1';
     const siglaDisplay = emp?.sigla || v.empresaNome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 4);
 
+    const isQuente = !!v.vagaQuente;
     const benefitsHtml = (v.beneficios || []).map(b => `<span class="benefit-tag">${b}</span>`).join('');
     const btnExcluir = podeExcluir
       ? `<button onclick="excluirVaga('${v.id}')" style="margin-top:10px;padding:7px 14px;border-radius:7px;border:1px solid #fca5a5;background:#fff1f2;color:#dc2626;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background 0.15s;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fff1f2'"><i class="fa-solid fa-trash-can"></i> Excluir Vaga</button>`
       : '';
 
+    const btnQuente = podeExcluir
+      ? `<button onclick="toggleVagaQuente('${v.id}')" style="margin-top:10px;padding:7px 14px;border-radius:7px;border:1px solid ${isQuente ? '#fdba74' : '#cbd5e1'};background:${isQuente ? '#fff7ed' : '#f8fafc'};color:${isQuente ? '#ea580c' : '#475569'};font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background 0.15s;" onmouseover="this.style.background='${isQuente ? '#ffedd5' : '#e2e8f0'}'" onmouseout="this.style.background='${isQuente ? '#fff7ed' : '#f8fafc'}'"><i class="fa-solid fa-fire"></i> ${isQuente ? 'Destaque Quente' : 'Destacar 🔥'}</button>`
+      : '';
+
+    const badgeQuente = isQuente ? `<span style="background:#ffedd5; color:#ea580c; border:1px solid #fed7aa; font-size:9px; font-weight:700; padding:2px 8px; border-radius:12px; display:inline-flex; align-items:center; gap:4px; margin-left:auto;"><i class="fa-solid fa-fire"></i> QUENTE</span>` : '';
+
     return `
-      <div class="vaga-card">
+      <div class="vaga-card" style="${isQuente ? 'border-color:#f97316; box-shadow:0 0 10px rgba(249,115,22,0.15);' : ''}">
         <div class="vaga-card-header">
           <div class="vaga-logo-badge" style="background:${cor};color:#fff;">${siglaDisplay}</div>
           <div class="vaga-title-area">
             <span class="vaga-company">${v.empresaNome}</span>
             <span class="vaga-cargo">${v.cargo}</span>
           </div>
+          ${badgeQuente}
         </div>
         <p class="vaga-desc">${v.descricao}</p>
         <span class="vaga-salario">R$ ${Number(v.salario).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -2145,6 +2262,7 @@ function renderVagasGrid() {
           <button class="btn btn-primary btn-vaga-inscrever" onclick="irParaInscricaoSite('${v.id}')" style="flex:1;">
             <i class="fa-solid fa-arrow-up-right-from-square"></i> Cadastrar-se
           </button>
+          ${btnQuente}
           ${btnExcluir}
         </div>
       </div>
@@ -2161,10 +2279,22 @@ window.excluirVaga = function(vagaId) {
   renderVagasGrid();
 };
 
+window.toggleVagaQuente = function(vagaId) {
+  const vaga = state.vagas.find(v => v.id === vagaId);
+  if (!vaga) return;
+  vaga.vagaQuente = !vaga.vagaQuente;
+  saveState();
+  renderVagasGrid();
+  if (typeof showToast === 'function') {
+    showToast(`Vaga "${vaga.cargo}" ${vaga.vagaQuente ? 'destacada como quente' : 'removida dos destaques'}!`, 'success');
+  } else {
+    alert(`Vaga "${vaga.cargo}" ${vaga.vagaQuente ? 'destacada como quente' : 'removida dos destaques'}!`);
+  }
+};
+
 function irParaInscricaoSite(vagaId) {
-  // Abre a página pública de candidato em nova aba, com a vaga pré-selecionada
   const base = window.location.origin + window.location.pathname.replace('index.html', '');
-  window.open(base + 'candidato.html' + (vagaId ? '?vaga=' + vagaId : ''), '_blank');
+  window.open(base + 'vemserrt.html' + (vagaId ? '?vaga=' + vagaId : ''), '_blank');
 }
 
 // ABA 3: BANCO DE TALENTOS (AGRUPADO POR EMPRESAS)
@@ -2707,6 +2837,40 @@ function renderSitePublico() {
         setTimeout(() => { btnPresencial.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar Link'; }, 2000);
       });
     });
+  }
+
+  // Lógica de Configuração do Portal (Admin somente)
+  const portalConfigContainer = document.getElementById('portal-configuracao-container');
+  if (!portalConfigContainer) return;
+
+  const podeEditar = loggedUser && (
+    loggedUser.login === 'joaobalaf' ||
+    loggedUser.departamento === 'administracao' ||
+    loggedUser.podeEditarPortalPublico === true
+  );
+
+  if (podeEditar) {
+    portalConfigContainer.style.display = 'block';
+    
+    // Wire submit and add FAQ listeners
+    const configForm = document.getElementById('form-config-portal');
+    if (configForm && !configForm.dataset.listenerAdded) {
+      configForm.dataset.listenerAdded = 'true';
+      configForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        window.salvarConfiguracaoPortal();
+      });
+    }
+
+    const btnAddFaq = document.getElementById('btn-adicionar-faq');
+    if (btnAddFaq && !btnAddFaq.dataset.listenerAdded) {
+      btnAddFaq.dataset.listenerAdded = 'true';
+      btnAddFaq.addEventListener('click', window.adicionarFaqConfig);
+    }
+
+    carregarConfiguracoesPortalForm();
+  } else {
+    portalConfigContainer.style.display = 'none';
   }
 }
 
@@ -3968,6 +4132,7 @@ function fecharModalReprovar() {
 function fecharModalVaga() {
   document.getElementById('modal-nova-vaga').classList.remove('active');
   document.getElementById('form-nova-vaga').reset();
+  resetarHorariosVaga();
 }
 
 // GESTÃO DE COLABORADORES INTERNOS (CRUD)
@@ -5123,6 +5288,8 @@ window.abrirModalGerenciarFuncionario = function(funcId) {
   document.getElementById('gerenciar-func-cargo').value = func.cargo || '';
   document.getElementById('gerenciar-func-status').value = func.status || 'ativo';
   document.getElementById('gerenciar-func-representante').checked = func.representanteDepto || false;
+  const cbPortal = document.getElementById('gerenciar-func-pode-editar-portal');
+  if (cbPortal) cbPortal.checked = func.podeEditarPortalPublico || false;
 
   // Garantir permissões definidas
   if (!func.permissoes) func.permissoes = criarPermissoesZeradas();
@@ -5213,6 +5380,8 @@ function salvarPermissoesFuncionario() {
   const novoCargo = document.getElementById('gerenciar-func-cargo').value.trim();
   const novoStatus = document.getElementById('gerenciar-func-status').value;
   const novoRep = document.getElementById('gerenciar-func-representante').checked;
+  const cbPortal = document.getElementById('gerenciar-func-pode-editar-portal');
+  const novoPodeEditarPortal = cbPortal ? cbPortal.checked : false;
 
   if (!novoCargo) { alert('Informe o cargo do funcionário.'); return; }
 
@@ -5240,6 +5409,7 @@ function salvarPermissoesFuncionario() {
   func.cargo = novoCargo;
   func.status = novoStatus;
   func.representanteDepto = novoRep;
+  func.podeEditarPortalPublico = novoPodeEditarPortal;
   func.permissoes = novasPerms;
 
   // Vínculo de recrutadora (Meu Painel) — define usuarioId no recrutador escolhido
@@ -7673,4 +7843,282 @@ window.mascaraCEPCliente = mascaraCEPCliente;
     }
   }, true);
 })();
+
+// ==========================================================================
+// PORTAL PÚBLICO VEM SER RT — ADMIN FUNCTIONS
+// ==========================================================================
+
+const SECOES_LABELS = {
+  banner: "Carrossel de Banners",
+  busca: "Barra de Busca e Filtros",
+  vagasQuentes: "Vagas Quentes (Destaques)",
+  vagasAbertas: "Todas as Vagas Abertas",
+  comoFunciona: "Como Funciona (Linha do Tempo)",
+  diferenciais: "Diferenciais R&T",
+  numeros: "Indicadores e Números",
+  quemSomos: "Quem Somos (Institucional)",
+  areasAtuacao: "Áreas de Atuação",
+  perguntasFrequentes: "Perguntas Frequentes (FAQ)",
+  contato: "Informações de Contato"
+};
+
+function renderNumerosConfig() {
+  const container = document.getElementById('p-numeros-container');
+  if (!container) return;
+  const contadores = state.portalSettings.contadores || [];
+  container.innerHTML = contadores.map((c, i) => `
+    <div style="display:grid; grid-template-columns:1fr 2fr; gap:10px; align-items:center; padding:10px; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); border-radius:6px; margin-bottom: 8px;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label style="font-size:11px; margin-bottom:4px;">Valor (ex: +300) *</label>
+        <input type="text" id="p-contador-${c.id}-numero" value="${c.numero}" class="form-control" style="height:34px; font-size:12px;">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label style="font-size:11px; margin-bottom:4px;">Legenda / Descrição *</label>
+        <input type="text" id="p-contador-${c.id}-texto" value="${c.texto}" class="form-control" style="height:34px; font-size:12px;">
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderFaqConfigList() {
+  const container = document.getElementById('p-faq-container');
+  if (!container) return;
+  const faqs = state.portalSettings.perguntasFrequentes || [];
+  container.innerHTML = faqs.map((f, i) => `
+    <div style="background:rgba(255,255,255,0.02); padding:16px; border-radius:8px; border:1px solid var(--border-color); display:flex; flex-direction:column; gap:8px; margin-bottom: 12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h4 style="margin:0; font-size:12px; color:var(--primary); font-weight:700;">Pergunta ${i + 1}</h4>
+        <button type="button" onclick="window.removerFaqConfig('${f.id}')" class="btn btn-secondary btn-sm" style="color:#ef4444; border-color:rgba(239,68,68,0.2); background:rgba(239,68,68,0.05); padding:3px 8px; font-size:11px; height:24px; display:inline-flex; align-items:center; gap:4px;">
+          <i class="fa-solid fa-trash-can"></i> Remover
+        </button>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label style="font-size:11px; margin-bottom:4px;">Pergunta *</label>
+        <input type="text" id="p-faq-${f.id}-pergunta" value="${f.pergunta}" required class="form-control" style="height:34px; font-size:12px;">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label style="font-size:11px; margin-bottom:4px;">Resposta *</label>
+        <textarea id="p-faq-${f.id}-resposta" required class="form-control" rows="2" style="font-size:12px; padding:6px 10px;">${f.resposta}</textarea>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderSecoesConfig() {
+  const container = document.getElementById('p-secoes-container');
+  if (!container) return;
+  
+  const visiveis = state.portalSettings.secoesVisiveis || {};
+  const ordem = state.portalSettings.secoesOrdem || Object.keys(SECOES_LABELS);
+  
+  container.innerHTML = ordem.map((key, idx) => {
+    const isVisible = visiveis[key] !== false;
+    const label = SECOES_LABELS[key] || key;
+    return `
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); border-radius:8px; grid-column: span 2; margin-bottom: 6px;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <input type="checkbox" id="p-secao-${key}-visivel" ${isVisible ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
+          <span style="font-size:12px; font-weight:600; color:var(--text-primary);">${label}</span>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button type="button" onclick="window.moverSecaoConfig('${key}', -1)" ${idx === 0 ? 'disabled' : ''} class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px; height:24px;">
+            <i class="fa-solid fa-arrow-up"></i>
+          </button>
+          <button type="button" onclick="window.moverSecaoConfig('${key}', 1)" ${idx === ordem.length - 1 ? 'disabled' : ''} class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px; height:24px;">
+            <i class="fa-solid fa-arrow-down"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function carregarConfiguracoesPortalForm() {
+  const p = state.portalSettings;
+  if (!p) return;
+
+  // Banners
+  if (p.banners && p.banners[0]) {
+    const elTitulo = document.getElementById('p-banner-1-titulo');
+    const elSub = document.getElementById('p-banner-1-subtitulo');
+    const elBotao = document.getElementById('p-banner-1-botao');
+    if (elTitulo) elTitulo.value = p.banners[0].titulo || '';
+    if (elSub) elSub.value = p.banners[0].subtitulo || '';
+    if (elBotao) elBotao.value = p.banners[0].botaoTexto || '';
+  }
+  if (p.banners && p.banners[1]) {
+    const elTitulo = document.getElementById('p-banner-2-titulo');
+    const elSub = document.getElementById('p-banner-2-subtitulo');
+    const elBotao = document.getElementById('p-banner-2-botao');
+    if (elTitulo) elTitulo.value = p.banners[1].titulo || '';
+    if (elSub) elSub.value = p.banners[1].subtitulo || '';
+    if (elBotao) elBotao.value = p.banners[1].botaoTexto || '';
+  }
+  if (p.banners && p.banners[2]) {
+    const elTitulo = document.getElementById('p-banner-3-titulo');
+    const elSub = document.getElementById('p-banner-3-subtitulo');
+    const elBotao = document.getElementById('p-banner-3-botao');
+    if (elTitulo) elTitulo.value = p.banners[2].titulo || '';
+    if (elSub) elSub.value = p.banners[2].subtitulo || '';
+    if (elBotao) elBotao.value = p.banners[2].botaoTexto || '';
+  }
+
+  // Quem somos
+  if (p.quemSomos) {
+    const elTitulo = document.getElementById('p-somos-titulo');
+    const elTexto = document.getElementById('p-somos-texto');
+    const elFrase = document.getElementById('p-somos-frase');
+    if (elTitulo) elTitulo.value = p.quemSomos.titulo || '';
+    if (elTexto) elTexto.value = p.quemSomos.texto || '';
+    if (elFrase) elFrase.value = p.quemSomos.fraseFinal || '';
+  }
+
+  // Missao
+  if (p.missao) {
+    const elTitulo = document.getElementById('p-missao-titulo');
+    const elTexto = document.getElementById('p-missao-texto');
+    if (elTitulo) elTitulo.value = p.missao.titulo || '';
+    if (elTexto) elTexto.value = p.missao.texto || '';
+  }
+
+  // Compromisso
+  if (p.compromisso) {
+    const elTitulo = document.getElementById('p-comp-titulo');
+    const elTexto = document.getElementById('p-comp-texto');
+    const elFrase = document.getElementById('p-comp-frase');
+    if (elTitulo) elTitulo.value = p.compromisso.titulo || '';
+    if (elTexto) elTexto.value = p.compromisso.texto || '';
+    if (elFrase) elFrase.value = p.compromisso.frase || '';
+  }
+
+  // Contatos
+  if (p.contatos) {
+    const elWa = document.getElementById('p-contato-whatsapp');
+    const elTel = document.getElementById('p-contato-telefone');
+    const elEmail = document.getElementById('p-contato-email');
+    const elIg = document.getElementById('p-contato-instagram');
+    const elEnd = document.getElementById('p-contato-endereco');
+    const elHor = document.getElementById('p-contato-horarios');
+    if (elWa) elWa.value = p.contatos.whatsapp || '';
+    if (elTel) elTel.value = p.contatos.telefone || '';
+    if (elEmail) elEmail.value = p.contatos.email || '';
+    if (elIg) elIg.value = p.contatos.instagram || '';
+    if (elEnd) elEnd.value = p.contatos.endereco || '';
+    if (elHor) elHor.value = p.contatos.horarios || '';
+  }
+
+  renderNumerosConfig();
+  renderFaqConfigList();
+  renderSecoesConfig();
+}
+
+window.adicionarFaqConfig = function() {
+  if (!state.portalSettings.perguntasFrequentes) state.portalSettings.perguntasFrequentes = [];
+  const newFaq = {
+    id: 'faq-' + Date.now(),
+    pergunta: '',
+    resposta: ''
+  };
+  state.portalSettings.perguntasFrequentes.push(newFaq);
+  renderFaqConfigList();
+};
+
+window.removerFaqConfig = function(id) {
+  if (!state.portalSettings.perguntasFrequentes) return;
+  state.portalSettings.perguntasFrequentes = state.portalSettings.perguntasFrequentes.filter(f => f.id !== id);
+  renderFaqConfigList();
+};
+
+window.moverSecaoConfig = function(key, dir) {
+  const ordem = state.portalSettings.secoesOrdem || Object.keys(SECOES_LABELS);
+  const idx = ordem.indexOf(key);
+  if (idx === -1) return;
+  const targetIdx = idx + dir;
+  if (targetIdx < 0 || targetIdx >= ordem.length) return;
+  
+  // Swap
+  ordem[idx] = ordem[targetIdx];
+  ordem[targetIdx] = key;
+  state.portalSettings.secoesOrdem = ordem;
+  renderSecoesConfig();
+};
+
+window.salvarConfiguracaoPortal = function() {
+  if (!state.portalSettings) state.portalSettings = {};
+  
+  // Salvar banners
+  state.portalSettings.banners = [
+    {
+      id: "banner-1",
+      titulo: document.getElementById('p-banner-1-titulo').value.trim(),
+      subtitulo: document.getElementById('p-banner-1-subtitulo').value.trim(),
+      botaoTexto: document.getElementById('p-banner-1-botao').value.trim()
+    },
+    {
+      id: "banner-2",
+      titulo: document.getElementById('p-banner-2-titulo').value.trim(),
+      subtitulo: document.getElementById('p-banner-2-subtitulo').value.trim(),
+      botaoTexto: document.getElementById('p-banner-2-botao').value.trim()
+    },
+    {
+      id: "banner-3",
+      titulo: document.getElementById('p-banner-3-titulo').value.trim(),
+      subtitulo: document.getElementById('p-banner-3-subtitulo').value.trim(),
+      botaoTexto: document.getElementById('p-banner-3-botao').value.trim()
+    }
+  ];
+
+  // Salvar textos institucionais
+  state.portalSettings.quemSomos = {
+    titulo: document.getElementById('p-somos-titulo').value.trim(),
+    texto: document.getElementById('p-somos-texto').value.trim(),
+    fraseFinal: document.getElementById('p-somos-frase').value.trim()
+  };
+  state.portalSettings.missao = {
+    titulo: document.getElementById('p-missao-titulo').value.trim(),
+    texto: document.getElementById('p-missao-texto').value.trim()
+  };
+  state.portalSettings.compromisso = {
+    titulo: document.getElementById('p-comp-titulo').value.trim(),
+    texto: document.getElementById('p-comp-texto').value.trim(),
+    frase: document.getElementById('p-comp-frase').value.trim()
+  };
+
+  // Salvar contatos
+  state.portalSettings.contatos = {
+    whatsapp: document.getElementById('p-contato-whatsapp').value.replace(/\D/g, '').trim(),
+    telefone: document.getElementById('p-contato-telefone').value.trim(),
+    email: document.getElementById('p-contato-email').value.trim(),
+    instagram: document.getElementById('p-contato-instagram').value.replace('@', '').trim(),
+    endereco: document.getElementById('p-contato-endereco').value.trim(),
+    horarios: document.getElementById('p-contato-horarios').value.trim()
+  };
+
+  // Salvar contadores
+  (state.portalSettings.contadores || []).forEach(c => {
+    const numVal = document.getElementById(`p-contador-${c.id}-numero`)?.value.trim() || '';
+    const textVal = document.getElementById(`p-contador-${c.id}-texto`)?.value.trim() || '';
+    c.numero = numVal;
+    c.texto = textVal;
+  });
+
+  // Salvar FAQs
+  (state.portalSettings.perguntasFrequentes || []).forEach(f => {
+    const pergVal = document.getElementById(`p-faq-${f.id}-pergunta`)?.value.trim() || '';
+    const respVal = document.getElementById(`p-faq-${f.id}-resposta`)?.value.trim() || '';
+    f.pergunta = pergVal;
+    f.resposta = respVal;
+  });
+
+  // Salvar visibilidade das seções
+  if (!state.portalSettings.secoesVisiveis) state.portalSettings.secoesVisiveis = {};
+  Object.keys(SECOES_LABELS).forEach(key => {
+    const el = document.getElementById(`p-secao-${key}-visivel`);
+    if (el) state.portalSettings.secoesVisiveis[key] = el.checked;
+  });
+
+  saveState();
+  showToast('Configurações do Portal salvas com sucesso!', 'success');
+};
+
 

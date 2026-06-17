@@ -41,11 +41,11 @@ const SECURITY_HEADERS = {
   // scripts e estilos permitidos: apenas CDNs conhecidos e o próprio servidor
   'Content-Security-Policy': [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.gstatic.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
     "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com",
-    "img-src 'self' data: blob: https://images.unsplash.com https://ui-avatars.com",
-    "connect-src 'self'",
+    "img-src 'self' data: blob: https://images.unsplash.com https://ui-avatars.com https://api.qrserver.com",
+    "connect-src 'self' https://viacep.com.br https://*.googleapis.com https://*.firebaseio.com https://*.appspot.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'"
@@ -56,12 +56,16 @@ http.createServer((req, res) => {
   let urlPath = req.url.split('?')[0];
   if (urlPath === '/') urlPath = '/index.html';
 
-  // Bloqueia acesso a arquivos fora do diretório base (Path Traversal)
-  const filePath = path.resolve(BASE, '.' + urlPath);
+  let filePath = path.resolve(BASE, '.' + urlPath);
   if (!filePath.startsWith(BASE)) {
     res.writeHead(403, { 'Content-Type': 'text/plain', ...SECURITY_HEADERS });
     res.end('403 Forbidden');
     return;
+  }
+
+  // Se a rota for sob /vagas/ e o arquivo físico correspondente não existir, serve vemserrt.html
+  if (urlPath.startsWith('/vagas/') && !fs.existsSync(filePath)) {
+    filePath = path.resolve(BASE, './vemserrt.html');
   }
 
   console.log('Request:', req.url, '->', filePath);

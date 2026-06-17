@@ -1057,6 +1057,202 @@
                         </div>
                     </div>
 
+                    <!-- CONFIGURAÇÃO DO PORTAL PÚBLICO VEM SER RT (SÓ PARA AUTORIZADOS) -->
+                    <div id="portal-configuracao-container" style="display:none; margin-top:32px;">
+                        <hr style="border:none; border-top:1px solid var(--border-color); margin: 32px 0;">
+                        
+                        <div class="page-title-section" style="margin-bottom:20px;">
+                            <h2><i class="fa-solid fa-sliders" style="color:var(--primary);"></i> Painel de Configuração do Vem Ser RT</h2>
+                            <p class="page-subtitle">Gerencie os banners, textos, contatos e seções do portal público</p>
+                        </div>
+                        
+                        <form id="form-config-portal">
+                            <!-- Banners -->
+                            <div class="table-box bg-glass mb-4" style="margin-bottom:24px;">
+                                <div class="table-header-area">
+                                    <h3><i class="fa-solid fa-images" style="color:var(--primary);"></i> Configuração de Banners (Carrossel)</h3>
+                                </div>
+                                <div style="padding:20px; display:flex; flex-direction:column; gap:16px;">
+                                    <div style="background:rgba(255,255,255,0.03); padding:16px; border-radius:8px; border:1px solid var(--border-color);">
+                                        <h4 style="margin:0 0 12px; font-size:13px; color:var(--primary);">Banner 1</h4>
+                                        <div class="form-group">
+                                            <label>Título *</label>
+                                            <input type="text" id="p-banner-1-titulo" required class="form-control">
+                                        </div>
+                                        <div class="form-group mt-2">
+                                            <label>Subtítulo *</label>
+                                            <input type="text" id="p-banner-1-subtitulo" required class="form-control">
+                                        </div>
+                                        <div class="form-group mt-2">
+                                            <label>Texto do Botão *</label>
+                                            <input type="text" id="p-banner-1-botao" required class="form-control">
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="background:rgba(255,255,255,0.03); padding:16px; border-radius:8px; border:1px solid var(--border-color);">
+                                        <h4 style="margin:0 0 12px; font-size:13px; color:var(--primary);">Banner 2</h4>
+                                        <div class="form-group">
+                                            <label>Título *</label>
+                                            <input type="text" id="p-banner-2-titulo" required class="form-control">
+                                        </div>
+                                        <div class="form-group mt-2">
+                                            <label>Subtítulo *</label>
+                                            <input type="text" id="p-banner-2-subtitulo" required class="form-control">
+                                        </div>
+                                        <div class="form-group mt-2">
+                                            <label>Texto do Botão *</label>
+                                            <input type="text" id="p-banner-2-botao" required class="form-control">
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="background:rgba(255,255,255,0.03); padding:16px; border-radius:8px; border:1px solid var(--border-color);">
+                                        <h4 style="margin:0 0 12px; font-size:13px; color:var(--primary);">Banner 3</h4>
+                                        <div class="form-group">
+                                            <label>Título *</label>
+                                            <input type="text" id="p-banner-3-titulo" required class="form-control">
+                                        </div>
+                                        <div class="form-group mt-2">
+                                            <label>Subtítulo *</label>
+                                            <input type="text" id="p-banner-3-subtitulo" required class="form-control">
+                                        </div>
+                                        <div class="form-group mt-2">
+                                            <label>Texto do Botão *</label>
+                                            <input type="text" id="p-banner-3-botao" required class="form-control">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Quem Somos, Missão e Compromisso -->
+                            <div class="table-box bg-glass mb-4" style="margin-bottom:24px;">
+                                <div class="table-header-area">
+                                    <h3><i class="fa-solid fa-circle-info" style="color:var(--primary);"></i> Textos Institucionais</h3>
+                                </div>
+                                <div style="padding:20px; display:flex; flex-direction:column; gap:16px;">
+                                    <h4 style="margin:0; font-size:13px; color:var(--primary); border-bottom:1px solid var(--border-color); padding-bottom:6px;">Quem Somos</h4>
+                                    <div class="form-group">
+                                        <label>Título principal *</label>
+                                        <input type="text" id="p-somos-titulo" required class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Texto institucional *</label>
+                                        <textarea id="p-somos-texto" required class="form-control" rows="5"></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Frase final *</label>
+                                        <input type="text" id="p-somos-frase" required class="form-control">
+                                    </div>
+                                    
+                                    <h4 style="margin:12px 0 0; font-size:13px; color:var(--primary); border-bottom:1px solid var(--border-color); padding-bottom:6px;">Missão</h4>
+                                    <div class="form-group">
+                                        <label>Título da Missão *</label>
+                                        <input type="text" id="p-missao-titulo" required class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Texto da Missão *</label>
+                                        <textarea id="p-missao-texto" required class="form-control" rows="3"></textarea>
+                                    </div>
+                                    
+                                    <h4 style="margin:12px 0 0; font-size:13px; color:var(--primary); border-bottom:1px solid var(--border-color); padding-bottom:6px;">Compromisso</h4>
+                                    <div class="form-group">
+                                        <label>Título do Compromisso *</label>
+                                        <input type="text" id="p-comp-titulo" required class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Texto do Compromisso *</label>
+                                        <textarea id="p-comp-texto" required class="form-control" rows="3"></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Frase de rodapé *</label>
+                                        <input type="text" id="p-comp-frase" required class="form-control">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Contatos e Redes Sociais -->
+                            <div class="table-box bg-glass mb-4" style="margin-bottom:24px;">
+                                <div class="table-header-area">
+                                    <h3><i class="fa-solid fa-address-book" style="color:var(--primary);"></i> Contatos e Endereço</h3>
+                                </div>
+                                <div style="padding:20px; display:flex; flex-direction:column; gap:16px;">
+                                    <div class="form-group-grid">
+                                        <div class="form-group">
+                                            <label>WhatsApp (Link direto - só números com DDD) *</label>
+                                            <input type="text" id="p-contato-whatsapp" required class="form-control" placeholder="11999998888">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Telefone Comercial *</label>
+                                            <input type="text" id="p-contato-telefone" required class="form-control" placeholder="(11) 3643-4848">
+                                        </div>
+                                    </div>
+                                    <div class="form-group-grid">
+                                        <div class="form-group">
+                                            <label>E-mail institucional *</label>
+                                            <input type="email" id="p-contato-email" required class="form-control" placeholder="contato@vemserrt.com.br">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Instagram (Nome de usuário, sem @) *</label>
+                                            <input type="text" id="p-contato-instagram" required class="form-control" placeholder="rtempregos">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Endereço completo *</label>
+                                        <input type="text" id="p-contato-endereco" required class="form-control" placeholder="Rua Dronsfield, 255 — Lapa — São Paulo/SP">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Horários de Atendimento *</label>
+                                        <input type="text" id="p-contato-horarios" required class="form-control" placeholder="Segunda a Sexta, das 08:00 às 17:48">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Indicadores / Números -->
+                            <div class="table-box bg-glass mb-4" style="margin-bottom:24px;">
+                                <div class="table-header-area">
+                                    <h3><i class="fa-solid fa-calculator" style="color:var(--primary);"></i> Indicadores e Números R&T</h3>
+                                </div>
+                                <div style="padding:20px; display:flex; flex-direction:column; gap:16px;">
+                                    <p style="font-size:12px; color:var(--text-secondary); margin:0;"><i class="fa-solid fa-circle-info"></i> Altere os contadores exibidos na página inicial do portal público.</p>
+                                    <div id="p-numeros-container" style="display:flex; flex-direction:column; gap:12px;">
+                                        <!-- Preenchido via JS -->
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Perguntas Frequentes (FAQs) -->
+                            <div class="table-box bg-glass mb-4" style="margin-bottom:24px;">
+                                <div class="table-header-area" style="display:flex; justify-content:space-between; align-items:center;">
+                                    <h3><i class="fa-solid fa-circle-question" style="color:var(--primary);"></i> Perguntas Frequentes (FAQ)</h3>
+                                    <button type="button" id="btn-adicionar-faq" class="btn btn-primary btn-sm" style="font-size:11.5px; height:28px;"><i class="fa-solid fa-plus"></i> Adicionar Pergunta</button>
+                                </div>
+                                <div style="padding:20px; display:flex; flex-direction:column; gap:16px;">
+                                    <div id="p-faq-container" style="display:flex; flex-direction:column; gap:16px;">
+                                        <!-- Preenchido via JS -->
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Visibilidade e Ordem das Seções -->
+                            <div class="table-box bg-glass mb-4" style="margin-bottom:24px;">
+                                <div class="table-header-area">
+                                    <h3><i class="fa-solid fa-list-ol" style="color:var(--primary);"></i> Visibilidade e Ordem das Seções</h3>
+                                </div>
+                                <div style="padding:20px; display:flex; flex-direction:column; gap:16px;">
+                                    <p style="font-size:12px; color:var(--text-secondary); margin:0;"><i class="fa-solid fa-circle-info"></i> Desmarque as seções que deseja ocultar ou reorganize a exibição.</p>
+                                    <div id="p-secoes-container" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                                        <!-- Preenchido via JS -->
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                                <button type="submit" class="btn btn-primary" style="background:var(--primary); border:none; padding:10px 24px;">
+                                    <i class="fa-solid fa-floppy-disk"></i> Salvar Configurações do Portal
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
                     </div>
                 </section>
 
@@ -1737,77 +1933,268 @@
             </div>
             <form id="form-nova-vaga">
                 <div class="modal-body">
+                    <!-- 4.1 EMPRESA E IDENTIFICAÇÃO -->
+                    <div class="vaga-sec-title" style="margin:4px 0 10px;font-weight:700;font-size:13px;color:var(--primary);border-bottom:1px solid var(--border);padding-bottom:5px;"><i class="fa-solid fa-building"></i> Empresa e identificação da vaga</div>
                     <div class="form-group">
                         <label for="vaga-add-empresa">Empresa Parceira *</label>
-                        <select id="vaga-add-empresa" required class="form-control">
-                            <!-- Empresas -->
-                        </select>
+                        <select id="vaga-add-empresa" required class="form-control"><!-- Empresas --></select>
                     </div>
-                    
                     <div class="form-group-grid">
                         <div class="form-group">
-                            <label for="vaga-add-cargo">Cargo / Ocupação *</label>
-                            <input type="text" id="vaga-add-cargo" required class="form-control" placeholder="Ex: Operador de Logística">
+                            <label for="vaga-add-cargo">Nome da vaga / Cargo *</label>
+                            <input type="text" id="vaga-add-cargo" required class="form-control" placeholder="Ex: Assistente de Operações">
                         </div>
                         <div class="form-group">
-                            <label for="vaga-add-codigo">Código da Unidade / Filial *</label>
+                            <label for="vaga-add-codigo">Código interno / Unidade *</label>
                             <input type="text" id="vaga-add-codigo" required class="form-control" placeholder="Ex: CGH7, SP01, GRU">
                         </div>
                     </div>
-                    
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-operacao">Nome da operação</label>
+                            <input type="text" id="vaga-add-operacao" class="form-control" placeholder="Ex: Luft CGH7">
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-quantidade">Quantidade de vagas *</label>
+                            <input type="number" id="vaga-add-quantidade" required class="form-control" placeholder="10">
+                        </div>
+                    </div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-status">Status da vaga</label>
+                            <select id="vaga-add-status" class="form-control">
+                                <option value="ativa">Ativa</option>
+                                <option value="pausada">Pausada</option>
+                                <option value="encerrada">Encerrada</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-validade">Data de validade</label>
+                            <input type="date" id="vaga-add-validade" class="form-control">
+                        </div>
+                    </div>
+
+                    <!-- 4.2 TOMADOR E CENTRO DE CUSTO -->
+                    <div class="vaga-sec-title" style="margin:18px 0 10px;font-weight:700;font-size:13px;color:var(--primary);border-bottom:1px solid var(--border);padding-bottom:5px;"><i class="fa-solid fa-sitemap"></i> Tomador e centro de custo</div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-tomador-nome">Nome do tomador</label>
+                            <input type="text" id="vaga-add-tomador-nome" class="form-control" placeholder="Ex: Tomador 2">
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-tomador-codigo">Código do tomador</label>
+                            <input type="text" id="vaga-add-tomador-codigo" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-tomador-cnpj">CNPJ do tomador</label>
+                            <input type="text" id="vaga-add-tomador-cnpj" class="form-control" placeholder="00.000.000/0000-00">
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-exata-id">Código da empresa no Exata</label>
+                            <input type="text" id="vaga-add-exata-id" class="form-control" placeholder="id_empresa_exata">
+                        </div>
+                    </div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-centro-custo">Centro de custo</label>
+                            <input type="text" id="vaga-add-centro-custo" class="form-control" placeholder="Ex: CGH7">
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-centro-sigla">Sigla do centro de custo</label>
+                            <input type="text" id="vaga-add-centro-sigla" class="form-control">
+                        </div>
+                    </div>
+
+                    <!-- 4.3 ENDEREÇO DO LOCAL DE TRABALHO -->
+                    <div class="vaga-sec-title" style="margin:18px 0 10px;font-weight:700;font-size:13px;color:var(--primary);border-bottom:1px solid var(--border);padding-bottom:5px;"><i class="fa-solid fa-location-dot"></i> Endereço do local de trabalho</div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-cep">CEP <span style="font-weight:400;color:var(--text-secondary)">(preenche automático)</span></label>
+                            <input type="text" id="vaga-add-cep" class="form-control" placeholder="00000-000" oninput="buscarCepVaga(this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-rua">Rua</label>
+                            <input type="text" id="vaga-add-rua" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-numero">Número</label>
+                            <input type="text" id="vaga-add-numero" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-complemento">Complemento</label>
+                            <input type="text" id="vaga-add-complemento" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-bairro">Bairro</label>
+                            <input type="text" id="vaga-add-bairro" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-cidade">Cidade</label>
+                            <input type="text" id="vaga-add-cidade" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="vaga-add-estado">Estado (UF)</label>
+                        <input type="text" id="vaga-add-estado" class="form-control" maxlength="2" placeholder="SP">
+                    </div>
+                    <input type="hidden" id="vaga-add-local">
+
+                    <!-- 4.4 INFORMAÇÕES DA FUNÇÃO -->
+                    <div class="vaga-sec-title" style="margin:18px 0 10px;font-weight:700;font-size:13px;color:var(--primary);border-bottom:1px solid var(--border);padding-bottom:5px;"><i class="fa-solid fa-briefcase"></i> Informações da função</div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-funcao-nome">Função / Cargo</label>
+                            <input type="text" id="vaga-add-funcao-nome" class="form-control" value="Assistente de Operações">
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-funcao-codigo">Código da função (Exata)</label>
+                            <input type="text" id="vaga-add-funcao-codigo" class="form-control" value="1189">
+                        </div>
+                    </div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-cbo">Código CBO</label>
+                            <input type="text" id="vaga-add-cbo" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-categoria">Categoria de contratação</label>
+                            <input type="text" id="vaga-add-categoria" class="form-control" value="Trabalho temporário por prazo determinado">
+                        </div>
+                    </div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-categoria-codigo">Código da categoria</label>
+                            <input type="text" id="vaga-add-categoria-codigo" class="form-control" value="106">
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-categoria-utilizado">Código utilizado</label>
+                            <input type="text" id="vaga-add-categoria-utilizado" class="form-control" value="01">
+                        </div>
+                    </div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-tipo-contrato">Tipo de contrato</label>
+                            <input type="text" id="vaga-add-tipo-contrato" class="form-control" placeholder="Ex: temporário">
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-vinculo">Vínculo</label>
+                            <input type="text" id="vaga-add-vinculo" class="form-control" placeholder="Ex: CLT">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="vaga-add-finalidade">Finalidade da contratação</label>
+                        <input type="text" id="vaga-add-finalidade" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="vaga-add-justificativa">Justificativa da contratação</label>
+                        <input type="text" id="vaga-add-justificativa" class="form-control">
+                    </div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-previsao-dias">Previsão de duração (dias)</label>
+                            <input type="number" id="vaga-add-previsao-dias" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-taxa">Taxa (quando aplicável)</label>
+                            <input type="text" id="vaga-add-taxa" class="form-control">
+                        </div>
+                    </div>
+
+                    <!-- 4.5 SALÁRIO E BENEFÍCIOS -->
+                    <div class="vaga-sec-title" style="margin:18px 0 10px;font-weight:700;font-size:13px;color:var(--primary);border-bottom:1px solid var(--border);padding-bottom:5px;"><i class="fa-solid fa-money-bill-wave"></i> Salário e benefícios</div>
                     <div class="form-group-grid">
                         <div class="form-group">
                             <label for="vaga-add-salario">Salário (R$) *</label>
                             <input type="number" step="0.01" id="vaga-add-salario" required class="form-control" placeholder="1800.00">
                         </div>
                         <div class="form-group">
-                            <label for="vaga-add-quantidade">Quantidade de Vagas Disponíveis *</label>
-                            <input type="number" id="vaga-add-quantidade" required class="form-control" placeholder="10">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="vaga-add-local">Local de Trabalho *</label>
-                        <input type="text" id="vaga-add-local" required class="form-control" placeholder="Cidade - Estado (e regiões próximas)">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="vaga-add-beneficios">Benefícios (Separados por vírgula) *</label>
-                        <input type="text" id="vaga-add-beneficios" required class="form-control" placeholder="VT, VR, Seguro de Vida, Convênio Médico">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="vaga-add-linhas-fretado">Linhas de Fretado <span style="font-weight:400;color:var(--text-secondary)">(uma por linha — opcional)</span></label>
-                        <textarea id="vaga-add-linhas-fretado" class="form-control" rows="3" placeholder="Ex:&#10;Linha 01 — Cajamar&#10;Linha 07 — Santo André&#10;Linha 12 — São Paulo Centro"></textarea>
-                    </div>
-
-                    <div class="form-group-grid">
-                        <div class="form-group">
-                            <label for="vaga-add-escala">Escala da Vaga</label>
-                            <select id="vaga-add-escala" class="form-control" onchange="document.getElementById('vaga-escala-custom-box').style.display=this.value==='personalizada'?'block':'none'">
-                                <option value="">Não definida</option>
-                                <option value="5x2">5x2 (5 dias trabalho / 2 folga)</option>
-                                <option value="3x1">3x1 (3 dias trabalho / 1 folga)</option>
-                                <option value="6x1">6x1 (6 dias trabalho / 1 folga)</option>
-                                <option value="12x36">12x36 (12h trabalho / 36h folga)</option>
-                                <option value="personalizada">Personalizada (descrever)</option>
+                            <label for="vaga-add-salario-tipo">Tipo de salário</label>
+                            <select id="vaga-add-salario-tipo" class="form-control">
+                                <option value="mensal">Mensal</option>
+                                <option value="hora">Por hora</option>
+                                <option value="dia">Por dia</option>
                             </select>
                         </div>
-                        <div class="form-group" id="vaga-escala-custom-box" style="display:none;">
-                            <label for="vaga-add-escala-custom">Descrever escala personalizada</label>
-                            <input type="text" id="vaga-add-escala-custom" class="form-control" placeholder="Ex: Seg, Qua e Sex apenas">
+                    </div>
+                    <div class="form-group">
+                        <label for="vaga-add-beneficios">Benefícios (separados por vírgula) *</label>
+                        <input type="text" id="vaga-add-beneficios" required class="form-control" placeholder="VT, VR, Seguro de Vida, Convênio Médico">
+                    </div>
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-vt">Vale-transporte</label>
+                            <input type="text" id="vaga-add-vt" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-refeicao">Refeição</label>
+                            <input type="text" id="vaga-add-refeicao" class="form-control">
                         </div>
                     </div>
-
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-va">Vale-alimentação</label>
+                            <input type="text" id="vaga-add-va" class="form-control">
+                        </div>
+                        <div class="form-group" style="display:flex;align-items:center;margin-top:24px;padding-left:6px;">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500;">
+                                <input type="checkbox" id="vaga-add-fretado"> <span>Possui fretado</span>
+                            </label>
+                        </div>
+                    </div>
                     <div class="form-group">
-                        <label for="vaga-add-turnos">Turnos disponíveis <span style="font-weight:400;color:var(--text-secondary)">(um por linha — opcional)</span></label>
-                        <textarea id="vaga-add-turnos" class="form-control" rows="3" placeholder="Ex:&#10;1º Turno: 06h00 – 14h00&#10;2º Turno: 14h00 – 22h00&#10;3º Turno: 22h00 – 06h00"></textarea>
+                        <label for="vaga-add-linhas-fretado">Linhas de fretado <span style="font-weight:400;color:var(--text-secondary)">(uma por linha)</span></label>
+                        <textarea id="vaga-add-linhas-fretado" class="form-control" rows="2" placeholder="Linha 01 — Cajamar&#10;Linha 07 — Santo André"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="vaga-add-outros">Outros benefícios</label>
+                        <input type="text" id="vaga-add-outros" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="vaga-add-obs">Observações</label>
+                        <textarea id="vaga-add-obs" class="form-control" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="vaga-add-desc">Descrição breve da oportunidade *</label>
+                        <textarea id="vaga-add-desc" required class="form-control" rows="2" placeholder="Requisitos básicos e atividades..."></textarea>
                     </div>
 
-                    <div class="form-group">
-                        <label for="vaga-add-desc">Descrição Breve da Oportunidade *</label>
-                        <textarea id="vaga-add-desc" required class="form-control" rows="3" placeholder="Descreva os requisitos básicos e atividades..."></textarea>
+                    <!-- PUBLICAR NO PORTAL VEM SER RT -->
+                    <div class="vaga-sec-title" style="margin:18px 0 10px;font-weight:700;font-size:13px;color:var(--primary);border-bottom:1px solid var(--border);padding-bottom:5px;">
+                        <i class="fa-solid fa-globe"></i> Publicação no Portal "Vem Ser RT"
                     </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; padding: 10px 0;">
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500;">
+                            <input type="checkbox" id="vaga-add-publicar" checked> <span>Publicar no portal</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500;">
+                            <input type="checkbox" id="vaga-add-quente"> <span>Marcar como Vaga Quente</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500;">
+                            <input type="checkbox" id="vaga-add-inicio-imediato"> <span>Início Imediato</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500;">
+                            <input type="checkbox" id="vaga-add-muitas-oportunidades"> <span>Muitas Oportunidades</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500;">
+                            <input type="checkbox" id="vaga-add-sem-experiencia"> <span>Sem Experiência</span>
+                        </label>
+                    </div>
+
+                    <!-- 4.6 HORÁRIOS DISPONÍVEIS -->
+                    <div class="vaga-sec-title" style="margin:18px 0 10px;font-weight:700;font-size:13px;color:var(--primary);border-bottom:1px solid var(--border);padding-bottom:5px;"><i class="fa-solid fa-clock"></i> Horários disponíveis</div>
+                    <div id="vaga-horarios-list"></div>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="adicionarHorarioVaga()" style="gap:6px;margin-top:6px;"><i class="fa-solid fa-plus"></i> Adicionar horário</button>
+
+                    <!-- Campos legados (escala/turnos) mantidos ocultos p/ compatibilidade -->
+                    <input type="hidden" id="vaga-add-escala">
+                    <input type="hidden" id="vaga-add-escala-custom">
+                    <input type="hidden" id="vaga-add-turnos">
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="fecharModalVaga()">Cancelar</button>
@@ -1881,153 +2268,25 @@
                 <button class="btn-close-modal" onclick="fecharModalNovoCliente()" style="color:#fff;"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <form id="form-novo-cliente">
-                <div class="modal-body" style="max-height:78vh; overflow-y:auto;">
-
-                    <!-- SEÇÃO: Identificação da Empresa -->
+                <div class="modal-body">
                     <div style="font-size:11px; font-weight:700; color:#059669; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
-                        <i class="fa-solid fa-building"></i> Identificação da Empresa
+                        <i class="fa-solid fa-building"></i> Empresa Parceira
                     </div>
-                    <div class="form-group-grid">
-                        <div class="form-group" style="grid-column:1/-1;">
-                            <label for="cli-nome">Nome da Empresa *</label>
-                            <input type="text" id="cli-nome" required class="form-control" placeholder="Ex: DHL Express, Total Express, Correios..." oninput="autoSiglaCliente()">
-                        </div>
-                    </div>
-                    <div class="form-group-grid">
-                        <div class="form-group">
-                            <label for="cli-tomador">Tomador / Responsável *</label>
-                            <input type="text" id="cli-tomador" required class="form-control" placeholder="Nome do responsável da empresa">
-                        </div>
-                        <div class="form-group">
-                            <label for="cli-cnpj">CNPJ *</label>
-                            <input type="text" id="cli-cnpj" required class="form-control" placeholder="00.000.000/0000-00" maxlength="18" oninput="mascaraCNPJ(this)">
-                        </div>
-                    </div>
-                    <div class="form-group-grid">
-                        <div class="form-group">
-                            <label for="cli-sigla">Sigla (até 4 letras) *</label>
-                            <input type="text" id="cli-sigla" required class="form-control" placeholder="Ex: DHL" maxlength="4" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase();this.dataset.userEdited='1'">
-                        </div>
-                        <div class="form-group">
-                            <label for="cli-cor">Cor da Marca</label>
-                            <div style="display:flex;gap:8px;align-items:center;">
-                                <input type="color" id="cli-cor" value="#6366f1" class="form-control" style="padding:4px;height:38px;width:60px;cursor:pointer;">
-                                <span style="font-size:12px;color:var(--text-secondary);">Cor usada no badge</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <hr style="border:none; border-top:1px solid var(--border-color); margin:18px 0;">
-
-                    <!-- SEÇÃO: Endereço -->
-                    <div style="font-size:11px; font-weight:700; color:#059669; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
-                        <i class="fa-solid fa-map-location-dot"></i> Endereço da Empresa
-                    </div>
-                    <div class="form-group-grid">
-                        <div class="form-group">
-                            <label for="cli-cep">CEP *</label>
-                            <input type="text" id="cli-cep" required class="form-control" placeholder="00000-000" maxlength="9" oninput="mascaraCEPCliente(this)">
-                        </div>
-                        <div class="form-group">
-                            <label for="cli-rua">Rua / Av. *</label>
-                            <input type="text" id="cli-rua" required class="form-control" placeholder="Ex: Av. das Nações">
-                        </div>
-                    </div>
-                    <div class="form-group-grid">
-                        <div class="form-group">
-                            <label for="cli-numero-end">Número *</label>
-                            <input type="text" id="cli-numero-end" required class="form-control" placeholder="Ex: 1000">
-                        </div>
-                        <div class="form-group">
-                            <label for="cli-bairro">Bairro *</label>
-                            <input type="text" id="cli-bairro" required class="form-control" placeholder="Ex: Gato Preto">
-                        </div>
-                    </div>
-                    <div class="form-group-grid">
-                        <div class="form-group">
-                            <label for="cli-cidade">Cidade *</label>
-                            <input type="text" id="cli-cidade" required class="form-control" placeholder="Ex: Cajamar, Guarulhos, São Paulo..." oninput="autoLatLngCliente()">
-                        </div>
-                        <div class="form-group">
-                            <label for="cli-estado">Estado *</label>
-                            <input type="text" id="cli-estado" required class="form-control" placeholder="SP" maxlength="2" style="text-transform:uppercase;" value="SP" oninput="this.value=this.value.toUpperCase()">
-                        </div>
-                    </div>
-                    <div id="cli-coords-box" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;font-size:12px;color:#15803d;display:none;margin-bottom:8px;">
-                        <i class="fa-solid fa-location-dot" style="margin-right:5px;"></i>
-                        <span id="cli-coords-txt"></span>
-                    </div>
-                    <input type="hidden" id="cli-lat">
-                    <input type="hidden" id="cli-lng">
-
-                    <hr style="border:none; border-top:1px solid var(--border-color); margin:18px 0;">
-
-                    <!-- SEÇÃO: Informações das Vagas -->
-                    <div style="font-size:11px; font-weight:700; color:#059669; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
-                        <i class="fa-solid fa-briefcase"></i> Informações das Vagas
-                    </div>
-                    <div class="form-group-grid">
-                        <div class="form-group">
-                            <label for="cli-centro-custo">Centro de Custo</label>
-                            <input type="text" id="cli-centro-custo" class="form-control" placeholder="Ex: CC-001, 1234-SP">
-                        </div>
-                        <div class="form-group">
-                            <label for="cli-data-entrada">Data de Entrada do Cliente</label>
-                            <input type="date" id="cli-data-entrada" class="form-control">
-                        </div>
-                    </div>
-                    <div class="form-group-grid">
-                        <div class="form-group">
-                            <label for="cli-data-saida">Data de Saída / Encerramento</label>
-                            <input type="date" id="cli-data-saida" class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label for="cli-categoria-vaga">Categoria da Vaga</label>
-                            <select id="cli-categoria-vaga" class="form-control">
-                                <option value="">Selecione...</option>
-                                <option value="CLT">CLT</option>
-                                <option value="Temporário">Temporário</option>
-                                <option value="Intermitente">Intermitente</option>
-                                <option value="Diária">Diária</option>
-                                <option value="Jovem Aprendiz">Jovem Aprendiz</option>
-                                <option value="Estágio">Estágio</option>
-                                <option value="PJ">PJ (Pessoa Jurídica)</option>
-                            </select>
-                        </div>
-                    </div>
-
                     <div class="form-group">
-                        <label for="cli-funcoes">Funções Disponíveis <span style="font-weight:400;color:var(--text-secondary)">(uma por linha)</span></label>
-                        <textarea id="cli-funcoes" class="form-control" rows="3" placeholder="Ex:&#10;Operador de Logística&#10;Auxiliar de Armazém&#10;Separador de Mercadorias"></textarea>
+                        <label for="cli-nome">Nome da Empresa *</label>
+                        <input type="text" id="cli-nome" required class="form-control" placeholder="Ex: Luft, CEVA, Amazon, MART..." oninput="autoSiglaCliente()">
                     </div>
-
                     <div class="form-group">
-                        <label for="cli-escalas">Escalas de Trabalho <span style="font-weight:400;color:var(--text-secondary)">(uma por linha)</span></label>
-                        <textarea id="cli-escalas" class="form-control" rows="3" placeholder="Ex:&#10;5x2 (Seg-Sex)&#10;6x1&#10;12x36"></textarea>
+                        <label for="cli-cnpj">CNPJ *</label>
+                        <input type="text" id="cli-cnpj" required class="form-control" placeholder="00.000.000/0000-00" maxlength="18" oninput="mascaraCNPJ(this)">
                     </div>
-
-                    <div class="form-group">
-                        <label>Dias de Trabalho Disponíveis</label>
-                        <div style="display:flex; flex-wrap:wrap; gap:10px; padding:12px; background:var(--bg-main); border:1px solid var(--border-color); border-radius:8px;">
-                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="cli-dia-seg" value="Segunda"> Segunda</label>
-                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="cli-dia-ter" value="Terça"> Terça</label>
-                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="cli-dia-qua" value="Quarta"> Quarta</label>
-                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="cli-dia-qui" value="Quinta"> Quinta</label>
-                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="cli-dia-sex" value="Sexta"> Sexta</label>
-                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="cli-dia-sab" value="Sábado"> Sábado</label>
-                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="cli-dia-dom" value="Domingo"> Domingo</label>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="cli-horarios">Horários Disponíveis <span style="font-weight:400;color:var(--text-secondary)">(um por linha)</span></label>
-                        <textarea id="cli-horarios" class="form-control" rows="3" placeholder="Ex:&#10;1º Turno: 06h00 – 14h00&#10;2º Turno: 14h00 – 22h00&#10;3º Turno: 22h00 – 06h00"></textarea>
-                    </div>
-
-                    <p style="font-size:11px;color:var(--text-secondary);margin:8px 0 0;">
+                    <p style="font-size:11px;color:var(--text-secondary);margin:10px 0 0;line-height:1.5;">
                         <i class="fa-solid fa-circle-info"></i>
-                        Se a cidade estiver no nosso banco de dados, a localização é preenchida automaticamente.
+                        Os dados operacionais (tomador, centro de custo, endereço, função, salário, benefícios e horários) ficam dentro de cada <strong>Vaga</strong>. Uma mesma empresa pode ter várias vagas.
                     </p>
+                    <!-- Campos legados ocultos (compatibilidade do cadastro/edição) -->
+                    <input type="hidden" id="cli-sigla">
+                    <input type="hidden" id="cli-cor" value="#6366f1">
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="fecharModalNovoCliente()">Cancelar</button>
@@ -2155,6 +2414,14 @@
                             <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; cursor: pointer;">
                                 <input type="checkbox" id="gerenciar-func-representante">
                                 <span>Representante do Departamento</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group-grid mt-2">
+                        <div class="form-group" style="display: flex; align-items: center; padding-left: 10px;">
+                            <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; cursor: pointer;">
+                                <input type="checkbox" id="gerenciar-func-pode-editar-portal">
+                                <span>Permissão para Editar Portal Público (Vem Ser RT)</span>
                             </label>
                         </div>
                     </div>
