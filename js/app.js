@@ -2975,6 +2975,10 @@ function renderVagasGrid() {
       ? `<button onclick="editarVaga('${v.id}')" style="margin-top:10px;padding:7px 14px;border-radius:7px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background 0.15s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'"><i class="fa-solid fa-pen-to-square"></i> Editar Vaga</button>`
       : '';
 
+    const btnConfigExata = podeEditarVaga
+      ? `<button onclick="abrirConfigExata('${v.id}')" style="margin-top:10px;padding:7px 14px;border-radius:7px;border:1px solid #c4b5fd;background:#f5f3ff;color:#6d28d9;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background 0.15s;" onmouseover="this.style.background='#ede9fe'" onmouseout="this.style.background='#f5f3ff'"><i class="fa-solid fa-file-invoice"></i> Configurar Exata</button>`
+      : '';
+
     return `
       <div class="vaga-card" style="${isQuente ? 'border-color:#f97316; box-shadow:0 0 10px rgba(249,115,22,0.15);' : ''}">
         <div class="vaga-card-header">
@@ -2997,6 +3001,7 @@ function renderVagasGrid() {
             <i class="fa-solid fa-arrow-up-right-from-square"></i> Cadastrar-se
           </button>
           ${btnEditar}
+          ${btnConfigExata}
           ${btnQuente}
           ${btnExcluir}
         </div>
@@ -3012,6 +3017,146 @@ window.excluirVaga = function(vagaId) {
   state.vagas = state.vagas.filter(v => v.id !== vagaId);
   saveState();
   renderVagasGrid();
+};
+
+// ── CONFIGURAÇÃO EXATA POR VAGA (os códigos ficam salvos NA VAGA) ──────────
+let _cfgExataVagaId = null;
+let _cfgExataExtras = [];
+let _cfgExataFuncao = { codigo: '', cbo: '', nome: '' };
+
+window.abrirConfigExata = function (vagaId) {
+  const v = (state.vagas || []).find(x => x.id === vagaId);
+  if (!v) { alert('Vaga não encontrada.'); return; }
+  _cfgExataVagaId = vagaId;
+  _cfgExataExtras = (v.exataExtras || []).map(x => ({ id: x.id || ('ex-' + Math.random().toString(36).slice(2)), campo: x.campo || '', valor: x.valor || '', ativo: x.ativo !== false }));
+  _cfgExataFuncao = { codigo: v.funcaoCodigo || '', cbo: v.cbo || '', nome: v.funcaoNome || '' };
+  _renderConfigExata(v);
+  document.getElementById('modal-config-exata').classList.add('active');
+};
+window.fecharConfigExata = function () {
+  const m = document.getElementById('modal-config-exata'); if (m) m.classList.remove('active');
+  _cfgExataVagaId = null;
+};
+
+function _renderConfigExata(v) {
+  const body = document.getElementById('config-exata-body');
+  if (!body) return;
+  const tipos = getTiposContratacao().filter(t => t.ativo !== false);
+  const tipoSelId = v.tipoContratacaoId || _tipoIdPorVinculo(v.vinculo) || '';
+  const tipoOpts = '<option value="">Selecione…</option>' + tipos.map(t => `<option value="${t.id}" ${t.id === tipoSelId ? 'selected' : ''}>${escapeHTML(t.nome)} — vínculo ${escapeHTML(t.vinculo)}</option>`).join('');
+  const funcDatalist = (window.EXATA_FUNCOES || []).map(f => `<option value="${escapeHTML(labelFuncaoExata(f))}"></option>`).join('');
+  const headerDatalist = EXATA_HEADER.map(h => `<option value="${h}"></option>`).join('');
+  const funcF = _cfgExataFuncao.codigo ? getFuncaoExata(_cfgExataFuncao.codigo) : null;
+  const funcBuscaVal = funcF ? labelFuncaoExata(funcF) : (_cfgExataFuncao.codigo || '');
+  body.innerHTML = `
+    <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:10px 12px;margin-bottom:14px;">
+      <div style="font-weight:700;font-size:14px;color:#6d28d9;">${escapeHTML(v.empresaNome || '')} — ${escapeHTML(v.cargo || '')}</div>
+      <div style="font-size:11px;color:var(--text-secondary);">Estes códigos ficam salvos NA VAGA e valem para todos os candidatos aprovados nela. Dados pessoais (nome, CPF, RG…) vêm da ficha do candidato na exportação.</div>
+    </div>
+
+    <div class="vaga-sec-title" style="margin:4px 0 10px;font-weight:700;font-size:13px;color:var(--primary);border-bottom:1px solid var(--border);padding-bottom:5px;"><i class="fa-solid fa-file-signature"></i> Códigos principais</div>
+    <div class="form-group">
+      <label for="cfg-exata-tipo">Tipo de contratação</label>
+      <select id="cfg-exata-tipo" class="form-control" onchange="aoMudarTipoConfigExata()">${tipoOpts}</select>
+    </div>
+    <div class="form-group-grid">
+      <div class="form-group"><label>Código tipo_contrato (vai no TXT)</label><input id="cfg-exata-codtipo" class="form-control" readonly placeholder="—"></div>
+      <div class="form-group"><label>Vínculo</label><input id="cfg-exata-vinculo" class="form-control" readonly placeholder="—"></div>
+    </div>
+    <div class="form-group-grid">
+      <div class="form-group"><label>Filial</label><input id="cfg-exata-filial" class="form-control" readonly placeholder="—"></div>
+      <div class="form-group"><label for="cfg-exata-tomador">Tomador (id_empresa_exata)</label><input id="cfg-exata-tomador" class="form-control" placeholder="Ex: 17" value="${escapeHTML(v.idEmpresaExata || '')}"></div>
+    </div>
+    <div class="form-group">
+      <label for="cfg-exata-funcao-busca">Função (catálogo) — código, descrição ou CBO</label>
+      <input id="cfg-exata-funcao-busca" class="form-control" list="cfg-exata-funcao-datalist" autocomplete="off" placeholder="Ex: 0002 · AUX DE PRODUCAO · 784205" oninput="aoSelecionarFuncaoConfigExata()" value="${escapeHTML(funcBuscaVal)}">
+      <datalist id="cfg-exata-funcao-datalist">${funcDatalist}</datalist>
+    </div>
+    <div class="form-group-grid">
+      <div class="form-group"><label>Função (código)</label><input id="cfg-exata-funcao-cod" class="form-control" readonly placeholder="—" value="${escapeHTML(_cfgExataFuncao.codigo)}"></div>
+      <div class="form-group"><label>CBO</label><input id="cfg-exata-cbo" class="form-control" readonly placeholder="—" value="${escapeHTML(_cfgExataFuncao.cbo)}"></div>
+    </div>
+    <div class="form-group-grid">
+      <div class="form-group"><label for="cfg-exata-dias-venc">Dias até vencimento (0 = sem)</label><input id="cfg-exata-dias-venc" type="number" class="form-control" value="${Number(v.diasVencimento) || 0}"></div>
+      <div class="form-group"><label for="cfg-exata-dias-prorr">Dias de prorrogação (0 = sem)</label><input id="cfg-exata-dias-prorr" type="number" class="form-control" value="${Number(v.diasProrrogacao) || 0}"></div>
+    </div>
+
+    <div class="vaga-sec-title" style="margin:14px 0 8px;font-weight:700;font-size:13px;color:var(--primary);border-bottom:1px solid var(--border);padding-bottom:5px;"><i class="fa-solid fa-code"></i> Outros códigos exigidos pela Exata (opcional)</div>
+    <p style="font-size:11px;color:var(--text-secondary);margin:0 0 8px;">Fixe qualquer outro campo do TXT só para esta vaga (ex.: <code>categoria</code>, <code>contratacao_finalidade</code>…). O <b>campo</b> deve ser um dos 90 nomes do cabeçalho. Sobrepõe o valor padrão na exportação.</p>
+    <datalist id="cfg-exata-campos-datalist">${headerDatalist}</datalist>
+    <div id="cfg-exata-extras"></div>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="cfgExtraAdd()"><i class="fa-solid fa-plus"></i> Adicionar código</button>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
+      <button type="button" class="btn btn-secondary" onclick="fecharConfigExata()">Cancelar</button>
+      <button type="button" class="btn btn-primary" onclick="salvarConfigExata()"><i class="fa-solid fa-floppy-disk"></i> Salvar configuração</button>
+    </div>`;
+  _preencherCodigosTipoConfig(false); // preenche cód/vínculo/filial sem mexer nos dias salvos
+  _renderCfgExtras();
+}
+
+function _preencherCodigosTipoConfig(atualizarDias) {
+  const sel = document.getElementById('cfg-exata-tipo');
+  const t = sel ? getTipoContratacao(sel.value) : null;
+  const set = (id, val) => { const e = document.getElementById(id); if (e) e.value = (val == null ? '' : val); };
+  set('cfg-exata-codtipo', t ? (t.codigoTipoContrato || t.vinculo) : '');
+  set('cfg-exata-vinculo', t ? t.vinculo : '');
+  set('cfg-exata-filial', t ? t.filial : '');
+  if (atualizarDias && t) { set('cfg-exata-dias-venc', Number(t.diasVencimento) || 0); set('cfg-exata-dias-prorr', Number(t.diasProrrogacao) || 0); }
+}
+window.aoMudarTipoConfigExata = function () { _preencherCodigosTipoConfig(true); };
+
+window.aoSelecionarFuncaoConfigExata = function () {
+  const inp = document.getElementById('cfg-exata-funcao-busca');
+  if (!inp) return;
+  const termo = (inp.value || '').trim();
+  const code = termo.split(/[\s·—-]+/)[0];
+  const f = getFuncaoExata(code) || (window.EXATA_FUNCOES || []).find(x => labelFuncaoExata(x) === termo) || null;
+  _cfgExataFuncao = { codigo: f ? f.code : '', cbo: f ? f.cbo : '', nome: f ? f.description : '' };
+  const set = (id, val) => { const e = document.getElementById(id); if (e) e.value = (val == null ? '' : val); };
+  set('cfg-exata-funcao-cod', _cfgExataFuncao.codigo);
+  set('cfg-exata-cbo', _cfgExataFuncao.cbo);
+};
+
+function _renderCfgExtras() {
+  const box = document.getElementById('cfg-exata-extras');
+  if (!box) return;
+  if (!_cfgExataExtras.length) { box.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);margin:0 0 8px;">Nenhum código extra. (Os principais acima já bastam para a maioria das vagas.)</p>'; return; }
+  box.innerHTML = _cfgExataExtras.map((x, i) => `
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;${x.ativo === false ? 'opacity:.5;' : ''}">
+      <input class="form-control" list="cfg-exata-campos-datalist" style="flex:1.3;" placeholder="campo (ex: categoria)" value="${escapeHTML(x.campo || '')}" onchange="cfgExtraSet(${i},'campo',this.value)">
+      <input class="form-control" style="flex:1;" placeholder="código/valor" value="${escapeHTML(x.valor || '')}" onchange="cfgExtraSet(${i},'valor',this.value)">
+      <button type="button" class="btn btn-sm" title="${x.ativo === false ? 'Ativar' : 'Desativar'}" style="background:${x.ativo === false ? '#dcfce7' : '#fef9c3'};border:1px solid #e2e8f0;" onclick="cfgExtraToggle(${i})"><i class="fa-solid fa-${x.ativo === false ? 'toggle-off' : 'toggle-on'}"></i></button>
+      <button type="button" class="btn btn-sm" title="Duplicar" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;" onclick="cfgExtraDup(${i})"><i class="fa-solid fa-copy"></i></button>
+      <button type="button" class="btn btn-sm" title="Excluir" style="background:#fff1f2;border:1px solid #fca5a5;color:#dc2626;" onclick="cfgExtraDel(${i})"><i class="fa-solid fa-trash"></i></button>
+    </div>`).join('');
+}
+window.cfgExtraAdd = function () { _cfgExataExtras.push({ id: 'ex-' + Math.random().toString(36).slice(2), campo: '', valor: '', ativo: true }); _renderCfgExtras(); };
+window.cfgExtraSet = function (i, campo, val) { if (_cfgExataExtras[i]) _cfgExataExtras[i][campo] = val; };
+window.cfgExtraToggle = function (i) { if (_cfgExataExtras[i]) { _cfgExataExtras[i].ativo = _cfgExataExtras[i].ativo === false; _renderCfgExtras(); } };
+window.cfgExtraDup = function (i) { const o = _cfgExataExtras[i]; if (o) { _cfgExataExtras.splice(i + 1, 0, { id: 'ex-' + Math.random().toString(36).slice(2), campo: o.campo, valor: o.valor, ativo: o.ativo }); _renderCfgExtras(); } };
+window.cfgExtraDel = function (i) { _cfgExataExtras.splice(i, 1); _renderCfgExtras(); };
+
+window.salvarConfigExata = function () {
+  const v = (state.vagas || []).find(x => x.id === _cfgExataVagaId);
+  if (!v) { alert('Vaga não encontrada.'); return; }
+  const g = id => ((document.getElementById(id) || {}).value || '').trim();
+  const t = getTipoContratacao(g('cfg-exata-tipo'));
+  if (t) {
+    v.tipoContratacaoId = t.id; v.vinculo = t.vinculo; v.codigoTipoContrato = t.codigoTipoContrato || t.vinculo;
+    v.employmentLabel = t.nome; v.exataEmploymentCode = t.vinculo; v.tipoContrato = t.nome;
+    v.filial = t.filial; v.branchCode = t.filial;
+  }
+  v.idEmpresaExata = g('cfg-exata-tomador');
+  if (_cfgExataFuncao.codigo) { v.funcaoCodigo = _cfgExataFuncao.codigo; v.cbo = _cfgExataFuncao.cbo; v.funcaoNome = _cfgExataFuncao.nome; v.exataJobFunctionId = _cfgExataFuncao.codigo; }
+  v.diasVencimento = Number(g('cfg-exata-dias-venc')) || 0;
+  v.diasProrrogacao = Number(g('cfg-exata-dias-prorr')) || 0;
+  v.exataExtras = _cfgExataExtras.filter(x => (x.campo || '').trim()).map(x => ({ id: x.id, campo: (x.campo || '').trim(), valor: (x.valor || '').trim(), ativo: x.ativo !== false }));
+  registrarLogGlobal(`Configurou Exata da vaga "${v.cargo} — ${v.empresaNome}".`, 'exata');
+  saveState();
+  fecharConfigExata();
+  if (typeof renderVagasGrid === 'function') renderVagasGrid();
+  alert('Configuração Exata salva na vaga. ✅');
 };
 
 window.toggleVagaQuente = function(vagaId) {
@@ -4676,7 +4821,8 @@ function aplicarSnapshotVaga(cand, vagaId) {
     finalidade: vaga.finalidade || '', justificativa: vaga.justificativa || '',
     previsaoDias: vaga.previsaoDias || '', taxa: vaga.taxa || '',
     salario: vaga.salario, salarioTipo: vaga.salarioTipo || 'mensal',
-    beneficios: vaga.beneficios || [], endereco: vaga.endereco || {}, localTrabalho: vaga.localTrabalho || '', cargo: vaga.cargo || ''
+    beneficios: vaga.beneficios || [], endereco: vaga.endereco || {}, localTrabalho: vaga.localTrabalho || '', cargo: vaga.cargo || '',
+    exataExtras: (vaga.exataExtras || []).map(x => ({ id: x.id, campo: x.campo, valor: x.valor, ativo: x.ativo !== false }))
   };
 }
 function aplicarHorarioVaga(cand, horarioValor) {
@@ -5224,6 +5370,16 @@ function _aplicarDominiosExata(arr) {
   });
   return arr;
 }
+// Override por VAGA: códigos extras configurados na própria vaga (exataExtras)
+function _aplicarExtrasVaga(arr, vs) {
+  const extras = (vs && vs.exataExtras) || [];
+  extras.forEach(x => {
+    if (!x || x.ativo === false) return;
+    const i = EXATA_HEADER.indexOf(String(x.campo || '').trim());
+    if (i >= 0) arr[i] = x.valor;
+  });
+  return arr;
+}
 
 // Protege o valor: nunca cria coluna extra nem emite null/undefined (itens 15-16)
 function sanitizarExata(v) {
@@ -5362,7 +5518,8 @@ function mapearExata(cand, vs) {
     vs.previsaoDias,                              // 89 previsao_contrato_dias (vaga)
     vs.taxa                                       // 90 taxa (vaga)
   ];
-  return _aplicarDominiosExata(arr); // traduz texto->código nos campos configuráveis (de/para)
+  // 1) traduz texto->código (de/para) · 2) aplica códigos extras fixados na vaga
+  return _aplicarExtrasVaga(_aplicarDominiosExata(arr), vs);
 }
 
 // Validação dos campos obrigatórios antes de exportar (item 19)
