@@ -1236,6 +1236,8 @@ function setupEventListeners() {
   if (selectVagaDrawer) {
     selectVagaDrawer.addEventListener('change', () => {
       atualizarAutopreviewVaga(selectVagaDrawer.value);
+      // Atualiza os horários disponíveis conforme a vaga escolhida (Etapa C)
+      popularHorariosSelect(selectVagaDrawer.value, '');
     });
   }
 
@@ -1332,16 +1334,14 @@ function setupEventListeners() {
       cand.tamanhoCalca = calca;
       cand.tamanhoBota = bota;
 
-      cand.vagaId = vagaId;
-      cand.empresaId = vaga.empresaId;
-      cand.codigoVaga = `${vaga.empresaNome} ${vaga.codigo}`;
+      // Auto-preenche os dados da vaga + snapshot e o horário escolhido
+      const turno = document.getElementById('det-select-turno').value;
+      aplicarSnapshotVaga(cand, vagaId);
+      aplicarHorarioVaga(cand, turno);
       cand.recrutadorId = recrutadorId;
       cand.status = 'aprovado'; // Move status para aprovado (DP)
       cand.diasEtapa = 1;
       cand.observacoesSelecao = observacoes;
-
-      const turno = document.getElementById('det-select-turno').value;
-      cand.turnoTrabalho = turno;
       const foiDevolvida = cand.devolvidoDP === true;
       cand.devolvidoDP = false;
       cand.motivoDevolucaoDP = '';
@@ -3127,7 +3127,12 @@ function abrirDrawerDetalhes(candidatoId) {
   // Preenche Select de Vagas
   const selectVaga = document.getElementById('det-select-vaga');
   if (selectVaga) {
-    selectVaga.innerHTML = '<option value="">-- Selecione a Vaga Destinada * --</option>' + state.vagas.map(v => `<option value="${v.id}">${v.cargo} — ${v.empresaNome}</option>`).join('');
+    selectVaga.innerHTML = '<option value="">-- Selecione a Vaga Destinada * --</option>' + (state.vagas || []).filter(v => v.statusVaga !== 'encerrada').map(v => {
+      const cidade = (v.endereco && v.endereco.cidade) ? v.endereco.cidade : '';
+      const op = v.operacaoNome ? v.operacaoNome + ' — ' : '';
+      const qtd = (v.vagasDisponiveis != null) ? ` (${v.vagasDisponiveis} vaga${v.vagasDisponiveis == 1 ? '' : 's'})` : '';
+      return `<option value="${v.id}">${escapeHTML(v.empresaNome || '')} — ${escapeHTML(op + (v.cargo || ''))}${cidade ? ' · ' + escapeHTML(cidade) : ''}${qtd}</option>`;
+    }).join('');
     selectVaga.value = cand.vagaId || '';
   }
   atualizarAutopreviewVaga(cand.vagaId);
@@ -3225,18 +3230,9 @@ function abrirDrawerDetalhes(candidatoId) {
   const docCountEl = document.getElementById('det-doc-count');
   if (docCountEl) docCountEl.textContent = countUploaded;
 
-  // Popula turno select com os turnos da vaga (se existir), senão usa opções padrão
+  // Popula o select de horário/turno com os horários DAQUELA vaga (Etapa C)
   const vagaCandTurno = (state.vagas || []).find(v => v.id === cand.vagaId);
-  const turnoSelect = document.getElementById('det-select-turno');
-  if (turnoSelect) {
-    const turnosVaga = (vagaCandTurno && vagaCandTurno.turnos && vagaCandTurno.turnos.length) ? vagaCandTurno.turnos : null;
-    if (turnosVaga) {
-      turnoSelect.innerHTML = turnosVaga.map(t => `<option value="${t}">${t}</option>`).join('');
-    } else {
-      turnoSelect.innerHTML = '<option value="Diurno">Diurno</option><option value="Noturno">Noturno</option><option value="Misto">Misto</option>';
-    }
-    turnoSelect.value = cand.turnoTrabalho || (turnoSelect.options[0] ? turnoSelect.options[0].value : '');
-  }
+  popularHorariosSelect(cand.vagaId, cand.horarioId || cand.turnoTrabalho);
 
   // Exibe escala da vaga no drawer
   const escalaBox = document.getElementById('vaga-escala-box');
@@ -3929,6 +3925,61 @@ function atualizarAutopreviewVaga(vagaId) {
   }
 }
 
+// ── SELEÇÃO: auto-preenchimento da vaga + snapshot + horário (Etapa C) ──────
+// Copia TODOS os dados da vaga para o candidato e grava um snapshot, para que
+// alterações futuras na vaga não mudem candidatos já enviados/contratados.
+function aplicarSnapshotVaga(cand, vagaId) {
+  const vaga = (state.vagas || []).find(v => v.id === vagaId);
+  if (!vaga) { cand.vagaId = ''; cand.dadosVagaSnapshot = null; return; }
+  cand.vagaId = vaga.id;
+  cand.empresaId = vaga.empresaId || '';
+  cand.empresaNome = vaga.empresaNome || '';
+  cand.empresaCnpj = vaga.empresaCnpj || '';
+  cand.codigoVaga = `${vaga.empresaNome || ''} ${vaga.codigo || ''}`.trim();
+  cand.salario = vaga.salario;
+  cand.dadosVagaSnapshot = {
+    vagaId: vaga.id, empresaId: vaga.empresaId, empresaNome: vaga.empresaNome, empresaCnpj: vaga.empresaCnpj || '',
+    operacaoNome: vaga.operacaoNome || '', tomadorNome: vaga.tomadorNome || '', tomadorCodigo: vaga.tomadorCodigo || '', tomadorCnpj: vaga.tomadorCnpj || '',
+    idEmpresaExata: vaga.idEmpresaExata || '', centroCusto: vaga.centroCusto || '', siglaCentroCusto: vaga.siglaCentroCusto || '',
+    funcaoNome: vaga.funcaoNome || '', funcaoCodigo: vaga.funcaoCodigo || '', cbo: vaga.cbo || '',
+    categoria: vaga.categoria || '', categoriaCodigo: vaga.categoriaCodigo || '', categoriaUtilizado: vaga.categoriaUtilizado || '',
+    tipoContrato: vaga.tipoContrato || '', vinculo: vaga.vinculo || '',
+    finalidade: vaga.finalidade || '', justificativa: vaga.justificativa || '',
+    previsaoDias: vaga.previsaoDias || '', taxa: vaga.taxa || '',
+    salario: vaga.salario, salarioTipo: vaga.salarioTipo || 'mensal',
+    beneficios: vaga.beneficios || [], endereco: vaga.endereco || {}, localTrabalho: vaga.localTrabalho || '', cargo: vaga.cargo || ''
+  };
+}
+function aplicarHorarioVaga(cand, horarioValor) {
+  const vaga = (state.vagas || []).find(v => v.id === cand.vagaId);
+  const h = vaga && (vaga.horarios || []).find(x => x.id === horarioValor);
+  if (h) {
+    cand.horarioId = h.id;
+    cand.horarioSnapshot = JSON.parse(JSON.stringify(h));
+    cand.turnoTrabalho = h.descricao || cand.turnoTrabalho || '';
+  } else {
+    cand.turnoTrabalho = horarioValor || cand.turnoTrabalho || '';
+    cand.horarioId = null;
+  }
+}
+// Popula o select de horário/turno com os horários DAQUELA vaga (não os globais)
+function popularHorariosSelect(vagaId, selecionado) {
+  const sel = document.getElementById('det-select-turno');
+  if (!sel) return;
+  const vaga = (state.vagas || []).find(v => v.id === vagaId);
+  if (vaga && vaga.horarios && vaga.horarios.length) {
+    sel.innerHTML = vaga.horarios.map(h => {
+      const lbl = (h.descricao || 'Turno') + (h.entrada && h.saida ? ` — ${h.entrada} às ${h.saida}` : '');
+      return `<option value="${h.id}">${escapeHTML(lbl)}</option>`;
+    }).join('');
+  } else if (vaga && vaga.turnos && vaga.turnos.length) {
+    sel.innerHTML = vaga.turnos.map(t => `<option value="${escapeHTML(t)}">${escapeHTML(t)}</option>`).join('');
+  } else {
+    sel.innerHTML = '<option value="Diurno">Diurno</option><option value="Noturno">Noturno</option><option value="Misto">Misto</option>';
+  }
+  if (selecionado) sel.value = selecionado;
+}
+
 function salvarDetalhesCandidato() {
   if (!currentCandidateId) return;
 
@@ -4038,18 +4089,16 @@ function salvarDetalhesCandidato() {
   cand.tamanhoCalca = calca;
   cand.tamanhoBota = bota;
 
-  // Turno
+  // Vaga: auto-preenche tudo + snapshot; horário escolhido da própria vaga
   const turno = document.getElementById('det-select-turno').value;
-  cand.turnoTrabalho = turno;
-
   if (vaga) {
-    cand.vagaId = vagaId;
-    cand.empresaId = vaga.empresaId;
-    cand.codigoVaga = `${vaga.empresaNome} ${vaga.codigo}`;
+    aplicarSnapshotVaga(cand, vagaId);
+    aplicarHorarioVaga(cand, turno);
   } else {
     cand.vagaId = '';
     cand.empresaId = '';
     cand.codigoVaga = 'Vaga Não Definida';
+    cand.turnoTrabalho = turno;
   }
   cand.recrutadorId = recrutadorId;
   cand.status = status;
