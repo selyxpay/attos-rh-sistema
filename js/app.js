@@ -1786,8 +1786,7 @@ function setupEventListeners() {
       const erXata = [];
       if (!g('vaga-add-funcao-codigo') || !funcExata) erXata.push('Selecione uma função válida do catálogo do Exata.');
       else if (!funcExata.cbo) erXata.push('O CBO da função não foi identificado.');
-      if (!vincCode) erXata.push('Selecione o tipo de vínculo.');
-      if (!g('vaga-add-filial')) erXata.push('Selecione a filial.');
+      if (!vincCode) erXata.push('Selecione o tipo de contratação (vínculo).');
       if (erXata.length) { alert('Verifique as Informações para o Exata:\n\n• ' + erXata.join('\n• ')); return; }
 
       const novaVaga = {
@@ -1823,9 +1822,9 @@ function setupEventListeners() {
         employmentType: vincSel ? vincSel.value : '',
         employmentLabel: vincOpt ? vincOpt.textContent.trim() : '',
         exataEmploymentCode: vincCode,
-        filial: g('vaga-add-filial'),
-        branchCode: g('vaga-add-filial'),
-        branchLabel: g('vaga-add-filial') ? ('Filial ' + g('vaga-add-filial')) : '',
+        filial: _filialPorVinculo(vincCode),        // automática: 101->01 (CLT) · 106->00 (Temporário)
+        branchCode: _filialPorVinculo(vincCode),
+        branchLabel: g('vaga-add-filial'),
         exataJobFunctionId: g('vaga-exata-id') || g('vaga-add-funcao-codigo'),
         exataFuncaoArea: g('vaga-exata-area'),
         finalidade: g('vaga-add-finalidade'),
@@ -2587,6 +2586,17 @@ function trocarFuncaoExata() {
 }
 window.trocarFuncaoExata = trocarFuncaoExata;
 
+// Filial é automática pelo vínculo (101->Filial 01 CLT · 106->Filial 00 Temporário)
+function aoMudarVinculoVaga() {
+  const sel = document.getElementById('vaga-add-vinculo');
+  const opt = (sel && sel.selectedIndex >= 0) ? sel.options[sel.selectedIndex] : null;
+  const code = (opt && opt.getAttribute('data-code')) || '';
+  const fil = _filialPorVinculo(code);
+  const inp = document.getElementById('vaga-add-filial');
+  if (inp) inp.value = fil ? (fil + (fil === '01' ? ' — CLT Efetivo' : fil === '00' ? ' — Temporário' : '')) : '';
+}
+window.aoMudarVinculoVaga = aoMudarVinculoVaga;
+
 // ── EDIÇÃO de vaga já criada (reusa o mesmo formulário de "Criar Nova Vaga") ──
 let _vagaEditId = null;
 function resetarFormVagaParaCriar() {
@@ -2622,7 +2632,7 @@ window.editarVaga = function (vagaId) {
     const av = document.getElementById('vaga-exata-aviso'); if (av) { av.style.display = 'block'; av.textContent = 'Função não encontrada no catálogo atual. Selecione novamente antes de exportar para o Exata.'; }
   }
   setV('vaga-add-vinculo', v.employmentType || '');
-  setV('vaga-add-filial', v.filial || v.branchCode || '');
+  aoMudarVinculoVaga(); // recalcula a filial automática pelo vínculo
   setV('vaga-add-categoria', v.categoria); setV('vaga-add-categoria-codigo', v.categoriaCodigo); setV('vaga-add-categoria-utilizado', v.categoriaUtilizado);
   setV('vaga-add-tipo-contrato', v.tipoContrato); setV('vaga-add-finalidade', v.finalidade); setV('vaga-add-justificativa', v.justificativa);
   setV('vaga-add-previsao-dias', v.previsaoDias); setV('vaga-add-taxa', v.taxa);
@@ -4905,10 +4915,47 @@ function formatarNumeroExata(v) {
 }
 
 // Mapa CONTROLADO sistema -> 90 campos do Exata (mesma ordem do cabeçalho)
+// ── Regras automáticas do Exata ───────────────────────────────────────────
+function _soDigitos(v) { return String(v == null ? '' : v).replace(/\D/g, ''); }
+// CTPS gerada do CPF: 7 primeiros dígitos = ctps; 4 últimos = ctps_serie
+function _ctpsDoCpf(cpf) {
+  const d = _soDigitos(cpf);
+  if (d.length < 11) return { ctps: '', serie: '' };
+  return { ctps: d.slice(0, 7), serie: d.slice(7, 11) };
+}
+// Filial automática pelo vínculo: 101(CLT)->01 · 106(Temporário)->00
+function _filialPorVinculo(vinculo) {
+  const v = String(vinculo || '');
+  if (v === '101') return '01';
+  if (v === '106') return '00';
+  return '';
+}
+function _dataExataParaDate(v) {
+  if (!v) return null;
+  const s = String(v).trim();
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s); if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(s); if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+  return null;
+}
+function _somarDiasExata(v, dias) {
+  const d = _dataExataParaDate(v); if (!d) return '';
+  d.setDate(d.getDate() + dias);
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
+
 function mapearExata(cand, vs) {
   const dep = (i) => (cand.dependentes && cand.dependentes[i]) || {};
   const vti = (i) => (cand.vtIda && cand.vtIda[i]) || {};
   const vtv = (i) => (cand.vtVolta && cand.vtVolta[i]) || {};
+  // Cálculos automáticos
+  const ctpsAuto = _ctpsDoCpf(cand.cpf);
+  const ehTemporario = String(vs.vinculo) === '106';
+  const dataAdm = formatarDataExata(cand.dataAdmissao);
+  const dataVenc = ehTemporario ? _somarDiasExata(cand.dataAdmissao, 180) : '';
+  const dataProrr = ehTemporario ? _somarDiasExata(dataVenc, 90) : '';
+  const ctpsUf = cand.ctpsUf || cand.rgUf || cand.estado || '';
+  const rgUfFinal = cand.rgOrgaoEmissor || cand.rgUf || '';
   return [
     vs.tipoContrato,                              // 1 tipo_contrato (vaga)
     vs.vinculo,                                   // 2 vinculo (vaga)
@@ -4919,15 +4966,15 @@ function mapearExata(cand, vs) {
     cand.telefone || cand.celular,                // 7 tel_celular
     cand.nomePai,                                 // 8 nome_pai
     cand.nomeMae,                                 // 9 nome_mae
-    cand.ctps,                                    // 10 ctps
-    cand.ctpsTipo,                                // 11 ctps_tipo
-    cand.ctpsSerie,                               // 12 ctps_serie
-    cand.ctpsUf,                                  // 13 ctps_uf
-    formatarDataExata(cand.ctpsDataExpedicao),    // 14 ctps_data_expedicao
-    formatarDataExata(cand.dataAdmissao),         // 15 data_admissao
-    formatarDataExata(cand.dataRescisao),         // 16 data_rescisao
-    formatarDataExata(cand.dataVencimento),       // 17 data_vencimento
-    formatarDataExata(cand.dataProrrogacao),      // 18 data_prorrogacao
+    ctpsAuto.ctps || cand.ctps || '',             // 10 ctps (gerada do CPF: 7 primeiros dígitos)
+    '',                                           // 11 ctps_tipo (vazio)
+    ctpsAuto.serie || cand.ctpsSerie || '',       // 12 ctps_serie (4 últimos dígitos do CPF)
+    ctpsUf,                                       // 13 ctps_uf (UF do documento)
+    '',                                           // 14 ctps_data_expedicao (não enviar)
+    dataAdm,                                      // 15 data_admissao (data da geração do contrato)
+    '',                                           // 16 data_rescisao (não enviar)
+    dataVenc,                                     // 17 data_vencimento (temporário: admissão + 180 dias)
+    dataProrr,                                    // 18 data_prorrogacao (temporário: vencimento + 90 dias)
     vs.idEmpresaExata,                            // 19 id_empresa_exata (vaga)
     vs.funcaoCodigo,                              // 20 funcao (código da função, vaga)
     vs.cbo,                                       // 21 funcao_cbo (vaga)
@@ -4969,7 +5016,7 @@ function mapearExata(cand, vs) {
     vti(0).tipo, formatarNumeroExata(vti(0).valor), vti(1).tipo, formatarNumeroExata(vti(1).valor), vti(2).tipo, formatarNumeroExata(vti(2).valor), // 72-77 ida
     vtv(0).tipo, formatarNumeroExata(vtv(0).valor), vtv(1).tipo, formatarNumeroExata(vtv(1).valor), vtv(2).tipo, formatarNumeroExata(vtv(2).valor), // 78-83 volta
     formatarDataExata(cand.rgExpedicao),          // 84 rg_expedicao
-    cand.rgUf,                                    // 85 rg_uf
+    rgUfFinal,                                    // 85 rg_uf (UF/órgão emissor do RG)
     cand.paisNascimento || 'BR',                  // 86 pais_nascimento
     cand.estadoNascimento,                        // 87 estado_nascimento
     cand.cidadeNascimento,                        // 88 cidade_nascimento

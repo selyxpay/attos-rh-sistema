@@ -1928,21 +1928,17 @@
 
                     <div class="form-group-grid">
                         <div class="form-group">
-                            <label for="vaga-add-vinculo">Tipo de vínculo *</label>
-                            <select id="vaga-add-vinculo" class="form-control">
+                            <label for="vaga-add-vinculo">Tipo de contratação (vínculo) *</label>
+                            <select id="vaga-add-vinculo" class="form-control" onchange="aoMudarVinculoVaga()">
                                 <option value="">Selecione…</option>
-                                <option value="EFFECTIVE" data-code="101">Efetivo (101)</option>
-                                <option value="TEMPORARY" data-code="106">Temporário (106)</option>
-                                <option value="INTERMITTENT" data-code="111">Intermitente (111)</option>
+                                <option value="EFFECTIVE" data-code="101">Efetivo (CLT) — 101</option>
+                                <option value="TEMPORARY" data-code="106">Temporário — 106</option>
+                                <option value="INTERMITTENT" data-code="111">Intermitente — 111</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="vaga-add-filial">Filial *</label>
-                            <select id="vaga-add-filial" class="form-control">
-                                <option value="">Selecione…</option>
-                                <option value="1">Filial 1</option>
-                                <option value="2">Filial 2</option>
-                            </select>
+                            <label for="vaga-add-filial">Filial (automática pelo vínculo)</label>
+                            <input type="text" id="vaga-add-filial" class="form-control" readonly placeholder="— definida pelo vínculo —">
                         </div>
                     </div>
                     <div class="form-group-grid">
