@@ -1778,6 +1778,18 @@ function setupEventListeners() {
         } else camposExtras[campo.id] = el.value;
       });
 
+      // Vínculo (código oficial) + função do catálogo + validação Exata
+      const vincSel = document.getElementById('vaga-add-vinculo');
+      const vincOpt = (vincSel && vincSel.selectedIndex >= 0) ? vincSel.options[vincSel.selectedIndex] : null;
+      const vincCode = (vincOpt && vincOpt.getAttribute('data-code')) || '';
+      const funcExata = getFuncaoExata(g('vaga-add-funcao-codigo'));
+      const erXata = [];
+      if (!g('vaga-add-funcao-codigo') || !funcExata) erXata.push('Selecione uma função válida do catálogo do Exata.');
+      else if (!funcExata.cbo) erXata.push('O CBO da função não foi identificado.');
+      if (!vincCode) erXata.push('Selecione o tipo de vínculo.');
+      if (!g('vaga-add-filial')) erXata.push('Selecione a filial.');
+      if (erXata.length) { alert('Verifique as Informações para o Exata:\n\n• ' + erXata.join('\n• ')); return; }
+
       const novaVaga = {
         id: `vaga-${Date.now()}`,
         empresaId,
@@ -1807,7 +1819,15 @@ function setupEventListeners() {
         categoriaCodigo: g('vaga-add-categoria-codigo'),
         categoriaUtilizado: g('vaga-add-categoria-utilizado'),
         tipoContrato: g('vaga-add-tipo-contrato'),
-        vinculo: g('vaga-add-vinculo'),
+        vinculo: vincCode,                          // código oficial (101/106/111) -> campo TXT 'vinculo'
+        employmentType: vincSel ? vincSel.value : '',
+        employmentLabel: vincOpt ? vincOpt.textContent.trim() : '',
+        exataEmploymentCode: vincCode,
+        filial: g('vaga-add-filial'),
+        branchCode: g('vaga-add-filial'),
+        branchLabel: g('vaga-add-filial') ? ('Filial ' + g('vaga-add-filial')) : '',
+        exataJobFunctionId: g('vaga-exata-id') || g('vaga-add-funcao-codigo'),
+        exataFuncaoArea: g('vaga-exata-area'),
         finalidade: g('vaga-add-finalidade'),
         justificativa: g('vaga-add-justificativa'),
         previsaoDias: g('vaga-add-previsao-dias'),
@@ -2518,6 +2538,48 @@ function buscarCepVaga(cep) {
 }
 window.buscarCepVaga = buscarCepVaga;
 
+// ── Catálogo oficial de funções do Exata (busca + autopreenchimento) ──────
+function getFuncaoExata(code) {
+  return (window.EXATA_FUNCOES || []).find(f => String(f.code) === String(code)) || null;
+}
+function labelFuncaoExata(f) { return `${f.code} — ${f.description} — CBO ${f.cbo} — Área ${f.area}`; }
+function popularDatalistExata() {
+  const dl = document.getElementById('vaga-exata-datalist');
+  if (!dl) return;
+  dl.innerHTML = (window.EXATA_FUNCOES || []).map(f => `<option value="${escapeHTML(labelFuncaoExata(f))}"></option>`).join('');
+}
+function _setFuncaoExataCampos(f) {
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+  set('vaga-exata-codigo', f ? f.code : '');
+  set('vaga-exata-descricao', f ? f.description : '');
+  set('vaga-exata-cbo', f ? f.cbo : '');
+  set('vaga-exata-area', f ? f.area : '');
+  set('vaga-exata-id', f ? f.code : '');
+  set('vaga-add-funcao-codigo', f ? f.code : '');   // texto, preserva zeros à esquerda
+  set('vaga-add-cbo', f ? f.cbo : '');
+  set('vaga-add-funcao-nome', f ? f.description : '');
+  const trocar = document.getElementById('vaga-exata-trocar');
+  if (trocar) trocar.style.display = f ? 'inline-flex' : 'none';
+}
+function aoSelecionarFuncaoExata() {
+  const inp = document.getElementById('vaga-exata-busca');
+  const aviso = document.getElementById('vaga-exata-aviso');
+  if (!inp) return;
+  const termo = (inp.value || '').trim();
+  if (!termo) { _setFuncaoExataCampos(null); if (aviso) aviso.style.display = 'none'; return; }
+  const code = termo.split(/[\s·—-]+/)[0];
+  let f = getFuncaoExata(code) || (window.EXATA_FUNCOES || []).find(x => labelFuncaoExata(x) === termo) || null;
+  _setFuncaoExataCampos(f);
+  if (aviso) aviso.style.display = f ? 'none' : (termo.length >= 3 ? 'block' : 'none');
+}
+window.aoSelecionarFuncaoExata = aoSelecionarFuncaoExata;
+function trocarFuncaoExata() {
+  const inp = document.getElementById('vaga-exata-busca'); if (inp) { inp.value = ''; inp.focus(); }
+  _setFuncaoExataCampos(null);
+  const aviso = document.getElementById('vaga-exata-aviso'); if (aviso) aviso.style.display = 'none';
+}
+window.trocarFuncaoExata = trocarFuncaoExata;
+
 // Migração (item 22): copia dados operacionais legados que estavam no CLIENTE
 // para as VAGAS daquela empresa, sem apagar nada. Roda uma única vez.
 function migrarOperacionalClientesParaVagas() {
@@ -2570,6 +2632,8 @@ function atualizarBotoesVagas() {
           selectEmpresaModal.innerHTML = state.empresas.map(e => `<option value="${e.id}">${e.nome}</option>`).join('');
         }
         resetarHorariosVaga();
+        popularDatalistExata();
+        trocarFuncaoExata();
         document.getElementById('modal-nova-vaga').classList.add('active');
         setTimeout(() => injetarCamposExtrasNoForm(), 50);
       });
@@ -4296,6 +4360,8 @@ function aplicarSnapshotVaga(cand, vagaId) {
     operacaoNome: vaga.operacaoNome || '', tomadorNome: vaga.tomadorNome || '', tomadorCodigo: vaga.tomadorCodigo || '', tomadorCnpj: vaga.tomadorCnpj || '',
     idEmpresaExata: vaga.idEmpresaExata || '', centroCusto: vaga.centroCusto || '', siglaCentroCusto: vaga.siglaCentroCusto || '',
     funcaoNome: vaga.funcaoNome || '', funcaoCodigo: vaga.funcaoCodigo || '', cbo: vaga.cbo || '',
+    exataFuncaoArea: vaga.exataFuncaoArea || '', exataJobFunctionId: vaga.exataJobFunctionId || '',
+    employmentLabel: vaga.employmentLabel || '', exataEmploymentCode: vaga.exataEmploymentCode || '', filial: vaga.filial || vaga.branchCode || '',
     categoria: vaga.categoria || '', categoriaCodigo: vaga.categoriaCodigo || '', categoriaUtilizado: vaga.categoriaUtilizado || '',
     tipoContrato: vaga.tipoContrato || '', vinculo: vaga.vinculo || '',
     finalidade: vaga.finalidade || '', justificativa: vaga.justificativa || '',

@@ -1892,24 +1892,67 @@
 
                     <!-- 4.4 INFORMAÇÕES DA FUNÇÃO -->
                     <div class="vaga-sec-title" style="margin:18px 0 10px;font-weight:700;font-size:13px;color:var(--primary);border-bottom:1px solid var(--border);padding-bottom:5px;"><i class="fa-solid fa-briefcase"></i> Informações da função</div>
+                    <!-- Busca de função no CATÁLOGO OFICIAL do Exata (código, descrição ou CBO) -->
+                    <div class="form-group">
+                        <label for="vaga-exata-busca">Função Exata — pesquise por código, descrição ou CBO *</label>
+                        <input type="text" id="vaga-exata-busca" class="form-control" list="vaga-exata-datalist" autocomplete="off" placeholder="Ex: 0002 · AUX DE PRODUCAO · 784205" oninput="aoSelecionarFuncaoExata()">
+                        <datalist id="vaga-exata-datalist"></datalist>
+                        <small id="vaga-exata-aviso" style="font-size:11px;color:#ef4444;display:none;"><i class="fa-solid fa-triangle-exclamation"></i> Nenhuma função cadastrada com esse código, descrição ou CBO.</small>
+                        <button type="button" class="btn btn-secondary btn-sm" id="vaga-exata-trocar" style="display:none;margin-top:6px;font-size:11px;" onclick="trocarFuncaoExata()"><i class="fa-solid fa-rotate"></i> Trocar função</button>
+                    </div>
                     <div class="form-group-grid">
                         <div class="form-group">
-                            <label for="vaga-add-funcao-nome">Função / Cargo</label>
-                            <input type="text" id="vaga-add-funcao-nome" class="form-control" value="Assistente de Operações">
+                            <label>Código da função</label>
+                            <input type="text" id="vaga-exata-codigo" class="form-control" readonly placeholder="—">
                         </div>
                         <div class="form-group">
-                            <label for="vaga-add-funcao-codigo">Código da função (Exata)</label>
-                            <input type="text" id="vaga-add-funcao-codigo" class="form-control" value="1189">
+                            <label>Descrição (oficial)</label>
+                            <input type="text" id="vaga-exata-descricao" class="form-control" readonly placeholder="—">
                         </div>
                     </div>
                     <div class="form-group-grid">
                         <div class="form-group">
-                            <label for="vaga-add-cbo">Código CBO</label>
-                            <input type="text" id="vaga-add-cbo" class="form-control">
+                            <label>CBO</label>
+                            <input type="text" id="vaga-exata-cbo" class="form-control" readonly placeholder="—">
                         </div>
+                        <div class="form-group">
+                            <label>Área</label>
+                            <input type="text" id="vaga-exata-area" class="form-control" readonly placeholder="—">
+                        </div>
+                    </div>
+                    <!-- Campos alimentados a partir do catálogo (a exportação usa estes) -->
+                    <input type="hidden" id="vaga-add-funcao-nome">
+                    <input type="hidden" id="vaga-add-funcao-codigo">
+                    <input type="hidden" id="vaga-add-cbo">
+                    <input type="hidden" id="vaga-exata-id">
+
+                    <div class="form-group-grid">
+                        <div class="form-group">
+                            <label for="vaga-add-vinculo">Tipo de vínculo *</label>
+                            <select id="vaga-add-vinculo" class="form-control">
+                                <option value="">Selecione…</option>
+                                <option value="EFFECTIVE" data-code="101">Efetivo (101)</option>
+                                <option value="TEMPORARY" data-code="106">Temporário (106)</option>
+                                <option value="INTERMITTENT" data-code="111">Intermitente (111)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-filial">Filial *</label>
+                            <select id="vaga-add-filial" class="form-control">
+                                <option value="">Selecione…</option>
+                                <option value="1">Filial 1</option>
+                                <option value="2">Filial 2</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group-grid">
                         <div class="form-group">
                             <label for="vaga-add-categoria">Categoria de contratação</label>
                             <input type="text" id="vaga-add-categoria" class="form-control" value="Trabalho temporário por prazo determinado">
+                        </div>
+                        <div class="form-group">
+                            <label for="vaga-add-tipo-contrato">Tipo de contrato</label>
+                            <input type="text" id="vaga-add-tipo-contrato" class="form-control" placeholder="Ex: temporário">
                         </div>
                     </div>
                     <div class="form-group-grid">
@@ -1920,16 +1963,6 @@
                         <div class="form-group">
                             <label for="vaga-add-categoria-utilizado">Código utilizado</label>
                             <input type="text" id="vaga-add-categoria-utilizado" class="form-control" value="01">
-                        </div>
-                    </div>
-                    <div class="form-group-grid">
-                        <div class="form-group">
-                            <label for="vaga-add-tipo-contrato">Tipo de contrato</label>
-                            <input type="text" id="vaga-add-tipo-contrato" class="form-control" placeholder="Ex: temporário">
-                        </div>
-                        <div class="form-group">
-                            <label for="vaga-add-vinculo">Vínculo</label>
-                            <input type="text" id="vaga-add-vinculo" class="form-control" placeholder="Ex: CLT">
                         </div>
                     </div>
                     <div class="form-group">
@@ -2620,6 +2653,7 @@
     <!-- Core App Scripts -->
     <script src="js/security.js"></script>
     <script src="js/firebase-sync.js"></script>
+    <script src="js/exata-catalogo.js"></script>
     <script src="js/data.js"></script>
     <script src="js/app.js"></script>
 </body>

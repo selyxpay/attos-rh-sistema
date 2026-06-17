@@ -1,0 +1,1684 @@
+Código: 0001
+Descrição: MOTORISTA D
+CBO: 782510
+Área: I
+
+Código: 0002
+Descrição: AUX. DE PRODUCAO
+CBO: 784205
+Área: D
+
+Código: 0003
+Descrição: AUX. COLETA
+CBO: 514205
+Área: A
+
+Código: 0004
+Descrição: AUX. ESCRITORIO
+CBO: 411005
+Área: A
+
+Código: 0005
+Descrição: ASSISTENTE DE FISCAL
+CBO: 521110
+Área: D
+
+Código: 0006
+Descrição: ASSISTENTE DE FROTA JR
+CBO: 411005
+Área: A
+
+Código: 0007
+Descrição: RECEPCIONISTA
+CBO: 422105
+Área: A
+
+Código: 0008
+Descrição: ESTOQUISTA
+CBO: 783225
+Área: A
+
+Código: 0009
+Descrição: ASSISTENTE ADM OPERACIONAL
+CBO: 411005
+Área: A
+
+Código: 0010
+Descrição: AUX. SERVICOS GERAIS
+CBO: 514320
+Área: D
+
+Código: 0011
+Descrição: FRESADOR FERRAMENTEIRO
+CBO: 721105
+Área: I
+
+Código: 0012
+Descrição: CONFERENTE JUNIOR
+CBO: 414215
+Área: A
+
+Código: 0013
+Descrição: ASSISTENTE DE FROTA
+CBO: 411005
+Área: A
+
+Código: 0014
+Descrição: AUXILIAR DE MARKETING
+CBO: 142335
+Área: A
+
+Código: 0015
+Descrição: OPERADOR DE ONDULADEIRA IV
+CBO: 763125
+Área: I
+
+Código: 0016
+Descrição: SERVENTE
+CBO: 717020
+Área: D
+
+Código: 0017
+Descrição: SUPERVISOR OPERACIONAL
+CBO: 520110
+Área: A
+
+Código: 0018
+Descrição: ASSISTENTE DE TI JR
+CBO: 317210
+Área: T
+
+Código: 0019
+Descrição: ASSIST DE SEG DO TRABALHO JR
+CBO: 517330
+Área: D
+
+Código: 0020
+Descrição: ANALISTA PCP II
+CBO: 391125
+Área: A
+
+Código: 0021
+Descrição: SUPERVISOR OPERACIONAL II
+CBO: 520110
+Área: A
+
+Código: 0022
+Descrição: ASSISTENTE DE CUSTOS JR
+CBO: 413110
+Área: A
+
+Código: 0023
+Descrição: INSP. QUALIDADE III
+CBO: 391205
+Área: T
+
+Código: 0024
+Descrição: ASSISTENTE DE RH I
+CBO: 252405
+Área: A
+
+Código: 0025
+Descrição: ASS. DE PRODUCAO
+CBO: 784205
+Área: D
+
+Código: 0026
+Descrição: PROMOTOR DE VENDAS
+CBO: 521115
+Área: A
+
+Código: 0027
+Descrição: PROMOTOR LIDER
+CBO: 521115
+Área: A
+
+Código: 0028
+Descrição: SUPERVISOR DE OPERACOES
+CBO: 410240
+Área: D
+
+Código: 0029
+Descrição: MOTORISTA
+CBO: 782510
+Área: D
+
+Código: 0030
+Descrição: ANALISTA DE CUSTOS I
+CBO: 252210
+Área: A
+
+Código: 0031
+Descrição: SUPERVISOR DE OPERACOES
+CBO: 410240
+Área: D
+
+Código: 0032
+Descrição: ENCARREGADO A
+CBO: 710205
+Área: I
+
+Código: 0033
+Descrição: ENCARREGADO B
+CBO: 710205
+Área: I
+
+Código: 0034
+Descrição: REVISOR
+CBO: 414105
+Área: D
+
+Código: 0035
+Descrição: ASSISTENTE DE TI II
+CBO: 317210
+Área: T
+
+Código: 0036
+Descrição: PEDREIRO B
+CBO: 715210
+Área: D
+
+Código: 0037
+Descrição: ASS. DE PRODUCAO JR
+CBO: 784205
+Área: D
+
+Código: 0038
+Descrição: ASSISTENTE DE TI
+CBO: 317210
+Área: T
+
+Código: 0039
+Descrição: MESTRE DE OBRA B
+CBO: 710205
+Área: D
+
+Código: 0040
+Descrição: PEDREIRO B
+CBO: 715210
+Área: I
+
+Código: 0041
+Descrição: PORTEIRO
+CBO: 517410
+Área: D
+
+Código: 0042
+Descrição: ENCARREGADO DE OBRAS A
+CBO: 710205
+Área: I
+
+Código: 0043
+Descrição: MESTRE DE OBRAS C
+CBO: 710205
+Área: I
+
+Código: 0044
+Descrição: 1/2 OF ARMADOR
+CBO: 715210
+Área: I
+
+Código: 0045
+Descrição: REPOSITOR(A) DE MERCADORIAS
+CBO: 521125
+Área: D
+
+Código: 0046
+Descrição: LIDER
+CBO: 760605
+Área: I
+
+Código: 0047
+Descrição: ASSIST TEC SEG DO TRABALHO
+CBO: 517330
+Área: D
+
+Código: 0048
+Descrição: AUX. ADMINISTRATIVO I
+CBO: 411005
+Área: T
+
+Código: 0049
+Descrição: PEDREIRO
+CBO: 715210
+Área: I
+
+Código: 0050
+Descrição: 1/2 OF DE REFRIGERACAO
+CBO: 911205
+Área: T
+
+Código: 0051
+Descrição: SERRALHEIRO
+CBO: 724440
+Área: D
+
+Código: 0052
+Descrição: AUX DE ARMAZEM I
+CBO: 414110
+Área: D
+
+Código: 0053
+Descrição: AUX DE ARMAZEM
+CBO: 414110
+Área: D
+
+Código: 0054
+Descrição: MECANICO DE REFRIGERACAO
+CBO: 911205
+Área: A
+
+Código: 0055
+Descrição: MECANICO DE REFRIGERACAO III
+CBO: 911205
+Área: A
+
+Código: 0056
+Descrição: ENCARREGADO DE OBRA B
+CBO: 710205
+Área: I
+
+Código: 0057
+Descrição: AUX. SHOWROOM
+CBO: 521140
+Área: I
+
+Código: 0058
+Descrição: PEDREIRO TAREFEIRO
+CBO: 715210
+Área: I
+
+Código: 0072
+Descrição: LIDER DE LIMPEZA
+CBO: 514320
+Área: A
+
+Código: 0076
+Descrição: AUX. EXPEDICAO
+CBO: 391125
+Área: D
+
+Código: 0088
+Descrição: AUX. FATURAMENTO
+CBO: 413115
+Área: A
+
+Código: 0096
+Descrição: CONFERENTE
+CBO: 414215
+Área: A
+
+Código: 0101
+Descrição: COZINHEIRO (A)
+CBO: 783225
+Área: D
+
+Código: 0108
+Descrição: DIGITADOR (A)
+CBO: 412110
+Área: A
+
+Código: 0123
+Descrição: ENCARREGADO DE MOVIMENTACAO 2
+CBO: 410105
+Área: A
+
+Código: 0179
+Descrição: ALMOXARIFE
+CBO: 414105
+Área: A
+
+Código: 0189
+Descrição: AJUDANTE DE SERRALHEIRO
+CBO: 724440
+Área: S
+
+Código: 0194
+Descrição: AUX. ESTOQUE
+CBO: 414105
+Área: I
+
+Código: 0202
+Descrição: JARDINEIRO
+CBO: 622010
+Área: D
+
+Código: 0208
+Descrição: SERVENTE DE OBRAS
+CBO: 717020
+Área: D
+
+Código: 0242
+Descrição: BALANCEIRO
+CBO: 521130
+Área: D
+
+Código: 0244
+Descrição: AUX. EXPEDICAO
+CBO: 414110
+Área: D
+
+Código: 0259
+Descrição: OP. EMPILHADEIRA
+CBO: 782220
+Área: A
+
+Código: 0284
+Descrição: ASSIST. CONTABIL
+CBO: 252210
+Área: A
+
+Código: 0287
+Descrição: ASSIST. ADMINIST
+CBO: 342105
+Área: A
+
+Código: 0293
+Descrição: AUX. ADMINISTRATIVO
+CBO: 411005
+Área: A
+
+Código: 0311
+Descrição: AUX DE OPERACOES
+CBO: 414110
+Área: T
+
+Código: 0318
+Descrição: BORRACHEIRO
+CBO: 511220
+Área: D
+
+Código: 0343
+Descrição: AUX. ALMOXARIFADO
+CBO: 414105
+Área: A
+
+Código: 0345
+Descrição: MANOBRISTA
+CBO: 514110
+Área: D
+
+Código: 0371
+Descrição: AUX. OPERACIONAL
+CBO: 784205
+Área: I
+
+Código: 0379
+Descrição: COLETOR DE LIXO
+CBO: 514205
+Área: S
+
+Código: 0390
+Descrição: VARREDOR (A)
+CBO: 514225
+Área: I
+
+Código: 0409
+Descrição: AJUDANTE GERAL
+CBO: 784205
+Área: O
+
+Código: 0412
+Descrição: 1/2 OF. PEDREIRO
+CBO: 715210
+Área: D
+
+Código: 0413
+Descrição: PROMOTOR C/ MOTO
+CBO: 521115
+Área: A
+
+Código: 0415
+Descrição: TEC. SEGURANCA DO TRABALHO
+CBO: 351605
+Área: D
+
+Código: 0454
+Descrição: OFICIAL DE MANUTENCAO
+CBO: 514310
+Área: I
+
+Código: 0464
+Descrição: 1/2 OF. FERRAMENTEIRO
+CBO: 721105
+Área: I
+
+Código: 0483
+Descrição: ROTEIRISTA
+CBO: 261505
+Área: I
+
+Código: 0509
+Descrição: CONSULTORA DE VENDAS
+CBO: 354810
+Área: D
+
+Código: 0515
+Descrição: COORD. OPERAC.
+CBO: 215120
+Área: I
+
+Código: 0516
+Descrição: ASSIT. OPERAC.
+CBO: 211110
+Área: A
+
+Código: 0575
+Descrição: DEGUSTADORA
+CBO: 848420
+Área: D
+
+Código: 0583
+Descrição: ASSISTENTE DE CADASTRO
+CBO: 411010
+Área: S
+
+Código: 0584
+Descrição: AUX. ADMINISTRATIVO
+CBO: 411005
+Área: T
+
+Código: 0588
+Descrição: AUX. INTALACAO
+CBO: 374105
+Área: A
+
+Código: 0605
+Descrição: MOTORISTA C
+CBO: 782510
+Área: I
+
+Código: 0641
+Descrição: OPERADOR DE EMPILHADEIRA
+CBO: 782220
+Área: I
+
+Código: 0649
+Descrição: OP. ROCADEIRA
+CBO: 919205
+Área: S
+
+Código: 0650
+Descrição: AJUDANTE DE CANAL
+CBO: 643010
+Área: I
+
+Código: 0701
+Descrição: OPERADOR DE ESTOQUE
+CBO: 783225
+Área: I
+
+Código: 0702
+Descrição: MOTORISTA B
+CBO: 782510
+Área: I
+
+Código: 0703
+Descrição: AUX. PREVENCAO E PERDAS
+CBO: 414105
+Área: A
+
+Código: 0721
+Descrição: II AJUDANTE DE OFF SET
+CBO: 010105
+Área: D
+
+Código: 0722
+Descrição: FARMACEUTICO (A)
+CBO: 223405
+Área: D
+
+Código: 0723
+Descrição: DEGUSTADORA C/MOTO
+CBO: 848420
+Área: A
+
+Código: 0724
+Descrição: LIDER DE RECEBIMENTO
+CBO: 784205
+Área: D
+
+Código: 0725
+Descrição: ASSISTENTE DE COMPRAS
+CBO: 513415
+Área: A
+
+Código: 0726
+Descrição: ASSIST ADM SAC
+CBO: 411010
+Área: A
+
+Código: 0727
+Descrição: ANALISTA DE COBRANCA
+CBO: 421310
+Área: A
+
+Código: 0728
+Descrição: OP. DE MAQUINAS PESADAS C
+CBO: 321105
+Área: M
+
+Código: 0730
+Descrição: VENDEDOR PLENO
+CBO: 354125
+Área: D
+
+Código: 0731
+Descrição: AUX. DE EXPEDICAO
+CBO: 511210
+Área: I
+
+Código: 0732
+Descrição: ASSISTENTE SOLUCOES JUNIOR
+CBO: 252545
+Área: A
+
+Código: 0733
+Descrição: AUXILIAR DE RISCO
+CBO: 951105
+Área: I
+
+Código: 0734
+Descrição: COMPRADOR (A) JUNIOR
+CBO: 354205
+Área: A
+
+Código: 0735
+Descrição: AJUDANTE DE SOLDADOR COC
+CBO: 724315
+Área: D
+
+Código: 0736
+Descrição: ASS ADM JUNIOR
+CBO: 342105
+Área: A
+
+Código: 0737
+Descrição: MECANICO A
+CBO: 725510
+Área: I
+
+Código: 0738
+Descrição: MECANICO B
+CBO: 725510
+Área: I
+
+Código: 0739
+Descrição: CONFERENTE LIDER
+CBO: 414215
+Área: I
+
+Código: 0740
+Descrição: OP. DE ARMAZEM
+CBO: 414110
+Área: I
+
+Código: 0741
+Descrição: AUX. LOGISTICA
+CBO: 414140
+Área: I
+
+Código: 0769
+Descrição: AUX. DE INFORMATICA
+CBO: 412100
+Área: A
+
+Código: 0790
+Descrição: MOTORISTA TRUCK
+CBO: 782510
+Área: I
+
+Código: 0810
+Descrição: 1/2 OF. DE COZINHA
+CBO: 841408
+Área: I
+
+Código: 0819
+Descrição: FISCAL DE TURMA
+CBO: 521110
+Área: D
+
+Código: 0820
+Descrição: ENCARREGADO DE OBRA
+CBO: 710205
+Área: I
+
+Código: 0829
+Descrição: AUX. DE SAC
+CBO: 420135
+Área: D
+
+Código: 0849
+Descrição: PEDREIRO A
+CBO: 715210
+Área: I
+
+Código: 0851
+Descrição: AJ. CARGA E DESCARGA
+CBO: 783225
+Área: D
+
+Código: 0884
+Descrição: AJUDANTE GERAL II
+CBO: 784205
+Área: I
+
+Código: 0888
+Descrição: ASSISTENTE DE CONTAS A PAGAR
+CBO: 413110
+Área: A
+
+Código: 0915
+Descrição: AUX. DE R.H.
+CBO: 252405
+Área: A
+
+Código: 0918
+Descrição: ASSIST. RH
+CBO: 252405
+Área: D
+
+Código: 0919
+Descrição: AJUDANTE DE COZINHA
+CBO: 513505
+Área: I
+
+Código: 0929
+Descrição: TEC SEG TRABALHO
+CBO: 351605
+Área: I
+
+Código: 0956
+Descrição: ASSIST. COMERCIAL
+CBO: 411010
+Área: A
+
+Código: 0993
+Descrição: CONTROLADOR DE ACESSO
+CBO: 517415
+Área: A
+
+Código: 1000
+Descrição: PROJETISTA DE LAY OUT
+CBO: 262410
+Área: S
+
+Código: 1011
+Descrição: ASS. DE RH
+CBO: 411010
+Área: A
+
+Código: 1029
+Descrição: AJUDANTE DE PRODUCAO
+CBO: 784205
+Área: D
+
+Código: 1067
+Descrição: ASSITENTE DE LOGISTICA
+CBO: 342125
+Área: D
+
+Código: 1069
+Descrição: AUX. OPERACIONAL JR
+CBO: 411005
+Área: A
+
+Código: 1072
+Descrição: ASS. ADM JOVEM APRENDIZ
+CBO: 414110
+Área: A
+
+Código: 1075
+Descrição: ENCARREGADO OPERACIONAL
+CBO: 710205
+Área: D
+
+Código: 1079
+Descrição: AUX. LIMPEZA
+CBO: 514320
+Área: D
+
+Código: 1080
+Descrição: ENCARREGADO DE OBRA JR
+CBO: 710205
+Área: I
+
+Código: 1081
+Descrição: ENCANADOR
+CBO: 724115
+Área: I
+
+Código: 1082
+Descrição: OP. DE MAQUINA PESADA B
+CBO: 641015
+Área: I
+
+Código: 1083
+Descrição: PEDREIRO A
+CBO: 715210
+Área: D
+
+Código: 1084
+Descrição: ASSIST. DE COLETA
+CBO: 622020
+Área: D
+
+Código: 1085
+Descrição: AUX ENFERMAGEM DO TRABALHO
+CBO: 322235
+Área: D
+
+Código: 1086
+Descrição: ENCARREGADA DE SOLUCOES
+CBO: 142605
+Área: A
+
+Código: 1087
+Descrição: AUX. OPERACIONAL JR
+CBO: 511210
+Área: T
+
+Código: 1088
+Descrição: AUX. ESCRITORIO COC
+CBO: 411005
+Área: A
+
+Código: 1089
+Descrição: ASSISTENTE ADMINISTRATIVO
+CBO: 411005
+Área: A
+
+Código: 1090
+Descrição: GERENTE DE LOGISTICA
+CBO: 710205
+Área: A
+
+Código: 1091
+Descrição: APONTADOR DE OBRAS COC
+CBO: 414205
+Área: D
+
+Código: 1092
+Descrição: AUX. ADMINISTRATIVO COC
+CBO: 411005
+Área: D
+
+Código: 1093
+Descrição: PROMOTOR (A)
+CBO: 521115
+Área: A
+
+Código: 1094
+Descrição: OPERADOR DE PALETEIRA
+CBO: 322105
+Área: A
+
+Código: 1095
+Descrição: ASSIST COBRANCAS JUNIOR
+CBO: 513415
+Área: A
+
+Código: 1096
+Descrição: AJUDANTE GERAL
+CBO: 514225
+Área: D
+
+Código: 1097
+Descrição: OP. DE MAQUINAS C
+CBO: 321105
+Área: A
+
+Código: 1098
+Descrição: AUX. DE ARQUIVO
+CBO: 414105
+Área: I
+
+Código: 1099
+Descrição: OP. CORTE E VINCO MANUAL
+CBO: 766320
+Área: I
+
+Código: 1100
+Descrição: SUP. COMERCIAL INTERNO
+CBO: 520110
+Área: A
+
+Código: 1101
+Descrição: AUXILIAR PROCESSOS
+CBO: 342125
+Área: A
+
+Código: 1102
+Descrição: AUXILIAR PREVENCAO E PERDAS
+CBO: 521110
+Área: D
+
+Código: 1103
+Descrição: SUPERVISOR
+CBO: 410240
+Área: D
+
+Código: 1104
+Descrição: DIVULGADOR (A)
+CBO: 521125
+Área: A
+
+Código: 1105
+Descrição: ASSISTENTE COMERCIAL
+CBO: 411010
+Área: A
+
+Código: 1106
+Descrição: ANALISTA COMERCIAL
+CBO: 411010
+Área: A
+
+Código: 1107
+Descrição: GERENTE DE FILIAL
+CBO: 710205
+Área: A
+
+Código: 1108
+Descrição: OPERADOR DE CALDEIRA
+CBO: 766320
+Área: I
+
+Código: 1109
+Descrição: MOTORISTA DE BETONEIRA
+CBO: 715405
+Área: D
+
+Código: 1110
+Descrição: OFICIAL DE MANUTENCAO
+CBO: 514325
+Área: I
+
+Código: 1111
+Descrição: AJUDANTE GERAL
+CBO: 717020
+Área: D
+
+Código: 1112
+Descrição: PINTOR DE AUTOS COC
+CBO: 723320
+Área: D
+
+Código: 1113
+Descrição: OPERADOR DE ONDULADEIRA
+CBO: 763125
+Área: I
+
+Código: 1114
+Descrição: AUX. DE MANUTENCAO
+CBO: 514325
+Área: I
+
+Código: 1115
+Descrição: CARPINTEIRO
+CBO: 715505
+Área: D
+
+Código: 1116
+Descrição: OPERADOR DE LAMINACAO AUTOM. I
+CBO: 821305
+Área: I
+
+Código: 1117
+Descrição: OPERADOR DE FACAO
+CBO: 766310
+Área: I
+
+Código: 1118
+Descrição: MARTELETEIRO
+CBO: 717010
+Área: D
+
+Código: 1119
+Descrição: AJUDANTE DE IMPRESSAO
+CBO: 766215
+Área: I
+
+Código: 1120
+Descrição: AJUDANTE DE EXPEDICAO
+CBO: 414215
+Área: I
+
+Código: 1121
+Descrição: PORTEIRO COC
+CBO: 517410
+Área: D
+
+Código: 1122
+Descrição: AJUDANTE DE OBRAS
+CBO: 717020
+Área: D
+
+Código: 1123
+Descrição: ELETRICISTA
+CBO: 951105
+Área: D
+
+Código: 1124
+Descrição: FARMACEUTICO (RT)
+CBO: 223405
+Área: D
+
+Código: 1125
+Descrição: IMPRESSOR DE OFF SET 4 C
+CBO: 766220
+Área: I
+
+Código: 1126
+Descrição: I AJUDANTE DE OFF SET
+CBO: 010105
+Área: I
+
+Código: 1127
+Descrição: OP. DE MAQ. TORNO REVOLVER
+CBO: 321105
+Área: I
+
+Código: 1128
+Descrição: OP DE INJETORA PLASTICA
+CBO: 641015
+Área: I
+
+Código: 1129
+Descrição: PINTOR
+CBO: 716610
+Área: D
+
+Código: 1130
+Descrição: 1/2 OFICIAL DE PINTURA
+CBO: 716610
+Área: D
+
+Código: 1131
+Descrição: MEIO OFICIAL DE PINTURA
+CBO: 716610
+Área: I
+
+Código: 1132
+Descrição: OPERADOR DE COLADEIRA
+CBO: 766320
+Área: I
+
+Código: 1133
+Descrição: OPERADOR DE ACETATO
+CBO: 766320
+Área: A
+
+Código: 1134
+Descrição: AJUDANTE DE ELETRICISTA COC
+CBO: 715615
+Área: D
+
+Código: 1135
+Descrição: OP. DE TORNO CNC
+CBO: 520110
+Área: A
+
+Código: 1136
+Descrição: AUX. DE ATENDIMENTO
+CBO: 411005
+Área: A
+
+Código: 1137
+Descrição: ABAST DE LINHA DE PRODUCAO
+CBO: 784205
+Área: I
+
+Código: 1138
+Descrição: MOTORISTA CARRETEIRO
+CBO: 782510
+Área: D
+
+Código: 1139
+Descrição: ASSISTENTE DE RISCO
+CBO: 351725
+Área: A
+
+Código: 1140
+Descrição: MOTORISTA DE CAMINHAO
+CBO: 782510
+Área: A
+
+Código: 1141
+Descrição: AUXILIAR DE LIMPEZA LUR
+CBO: 514320
+Área: D
+
+Código: 1142
+Descrição: OPERADOR DE MAQUINA
+CBO: 862150
+Área: I
+
+Código: 1143
+Descrição: CALCETEIRO
+CBO: 715205
+Área: D
+
+Código: 1144
+Descrição: OP. MAQUINA
+CBO: 813125
+Área: I
+
+Código: 1145
+Descrição: AUX. COMERCIAL
+CBO: 411005
+Área: A
+
+Código: 1146
+Descrição: RASTELEIRO
+CBO: 711120
+Área: D
+
+Código: 1147
+Descrição: OPERADOR DE MUNCK
+CBO: 782515
+Área: D
+
+Código: 1148
+Descrição: COMPRADOR DE MATERIAIS
+CBO: 354205
+Área: I
+
+Código: 1149
+Descrição: LIDER OPERACIONAL
+CBO: 760605
+Área: I
+
+Código: 1150
+Descrição: ENCARREGADO DE ELETRICA
+CBO: 950105
+Área: A
+
+Código: 1151
+Descrição: ADM. OBRAS
+CBO: 411010
+Área: A
+
+Código: 1152
+Descrição: SOLDADOR "A"
+CBO: 724315
+Área: D
+
+Código: 1153
+Descrição: AUXILIAR DE AGENDAMENTO
+CBO: 422315
+Área: I
+
+Código: 1154
+Descrição: ASS. DE COBRANCA SENIOR
+CBO: 513415
+Área: A
+
+Código: 1155
+Descrição: ANALISTA FISCAL I
+CBO: 251225
+Área: A
+
+Código: 1156
+Descrição: ARMADOR
+CBO: 715315
+Área: D
+
+Código: 1157
+Descrição: FEITOR
+CBO: 710205
+Área: D
+
+Código: 1158
+Descrição: EXECUTIVO DE CONTAS INTERNAS
+CBO: 252210
+Área: A
+
+Código: 1159
+Descrição: ATENDENTE
+CBO: 421105
+Área: A
+
+Código: 1160
+Descrição: FRENTISTA
+CBO: 521135
+Área: I
+
+Código: 1161
+Descrição: ASSISTENTE DE SOLUCOES I
+CBO: 342125
+Área: A
+
+Código: 1162
+Descrição: LIDER DE OPERACAO DE MAQUINA
+CBO: 862150
+Área: I
+
+Código: 1163
+Descrição: AUX. CARGA E DESCARGA
+CBO: 783225
+Área: D
+
+Código: 1164
+Descrição: AUX. FINANCEIRO
+CBO: 413110
+Área: A
+
+Código: 1165
+Descrição: MOLEIRO
+CBO: 914425
+Área: D
+
+Código: 1166
+Descrição: AUXILIAR DE OPERADOR DE USINA
+CBO: 715415
+Área: D
+
+Código: 1167
+Descrição: AUXILIAR DE TRANSPORTE
+CBO: 783225
+Área: D
+
+Código: 1168
+Descrição: ASSIST. EXPEDICAO JUNIOR
+CBO: 342125
+Área: A
+
+Código: 1169
+Descrição: ANALISTA ADMINISTRATIVO
+CBO: 342105
+Área: A
+
+Código: 1170
+Descrição: ASS. ADMINISTRATIVO SR/SAC
+CBO: 411010
+Área: A
+
+Código: 1171
+Descrição: OP DE LOGISTICA
+CBO: 342125
+Área: I
+
+Código: 1172
+Descrição: AUX DE MONITORAMENTO
+CBO: 951310
+Área: T
+
+Código: 1173
+Descrição: AUXILIAR TEC MEDICOES E CUSTOS
+CBO: 312105
+Área: D
+
+Código: 1174
+Descrição: ANALISTA DE COBRANCA JUNIOR
+CBO: 421310
+Área: A
+
+Código: 1175
+Descrição: ANALISTA DE RH
+CBO: 342105
+Área: A
+
+Código: 1176
+Descrição: ASS ADMINISTRATIVO DE SAC
+CBO: 411010
+Área: A
+
+Código: 1177
+Descrição: AJ. CARPINTEIRO
+CBO: 715505
+Área: D
+
+Código: 1178
+Descrição: MOTORISTA OP DE VARREDEIRA
+CBO: 991115
+Área: D
+
+Código: 1179
+Descrição: PEDREIRO COC
+CBO: 715210
+Área: D
+
+Código: 1180
+Descrição: TECNICO DE OBRAS
+CBO: 312105
+Área: T
+
+Código: 1181
+Descrição: ENCARREGADO DE OBRAS SENIOR
+CBO: 710205
+Área: D
+
+Código: 1182
+Descrição: AUXILIAR DE TI
+CBO: 317210
+Área: T
+
+Código: 1183
+Descrição: MECANICO DE AUTOS
+CBO: 914405
+Área: D
+
+Código: 1184
+Descrição: BORRACHEIRO COC
+CBO: 992115
+Área: D
+
+Código: 1185
+Descrição: MACARIQUEIRO
+CBO: 711230
+Área: D
+
+Código: 1186
+Descrição: SOLDADOR RX
+CBO: 724315
+Área: D
+
+Código: 1187
+Descrição: OPERADOR DE BOMBA COMBUSTIVEL
+CBO: 521135
+Área: D
+
+Código: 1188
+Descrição: MECANICO
+CBO: 911305
+Área: D
+
+Código: 1189
+Descrição: ASSISTENTE DE OPERACOES
+CBO: 414140
+Área: D
+
+Código: 1190
+Descrição: ELETRICISTA DE AUTOS
+CBO: 953115
+Área: D
+
+Código: 1191
+Descrição: ASSIST. DE FATURAMENTO
+CBO: 413115
+Área: A
+
+Código: 1192
+Descrição: ASSIST. FINANCEIRO TESOURARIA
+CBO: 413110
+Área: A
+
+Código: 1193
+Descrição: AJUDANTE DE LUBRIFICACAO
+CBO: 919105
+Área: I
+
+Código: 1194
+Descrição: COORDENADORA DE MERCHANDISING
+CBO: 142315
+Área: A
+
+Código: 1195
+Descrição: ASSISTENTE DE COBRANCA
+CBO: 513415
+Área: A
+
+Código: 1196
+Descrição: OP. DE MAQUINAS A LUR
+CBO: 321105
+Área: D
+
+Código: 1197
+Descrição: AJUDANTE DE USINA
+CBO: 715140
+Área: D
+
+Código: 1198
+Descrição: ANALISTA DE FROTA JR
+CBO: 411005
+Área: A
+
+Código: 1199
+Descrição: ELETRICISTA DE MANUTENCAO
+CBO: 953115
+Área: D
+
+Código: 1200
+Descrição: MECANICO DE MANUTENCAO
+CBO: 911305
+Área: I
+
+Código: 1201
+Descrição: ASS. DEPARTAMENTO PESSOAL
+CBO: 411010
+Área: A
+
+Código: 1202
+Descrição: PROCESSADOR
+CBO: 414105
+Área: D
+
+Código: 1203
+Descrição: AUXILIAR DE MOVIMENTACAO
+CBO: 414210
+Área: I
+
+Código: 1204
+Descrição: OPERADOR DE INJETORA
+CBO: 811770
+Área: I
+
+Código: 1205
+Descrição: ELETRICISTA MANUTENCAO PREDIAL
+CBO: 715615
+Área: D
+
+Código: 1206
+Descrição: AUXILIAR DEP. PESSOAL
+CBO: 411030
+Área: D
+
+Código: 1207
+Descrição: PREP. INJETORA PLASTICA
+CBO: 721225
+Área: D
+
+Código: 1208
+Descrição: FERRAMENTEIRO
+CBO: 721105
+Área: D
+
+Código: 1209
+Descrição: ASSISTENTE FINANCEIRO
+CBO: 413110
+Área: A
+
+Código: 9779
+Descrição: ANALISTA DE CUSTOS JR
+CBO: 252210
+Área: A
+
+Código: 9780
+Descrição: AUXILIAR DE MANUTENCAO
+CBO: 514310
+Área: D
+
+Código: 9781
+Descrição: VENDEDOR INTERNO
+CBO: 521110
+Área: A
+
+Código: 9782
+Descrição: AUXILIAR OPERACIONAL
+CBO: 514225
+Área: D
+
+Código: 9783
+Descrição: 1/2 OFICIAL
+CBO: 514310
+Área: D
+
+Código: 9784
+Descrição: AUX OPERACIONAL
+CBO: 411005
+Área: A
+
+Código: 9785
+Descrição: ASSIST. DEPTO PESSOAL JN
+CBO: 411030
+Área: A
+
+Código: 9786
+Descrição: AJUDANTE DE TRANSBORDO
+CBO: 514205
+Área: D
+
+Código: 9787
+Descrição: ASSISTENTE DE CUSTOS PL
+CBO: 413110
+Área: A
+
+Código: 9788
+Descrição: ANALISTA DE CUSTOMER JR
+CBO: 142335
+Área: A
+
+Código: 9789
+Descrição: ASSISTENTE DE RH JR II
+CBO: 252405
+Área: A
+
+Código: 9790
+Descrição: COMPRADORA
+CBO: 354205
+Área: A
+
+Código: 9791
+Descrição: ASS. DE RH JR II
+CBO: 411010
+Área: A
+
+Código: 9792
+Descrição: TEC DE ENFERMAGEM DO TRABALHO
+CBO: 322215
+Área: D
+
+Código: 9793
+Descrição: ASS. DE COSTUMER SERVICE
+CBO: 142335
+Área: A
+
+Código: 9794
+Descrição: ABASTECEDOR
+CBO: 784205
+Área: I
+
+Código: 9795
+Descrição: LIDER OPERACIONAL JUNIOR
+CBO: 141615
+Área: A
+
+Código: 9796
+Descrição: ASSISTENTE DE PCP I
+CBO: 391125
+Área: A
+
+Código: 9797
+Descrição: ANALISTA DE ALMOXARIFADO I
+CBO: 414105
+Área: A
+
+Código: 9798
+Descrição: ANALISTA CONTABIL II
+CBO: 252210
+Área: A
+
+Código: 9799
+Descrição: FISCAL DE LOJA
+CBO: 517425
+Área: D
+
+Código: 9800
+Descrição: ANALISTA DE LOGISTICA
+CBO: 342125
+Área: A
+
+Código: 9801
+Descrição: ANALISTA DE RH
+CBO: 252405
+Área: A
+
+Código: 9802
+Descrição: TORNEIRO MECANICO
+CBO: 721215
+Área: I
+
+Código: 9803
+Descrição: LIDER DE CONTROLADOR DE ACESSO
+CBO: 391115
+Área: A
+
+Código: 9804
+Descrição: SUPERVISOR DE OBRAS
+CBO: 710205
+Área: D
+
+Código: 9805
+Descrição: MESTRE DE OBRA
+CBO: 710205
+Área: D
+
+Código: 9806
+Descrição: INSPETOR DE QUALIDADE
+CBO: 391205
+Área: I
+
+Código: 9807
+Descrição: 1/2 OFICIAL DE MONTADOR I
+CBO: 374110
+Área: A
+
+Código: 9808
+Descrição: SUPERVISOR DE SESMET
+CBO: 351605
+Área: A
+
+Código: 9809
+Descrição: AUXILIAR DE ENGENHARIA
+CBO: 312105
+Área: D
+
+Código: 9810
+Descrição: ASS DE INFRA ESTRUTURA I
+CBO: 212410
+Área: T
+
+Código: 9811
+Descrição: AUXILIAR DE RECEBIMENTO
+CBO: 414105
+Área: D
+
+Código: 9812
+Descrição: AUX FISCAL
+CBO: 413110
+Área: D
+
+Código: 9813
+Descrição: POLIDOR
+CBO: 721325
+Área: A
+
+Código: 9814
+Descrição: AUX POLIMENTO
+CBO: 721325
+Área: A
+
+Código: 9815
+Descrição: AUX DE COMPRAS
+CBO: 411010
+Área: A
+
+Código: 9816
+Descrição: ASSISTENTE DE CONTROLADORIA
+CBO: 252210
+Área: A
+
+Código: 9817
+Descrição: ASSISTENTE DE VENDAS
+CBO: 354125
+Área: D
+
+Código: 9818
+Descrição: APONTADOR DE PRODUCAO
+CBO: 414210
+Área: I
+
+Código: 9819
+Descrição: 1/2 OFICIAL DE REFRIGERACAO
+CBO: 911205
+Área: I
+
+Código: 9820
+Descrição: ASSISTENTE DE PRODUCAO
+CBO: 784205
+Área: I
+
+Código: 9821
+Descrição: OPERADOR DE CAIXA
+CBO: 421125
+Área: D
+
+Código: 9822
+Descrição: VENDEDOR
+CBO: 521110
+Área: D
+
+Código: 9823
+Descrição: AJUDANTE DE PEDREIRO
+CBO: 717020
+Área: D
+
+Código: 9824
+Descrição: MECANICO DE REFRIGERACAO IV
+CBO: 911205
+Área: A
+
+Código: 9825
+Descrição: ORCAMENTISTA PLENO
+CBO: 312105
+Área: A
+
+Código: 9826
+Descrição: FISCAL DE PREVENCAO E PERDAS
+CBO: 517425
+Área: A
+
+Código: 9827
+Descrição: OPERADOR DE PRODUCAO I
+CBO: 414105
+Área: I
+
+Código: 9828
+Descrição: AUX TECNICO DE SEG DO TRABALHO
+CBO: 254110
+Área: A
+
+Código: 9829
+Descrição: REVISORA DE TECIDOS
+CBO: 761815
+Área: T
+
+Código: 9830
+Descrição: BOMBEIRO CIVIL
+CBO: 517110
+Área: I
+
+Código: 9831
+Descrição: AUX. LOGISTICA
+CBO: 414140
+Área: A
+
+Código: 9832
+Descrição: AUXILIAR DE INJECAO
+CBO: 811770
+Área: I
+
+Código: 9833
+Descrição: AUXILIAR DE MONTAGEM
+CBO: 725105
+Área: I
+
+Código: 9834
+Descrição: ASSISTENTE DE LOGISTICA
+CBO: 414110
+Área: D
+
+Código: 9835
+Descrição: AUXILIAR DE COZINHA
+CBO: 783225
+Área: I
+
+Código: 9836
+Descrição: AUXILIAR TECNICO
+CBO: 317210
+Área: A
+
+Código: 9837
+Descrição: ASSISTENTE TECNICO
+CBO: 411010
+Área: T
