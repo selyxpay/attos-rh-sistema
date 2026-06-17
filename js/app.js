@@ -978,6 +978,7 @@ function controleAcessoDefault() {
 }
 
 function getControleAcesso() {
+  if (!state) return controleAcessoDefault();
   if (!state.controleAcesso) state.controleAcesso = controleAcessoDefault();
   return state.controleAcesso;
 }
@@ -3576,6 +3577,17 @@ function abrirDrawerDetalhes(candidatoId) {
   const vagaCandTurno = (state.vagas || []).find(v => v.id === cand.vagaId);
   popularHorariosSelect(cand.vagaId, cand.horarioId || cand.turnoTrabalho);
 
+  // Data de admissão (DP): mostra a salva ou, se vazia, a data de hoje (editável)
+  const inpAdm = document.getElementById('det-data-admissao');
+  if (inpAdm) {
+    inpAdm.value = cand.dataAdmissao || _hojeISO();
+    inpAdm.onchange = () => {
+      cand.dataAdmissao = inpAdm.value;
+      registrarAcaoHistorico(cand, `Data de admissão definida pelo DP: ${inpAdm.value}`);
+      saveState();
+    };
+  }
+
   // Exibe escala da vaga no drawer
   const escalaBox = document.getElementById('vaga-escala-box');
   const escalaValor = document.getElementById('vaga-escala-valor');
@@ -4823,17 +4835,22 @@ function mapearExata(cand, vs) {
 }
 
 // Validação dos campos obrigatórios antes de exportar (item 19)
+// Data de hoje (YYYY-MM-DD) pela hora confiável e fuso configurado.
+function _hojeISO() {
+  const fuso = (typeof getControleAcesso === 'function' && getControleAcesso().fuso) || 'America/Sao_Paulo';
+  const d = (typeof horaConfiavel === 'function') ? horaConfiavel() : new Date();
+  try {
+    const p = {}; new Intl.DateTimeFormat('en-CA', { timeZone: fuso, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d).forEach(x => p[x.type] = x.value);
+    return `${p.year}-${p.month}-${p.day}`;
+  } catch (e) { return d.toISOString().slice(0, 10); }
+}
+
+// Validação MÍNIMA do Exata: só o essencial para identificar o arquivo
+// (nome + CPF). Os demais campos ausentes saem EM BRANCO — não bloqueiam.
 function validarExata(cand, vs) {
   const faltando = [];
-  if (!cand.nome) faltando.push('Nome');
+  if (!cand.nome) faltando.push('Nome do candidato');
   if (!cand.cpf) faltando.push('CPF');
-  if (!cand.dataNascimento) faltando.push('Data de nascimento');
-  if (!cand.vagaId) faltando.push('Vaga');
-  if (!(vs.empresaNome || cand.empresaNome)) faltando.push('Empresa');
-  if (!vs.funcaoCodigo) faltando.push('Função (código no Exata)');
-  if (!(vs.salario != null && vs.salario !== '') && !cand.salario) faltando.push('Salário');
-  if (!cand.dataAdmissao) faltando.push('Data de admissão (preenchida pelo DP)');
-  if (!vs.idEmpresaExata) faltando.push('Código da empresa no Exata');
   return { ok: faltando.length === 0, faltando };
 }
 
@@ -4845,10 +4862,19 @@ function exportarExata(candidatoId) {
   // O snapshot salvo no candidato tem prioridade sobre a vaga atual (não muda contratados)
   const vs = Object.assign({}, vaga || {}, cand.dadosVagaSnapshot || {});
 
-  // 1) Validação de obrigatórios
+  // Data de admissão: lê o campo do DP (auto-hoje se vazio) e salva no candidato
+  const inpAdm = document.getElementById('det-data-admissao');
+  if (inpAdm) {
+    if (!inpAdm.value) inpAdm.value = _hojeISO();
+    cand.dataAdmissao = inpAdm.value;
+  } else if (!cand.dataAdmissao) {
+    cand.dataAdmissao = _hojeISO();
+  }
+
+  // 1) Validação mínima (nome + CPF). Demais campos ausentes saem em branco.
   const val = validarExata(cand, vs);
   if (!val.ok) {
-    alert('Não foi possível exportar para o Exata. Preencha os campos abaixo:\n\n• ' + val.faltando.join('\n• '));
+    alert('Não foi possível exportar para o Exata. Preencha:\n\n• ' + val.faltando.join('\n• '));
     return;
   }
 

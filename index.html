@@ -1639,6 +1639,11 @@
                 
                 <!-- Painel de Ações Especiais do DP (Somente Leitura) -->
                 <div class="drawer-footer-dp" id="drawer-footer-dp-actions" style="width: 100%; display: none; flex-direction: column; gap: 8px; margin-top: 8px;">
+                    <div style="width:100%; background:rgba(124,58,237,0.06); border:1px solid rgba(124,58,237,0.25); border-radius:8px; padding:8px 10px;">
+                        <label for="det-data-admissao" style="font-size:11px; font-weight:700; color:#6d28d9; display:flex; align-items:center; gap:5px; margin-bottom:4px;"><i class="fa-solid fa-calendar-check"></i> DATA DE ADMISSÃO (preenchida pelo DP — usada no Exata)</label>
+                        <input type="date" id="det-data-admissao" class="form-control" style="width:100%;">
+                        <span style="font-size:10px; color:var(--text-secondary);">Preenche com a data de hoje automaticamente; clique para editar.</span>
+                    </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
                         <button class="btn btn-primary" id="btn-dp-exportar" style="background-color: #3b82f6; color: white; border: none; padding: 10px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px;"><i class="fa-solid fa-file-zipper"></i> EXPORTAR PASTA</button>
                         <button class="btn" id="btn-dp-exportar-exata" style="background-color: #7c3aed; color: white; border: none; padding: 10px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px;"><i class="fa-solid fa-file-export"></i> EXPORTAR EXATA</button>
