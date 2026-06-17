@@ -2660,6 +2660,61 @@ function renderCadastrosExata() {
           : '<span style="font-size:11px;color:var(--text-secondary);">só João altera</span>'}
       </td>
     </tr>`).join('');
+
+  // ── Painel completo: todos os campos do TXT do Exata + tabelas de/para ──
+  const dom = getExataDominios();
+  const badge = (origem) => {
+    const m = {
+      tipos: ['Tipos de Contratação', '#6d28d9', '#ede9fe'],
+      vaga: ['Vaga/Seleção', '#047857', '#d1fae5'],
+      ficha: ['Ficha do candidato', '#475569', '#e2e8f0'],
+      auto: ['Automático', '#b45309', '#fef3c7'],
+      dominio: ['Configurável (de/para)', '#1d4ed8', '#dbeafe']
+    };
+    const x = m[origem] || ['—', '#475569', '#e2e8f0'];
+    return `<span style="background:${x[2]};color:${x[1]};padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;white-space:nowrap;">${x[0]}</span>`;
+  };
+  const mapaLinhas = EXATA_CAMPOS_INFO.map(c => {
+    let extra = '';
+    if (c.origem === 'dominio') {
+      const k = c.dominioKey || c.key;
+      extra = `<a href="#depara-${k}" style="font-size:11px;color:#1d4ed8;font-weight:600;">${(dom[k] || []).length} opção(ões) ▸</a>`;
+    }
+    return `<tr>
+      <td style="color:var(--text-secondary);font-size:11px;">${c.pos}</td>
+      <td><code style="font-size:11px;">${escapeHTML(c.key)}</code><br><span style="font-size:11px;color:var(--text-secondary);">${escapeHTML(c.titulo)}</span></td>
+      <td style="font-size:11px;">${escapeHTML(c.desc)}</td>
+      <td>${badge(c.origem)}</td>
+      <td>${extra}</td>
+    </tr>`;
+  }).join('');
+  const vistos = {};
+  const deparaCards = EXATA_CAMPOS_INFO.filter(c => c.origem === 'dominio').filter(c => {
+    const k = c.dominioKey || c.key; if (vistos[k]) return false; vistos[k] = true; return true;
+  }).map(c => {
+    const k = c.dominioKey || c.key;
+    const lista = dom[k] || [];
+    const linhasDp = lista.length ? lista.map((o, idx) => `
+      <tr>
+        <td>${escapeHTML(o.de)}</td>
+        <td style="font-weight:700;">${escapeHTML(o.codigo)}</td>
+        <td>${soJoao ? `<button class="btn btn-sm" style="background:#fff1f2;color:#dc2626;border:1px solid #fca5a5;" onclick="excluirDeParaExata('${k}',${idx})"><i class="fa-solid fa-trash"></i></button>` : '<span style="font-size:10px;color:var(--text-secondary)">só João</span>'}</td>
+      </tr>`).join('') : '<tr><td colspan="3" style="color:var(--text-secondary);font-size:12px;">Nenhuma opção cadastrada ainda.</td></tr>';
+    return `
+    <details id="depara-${k}" style="border:1px solid var(--border-color,#e2e8f0);border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+      <summary style="cursor:pointer;font-weight:700;font-size:13px;">${escapeHTML(c.titulo)} <span style="font-weight:400;color:var(--text-secondary);font-size:11px;">(campo ${escapeHTML(k)}${lista.length ? ' · ' + lista.length : ''})</span></summary>
+      <p style="font-size:11px;color:var(--text-secondary);margin:8px 0;">À esquerda, o texto como está na ficha/sistema (ex.: <b>Masculino</b>). À direita, o <b>código</b> que vai no TXT do Exata.</p>
+      <div class="table-scroll-container"><table class="excel-table" style="width:100%;">
+        <thead><tr><th>Na ficha (texto)</th><th>Código no Exata</th><th></th></tr></thead>
+        <tbody>${linhasDp}</tbody></table></div>
+      <div class="form-group-grid" style="margin-top:8px;">
+        <div class="form-group"><label>Texto na ficha</label><input id="depara-de-${k}" class="form-control" placeholder="Ex: Masculino"></div>
+        <div class="form-group"><label>Código no Exata</label><input id="depara-cod-${k}" class="form-control" placeholder="Ex: 1"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="salvarDeParaExata('${k}')"><i class="fa-solid fa-plus"></i> Adicionar opção</button>
+    </details>`;
+  }).join('');
+
   cont.innerHTML = `
     <div style="background:var(--card-bg,#fff);border:1px solid var(--border-color,#e2e8f0);border-radius:12px;padding:16px;margin-bottom:16px;">
       <h4 style="margin:0 0 10px;font-size:14px;"><i class="fa-solid fa-briefcase"></i> Tipos de Contratação</h4>
@@ -2684,6 +2739,20 @@ function renderCadastrosExata() {
         <div class="form-group"><label for="tc-prorr">Dias de prorrogação (0 = sem)</label><input id="tc-prorr" type="number" class="form-control" value="0"></div>
       </div>
       <div style="display:flex;gap:8px;"><button class="btn btn-primary btn-sm" onclick="salvarTipoContratacao()">Salvar</button><button class="btn btn-secondary btn-sm" onclick="limparFormTipoContratacao()">Limpar</button></div>
+    </div>
+
+    <div style="background:var(--card-bg,#fff);border:1px solid var(--border-color,#e2e8f0);border-radius:12px;padding:16px;margin-top:16px;">
+      <h4 style="margin:0 0 4px;font-size:14px;"><i class="fa-solid fa-list-check"></i> Campos enviados ao Exata (TXT) — os 90 campos</h4>
+      <p style="font-size:12px;color:var(--text-secondary);margin:0 0 10px;">Tudo que sai no arquivo. Os campos <b>azuis</b> (Configurável) você define o <b>de/para</b> (texto da ficha → código). Os <b>cinza</b> (Ficha) já vêm preenchidos do cadastro da pessoa. Os <b>laranja</b> são automáticos.</p>
+      <div class="table-scroll-container" style="max-height:360px;overflow:auto;"><table class="excel-table" style="width:100%;">
+        <thead><tr><th>#</th><th>Campo</th><th>O que é</th><th>De onde vem</th><th></th></tr></thead>
+        <tbody>${mapaLinhas}</tbody></table></div>
+    </div>
+
+    <div style="background:var(--card-bg,#fff);border:1px solid var(--border-color,#e2e8f0);border-radius:12px;padding:16px;margin-top:16px;">
+      <h4 style="margin:0 0 4px;font-size:14px;"><i class="fa-solid fa-right-left"></i> Códigos configuráveis (de/para)</h4>
+      <p style="font-size:12px;color:var(--text-secondary);margin:0 0 12px;">Para cada campo abaixo, cadastre as opções: o que aparece na ficha e o <b>código</b> correspondente que o Exata espera. Na hora de exportar, o sistema troca o texto pelo código automaticamente.</p>
+      ${deparaCards}
     </div>`;
 }
 window.editarTipoContratacao = function (id) {
@@ -2715,6 +2784,24 @@ window.excluirTipoContratacao = function (id) {
   state.tiposContratacao = getTiposContratacao().filter(t => t.id !== id);
   registrarLogGlobal('Excluiu um tipo de contratação.', 'exata');
   saveState(); renderCadastrosExata();
+};
+// de/para dos campos configuráveis: texto da ficha -> código no Exata
+window.salvarDeParaExata = function (key) {
+  const de = ((document.getElementById('depara-de-' + key) || {}).value || '').trim();
+  const cod = ((document.getElementById('depara-cod-' + key) || {}).value || '').trim();
+  if (!de) { alert('Informe o texto como aparece na ficha (ex.: Masculino).'); return; }
+  const dom = getExataDominios();
+  if (!dom[key]) dom[key] = [];
+  const i = dom[key].findIndex(o => String(o.de || '').trim().toLowerCase() === de.toLowerCase());
+  if (i >= 0) dom[key][i].codigo = cod; else dom[key].push({ de, codigo: cod });
+  registrarLogGlobal(`Exata de/para "${key}": "${de}" → "${cod}".`, 'exata');
+  saveState(); renderCadastrosExata();
+  setTimeout(() => { const d = document.getElementById('depara-' + key); if (d) d.open = true; }, 0);
+};
+window.excluirDeParaExata = function (key, idx) {
+  if (!(loggedUser && loggedUser.login === 'joaobalaf')) { alert('Somente o administrador João Balear pode excluir.'); return; }
+  const dom = getExataDominios();
+  if (dom[key]) { dom[key].splice(idx, 1); registrarLogGlobal(`Exata de/para "${key}": removeu uma opção.`, 'exata'); saveState(); renderCadastrosExata(); setTimeout(() => { const d = document.getElementById('depara-' + key); if (d) d.open = true; }, 0); }
 };
 
 // ── EDIÇÃO de vaga já criada (reusa o mesmo formulário de "Criar Nova Vaga") ──
@@ -5022,6 +5109,122 @@ const EXATA_HEADER = [
   'previsao_contrato_dias','taxa'
 ];
 
+// Catálogo explicativo dos 90 campos enviados ao Exata (para o painel "Cadastros Exata").
+// origem: 'tipos' (Tipos de Contratação) · 'vaga' · 'ficha' (candidato) · 'auto' (calculado) · 'dominio' (de/para configurável aqui)
+const EXATA_CAMPOS_INFO = (function () {
+  const F = (key, titulo, origem, desc, dominioKey) => ({ key, titulo, origem, desc: desc || '', dominioKey: dominioKey || null });
+  const base = [
+    F('tipo_contrato', 'Tipo de contrato', 'tipos', 'Código do tipo (Efetivo/Temporário). Definido em Tipos de Contratação.'),
+    F('vinculo', 'Vínculo', 'tipos', 'Código do vínculo. Definido em Tipos de Contratação.'),
+    F('id', 'ID interno', 'auto', 'Identificador interno do candidato (gerado pelo sistema).'),
+    F('nome', 'Nome', 'ficha', 'Nome completo — vem da ficha do candidato.'),
+    F('email', 'E-mail', 'ficha', 'Vem da ficha.'),
+    F('tel_residencial', 'Telefone residencial', 'ficha', 'Vem da ficha.'),
+    F('tel_celular', 'Celular', 'ficha', 'Vem da ficha.'),
+    F('nome_pai', 'Nome do pai', 'ficha', 'Vem da ficha.'),
+    F('nome_mae', 'Nome da mãe', 'ficha', 'Vem da ficha.'),
+    F('ctps', 'CTPS (número)', 'auto', 'Automático: 7 primeiros dígitos do CPF.'),
+    F('ctps_tipo', 'CTPS - tipo', 'dominio', 'Código do tipo de CTPS (de/para).'),
+    F('ctps_serie', 'CTPS - série', 'auto', 'Automático: 4 últimos dígitos do CPF.'),
+    F('ctps_uf', 'CTPS - UF', 'ficha', 'Vem da ficha (UF do documento).'),
+    F('ctps_data_expedicao', 'CTPS - expedição', 'auto', 'Não enviado (em branco).'),
+    F('data_admissao', 'Data de admissão', 'auto', 'Preenchida pelo DP (hoje, editável).'),
+    F('data_rescisao', 'Data de rescisão', 'auto', 'Não enviado (em branco).'),
+    F('data_vencimento', 'Data de vencimento', 'auto', 'Calculada: admissão + dias do tipo.'),
+    F('data_prorrogacao', 'Data de prorrogação', 'auto', 'Calculada: vencimento + dias do tipo.'),
+    F('id_empresa_exata', 'ID empresa Exata', 'vaga', 'Tomador/empresa — vem do cadastro do cliente/vaga.'),
+    F('funcao', 'Função (código)', 'vaga', 'Código da função do catálogo (na vaga).'),
+    F('funcao_cbo', 'Função - CBO', 'vaga', 'CBO da função do catálogo (na vaga).'),
+    F('pis', 'PIS', 'ficha', 'Vem da ficha.'),
+    F('cpf', 'CPF', 'ficha', 'Vem da ficha.'),
+    F('rg', 'RG', 'ficha', 'Vem da ficha.'),
+    F('titulo', 'Título de eleitor', 'ficha', 'Vem da ficha (só se preenchido).'),
+    F('titulo_zona', 'Título - zona', 'ficha', 'Vem da ficha.'),
+    F('titulo_secao', 'Título - seção', 'ficha', 'Vem da ficha.'),
+    F('titulo_emissao', 'Título - emissão', 'ficha', 'Vem da ficha.'),
+    F('endereco_cep', 'CEP', 'ficha', 'Vem da ficha.'),
+    F('endereco', 'Endereço', 'ficha', 'Vem da ficha.'),
+    F('endereco_numero', 'Número', 'ficha', 'Vem da ficha.'),
+    F('endereco_complemento', 'Complemento', 'ficha', 'Vem da ficha.'),
+    F('endereco_estado', 'UF (endereço)', 'ficha', 'Vem da ficha.'),
+    F('endereco_cidade', 'Cidade', 'ficha', 'Vem da ficha.'),
+    F('endereco_bairro', 'Bairro', 'ficha', 'Vem da ficha.'),
+    F('salario', 'Salário', 'vaga', 'Vem da vaga.'),
+    F('salario_tipo', 'Salário - tipo', 'dominio', 'Código do tipo de salário (de/para).'),
+    F('data_nascimento', 'Data de nascimento', 'ficha', 'Vem da ficha.'),
+    F('estado_civil', 'Estado civil', 'dominio', 'Código do estado civil (de/para).'),
+    F('sexo', 'Sexo', 'dominio', 'Código do sexo (de/para).'),
+    F('raca', 'Raça/cor', 'dominio', 'Código da raça/cor (de/para).'),
+    F('escolaridade', 'Escolaridade', 'dominio', 'Código da escolaridade (de/para).'),
+    F('escolaridade_status', 'Escolaridade - status', 'dominio', 'Código do status de escolaridade (de/para).'),
+    F('contratacao_finalidade', 'Finalidade da contratação', 'dominio', 'Código da finalidade (de/para).'),
+    F('contratacao_justificativa', 'Justificativa da contratação', 'dominio', 'Código da justificativa (de/para).'),
+    F('banco', 'Banco', 'dominio', 'Código do banco (de/para).'),
+    F('agencia', 'Agência', 'ficha', 'Vem da ficha.'),
+    F('agencia_digito', 'Agência - dígito', 'ficha', 'Vem da ficha.'),
+    F('conta', 'Conta', 'ficha', 'Vem da ficha.'),
+    F('conta_digito', 'Conta - dígito', 'ficha', 'Vem da ficha.'),
+    F('conta_tipo', 'Conta - tipo', 'dominio', 'Código do tipo de conta (de/para).')
+  ];
+  for (let i = 1; i <= 5; i++) {
+    base.push(F('dep' + i + '_nome', 'Dependente ' + i + ' - nome', 'ficha', 'Vem da ficha.'));
+    base.push(F('dep' + i + '_data_nascimento', 'Dependente ' + i + ' - nascimento', 'ficha', 'Vem da ficha.'));
+    base.push(F('dep' + i + '_cpf', 'Dependente ' + i + ' - CPF', 'ficha', 'Vem da ficha.'));
+    base.push(F('dep' + i + '_parentesco', 'Dependente ' + i + ' - parentesco', 'dominio', 'Código do parentesco (de/para).', 'parentesco'));
+  }
+  ['ida', 'volta'].forEach(dir => {
+    for (let i = 1; i <= 3; i++) {
+      base.push(F('vt' + i + '_' + dir + '_tipo', 'VT ' + dir + ' ' + i + ' - tipo', 'dominio', 'Código do tipo de VT (de/para).', 'vt_tipo'));
+      base.push(F('vt' + i + '_' + dir + '_valor', 'VT ' + dir + ' ' + i + ' - valor', 'ficha', 'Vem da ficha.'));
+    }
+  });
+  base.push(F('rg_expedicao', 'RG - expedição', 'ficha', 'Vem da ficha.'));
+  base.push(F('rg_uf', 'RG - UF/órgão', 'ficha', 'Vem da ficha.'));
+  base.push(F('pais_nascimento', 'País de nascimento', 'ficha', 'Vem da ficha (padrão BR).'));
+  base.push(F('estado_nascimento', 'Estado de nascimento', 'ficha', 'Vem da ficha.'));
+  base.push(F('cidade_nascimento', 'Cidade de nascimento', 'ficha', 'Vem da ficha.'));
+  base.push(F('previsao_contrato_dias', 'Previsão do contrato (dias)', 'vaga', 'Vem da vaga.'));
+  base.push(F('taxa', 'Taxa', 'vaga', 'Vem da vaga.'));
+  return base.map((c, i) => Object.assign(c, { pos: i + 1 }));
+})();
+
+// Diagnóstico: o catálogo explicativo precisa bater 1:1 com o cabeçalho exportado
+function _validarCamposExata() {
+  const a = EXATA_CAMPOS_INFO.map(c => c.key);
+  return {
+    total: a.length,
+    okLen: a.length === EXATA_HEADER.length,
+    okOrder: a.every((k, i) => k === EXATA_HEADER[i]),
+    dominiosOk: EXATA_CAMPOS_INFO.filter(c => c.origem === 'dominio').every(c => EXATA_HEADER.indexOf(c.key) >= 0)
+  };
+}
+if (typeof window !== 'undefined') window._validarCamposExata = _validarCamposExata;
+
+// Tabelas de/para configuráveis (texto da ficha -> código do Exata)
+function getExataDominios() {
+  if (typeof state === 'undefined' || !state) return {};
+  if (!state.exataDominios) state.exataDominios = {};
+  return state.exataDominios;
+}
+function _traduzirDominioValor(key, valor, dom) {
+  const lista = (dom && dom[key]) || [];
+  const alvo = String(valor == null ? '' : valor).trim().toLowerCase();
+  if (!alvo || !lista.length) return valor;
+  const hit = lista.find(o => String(o.de || '').trim().toLowerCase() === alvo);
+  return hit ? hit.codigo : valor;
+}
+// Aplica as tabelas de/para nos campos marcados como 'dominio' (sem alterar os demais)
+function _aplicarDominiosExata(arr) {
+  const dom = getExataDominios();
+  EXATA_CAMPOS_INFO.forEach(c => {
+    if (c.origem !== 'dominio') return;
+    const i = EXATA_HEADER.indexOf(c.key);
+    if (i < 0) return;
+    arr[i] = _traduzirDominioValor(c.dominioKey || c.key, arr[i], dom);
+  });
+  return arr;
+}
+
 // Protege o valor: nunca cria coluna extra nem emite null/undefined (itens 15-16)
 function sanitizarExata(v) {
   if (v === null || v === undefined) return '';
@@ -5092,7 +5295,7 @@ function mapearExata(cand, vs) {
   const dataProrr = (_diasV > 0 && _diasP > 0) ? _somarDiasExata(dataVenc, _diasP) : '';
   const ctpsUf = cand.ctpsUf || cand.rgUf || cand.estado || '';
   const rgUfFinal = cand.rgOrgaoEmissor || cand.rgUf || '';
-  return [
+  const arr = [
     vs.codigoTipoContrato || vs.vinculo,          // 1 tipo_contrato (CÓDIGO, não o nome)
     vs.vinculo,                                   // 2 vinculo (código do vínculo)
     cand.id,                                      // 3 id (ID interno do candidato)
@@ -5159,6 +5362,7 @@ function mapearExata(cand, vs) {
     vs.previsaoDias,                              // 89 previsao_contrato_dias (vaga)
     vs.taxa                                       // 90 taxa (vaga)
   ];
+  return _aplicarDominiosExata(arr); // traduz texto->código nos campos configuráveis (de/para)
 }
 
 // Validação dos campos obrigatórios antes de exportar (item 19)
