@@ -1381,29 +1381,9 @@ function setupEventListeners() {
     });
   }
 
-  // Mostrar botões de vagas conforme permissão
-  const btnNovaVaga = document.getElementById('btn-nova-vaga');
-  const btnNovoCliente = document.getElementById('btn-novo-cliente');
-  const podeCriarVaga = loggedUser?.permissoes?.vagas?.criar === true;
-  const podeGerenciarCliente = loggedUser?.permissoes?.vagas?.excluir === true;
-  if (btnNovaVaga) {
-    btnNovaVaga.style.display = podeCriarVaga ? 'flex' : 'none';
-    btnNovaVaga.addEventListener('click', () => {
-      const selectEmpresaModal = document.getElementById('vaga-add-empresa');
-      if (selectEmpresaModal) {
-        selectEmpresaModal.innerHTML = state.empresas.map(e => `<option value="${e.id}">${e.nome}</option>`).join('');
-      }
-      document.getElementById('modal-nova-vaga').classList.add('active');
-      // Injeta campos extras configurados pelo admin
-      setTimeout(() => injetarCamposExtrasNoForm(), 50);
-    });
-  }
-  if (btnNovoCliente) {
-    btnNovoCliente.style.display = podeGerenciarCliente ? 'flex' : 'none';
-    btnNovoCliente.addEventListener('click', () => {
-      document.getElementById('modal-novo-cliente').classList.add('active');
-    });
-  }
+  // Botões de Vagas: visibilidade + listeners reaplicados de forma segura.
+  // (Também são reaplicados em renderVagasGrid — corrige o bug de "sumir até o refresh".)
+  atualizarBotoesVagas();
 
   const formNovaVaga = document.getElementById('form-nova-vaga');
   if (formNovaVaga) {
@@ -2091,7 +2071,40 @@ function setupDragAndDrop() {
 }
 
 // ABA 2: VAGAS (VITRINE DE VAGAS)
+// Aplica a visibilidade dos botões de Vagas por permissão e anexa os listeners
+// uma única vez (guard dataset.wired). Chamado no setup, no login e a cada render.
+function atualizarBotoesVagas() {
+  const btnNovaVaga = document.getElementById('btn-nova-vaga');
+  const btnNovoCliente = document.getElementById('btn-novo-cliente');
+  const podeCriarVaga = loggedUser?.permissoes?.vagas?.criar === true;
+  const podeGerenciarCliente = loggedUser?.permissoes?.vagas?.excluir === true;
+  if (btnNovaVaga) {
+    btnNovaVaga.style.display = podeCriarVaga ? 'flex' : 'none';
+    if (!btnNovaVaga.dataset.wired) {
+      btnNovaVaga.dataset.wired = '1';
+      btnNovaVaga.addEventListener('click', () => {
+        const selectEmpresaModal = document.getElementById('vaga-add-empresa');
+        if (selectEmpresaModal) {
+          selectEmpresaModal.innerHTML = state.empresas.map(e => `<option value="${e.id}">${e.nome}</option>`).join('');
+        }
+        document.getElementById('modal-nova-vaga').classList.add('active');
+        setTimeout(() => injetarCamposExtrasNoForm(), 50);
+      });
+    }
+  }
+  if (btnNovoCliente) {
+    btnNovoCliente.style.display = podeGerenciarCliente ? 'flex' : 'none';
+    if (!btnNovoCliente.dataset.wired) {
+      btnNovoCliente.dataset.wired = '1';
+      btnNovoCliente.addEventListener('click', () => {
+        document.getElementById('modal-novo-cliente').classList.add('active');
+      });
+    }
+  }
+}
+
 function renderVagasGrid() {
+  atualizarBotoesVagas();
   const container = document.getElementById('vagas-cards-container');
   if (!container) return;
 
@@ -4123,127 +4136,188 @@ window.liberarAcessoLogin = function(funcId) {
 // ==========================================================================
 // EXPORTAR EXATA — gera CSV no formato de importação do sistema Exata
 // ==========================================================================
+// ==========================================================================
+// EXPORTAÇÃO EXATA — TXT técnico com EXATAMENTE 90 campos (separador ;)
+// ==========================================================================
+const EXATA_HEADER = [
+  'tipo_contrato','vinculo','id','nome','email',
+  'tel_residencial','tel_celular','nome_pai','nome_mae',
+  'ctps','ctps_tipo','ctps_serie','ctps_uf','ctps_data_expedicao',
+  'data_admissao','data_rescisao','data_vencimento','data_prorrogacao',
+  'id_empresa_exata','funcao','funcao_cbo',
+  'pis','cpf','rg',
+  'titulo','titulo_zona','titulo_secao','titulo_emissao',
+  'endereco_cep','endereco','endereco_numero','endereco_complemento',
+  'endereco_estado','endereco_cidade','endereco_bairro',
+  'salario','salario_tipo',
+  'data_nascimento','estado_civil','sexo','raca',
+  'escolaridade','escolaridade_status',
+  'contratacao_finalidade','contratacao_justificativa',
+  'banco','agencia','agencia_digito','conta','conta_digito','conta_tipo',
+  'dep1_nome','dep1_data_nascimento','dep1_cpf','dep1_parentesco',
+  'dep2_nome','dep2_data_nascimento','dep2_cpf','dep2_parentesco',
+  'dep3_nome','dep3_data_nascimento','dep3_cpf','dep3_parentesco',
+  'dep4_nome','dep4_data_nascimento','dep4_cpf','dep4_parentesco',
+  'dep5_nome','dep5_data_nascimento','dep5_cpf','dep5_parentesco',
+  'vt1_ida_tipo','vt1_ida_valor','vt2_ida_tipo','vt2_ida_valor','vt3_ida_tipo','vt3_ida_valor',
+  'vt1_volta_tipo','vt1_volta_valor','vt2_volta_tipo','vt2_volta_valor','vt3_volta_tipo','vt3_volta_valor',
+  'rg_expedicao','rg_uf','pais_nascimento','estado_nascimento','cidade_nascimento',
+  'previsao_contrato_dias','taxa'
+];
+
+// Protege o valor: nunca cria coluna extra nem emite null/undefined (itens 15-16)
+function sanitizarExata(v) {
+  if (v === null || v === undefined) return '';
+  let s = String(v);
+  const low = s.trim().toLowerCase();
+  if (low === 'undefined' || low === 'null' || low === '[object object]' || low === 'não informado' || low === 'nao informado') return '';
+  s = s.replace(/[\r\n\t]+/g, ' '); // quebra de linha/TAB -> espaço
+  s = s.replace(/;/g, ',');         // ; -> , (não estoura colunas)
+  s = s.replace(/"/g, "'");         // aspas
+  return s.trim();
+}
+
+// Formato de data único e centralizado (item 17): DD/MM/AAAA
+function formatarDataExata(v) {
+  if (!v) return '';
+  const str = String(v).trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  return str; // já em DD/MM/AAAA ou texto: mantém como está
+}
+
+// Números (salário/taxa/VT) — mantém o padrão do registro, como texto (item 17)
+function formatarNumeroExata(v) {
+  if (v === null || v === undefined || v === '') return '';
+  return String(v).replace(/[\r\n\t;]+/g, ' ').trim();
+}
+
+// Mapa CONTROLADO sistema -> 90 campos do Exata (mesma ordem do cabeçalho)
+function mapearExata(cand, vs) {
+  const dep = (i) => (cand.dependentes && cand.dependentes[i]) || {};
+  const vti = (i) => (cand.vtIda && cand.vtIda[i]) || {};
+  const vtv = (i) => (cand.vtVolta && cand.vtVolta[i]) || {};
+  return [
+    vs.tipoContrato,                              // 1 tipo_contrato (vaga)
+    vs.vinculo,                                   // 2 vinculo (vaga)
+    cand.id,                                      // 3 id (ID interno do candidato)
+    cand.nome,                                    // 4 nome
+    cand.email,                                   // 5 email
+    cand.telefoneResidencial,                     // 6 tel_residencial
+    cand.telefone || cand.celular,                // 7 tel_celular
+    cand.nomePai,                                 // 8 nome_pai
+    cand.nomeMae,                                 // 9 nome_mae
+    cand.ctps,                                    // 10 ctps
+    cand.ctpsTipo,                                // 11 ctps_tipo
+    cand.ctpsSerie,                               // 12 ctps_serie
+    cand.ctpsUf,                                  // 13 ctps_uf
+    formatarDataExata(cand.ctpsDataExpedicao),    // 14 ctps_data_expedicao
+    formatarDataExata(cand.dataAdmissao),         // 15 data_admissao
+    formatarDataExata(cand.dataRescisao),         // 16 data_rescisao
+    formatarDataExata(cand.dataVencimento),       // 17 data_vencimento
+    formatarDataExata(cand.dataProrrogacao),      // 18 data_prorrogacao
+    vs.idEmpresaExata,                            // 19 id_empresa_exata (vaga)
+    vs.funcaoCodigo,                              // 20 funcao (código da função, vaga)
+    vs.cbo,                                       // 21 funcao_cbo (vaga)
+    cand.pis,                                     // 22 pis
+    cand.cpf,                                     // 23 cpf
+    cand.rg,                                      // 24 rg
+    cand.tituloEleitor,                           // 25 titulo
+    cand.tituloZona,                              // 26 titulo_zona
+    cand.tituloSecao,                             // 27 titulo_secao
+    formatarDataExata(cand.tituloEmissao),        // 28 titulo_emissao
+    cand.cep,                                     // 29 endereco_cep
+    cand.rua,                                     // 30 endereco
+    cand.numeroCasa,                              // 31 endereco_numero
+    cand.complemento,                             // 32 endereco_complemento
+    cand.estado,                                  // 33 endereco_estado
+    cand.cidade,                                  // 34 endereco_cidade
+    cand.bairro,                                  // 35 endereco_bairro
+    formatarNumeroExata(vs.salario != null && vs.salario !== '' ? vs.salario : cand.salario), // 36 salario (vaga)
+    vs.salarioTipo,                               // 37 salario_tipo (vaga)
+    formatarDataExata(cand.dataNascimento),       // 38 data_nascimento
+    cand.estadoCivil,                             // 39 estado_civil
+    cand.sexo,                                    // 40 sexo
+    cand.raca,                                    // 41 raca
+    cand.escolaridade,                            // 42 escolaridade
+    cand.escolaridadeStatus,                      // 43 escolaridade_status
+    vs.finalidade,                                // 44 contratacao_finalidade (vaga)
+    vs.justificativa,                             // 45 contratacao_justificativa (vaga)
+    cand.banco,                                   // 46 banco
+    cand.agenciaBanco || cand.agencia,            // 47 agencia
+    cand.agenciaDigito,                           // 48 agencia_digito
+    cand.contaBanco || cand.conta,                // 49 conta
+    cand.contaDigito,                             // 50 conta_digito
+    cand.contaTipo,                               // 51 conta_tipo
+    dep(0).nome, formatarDataExata(dep(0).dataNascimento), dep(0).cpf, dep(0).parentesco, // 52-55
+    dep(1).nome, formatarDataExata(dep(1).dataNascimento), dep(1).cpf, dep(1).parentesco, // 56-59
+    dep(2).nome, formatarDataExata(dep(2).dataNascimento), dep(2).cpf, dep(2).parentesco, // 60-63
+    dep(3).nome, formatarDataExata(dep(3).dataNascimento), dep(3).cpf, dep(3).parentesco, // 64-67
+    dep(4).nome, formatarDataExata(dep(4).dataNascimento), dep(4).cpf, dep(4).parentesco, // 68-71
+    vti(0).tipo, formatarNumeroExata(vti(0).valor), vti(1).tipo, formatarNumeroExata(vti(1).valor), vti(2).tipo, formatarNumeroExata(vti(2).valor), // 72-77 ida
+    vtv(0).tipo, formatarNumeroExata(vtv(0).valor), vtv(1).tipo, formatarNumeroExata(vtv(1).valor), vtv(2).tipo, formatarNumeroExata(vtv(2).valor), // 78-83 volta
+    formatarDataExata(cand.rgExpedicao),          // 84 rg_expedicao
+    cand.rgUf,                                    // 85 rg_uf
+    cand.paisNascimento || 'BR',                  // 86 pais_nascimento
+    cand.estadoNascimento,                        // 87 estado_nascimento
+    cand.cidadeNascimento,                        // 88 cidade_nascimento
+    vs.previsaoDias,                              // 89 previsao_contrato_dias (vaga)
+    vs.taxa                                       // 90 taxa (vaga)
+  ];
+}
+
+// Validação dos campos obrigatórios antes de exportar (item 19)
+function validarExata(cand, vs) {
+  const faltando = [];
+  if (!cand.nome) faltando.push('Nome');
+  if (!cand.cpf) faltando.push('CPF');
+  if (!cand.dataNascimento) faltando.push('Data de nascimento');
+  if (!cand.vagaId) faltando.push('Vaga');
+  if (!(vs.empresaNome || cand.empresaNome)) faltando.push('Empresa');
+  if (!vs.funcaoCodigo) faltando.push('Função (código no Exata)');
+  if (!(vs.salario != null && vs.salario !== '') && !cand.salario) faltando.push('Salário');
+  if (!cand.dataAdmissao) faltando.push('Data de admissão (preenchida pelo DP)');
+  if (!vs.idEmpresaExata) faltando.push('Código da empresa no Exata');
+  return { ok: faltando.length === 0, faltando };
+}
+
 function exportarExata(candidatoId) {
   const cand = state.candidatos.find(c => c.id === candidatoId);
   if (!cand) { alert('Candidato não encontrado.'); return; }
 
   const vaga = cand.vagaId ? (state.vagas || []).find(v => v.id === cand.vagaId) : null;
+  // O snapshot salvo no candidato tem prioridade sobre a vaga atual (não muda contratados)
+  const vs = Object.assign({}, vaga || {}, cand.dadosVagaSnapshot || {});
 
-  // Sanitiza valor: remove ponto-e-vírgula e normaliza undefined/null
-  const s = (val) => String(val == null ? '' : val).replace(/;/g, ',');
+  // 1) Validação de obrigatórios
+  const val = validarExata(cand, vs);
+  if (!val.ok) {
+    alert('Não foi possível exportar para o Exata. Preencha os campos abaixo:\n\n• ' + val.faltando.join('\n• '));
+    return;
+  }
 
-  // Mapeamento dos campos do sistema → colunas do Exata (ordem exata do modelo)
-  const cabecalho = [
-    'tipo_contrato','vinculo','id','nome','email',
-    'tel_residencial','tel_celular','nome_pai','nome_mae',
-    'ctps','ctps_tipo','ctps_serie','ctps_uf','ctps_data_expedicao',
-    'data_admissao','data_rescisao','data_vencimento','data_prorrogacao',
-    'id_empresa_exata','funcao','funcao_cbo',
-    'pis','cpf','rg',
-    'titulo','titulo_zona','titulo_secao','titulo_emissao',
-    'endereco_cep','endereco','endereco_numero','endereco_complemento',
-    'endereco_estado','endereco_cidade','endereco_bairro',
-    'salario','salario_tipo',
-    'data_nascimento','estado_civil','sexo','raca',
-    'escolaridade','escolaridade_status',
-    'contratacao_finalidade','contratacao_justificativa',
-    'banco','agencia','agencia_digito','conta','conta_digito','conta_tipo',
-    'dep1_nome','dep1_data_nascimento','dep1_cpf','dep1_parentesco',
-    'dep2_nome','dep2_data_nascimento','dep2_cpf','dep2_parentesco',
-    'dep3_nome','dep3_data_nascimento','dep3_cpf','dep3_parentesco',
-    'dep4_nome','dep4_data_nascimento','dep4_cpf','dep4_parentesco',
-    'dep5_nome','dep5_data_nascimento','dep5_cpf','dep5_parentesco',
-    'vt1_ida_tipo','vt1_ida_valor','vt2_ida_tipo','vt2_ida_valor','vt3_ida_tipo','vt3_ida_valor',
-    'vt1_volta_tipo','vt1_volta_valor','vt2_volta_tipo','vt2_volta_valor','vt3_volta_tipo','vt3_volta_valor',
-    'rg_expedicao','rg_uf','pais_nascimento','estado_nascimento','cidade_nascimento',
-    'previsao_contrato_dias','taxa'
-  ];
+  const cabecalho = EXATA_HEADER;
+  const valores = mapearExata(cand, vs).map(sanitizarExata);
 
-  const valores = [
-    s(cand.tipoContrato),              // tipo_contrato
-    s(cand.vinculo),                   // vinculo
-    '',                                // id (Exata gera internamente)
-    s(cand.nome),                      // nome
-    s(cand.email),                     // email
-    '',                                // tel_residencial
-    s(cand.telefone),                  // tel_celular
-    s(cand.nomePai),                   // nome_pai
-    s(cand.nomeMae),                   // nome_mae
-    s(cand.ctps),                      // ctps
-    s(cand.ctpsTipo),                  // ctps_tipo
-    s(cand.ctpsSerie),                 // ctps_serie
-    s(cand.ctpsUf),                    // ctps_uf
-    s(cand.ctpsDataExpedicao),         // ctps_data_expedicao
-    s(cand.dataAdmissao),              // data_admissao
-    '',                                // data_rescisao
-    '',                                // data_vencimento
-    '',                                // data_prorrogacao
-    '',                                // id_empresa_exata
-    s(vaga ? vaga.cargo : cand.codigoVaga), // funcao
-    '',                                // funcao_cbo
-    s(cand.pis),                       // pis
-    s(cand.cpf),                       // cpf
-    s(cand.rg),                        // rg
-    '',                                // titulo
-    '',                                // titulo_zona
-    '',                                // titulo_secao
-    '',                                // titulo_emissao
-    s(cand.cep),                       // endereco_cep
-    s(cand.rua),                       // endereco
-    s(cand.numeroCasa),                // endereco_numero
-    s(cand.complemento),               // endereco_complemento
-    s(cand.estado),                    // endereco_estado
-    s(cand.cidade),                    // endereco_cidade
-    s(cand.bairro),                    // endereco_bairro
-    s(vaga ? vaga.salario : cand.salario), // salario
-    '',                                // salario_tipo
-    s(cand.dataNascimento),            // data_nascimento
-    s(cand.estadoCivil),               // estado_civil
-    s(cand.sexo),                      // sexo
-    s(cand.raca),                      // raca
-    s(cand.escolaridade),              // escolaridade
-    '',                                // escolaridade_status
-    '',                                // contratacao_finalidade
-    '',                                // contratacao_justificativa
-    s(cand.banco),                     // banco
-    s(cand.agenciaBanco),              // agencia
-    s(cand.agenciaDigito),             // agencia_digito
-    s(cand.contaBanco),                // conta
-    s(cand.contaDigito),               // conta_digito
-    s(cand.contaTipo),                 // conta_tipo
-    // Dependentes (até 5 — campos não existem ainda, ficam vazios)
-    '','','','',
-    '','','','',
-    '','','','',
-    '','','','',
-    '','','','',
-    // VT (não gerenciado individualmente, fica vazio)
-    '','','','','','',
-    '','','','','','',
-    // RG extra, nascimento
-    s(cand.rgExpedicao),               // rg_expedicao
-    s(cand.rgUf),                      // rg_uf
-    'BR',                              // pais_nascimento
-    s(cand.estadoNascimento),          // estado_nascimento
-    s(cand.cidadeNascimento),          // cidade_nascimento
-    '',                                // previsao_contrato_dias
-    ''                                 // taxa
-  ];
+  // 2) Validação estrutural (item 20)
+  const probl = [];
+  if (cabecalho.length !== 90) probl.push('Cabeçalho não possui 90 campos.');
+  if (valores.length !== 90) probl.push('Linha de dados não possui 90 campos.');
+  if (valores.some(v => /undefined|null|\[object Object\]/i.test(v))) probl.push('Há valor inválido (null/undefined) em um campo.');
+  if (valores.some(v => /[\r\n]/.test(v))) probl.push('Há quebra de linha dentro de um campo.');
+  if (probl.length) { alert('Não foi possível gerar o Exata:\n\n• ' + probl.join('\n• ')); return; }
 
-  const csvContent = cabecalho.join(';') + '\r\n' + valores.join(';');
+  const conteudo = cabecalho.join(';') + '\r\n' + valores.join(';');
 
-  // Nome do arquivo: NOME_CPF.txt
+  // 3) Nome do arquivo: EXATA_NOME_CPF.txt (item 18)
   const nomeArq = (cand.nome || 'CANDIDATO')
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .toUpperCase()
-    .replace(/[^A-Z0-9\s]/g, '')
-    .trim()
-    .replace(/\s+/g, '_');
+    .toUpperCase().replace(/[^A-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
   const cpfArq = (cand.cpf || '').replace(/[^0-9]/g, '');
-  const filename = `${nomeArq}_${cpfArq}.txt`;
+  const filename = `EXATA_${nomeArq}_${cpfArq}.txt`;
 
-  // BOM UTF-8 para abrir corretamente no Excel/Notepad
-  const blob = new Blob(['﻿' + csvContent], { type: 'text/plain;charset=utf-8' });
+  // BOM UTF-8 para acentuação correta na importação
+  const blob = new Blob(['﻿' + conteudo], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -4253,7 +4327,8 @@ function exportarExata(candidatoId) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 
-  registrarAcaoHistorico(cand, `Exportou ficha no formato Exata — ${filename}`);
+  registrarAcaoHistorico(cand, `Exportou TXT do Exata — ${filename}`);
+  registrarLogGlobal(`Exportou Exata (TXT) de "${cand.nome}".`, 'exportacao');
   saveState();
 }
 
