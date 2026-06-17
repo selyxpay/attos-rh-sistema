@@ -666,8 +666,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // para o cache/semente nunca sobrescrever dados mais recentes do servidor.
 let _cloudReady = false;
 
-// Ativa a sincronização na nuvem (Supabase).
-// Só roda se as 2 chaves estiverem configuradas em js/supabase-sync.js;
+// Ativa a sincronização na nuvem (Firebase).
+// Só roda se a config estiver preenchida em js/firebase-sync.js;
 // caso contrário, o sistema segue funcionando só com localStorage (como hoje).
 async function ativarNuvem() {
   if (!(window.RTCloud && RTCloud.configured)) return;
@@ -1152,7 +1152,7 @@ function renderDocumentos() {
 
   if (!(window.RTCloud && RTCloud.configured)) {
     if (resumo) resumo.innerHTML = '';
-    lista.innerHTML = '<div style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);color:#b45309;padding:16px 18px;border-radius:12px;font-size:13px;"><i class="fa-solid fa-circle-info"></i> A sincronização na nuvem ainda não foi configurada. Os documentos enviados pelos candidatos aparecerão aqui assim que o Supabase estiver ligado (cole as chaves em <strong>js/supabase-sync.js</strong>).</div>';
+    lista.innerHTML = '<div style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);color:#b45309;padding:16px 18px;border-radius:12px;font-size:13px;"><i class="fa-solid fa-circle-info"></i> A sincronização na nuvem ainda não foi configurada. Os documentos enviados pelos candidatos aparecerão aqui assim que o Firebase estiver ligado (cole a config em <strong>js/firebase-sync.js</strong>).</div>';
     return;
   }
 
