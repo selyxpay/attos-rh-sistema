@@ -63,10 +63,6 @@ http.createServer((req, res) => {
     return;
   }
 
-  // Se a rota for sob /vagas/ e o arquivo físico correspondente não existir, serve vemserrt.html
-  if (urlPath.startsWith('/vagas/') && !fs.existsSync(filePath)) {
-    filePath = path.resolve(BASE, './vemserrt.html');
-  }
 
   console.log('Request:', req.url, '->', filePath);
 

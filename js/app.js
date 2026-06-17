@@ -2668,7 +2668,7 @@ window.toggleVagaQuente = function(vagaId) {
 
 function irParaInscricaoSite(vagaId) {
   const base = window.location.origin + window.location.pathname.replace('index.html', '');
-  window.open(base + 'vemserrt.html' + (vagaId ? '?vaga=' + vagaId : ''), '_blank');
+  window.open(base + 'candidato.html' + (vagaId ? '?vaga=' + vagaId : ''), '_blank');
 }
 
 // ABA 3: BANCO DE TALENTOS (AGRUPADO POR EMPRESAS)
@@ -3213,39 +3213,7 @@ function renderSitePublico() {
     });
   }
 
-  // Lógica de Configuração do Portal (Admin somente)
-  const portalConfigContainer = document.getElementById('portal-configuracao-container');
-  if (!portalConfigContainer) return;
 
-  const podeEditar = loggedUser && (
-    loggedUser.login === 'joaobalaf' ||
-    loggedUser.departamento === 'administracao' ||
-    loggedUser.podeEditarPortalPublico === true
-  );
-
-  if (podeEditar) {
-    portalConfigContainer.style.display = 'block';
-    
-    // Wire submit and add FAQ listeners
-    const configForm = document.getElementById('form-config-portal');
-    if (configForm && !configForm.dataset.listenerAdded) {
-      configForm.dataset.listenerAdded = 'true';
-      configForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        window.salvarConfiguracaoPortal();
-      });
-    }
-
-    const btnAddFaq = document.getElementById('btn-adicionar-faq');
-    if (btnAddFaq && !btnAddFaq.dataset.listenerAdded) {
-      btnAddFaq.dataset.listenerAdded = 'true';
-      btnAddFaq.addEventListener('click', window.adicionarFaqConfig);
-    }
-
-    carregarConfiguracoesPortalForm();
-  } else {
-    portalConfigContainer.style.display = 'none';
-  }
 }
 
 // Renderiza a tabela de links personalizados por recrutador
@@ -5712,8 +5680,7 @@ window.abrirModalGerenciarFuncionario = function(funcId) {
   document.getElementById('gerenciar-func-cargo').value = func.cargo || '';
   document.getElementById('gerenciar-func-status').value = func.status || 'ativo';
   document.getElementById('gerenciar-func-representante').checked = func.representanteDepto || false;
-  const cbPortal = document.getElementById('gerenciar-func-pode-editar-portal');
-  if (cbPortal) cbPortal.checked = func.podeEditarPortalPublico || false;
+
 
   // Garantir permissões definidas
   if (!func.permissoes) func.permissoes = criarPermissoesZeradas();
@@ -5804,9 +5771,6 @@ function salvarPermissoesFuncionario() {
   const novoCargo = document.getElementById('gerenciar-func-cargo').value.trim();
   const novoStatus = document.getElementById('gerenciar-func-status').value;
   const novoRep = document.getElementById('gerenciar-func-representante').checked;
-  const cbPortal = document.getElementById('gerenciar-func-pode-editar-portal');
-  const novoPodeEditarPortal = cbPortal ? cbPortal.checked : false;
-
   if (!novoCargo) { alert('Informe o cargo do funcionário.'); return; }
 
   // Coleta permissões dos checkboxes
@@ -5833,7 +5797,6 @@ function salvarPermissoesFuncionario() {
   func.cargo = novoCargo;
   func.status = novoStatus;
   func.representanteDepto = novoRep;
-  func.podeEditarPortalPublico = novoPodeEditarPortal;
   func.permissoes = novasPerms;
 
   // Vínculo de recrutadora (Meu Painel) — define usuarioId no recrutador escolhido
@@ -8268,281 +8231,6 @@ window.mascaraCEPCliente = mascaraCEPCliente;
   }, true);
 })();
 
-// ==========================================================================
-// PORTAL PÚBLICO VEM SER RT — ADMIN FUNCTIONS
-// ==========================================================================
 
-const SECOES_LABELS = {
-  banner: "Carrossel de Banners",
-  busca: "Barra de Busca e Filtros",
-  vagasQuentes: "Vagas Quentes (Destaques)",
-  vagasAbertas: "Todas as Vagas Abertas",
-  comoFunciona: "Como Funciona (Linha do Tempo)",
-  diferenciais: "Diferenciais R&T",
-  numeros: "Indicadores e Números",
-  quemSomos: "Quem Somos (Institucional)",
-  areasAtuacao: "Áreas de Atuação",
-  perguntasFrequentes: "Perguntas Frequentes (FAQ)",
-  contato: "Informações de Contato"
-};
-
-function renderNumerosConfig() {
-  const container = document.getElementById('p-numeros-container');
-  if (!container) return;
-  const contadores = state.portalSettings.contadores || [];
-  container.innerHTML = contadores.map((c, i) => `
-    <div style="display:grid; grid-template-columns:1fr 2fr; gap:10px; align-items:center; padding:10px; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); border-radius:6px; margin-bottom: 8px;">
-      <div class="form-group" style="margin-bottom:0;">
-        <label style="font-size:11px; margin-bottom:4px;">Valor (ex: +300) *</label>
-        <input type="text" id="p-contador-${c.id}-numero" value="${c.numero}" class="form-control" style="height:34px; font-size:12px;">
-      </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label style="font-size:11px; margin-bottom:4px;">Legenda / Descrição *</label>
-        <input type="text" id="p-contador-${c.id}-texto" value="${c.texto}" class="form-control" style="height:34px; font-size:12px;">
-      </div>
-    </div>
-  `).join('');
-}
-
-function renderFaqConfigList() {
-  const container = document.getElementById('p-faq-container');
-  if (!container) return;
-  const faqs = state.portalSettings.perguntasFrequentes || [];
-  container.innerHTML = faqs.map((f, i) => `
-    <div style="background:rgba(255,255,255,0.02); padding:16px; border-radius:8px; border:1px solid var(--border-color); display:flex; flex-direction:column; gap:8px; margin-bottom: 12px;">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h4 style="margin:0; font-size:12px; color:var(--primary); font-weight:700;">Pergunta ${i + 1}</h4>
-        <button type="button" onclick="window.removerFaqConfig('${f.id}')" class="btn btn-secondary btn-sm" style="color:#ef4444; border-color:rgba(239,68,68,0.2); background:rgba(239,68,68,0.05); padding:3px 8px; font-size:11px; height:24px; display:inline-flex; align-items:center; gap:4px;">
-          <i class="fa-solid fa-trash-can"></i> Remover
-        </button>
-      </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label style="font-size:11px; margin-bottom:4px;">Pergunta *</label>
-        <input type="text" id="p-faq-${f.id}-pergunta" value="${f.pergunta}" required class="form-control" style="height:34px; font-size:12px;">
-      </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label style="font-size:11px; margin-bottom:4px;">Resposta *</label>
-        <textarea id="p-faq-${f.id}-resposta" required class="form-control" rows="2" style="font-size:12px; padding:6px 10px;">${f.resposta}</textarea>
-      </div>
-    </div>
-  `).join('');
-}
-
-function renderSecoesConfig() {
-  const container = document.getElementById('p-secoes-container');
-  if (!container) return;
-  
-  const visiveis = state.portalSettings.secoesVisiveis || {};
-  const ordem = state.portalSettings.secoesOrdem || Object.keys(SECOES_LABELS);
-  
-  container.innerHTML = ordem.map((key, idx) => {
-    const isVisible = visiveis[key] !== false;
-    const label = SECOES_LABELS[key] || key;
-    return `
-      <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); border-radius:8px; grid-column: span 2; margin-bottom: 6px;">
-        <div style="display:flex; align-items:center; gap:12px;">
-          <input type="checkbox" id="p-secao-${key}-visivel" ${isVisible ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
-          <span style="font-size:12px; font-weight:600; color:var(--text-primary);">${label}</span>
-        </div>
-        <div style="display:flex; gap:6px;">
-          <button type="button" onclick="window.moverSecaoConfig('${key}', -1)" ${idx === 0 ? 'disabled' : ''} class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px; height:24px;">
-            <i class="fa-solid fa-arrow-up"></i>
-          </button>
-          <button type="button" onclick="window.moverSecaoConfig('${key}', 1)" ${idx === ordem.length - 1 ? 'disabled' : ''} class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px; height:24px;">
-            <i class="fa-solid fa-arrow-down"></i>
-          </button>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-function carregarConfiguracoesPortalForm() {
-  const p = state.portalSettings;
-  if (!p) return;
-
-  // Banners
-  if (p.banners && p.banners[0]) {
-    const elTitulo = document.getElementById('p-banner-1-titulo');
-    const elSub = document.getElementById('p-banner-1-subtitulo');
-    const elBotao = document.getElementById('p-banner-1-botao');
-    if (elTitulo) elTitulo.value = p.banners[0].titulo || '';
-    if (elSub) elSub.value = p.banners[0].subtitulo || '';
-    if (elBotao) elBotao.value = p.banners[0].botaoTexto || '';
-  }
-  if (p.banners && p.banners[1]) {
-    const elTitulo = document.getElementById('p-banner-2-titulo');
-    const elSub = document.getElementById('p-banner-2-subtitulo');
-    const elBotao = document.getElementById('p-banner-2-botao');
-    if (elTitulo) elTitulo.value = p.banners[1].titulo || '';
-    if (elSub) elSub.value = p.banners[1].subtitulo || '';
-    if (elBotao) elBotao.value = p.banners[1].botaoTexto || '';
-  }
-  if (p.banners && p.banners[2]) {
-    const elTitulo = document.getElementById('p-banner-3-titulo');
-    const elSub = document.getElementById('p-banner-3-subtitulo');
-    const elBotao = document.getElementById('p-banner-3-botao');
-    if (elTitulo) elTitulo.value = p.banners[2].titulo || '';
-    if (elSub) elSub.value = p.banners[2].subtitulo || '';
-    if (elBotao) elBotao.value = p.banners[2].botaoTexto || '';
-  }
-
-  // Quem somos
-  if (p.quemSomos) {
-    const elTitulo = document.getElementById('p-somos-titulo');
-    const elTexto = document.getElementById('p-somos-texto');
-    const elFrase = document.getElementById('p-somos-frase');
-    if (elTitulo) elTitulo.value = p.quemSomos.titulo || '';
-    if (elTexto) elTexto.value = p.quemSomos.texto || '';
-    if (elFrase) elFrase.value = p.quemSomos.fraseFinal || '';
-  }
-
-  // Missao
-  if (p.missao) {
-    const elTitulo = document.getElementById('p-missao-titulo');
-    const elTexto = document.getElementById('p-missao-texto');
-    if (elTitulo) elTitulo.value = p.missao.titulo || '';
-    if (elTexto) elTexto.value = p.missao.texto || '';
-  }
-
-  // Compromisso
-  if (p.compromisso) {
-    const elTitulo = document.getElementById('p-comp-titulo');
-    const elTexto = document.getElementById('p-comp-texto');
-    const elFrase = document.getElementById('p-comp-frase');
-    if (elTitulo) elTitulo.value = p.compromisso.titulo || '';
-    if (elTexto) elTexto.value = p.compromisso.texto || '';
-    if (elFrase) elFrase.value = p.compromisso.frase || '';
-  }
-
-  // Contatos
-  if (p.contatos) {
-    const elWa = document.getElementById('p-contato-whatsapp');
-    const elTel = document.getElementById('p-contato-telefone');
-    const elEmail = document.getElementById('p-contato-email');
-    const elIg = document.getElementById('p-contato-instagram');
-    const elEnd = document.getElementById('p-contato-endereco');
-    const elHor = document.getElementById('p-contato-horarios');
-    if (elWa) elWa.value = p.contatos.whatsapp || '';
-    if (elTel) elTel.value = p.contatos.telefone || '';
-    if (elEmail) elEmail.value = p.contatos.email || '';
-    if (elIg) elIg.value = p.contatos.instagram || '';
-    if (elEnd) elEnd.value = p.contatos.endereco || '';
-    if (elHor) elHor.value = p.contatos.horarios || '';
-  }
-
-  renderNumerosConfig();
-  renderFaqConfigList();
-  renderSecoesConfig();
-}
-
-window.adicionarFaqConfig = function() {
-  if (!state.portalSettings.perguntasFrequentes) state.portalSettings.perguntasFrequentes = [];
-  const newFaq = {
-    id: 'faq-' + Date.now(),
-    pergunta: '',
-    resposta: ''
-  };
-  state.portalSettings.perguntasFrequentes.push(newFaq);
-  renderFaqConfigList();
-};
-
-window.removerFaqConfig = function(id) {
-  if (!state.portalSettings.perguntasFrequentes) return;
-  state.portalSettings.perguntasFrequentes = state.portalSettings.perguntasFrequentes.filter(f => f.id !== id);
-  renderFaqConfigList();
-};
-
-window.moverSecaoConfig = function(key, dir) {
-  const ordem = state.portalSettings.secoesOrdem || Object.keys(SECOES_LABELS);
-  const idx = ordem.indexOf(key);
-  if (idx === -1) return;
-  const targetIdx = idx + dir;
-  if (targetIdx < 0 || targetIdx >= ordem.length) return;
-  
-  // Swap
-  ordem[idx] = ordem[targetIdx];
-  ordem[targetIdx] = key;
-  state.portalSettings.secoesOrdem = ordem;
-  renderSecoesConfig();
-};
-
-window.salvarConfiguracaoPortal = function() {
-  if (!state.portalSettings) state.portalSettings = {};
-  
-  // Salvar banners
-  state.portalSettings.banners = [
-    {
-      id: "banner-1",
-      titulo: document.getElementById('p-banner-1-titulo').value.trim(),
-      subtitulo: document.getElementById('p-banner-1-subtitulo').value.trim(),
-      botaoTexto: document.getElementById('p-banner-1-botao').value.trim()
-    },
-    {
-      id: "banner-2",
-      titulo: document.getElementById('p-banner-2-titulo').value.trim(),
-      subtitulo: document.getElementById('p-banner-2-subtitulo').value.trim(),
-      botaoTexto: document.getElementById('p-banner-2-botao').value.trim()
-    },
-    {
-      id: "banner-3",
-      titulo: document.getElementById('p-banner-3-titulo').value.trim(),
-      subtitulo: document.getElementById('p-banner-3-subtitulo').value.trim(),
-      botaoTexto: document.getElementById('p-banner-3-botao').value.trim()
-    }
-  ];
-
-  // Salvar textos institucionais
-  state.portalSettings.quemSomos = {
-    titulo: document.getElementById('p-somos-titulo').value.trim(),
-    texto: document.getElementById('p-somos-texto').value.trim(),
-    fraseFinal: document.getElementById('p-somos-frase').value.trim()
-  };
-  state.portalSettings.missao = {
-    titulo: document.getElementById('p-missao-titulo').value.trim(),
-    texto: document.getElementById('p-missao-texto').value.trim()
-  };
-  state.portalSettings.compromisso = {
-    titulo: document.getElementById('p-comp-titulo').value.trim(),
-    texto: document.getElementById('p-comp-texto').value.trim(),
-    frase: document.getElementById('p-comp-frase').value.trim()
-  };
-
-  // Salvar contatos
-  state.portalSettings.contatos = {
-    whatsapp: document.getElementById('p-contato-whatsapp').value.replace(/\D/g, '').trim(),
-    telefone: document.getElementById('p-contato-telefone').value.trim(),
-    email: document.getElementById('p-contato-email').value.trim(),
-    instagram: document.getElementById('p-contato-instagram').value.replace('@', '').trim(),
-    endereco: document.getElementById('p-contato-endereco').value.trim(),
-    horarios: document.getElementById('p-contato-horarios').value.trim()
-  };
-
-  // Salvar contadores
-  (state.portalSettings.contadores || []).forEach(c => {
-    const numVal = document.getElementById(`p-contador-${c.id}-numero`)?.value.trim() || '';
-    const textVal = document.getElementById(`p-contador-${c.id}-texto`)?.value.trim() || '';
-    c.numero = numVal;
-    c.texto = textVal;
-  });
-
-  // Salvar FAQs
-  (state.portalSettings.perguntasFrequentes || []).forEach(f => {
-    const pergVal = document.getElementById(`p-faq-${f.id}-pergunta`)?.value.trim() || '';
-    const respVal = document.getElementById(`p-faq-${f.id}-resposta`)?.value.trim() || '';
-    f.pergunta = pergVal;
-    f.resposta = respVal;
-  });
-
-  // Salvar visibilidade das seções
-  if (!state.portalSettings.secoesVisiveis) state.portalSettings.secoesVisiveis = {};
-  Object.keys(SECOES_LABELS).forEach(key => {
-    const el = document.getElementById(`p-secao-${key}-visivel`);
-    if (el) state.portalSettings.secoesVisiveis[key] = el.checked;
-  });
-
-  saveState();
-  showToast('Configurações do Portal salvas com sucesso!', 'success');
-};
 
 
