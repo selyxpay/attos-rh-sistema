@@ -2620,13 +2620,13 @@ function popularSelectVinculo(selectedId) {
     `<option value="${t.id}" data-filial="${escapeHTML(t.filial)}">${escapeHTML(t.nome)} — vínculo ${escapeHTML(t.vinculo)}</option>`).join('');
   if (selectedId) sel.value = selectedId;
 }
-// Filial é automática pelo tipo de contratação selecionado
+// Filial é automática pelo tipo de contratação selecionado — mostra SÓ o código
 function aoMudarVinculoVaga() {
   const sel = document.getElementById('vaga-add-vinculo');
   const opt = (sel && sel.selectedIndex >= 0) ? sel.options[sel.selectedIndex] : null;
   const fil = (opt && opt.getAttribute('data-filial')) || '';
   const inp = document.getElementById('vaga-add-filial');
-  if (inp) inp.value = fil ? ('Filial ' + fil) : '';
+  if (inp) inp.value = fil; // só o número/código (ex.: 00, 01) — sem a palavra "Filial"
 }
 window.aoMudarVinculoVaga = aoMudarVinculoVaga;
 
