@@ -16,12 +16,13 @@
 // >>>>>>>>>>>>>>>>>>>>  COLE A CONFIG DO FIREBASE AQUI  <<<<<<<<<<<<<<<<<<<<<<
 // (Firebase Console -> engrenagem -> Configurações do projeto -> Seus apps -> Web)
 const firebaseConfig = {
-  apiKey: "COLE_AQUI",
-  authDomain: "COLE_AQUI.firebaseapp.com",
-  projectId: "COLE_AQUI",
-  storageBucket: "COLE_AQUI.appspot.com",
-  messagingSenderId: "COLE_AQUI",
-  appId: "COLE_AQUI"
+  apiKey: "AIzaSyBSCRyC2bi1b8JkfxolWWRBdXCab3O7478",
+  authDomain: "vagasrt.firebaseapp.com",
+  databaseURL: "https://vagasrt-default-rtdb.firebaseio.com",
+  projectId: "vagasrt",
+  storageBucket: "vagasrt.firebasestorage.app",
+  messagingSenderId: "365816313080",
+  appId: "1:365816313080:web:24ed3700c1384b6a0df70d"
 };
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
