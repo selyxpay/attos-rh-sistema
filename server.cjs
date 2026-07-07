@@ -34,18 +34,18 @@ const SECURITY_HEADERS = {
   // Não envia o URL de origem nas requisições externas (vazamento de info)
   'Referrer-Policy': 'no-referrer',
 
-  // Desativa funcionalidades do browser que não são usadas pelo sistema
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+  // Libera câmera e localização para o PRÓPRIO site (candidato tira foto por 'capture'); bloqueia o resto
+  'Permissions-Policy': 'camera=(self), microphone=(), geolocation=(self), payment=()',
 
   // Content Security Policy: define origens permitidas para cada tipo de recurso
-  // scripts e estilos permitidos: apenas CDNs conhecidos e o próprio servidor
+  // Inclui os domínios do Firebase (Storage/Firestore) para as fotos e dados funcionarem
   'Content-Security-Policy': [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.gstatic.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
     "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com",
-    "img-src 'self' data: blob: https://images.unsplash.com https://ui-avatars.com https://api.qrserver.com",
-    "connect-src 'self' https://viacep.com.br https://*.googleapis.com https://*.firebaseio.com https://*.appspot.com",
+    "img-src 'self' data: blob: https://images.unsplash.com https://ui-avatars.com https://api.qrserver.com https://firebasestorage.googleapis.com https://storage.googleapis.com https://*.firebasestorage.app",
+    "connect-src 'self' https://viacep.com.br https://*.googleapis.com https://*.firebaseio.com https://*.appspot.com https://*.firebasestorage.app",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'"

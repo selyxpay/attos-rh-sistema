@@ -1,0 +1,17 @@
+# Fora da imagem: nada disso vai pro site
+.git
+.gitignore
+.claude
+node_modules
+docs
+data
+*.md
+server.cjs
+package.json
+package-lock.json
+firebase.json
+.firebaserc
+*.bat
+_*
+.DS_Store
+Thumbs.db
