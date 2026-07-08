@@ -1,14 +1,18 @@
-# R&T VAGAS IA — site estático (HTML/JS + Firebase) servido pelo nginx.
-# Coolify detecta este Dockerfile e publica automaticamente como site estático.
-FROM nginx:alpine
+# R&T VAGAS IA — site + backend próprio (Node) rodando 100% na sua VPS.
+# Guarda os dados e as fotos no próprio servidor (sem Firebase).
+FROM node:20-alpine
+WORKDIR /app
 
-# Configuração do servidor (cabeçalhos de segurança + cache)
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Arquivos do site + servidor (o server.cjs usa só Node puro, sem instalar nada)
+COPY server.cjs ./
+COPY index.html candidato.html talento.html fila-display.html ./
+COPY css ./css
+COPY js  ./js
+COPY img ./img
 
-# Arquivos do site (apenas o que é servido no navegador)
-COPY index.html candidato.html talento.html fila-display.html /usr/share/nginx/html/
-COPY css /usr/share/nginx/html/css
-COPY js  /usr/share/nginx/html/js
-COPY img /usr/share/nginx/html/img
-
+# Porta do site e pasta de dados PERSISTENTES (no Coolify montamos um volume em /data)
+ENV PORT=80
+ENV DATA_DIR=/data
 EXPOSE 80
+
+CMD ["node", "server.cjs"]

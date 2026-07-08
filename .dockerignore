@@ -1,16 +1,17 @@
-# Fora da imagem: nada disso vai pro site
+# Fora da imagem: nada disso vai pro site (server.cjs AGORA entra — é o backend)
 .git
 .gitignore
 .claude
 node_modules
 docs
 data
+server-data
+.data
 *.md
-server.cjs
-package.json
-package-lock.json
+nginx.conf
 firebase.json
 .firebaserc
+firebase-setup.md
 *.bat
 _*
 .DS_Store

@@ -1,0 +1,5 @@
+# Dados de execução (ficam na VPS, não no GitHub)
+server-data/
+.data/
+node_modules/
+*.log

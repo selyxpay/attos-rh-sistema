@@ -1,0 +1,167 @@
+// ==========================================================================
+// R&T VAGAS IA — SINCRONIZAÇÃO NA PRÓPRIA VPS (sem Firebase)
+// ==========================================================================
+// Mesma interface (window.RTCloud) usada pelo resto do sistema — por isso
+// NENHUMA função do app precisa mudar. Esta camada conversa com o backend
+// próprio em /api/* (Node, no server.cjs), que guarda tudo NA SUA VPS:
+//  - Os registros ficam num arquivo JSON no servidor (volume persistente).
+//  - As fotos/documentos vão para /uploads e no banco fica só o LINK.
+//  - "Tempo real" é feito por verificação periódica (polling) a cada poucos seg.
+// ==========================================================================
+window.RTCloud = (function () {
+  'use strict';
+
+  const API = '/api';
+  const SAVE_DEBOUNCE_MS = 900;
+  const POLL_MS = 4000;
+
+  let onRemote = null;
+  let pending = null, pendingMerge = false, pendingUpsert = [];
+  let saveTimer = null, pollTimer = null;
+  let lastVersion = 0;
+  let flushing = false;
+
+  async function apiGet(path) {
+    const r = await fetch(API + path, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+    if (!r.ok) throw new Error('GET ' + path + ' -> ' + r.status);
+    return r.json();
+  }
+  async function apiPost(path, body) {
+    const r = await fetch(API + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) throw new Error('POST ' + path + ' -> ' + r.status);
+    return r.json();
+  }
+
+  // -- Inicializa: guarda callback e começa o polling (substitui o tempo real) --
+  async function init(opts) {
+    onRemote = (opts && opts.onRemoteUpdate) || null;
+    try { const s = await apiGet('/state'); lastVersion = s.version || 0; } catch (e) {}
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(verificarRemoto, POLL_MS);
+    return true;
+  }
+
+  async function verificarRemoto() {
+    if (flushing || pending) return; // não checa enquanto está salvando o nosso
+    try {
+      const s = await apiGet('/state');
+      if ((s.version || 0) !== lastVersion) {
+        lastVersion = s.version || 0;
+        if (onRemote && s.dados) onRemote(s.dados);
+      }
+    } catch (e) { /* silencioso: instabilidade de rede */ }
+  }
+
+  // -- Lê o estado do servidor -----------------------------------------------
+  async function loadState() {
+    const s = await apiGet('/state');
+    lastVersion = s.version || 0;
+    return s.dados || null;
+  }
+
+  // -- Salva (com debounce). merge=true p/ páginas públicas ------------------
+  function saveState(state, options) {
+    pending = state;
+    pendingMerge = !!(options && options.merge);
+    pendingUpsert = (options && options.upsertIds) ? options.upsertIds.slice() : [];
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flush, SAVE_DEBOUNCE_MS);
+  }
+
+  async function flush() {
+    if (!pending) return;
+    const state = pending;
+    const merge = pendingMerge;
+    const upsert = pendingUpsert;
+    pending = null; pendingUpsert = [];
+    clearTimeout(saveTimer);
+    flushing = true;
+    try {
+      await processarDocumentos(state);   // sobe base64 -> /uploads e troca por link
+      const res = await apiPost('/state', { dados: state, merge: merge, upsertIds: upsert });
+      if (res && res.version) lastVersion = res.version; // evita "eco" do nosso próprio save
+    } catch (e) {
+      console.error('[RT VPS] Falha ao salvar (tentaremos de novo):', e);
+      if (!pending) { pending = state; pendingMerge = merge; pendingUpsert = upsert; clearTimeout(saveTimer); saveTimer = setTimeout(flush, 3000); }
+    } finally {
+      flushing = false;
+    }
+  }
+
+  // -- Documentos: sobe cada base64 grande pro /uploads e troca pelo link -----
+  async function processarDocumentos(state) {
+    state._docsMeta = state._docsMeta || {};
+    await percorrer(state, state._docsMeta, null);
+  }
+  async function percorrer(obj, meta, contexto) {
+    if (obj == null || typeof obj !== 'object') return;
+    if (!Array.isArray(obj)) {
+      if (obj.id != null && (obj.nome || obj.nomeCompleto)) {
+        contexto = { id: obj.id, nome: obj.nome || obj.nomeCompleto };
+      }
+    }
+    if (Array.isArray(obj)) {
+      for (let i = 0; i < obj.length; i++) await percorrer(obj[i], meta, contexto);
+      return;
+    }
+    const chaves = Object.keys(obj);
+    for (let j = 0; j < chaves.length; j++) {
+      const k = chaves[j];
+      if (k === '_docsMeta') continue;
+      const v = obj[k];
+      if (typeof v === 'string' && v.indexOf('data:') === 0 && v.indexOf(';base64,') > 0 && v.length > 4000) {
+        const url = await subirBase64(v, k);
+        if (url) {
+          obj[k] = url;
+          meta[url] = { campo: k, pessoa: contexto ? contexto.nome : '—', pessoaId: contexto ? contexto.id : null, enviadoEm: Date.now() };
+        }
+      } else if (v && typeof v === 'object') {
+        await percorrer(v, meta, contexto);
+      }
+    }
+  }
+  async function subirBase64(dataUri, hint) {
+    try {
+      const res = await apiPost('/upload', { dataUrl: dataUri, hint: hint });
+      return (res && res.url) || null;
+    } catch (e) {
+      console.error('[RT VPS] Erro no upload de documento:', e);
+      return null; // mantém o base64 pra tentar de novo depois (nada se perde)
+    }
+  }
+
+  // -- Área de documentos: lista todos os arquivos guardados ------------------
+  function listarDocumentos(state) {
+    const meta = (state && state._docsMeta) || {};
+    return Object.keys(meta).map(function (url) {
+      const d = meta[url];
+      return { url: url, campo: d.campo, pessoa: d.pessoa || '—', pessoaId: d.pessoaId || null, enviadoEm: d.enviadoEm || null };
+    }).sort(function (a, b) { return (b.enviadoEm || 0) - (a.enviadoEm || 0); });
+  }
+
+  // -- Hora confiável do servidor (resiste a relógio do aparelho adulterado) --
+  async function horaServidor() {
+    try {
+      const r = await apiGet('/time');
+      const serverMs = r.epoch || Date.now();
+      return { epoch: serverMs, offset: serverMs - Date.now(), fonte: 'vps' };
+    } catch (e) {
+      return { epoch: Date.now(), offset: 0, fonte: 'local' };
+    }
+  }
+
+  return {
+    configured: true,
+    backend: 'vps',
+    init: init,
+    loadState: loadState,
+    saveState: saveState,
+    flush: flush,
+    listarDocumentos: listarDocumentos,
+    horaServidor: horaServidor
+  };
+})();
