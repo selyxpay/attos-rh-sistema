@@ -9,7 +9,7 @@ const INITIAL_DATA = {
       nome: 'Administrador RT',
       email: 'admin@rtempregos.com',
       login: 'admin',
-      senha: 'admin',
+      senha: '6101ed3e13dcdc5ea80901f4c5e1c9152d55b33b077b9f0b6ec30e72bf082e08', // gruport07072026 (SHA-256)
       departamento: 'administracao',
       cargo: 'Administrador Geral',
       status: 'ativo',

