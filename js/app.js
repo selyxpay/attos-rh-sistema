@@ -698,33 +698,56 @@ let _cloudReady = false;
 // caso contrário, o sistema segue funcionando só com localStorage (como hoje).
 async function ativarNuvem() {
   if (!(window.RTCloud && RTCloud.configured)) return;
+  // Confirma a sessão NO SERVIDOR. Sem sessão válida, não há acesso aos dados.
+  try {
+    const r = await fetch('/api/me', { credentials: 'same-origin', cache: 'no-store' });
+    if (!r.ok) {
+      // Não autenticado no servidor: garante que só a tela de login apareça.
+      try { localStorage.removeItem('rt_logged_user'); } catch (e) {}
+      loggedUser = null;
+      if (typeof verificarSessao === 'function') verificarSessao();
+      return; // NÃO carrega estado (o servidor só devolveria o público)
+    }
+    const me = await r.json();
+    if (me && me.user) {
+      if (typeof criarSessaoComExpiracao === 'function') criarSessaoComExpiracao(me.user);
+      else { try { localStorage.setItem('rt_logged_user', JSON.stringify(me.user)); } catch (e) {} }
+      loggedUser = me.user;
+    }
+  } catch (e) { /* sem rede: segue com o cache local */ }
+
   try {
     await RTCloud.init({
       onRemoteUpdate: (dados) => {
         if (!dados) return;
+        // Sessão perdida/expirada no servidor (veio só o subconjunto público) → volta pro login
+        if (loggedUser && !dados.funcionarios) {
+          try { localStorage.removeItem('rt_logged_user'); } catch (e) {}
+          location.reload();
+          return;
+        }
         state = dados;
         try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (e) {}
         renderCurrentAba();
       }
     });
     const nuvem = await RTCloud.loadState();
-    if (nuvem) {
-      // A NUVEM é a fonte principal: adota os dados da nuvem (o cache/semente
-      // local não sobrescreve dados mais recentes do servidor).
+    if (nuvem && nuvem.funcionarios) {
+      // Estado COMPLETO (autenticado): a nuvem é a fonte principal.
       state = nuvem;
       _cloudReady = true;
-      const _ajustouAdmin = garantirAdminMestre(); // aplica poder/senha mestre mesmo no que veio da nuvem
+      const _ajustouAdmin = garantirAdminMestre();
       try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (e) {}
-      if (_ajustouAdmin) RTCloud.saveState(state); // persiste a correção na VPS
+      if (_ajustouAdmin) RTCloud.saveState(state);
       renderCurrentAba();
     } else {
-      // Nuvem vazia (primeiro uso): inicializa a nuvem com o estado atual.
       _cloudReady = true;
-      RTCloud.saveState(state);
+      // Se o servidor está autenticado mas vazio (1º uso), semeia; se veio público, não sobrescreve.
+      if (!(nuvem && !nuvem.funcionarios)) RTCloud.saveState(state);
     }
   } catch (e) {
     console.error('[RT Nuvem] Não foi possível ativar a sincronização:', e);
-    _cloudReady = true; // fallback: permite que edições tentem sincronizar
+    _cloudReady = true;
   }
 }
 
@@ -2141,20 +2164,31 @@ function setupEventListeners() {
       if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = '0.6'; }
 
       try {
-        // Encontrar usuário pelo login (sem diferenciar maiúsculas/minúsculas)
-        const userFound = state.funcionarios.find(f => (f.login || '').toLowerCase() === userVal);
+        // Autenticação REAL no servidor (o navegador não decide mais a senha).
+        // Sem sessão válida, o servidor NEM entrega os dados.
+        let _loginResp = { status: 0, data: {} };
+        try {
+          const _r = await fetch('/api/login', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin', body: JSON.stringify({ login: userVal, senha: passVal })
+          });
+          _loginResp = { status: _r.status, data: await _r.json().catch(() => ({})) };
+        } catch (e) { _loginResp = { status: 0, data: {} }; }
 
-        // Verificar senha (com suporte a hash SHA-256 e texto puro legado)
-        let senhaCorreta = false;
-        if (userFound) {
-          if (typeof verificarSenha === 'function') {
-            senhaCorreta = await verificarSenha(passVal, userFound.senha);
-          } else {
-            senhaCorreta = userFound.senha === passVal;
-          }
+        const found = (_loginResp.status === 200 && _loginResp.data.ok) ? _loginResp.data.user : null;
+
+        // Autenticado: agora o cookie de sessão libera o estado COMPLETO. Carrega-o.
+        if (found) {
+          try {
+            const _nuvem = await RTCloud.loadState();
+            if (_nuvem) {
+              state = _nuvem;
+              if (typeof garantirAdminMestre === 'function' && garantirAdminMestre()) RTCloud.saveState(state);
+              try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (e) {}
+            }
+          } catch (e) {}
+          _cloudReady = true;
         }
-
-        const found = senhaCorreta ? userFound : null;
 
         if (found) {
           if (found.status === 'aguardando_aprovacao') {
@@ -2203,23 +2237,18 @@ function setupEventListeners() {
             switchAba(homeAba);
           }
         } else {
-          let res = { bloqueado: false };
-          if (typeof registrarTentativaFalha === 'function') res = registrarTentativaFalha(userVal);
-
-          if (res.permanente) {
-            const fb = state.funcionarios.find(f => f.login === userVal);
-            if (fb) {
-              fb.bloqueadoLogin = true;
-              fb.bloqueioInfo = { data: new Date().toLocaleString('pt-BR'), dispositivo: navigator.userAgent };
-              saveState();
-              registrarLogGlobal(`Acesso de "${fb.nome}" (${fb.login}) bloqueado por excesso de tentativas de login.`, 'seguranca');
-            }
-            mostrarErroLogin('Acesso bloqueado por excesso de tentativas. Procure um administrador.');
-          } else if (res.bloqueado) {
-            iniciarContadorBloqueio(userVal);
+          const motivo = _loginResp.data && _loginResp.data.motivo;
+          if (_loginResp.status === 403 && motivo === 'aprovacao') {
+            mostrarErroLogin('Seu cadastro ainda aguarda aprovação do administrador. Tente novamente em breve.');
+          } else if (_loginResp.status === 403) {
+            mostrarErroLogin('Esta conta está inativa ou bloqueada. Procure um administrador.');
+          } else if (_loginResp.status === 429 || motivo === 'bloqueado') {
+            mostrarErroLogin('Muitas tentativas de login. Aguarde cerca de 1 minuto e tente novamente.');
           } else {
-            const rest = (res.tentativasRestantes != null) ? res.tentativasRestantes : null;
-            mostrarErroLogin(rest != null ? `Usuário ou senha incorretos! (${rest} tentativa(s) restante(s))` : 'Usuário ou senha incorretos!');
+            let res = { bloqueado: false };
+            if (typeof registrarTentativaFalha === 'function') res = registrarTentativaFalha(userVal);
+            if (res.bloqueado && !res.permanente) { iniciarContadorBloqueio(userVal); }
+            else { const rest = (res.tentativasRestantes != null) ? res.tentativasRestantes : null; mostrarErroLogin(rest != null ? `Usuário ou senha incorretos! (${rest} tentativa(s) restante(s))` : 'Usuário ou senha incorretos!'); }
           }
         }
       } finally {
@@ -2231,9 +2260,11 @@ function setupEventListeners() {
   // Logout
   const btnLogout = document.getElementById('btn-logout');
   if (btnLogout) {
-    btnLogout.addEventListener('click', (e) => {
+    btnLogout.addEventListener('click', async (e) => {
       e.preventDefault();
+      try { await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' }); } catch (e2) {}
       localStorage.removeItem('rt_logged_user');
+      loggedUser = null;
       verificarSessao();
     });
   }

@@ -22,7 +22,7 @@ window.RTCloud = (function () {
   let flushing = false;
 
   async function apiGet(path) {
-    const r = await fetch(API + path, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+    const r = await fetch(API + path, { headers: { 'Accept': 'application/json' }, cache: 'no-store', credentials: 'same-origin' });
     if (!r.ok) throw new Error('GET ' + path + ' -> ' + r.status);
     return r.json();
   }
@@ -30,6 +30,7 @@ window.RTCloud = (function () {
     const r = await fetch(API + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify(body)
     });
     if (!r.ok) throw new Error('POST ' + path + ' -> ' + r.status);

@@ -8,6 +8,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const PORT = Number(process.env.PORT) || 3000;
 const BASE = path.resolve(__dirname);
@@ -151,10 +152,149 @@ function lerCorpo(req, cb) {
 }
 
 // ==========================================================================
+// AUTENTICAÇÃO NO SERVIDOR (a segurança de verdade)
+// ==========================================================================
+const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
+const SESSION_TTL = 8 * 60 * 60 * 1000; // 8 horas
+let sessions = {};
+try { sessions = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8')) || {}; } catch (e) { sessions = {}; }
+function salvarSessions() { try { fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions)); } catch (e) {} }
+function novaSessao(login) {
+  const token = crypto.randomBytes(32).toString('hex');
+  sessions[token] = { login: login, expira: Date.now() + SESSION_TTL };
+  salvarSessions();
+  return token;
+}
+function sessaoValida(token) {
+  const s = token && sessions[token];
+  if (!s) return null;
+  if (Date.now() > s.expira) { delete sessions[token]; salvarSessions(); return null; }
+  return s;
+}
+function parseCookies(req) {
+  const out = {}; const h = req.headers.cookie || '';
+  h.split(';').forEach(function (p) { const i = p.indexOf('='); if (i > 0) out[p.slice(0, i).trim()] = p.slice(i + 1).trim(); });
+  return out;
+}
+function tokenDaReq(req) { return parseCookies(req)['rt_session']; }
+function reqAutenticada(req) { return !!sessaoValida(tokenDaReq(req)); }
+
+// Senha: SHA-256 padrão (mesmo do cliente); aceita texto puro legado
+function hashSenhaServer(senha) { return crypto.createHash('sha256').update(String(senha), 'utf8').digest('hex'); }
+function senhaConfere(digitada, armazenada) {
+  if (!armazenada || String(armazenada).length !== 64) return String(digitada) === String(armazenada);
+  return hashSenhaServer(digitada) === String(armazenada);
+}
+
+// Anti-brute-force por login (memória): 5 falhas -> 60s de espera
+const tentativasLogin = {};
+function podeTentarLogin(login) { const t = tentativasLogin[login]; return !(t && t.ate && Date.now() < t.ate); }
+function registrarFalhaLogin(login) { const t = tentativasLogin[login] || { n: 0, ate: 0 }; t.n++; if (t.n % 5 === 0) t.ate = Date.now() + 60 * 1000; tentativasLogin[login] = t; }
+function limparFalhasLogin(login) { delete tentativasLogin[login]; }
+
+// Subconjunto PÚBLICO do estado (sem login): só o que as páginas públicas usam.
+// NUNCA expõe candidatos, banco de talentos, funcionários (senhas!), logs, etc.
+function subsetPublico(dados) {
+  const d = JSON.parse(JSON.stringify(dados || {}));
+  // Remove tudo que é sensível/interno
+  ['funcionarios', 'logs', 'logsGlobais', 'auditoria', 'config', 'controleAcesso',
+    'exataDominios', 'tiposContratacao', 'comissao', 'comissoes', 'relatorios', 'notificacoes']
+    .forEach(function (k) { delete d[k]; });
+  // Candidatos e banco de talentos: some com os dados (privacidade), mas mantém
+  // os arrays VAZIOS para as páginas públicas não quebrarem ao adicionar um novo.
+  d.candidatos = [];
+  d.bancoTalentos = [];
+  if (Array.isArray(d.vagas)) {
+    d.vagas = d.vagas.filter(function (v) { return !v.excluido; }).map(function (v) {
+      const c = Object.assign({}, v);
+      ['exataCampos', 'exataExtras', 'funcaoCodigo', 'cbo', 'vinculo', 'codigoTipoContrato',
+        'tipoContratacaoId', 'idEmpresaExata', 'exataJobFunctionId', 'diasVencimento', 'diasProrrogacao',
+        'finalidade', 'justificativa', 'taxa', 'categoriaCodigo', 'filial', 'branchCode',
+        'employmentLabel', 'exataEmploymentCode', 'employmentType', 'exataFuncaoArea', 'funcaoNome'
+      ].forEach(function (k) { delete c[k]; });
+      return c;
+    });
+  }
+  if (Array.isArray(d.recrutadores)) d.recrutadores = d.recrutadores.map(function (r) {
+    return { id: r.id, nome: r.nome, corHex: r.corHex, cor: r.cor, whatsapp: r.whatsapp };
+  });
+  return d;
+}
+// Sem login, só pode ADICIONAR nestes campos (candidatos/talentos/fila). Nada de funcionários/vagas.
+const CHAVES_ESCRITA_PUBLICA = ['candidatos', 'bancoTalentos', 'fila', '_docsMeta', 'proximaFilaNum'];
+
+// Garante que a conta MESTRE "admin" exista (senão, ninguém consegue logar num 1º uso).
+// Nunca sobrescreve um admin já existente (preserva a senha atual).
+function garantirAdminServidor() {
+  comTrava(function () {
+    const st = lerEstado();
+    const d = st.dados || {};
+    if (!Array.isArray(d.funcionarios)) d.funcionarios = [];
+    const existe = d.funcionarios.some(function (f) { return (f.login || '').toLowerCase() === 'admin'; });
+    if (!existe) {
+      d.funcionarios.push({
+        id: 'func-admin', nome: 'Administrador', login: 'admin',
+        senha: '6101ed3e13dcdc5ea80901f4c5e1c9152d55b33b077b9f0b6ec30e72bf082e08', // gruport07072026
+        departamento: 'administracao', status: 'ativo', permissoes: {}
+      });
+      gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+      console.log('[RT] Conta admin criada (primeiro uso).');
+    }
+  });
+}
+
+// ==========================================================================
 // SERVIDOR
 // ==========================================================================
 http.createServer(function (req, res) {
   const urlPath = decodeURIComponent(req.url.split('?')[0]);
+  const autenticado = reqAutenticada(req);
+
+  // ---- API: LOGIN (verificação REAL no servidor) ----
+  if (urlPath === '/api/login' && req.method === 'POST') {
+    lerCorpo(req, function (err, body) {
+      if (err) { responderJson(res, 400, { ok: false }); return; }
+      const login = String((body && body.login) || '').trim().toLowerCase();
+      const senha = String((body && body.senha) || '');
+      if (!login) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
+      if (!podeTentarLogin(login)) { responderJson(res, 429, { ok: false, motivo: 'bloqueado' }); return; }
+      const st = lerEstado();
+      const u = ((st.dados && st.dados.funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === login; });
+      if (!u || !senhaConfere(senha, u.senha)) { registrarFalhaLogin(login); responderJson(res, 401, { ok: false, motivo: 'credenciais' }); return; }
+      if (u.status === 'aguardando_aprovacao') { responderJson(res, 403, { ok: false, motivo: 'aprovacao' }); return; }
+      if (u.status && u.status !== 'ativo') { responderJson(res, 403, { ok: false, motivo: 'inativo' }); return; }
+      if (u.bloqueadoLogin) { responderJson(res, 403, { ok: false, motivo: 'bloqueado_admin' }); return; }
+      limparFalhasLogin(login);
+      const token = novaSessao(u.login);
+      const seguro = String(req.headers['x-forwarded-proto'] || '').indexOf('https') >= 0;
+      const cookie = 'rt_session=' + token + '; HttpOnly; Path=/; Max-Age=' + (SESSION_TTL / 1000) + '; SameSite=Lax' + (seguro ? '; Secure' : '');
+      const semSenha = Object.assign({}, u); delete semSenha.senha;
+      res.writeHead(200, Object.assign({ 'Content-Type': 'application/json; charset=utf-8', 'Set-Cookie': cookie }, SECURITY_HEADERS));
+      res.end(JSON.stringify({ ok: true, user: semSenha }));
+    });
+    return;
+  }
+
+  // ---- API: LOGOUT ----
+  if (urlPath === '/api/logout' && req.method === 'POST') {
+    const tok = tokenDaReq(req);
+    if (tok) { delete sessions[tok]; salvarSessions(); }
+    res.writeHead(200, Object.assign({ 'Content-Type': 'application/json', 'Set-Cookie': 'rt_session=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax' }, SECURITY_HEADERS));
+    res.end('{"ok":true}');
+    return;
+  }
+
+  // ---- API: quem sou eu (sessão atual) ----
+  if (urlPath === '/api/me' && req.method === 'GET') {
+    const s = sessaoValida(tokenDaReq(req));
+    if (!s) { responderJson(res, 401, { ok: false }); return; }
+    const st = lerEstado();
+    const u = ((st.dados && st.dados.funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === s.login; });
+    if (!u) { responderJson(res, 401, { ok: false }); return; }
+    const semSenha = Object.assign({}, u); delete semSenha.senha;
+    responderJson(res, 200, { ok: true, user: semSenha });
+    return;
+  }
 
   // ---- API: hora do servidor ----
   if (urlPath === '/api/time' && req.method === 'GET') {
@@ -162,22 +302,35 @@ http.createServer(function (req, res) {
     return;
   }
 
-  // ---- API: ler estado ----
+  // ---- API: ler estado (com login = tudo; sem login = só o público) ----
   if (urlPath === '/api/state' && req.method === 'GET') {
     const s = lerEstado();
-    responderJson(res, 200, { dados: s.dados, version: s.version, atualizadoEm: s.atualizadoEm });
+    if (autenticado) {
+      responderJson(res, 200, { dados: s.dados, version: s.version, atualizadoEm: s.atualizadoEm });
+    } else {
+      responderJson(res, 200, { dados: subsetPublico(s.dados), version: s.version, atualizadoEm: s.atualizadoEm, publico: true });
+    }
     return;
   }
 
-  // ---- API: salvar estado (merge para páginas públicas) ----
+  // ---- API: salvar estado ----
   if (urlPath === '/api/state' && req.method === 'POST') {
     lerCorpo(req, function (err, body) {
       if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
       comTrava(function () {
         const atual = lerEstado();
         let dados;
-        if (body && body.merge) dados = mesclarEstado(atual.dados || {}, body.dados || {}, body.upsertIds || []);
-        else dados = (body && body.dados) || {};
+        if (autenticado) {
+          // Staff logado: comportamento normal (merge ou substituição total)
+          if (body && body.merge) dados = mesclarEstado(atual.dados || {}, body.dados || {}, body.upsertIds || []);
+          else dados = (body && body.dados) || {};
+        } else {
+          // SEM login: só pode ADICIONAR candidatos/talentos/fila. Nunca toca em funcionários/vagas/etc.
+          const local = (body && body.dados) || {};
+          const filtrado = {};
+          CHAVES_ESCRITA_PUBLICA.forEach(function (k) { if (local[k] !== undefined) filtrado[k] = local[k]; });
+          dados = mesclarEstado(atual.dados || {}, filtrado, (body && body.upsertIds) || []);
+        }
         const novo = { dados: dados, version: (atual.version || 0) + 1, atualizadoEm: Date.now() };
         try { gravarEstado(novo); responderJson(res, 200, { ok: true, version: novo.version }); }
         catch (e) { console.error('Erro ao gravar estado:', e); responderJson(res, 500, { error: 'falha ao gravar' }); }
@@ -241,5 +394,6 @@ http.createServer(function (req, res) {
   });
 }).listen(PORT, '0.0.0.0', function () {
   console.log('Servidor R&T em: http://localhost:' + PORT);
-  console.log('Dados na VPS ativos (state.json + uploads). Sem Firebase.');
+  console.log('Dados na VPS ativos (state.json + uploads). Sem Firebase. Login exigido no servidor.');
+  try { garantirAdminServidor(); } catch (e) { console.error('garantirAdminServidor:', e); }
 });
