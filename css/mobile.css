@@ -50,6 +50,22 @@
   .charts-grid, .dashboard-charts-grid, .kanban-wrapper, .site-stats-container { grid-template-columns: 1fr !important; }
   .vagas-grid, .selecao-grid, .banco-grid { grid-template-columns: 1fr !important; }
 
+  /* ---------- DASHBOARD compacto no celular ---------- */
+  /* KPIs em 2 colunas pequenas (cabe tudo, sem ficar gigante) */
+  .kpi-row, .dashboard-kpis { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+  .kpi-card { padding: 12px 12px !important; gap: 10px; }
+  .kpi-number { font-size: 20px !important; }
+  .kpi-label { font-size: 10.5px !important; line-height: 1.2; }
+  .kpi-icon-wrapper { width: 34px !important; height: 34px !important; min-width: 34px; font-size: 14px !important; }
+  /* Banner de saudação empilha e encolhe */
+  .dashboard-greeting-banner { flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px 16px !important; }
+  .dashboard-greeting-banner .logo-img { max-width: 84px; height: auto; }
+  /* Gráficos nunca estouram a largura */
+  canvas { max-width: 100% !important; height: auto !important; }
+  .chart-card, .dashboard-chart-card { padding: 14px !important; }
+  /* Deixa os cards em geral um pouco mais compactos */
+  .card, .stat-card, .info-card { padding: 14px !important; }
+
   /* Títulos de página + botões empilhados */
   .page-title-section.title-with-btn { flex-direction: column; align-items: stretch; gap: 10px; }
   .page-title-section.title-with-btn > div:last-child { flex-direction: column; }
@@ -99,6 +115,9 @@
 @media (max-width: 380px) {
   .drawer-footer .drawer-footer-row { grid-template-columns: 1fr; }
   .header-app-name { display: none; } /* mantém só o logo no header */
+  /* Telas bem pequenas: KPIs em 1 coluna para não espremer */
+  .kpi-row, .dashboard-kpis { grid-template-columns: 1fr !important; }
+  .kpi-number { font-size: 22px !important; }
 }
 
 /* O botão hambúrguer (#sidebar-toggle) já existe; no desktop ele continua
