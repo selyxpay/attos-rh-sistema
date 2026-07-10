@@ -296,6 +296,37 @@ http.createServer(function (req, res) {
     return;
   }
 
+  // ---- API: auto-cadastro de funcionário (público, mas SEMPRE cria pendente e SEM permissões) ----
+  if (urlPath === '/api/register-staff' && req.method === 'POST') {
+    lerCorpo(req, function (err, body) {
+      if (err) { responderJson(res, 400, { ok: false }); return; }
+      const nome = String((body && body.nome) || '').trim();
+      const login = String((body && body.login) || '').trim().toLowerCase();
+      const senha = String((body && body.senha) || '');
+      const telefone = String((body && body.telefone) || '').trim();
+      const depto = String((body && body.departamento) || 'selecao').trim();
+      if (!nome || !login || senha.length < 6) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
+      comTrava(function () {
+        const st = lerEstado();
+        const d = st.dados || {};
+        if (!Array.isArray(d.funcionarios)) d.funcionarios = [];
+        if (d.funcionarios.some(function (f) { return (f.login || '').toLowerCase() === login; })) { responderJson(res, 409, { ok: false, motivo: 'login_existe' }); return; }
+        const pendentes = d.funcionarios.filter(function (f) { return f.status === 'aguardando_aprovacao'; }).length;
+        if (pendentes >= 30) { responderJson(res, 429, { ok: false, motivo: 'limite' }); return; }
+        d.funcionarios.push({
+          id: 'func-' + Date.now(), nome: nome, email: '', telefone: telefone, login: login,
+          senha: hashSenhaServer(senha),
+          departamento: depto, departamentoSolicitado: depto, cargo: 'Colaborador em Aprovação',
+          status: 'aguardando_aprovacao', dataSolicitacao: new Date().toLocaleString('pt-BR'),
+          representanteDepto: false, bloqueadoLogin: false, permissoes: {}
+        });
+        try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); responderJson(res, 200, { ok: true }); }
+        catch (e) { responderJson(res, 500, { ok: false }); }
+      });
+    });
+    return;
+  }
+
   // ---- API: hora do servidor ----
   if (urlPath === '/api/time' && req.method === 'GET') {
     responderJson(res, 200, { epoch: Date.now() });
@@ -372,6 +403,17 @@ http.createServer(function (req, res) {
 
   // ---- Site estático ----
   let rel = urlPath === '/' ? '/index.html' : urlPath;
+
+  // SEGURANÇA: o app (index.html + app.js + data.js) só vai para quem TEM sessão válida.
+  // Sem login, o visitante recebe SÓ a página de login — o "esqueleto" do app e as
+  // senhas-semente do data.js NEM chegam ao navegador (inspecionar/Ctrl+U não revela nada).
+  if (rel === '/index.html' && !autenticado) rel = '/login.html';
+  if ((rel === '/js/app.js' || rel === '/js/data.js') && !autenticado) {
+    res.writeHead(404, Object.assign({ 'Content-Type': 'text/plain' }, SECURITY_HEADERS));
+    res.end('404 Not Found');
+    return;
+  }
+
   let filePath = path.resolve(BASE, '.' + rel);
   if (!filePath.startsWith(BASE)) {
     res.writeHead(403, Object.assign({ 'Content-Type': 'text/plain' }, SECURITY_HEADERS));

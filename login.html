@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>R&amp;T Empregos — Acesso</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+          integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
+          crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/design-system.css">
+    <link rel="stylesheet" href="css/mobile.css">
+</head>
+<body>
+    <!-- LOGIN -->
+    <div id="login-screen" class="login-overlay-full" style="display: flex;">
+        <div class="login-glass-box">
+            <div class="login-logo-area"><img src="img/logo-rt.png" class="logo-img" alt="R&amp;T Empregos"></div>
+            <h2>Acesso Interno CRM</h2>
+            <p class="login-subtext">Faça login com suas credenciais de funcionário</p>
+            <form id="login-form">
+                <div class="form-group" style="width:100%;display:flex;flex-direction:column;text-align:left;margin-bottom:16px;">
+                    <label for="login-username" style="color:#cbd5e1;font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-user"></i> Usuário</label>
+                    <input type="text" id="login-username" required placeholder="Digite seu usuário..." class="form-control-login" autocomplete="username">
+                </div>
+                <div class="form-group" style="width:100%;display:flex;flex-direction:column;text-align:left;margin-bottom:8px;">
+                    <label for="login-password" style="color:#cbd5e1;font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-lock"></i> Senha</label>
+                    <input type="password" id="login-password" required placeholder="Digite sua senha..." class="form-control-login" autocomplete="current-password">
+                </div>
+                <div id="login-error-msg" class="login-error-alert" style="display:none;"><i class="fa-solid fa-circle-exclamation"></i> <span>Usuário ou senha incorretos!</span></div>
+                <button type="submit" class="btn-login-submit"><span>Entrar no Sistema</span> <i class="fa-solid fa-arrow-right"></i></button>
+            </form>
+            <p style="margin-top:16px;font-size:12px;color:#94a3b8;">É funcionário novo? <a href="#" id="link-ir-cadastro" style="color:var(--primary);text-decoration:none;font-weight:600;">Cadastre-se por aqui</a></p>
+        </div>
+    </div>
+
+    <!-- AUTO-CADASTRO DE FUNCIONÁRIO -->
+    <div id="staff-registration-screen" class="login-overlay-full" style="display:none;">
+        <div class="login-glass-box">
+            <div class="login-logo-area"><img src="img/logo-rt.png" class="logo-img" alt="R&amp;T Empregos"></div>
+            <h2>Cadastro de Colaborador</h2>
+            <p class="login-subtext">Preencha sua ficha para liberação do administrador</p>
+            <form id="staff-registration-form">
+                <div class="form-group" style="width:100%;display:flex;flex-direction:column;text-align:left;margin-bottom:14px;">
+                    <label for="reg-nome" style="color:#cbd5e1;font-size:13px;font-weight:500;"><i class="fa-solid fa-signature"></i> Nome Completo</label>
+                    <input type="text" id="reg-nome" required placeholder="Seu nome completo..." class="form-control-login">
+                </div>
+                <div class="form-group" style="width:100%;display:flex;flex-direction:column;text-align:left;margin-bottom:14px;">
+                    <label for="reg-username" style="color:#cbd5e1;font-size:13px;font-weight:500;"><i class="fa-solid fa-user-plus"></i> Nome de Usuário (Login)</label>
+                    <input type="text" id="reg-username" required placeholder="Crie seu usuário de login..." class="form-control-login">
+                </div>
+                <div class="form-group" style="width:100%;display:flex;flex-direction:column;text-align:left;margin-bottom:14px;">
+                    <label for="reg-telefone" style="color:#cbd5e1;font-size:13px;font-weight:500;"><i class="fa-solid fa-phone"></i> Telefone / WhatsApp</label>
+                    <input type="text" id="reg-telefone" placeholder="DDD + número..." class="form-control-login">
+                </div>
+                <div class="form-group" style="width:100%;display:flex;flex-direction:column;text-align:left;margin-bottom:14px;">
+                    <label for="reg-departamento" style="color:#cbd5e1;font-size:13px;font-weight:500;"><i class="fa-solid fa-building"></i> Departamento solicitado</label>
+                    <select id="reg-departamento" class="form-control-login">
+                        <option value="selecao">Seleção (Recrutamento)</option>
+                        <option value="dp">Departamento Pessoal (DP)</option>
+                        <option value="comissao">Comissão / Estatísticas</option>
+                        <option value="administracao">Administração</option>
+                    </select>
+                </div>
+                <div class="form-group" style="width:100%;display:flex;flex-direction:column;text-align:left;margin-bottom:8px;">
+                    <label for="reg-password" style="color:#cbd5e1;font-size:13px;font-weight:500;"><i class="fa-solid fa-lock"></i> Senha (mínimo 6 caracteres)</label>
+                    <input type="password" id="reg-password" required placeholder="Crie uma senha..." class="form-control-login" autocomplete="new-password">
+                </div>
+                <div id="reg-error-msg" class="login-error-alert" style="display:none;"><i class="fa-solid fa-circle-exclamation"></i> <span>Preencha os campos.</span></div>
+                <div id="reg-success-msg" class="login-error-alert" style="display:none;background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.4);color:#10b981;"><i class="fa-solid fa-circle-check"></i> <span>Cadastro enviado! Aguarde a aprovação do administrador.</span></div>
+                <button type="submit" class="btn-login-submit"><span>Solicitar Acesso</span> <i class="fa-solid fa-user-check"></i></button>
+            </form>
+            <p style="margin-top:16px;font-size:12px;color:#94a3b8;">Já tem uma conta? <a href="#" id="link-voltar-login" style="color:var(--primary);text-decoration:none;font-weight:600;">Voltar ao Login</a></p>
+        </div>
+    </div>
+
+    <script>
+      (function () {
+        var loginScreen = document.getElementById('login-screen');
+        var regScreen = document.getElementById('staff-registration-screen');
+        function mostrarCadastro() { loginScreen.style.display = 'none'; regScreen.style.display = 'flex'; }
+        function mostrarLogin() { regScreen.style.display = 'none'; loginScreen.style.display = 'flex'; }
+        if (new URLSearchParams(location.search).get('reg') === 'funcionarios') mostrarCadastro();
+        document.getElementById('link-ir-cadastro').addEventListener('click', function (e) { e.preventDefault(); mostrarCadastro(); });
+        document.getElementById('link-voltar-login').addEventListener('click', function (e) { e.preventDefault(); mostrarLogin(); });
+
+        // LOGIN
+        var form = document.getElementById('login-form');
+        form.addEventListener('submit', async function (e) {
+          e.preventDefault();
+          var login = document.getElementById('login-username').value.trim();
+          var senha = document.getElementById('login-password').value;
+          var err = document.getElementById('login-error-msg');
+          err.style.display = 'none';
+          var btn = form.querySelector('button[type=submit]'); btn.disabled = true;
+          try {
+            var r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ login: login, senha: senha }) });
+            var d = await r.json().catch(function () { return {}; });
+            if (r.status === 200 && d.ok) { window.location.href = '/'; return; }
+            var msg = 'Usuário ou senha incorretos!';
+            if (r.status === 403 && d.motivo === 'aprovacao') msg = 'Seu cadastro ainda aguarda aprovação do administrador.';
+            else if (r.status === 403) msg = 'Conta inativa ou bloqueada. Procure um administrador.';
+            else if (r.status === 429 || d.motivo === 'bloqueado') msg = 'Muitas tentativas. Aguarde cerca de 1 minuto.';
+            err.querySelector('span').textContent = msg; err.style.display = 'flex';
+          } catch (e2) { err.querySelector('span').textContent = 'Erro de conexão. Tente novamente.'; err.style.display = 'flex'; }
+          finally { btn.disabled = false; }
+        });
+
+        // CADASTRO
+        var regForm = document.getElementById('staff-registration-form');
+        regForm.addEventListener('submit', async function (e) {
+          e.preventDefault();
+          var nome = document.getElementById('reg-nome').value.trim();
+          var login = document.getElementById('reg-username').value.trim();
+          var senha = document.getElementById('reg-password').value;
+          var telefone = document.getElementById('reg-telefone').value.trim();
+          var departamento = document.getElementById('reg-departamento').value;
+          var err = document.getElementById('reg-error-msg'); var ok = document.getElementById('reg-success-msg');
+          err.style.display = 'none'; ok.style.display = 'none';
+          if (!nome || !login || !senha) { err.querySelector('span').textContent = 'Preencha nome, usuário e senha.'; err.style.display = 'flex'; return; }
+          if (senha.length < 6) { err.querySelector('span').textContent = 'A senha precisa ter ao menos 6 caracteres.'; err.style.display = 'flex'; return; }
+          var btn = regForm.querySelector('button[type=submit]'); btn.disabled = true;
+          try {
+            var r = await fetch('/api/register-staff', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ nome: nome, login: login, senha: senha, telefone: telefone, departamento: departamento }) });
+            var d = await r.json().catch(function () { return {}; });
+            if (r.status === 200 && d.ok) { ok.style.display = 'flex'; regForm.reset(); }
+            else {
+              var m = 'Não foi possível enviar. Verifique os dados.';
+              if (d.motivo === 'login_existe') m = 'Este nome de usuário já está em uso.';
+              else if (d.motivo === 'limite') m = 'Limite de cadastros pendentes atingido. Tente mais tarde.';
+              else if (d.motivo === 'dados') m = 'Preencha nome, usuário e senha (mín. 6).';
+              err.querySelector('span').textContent = m; err.style.display = 'flex';
+            }
+          } catch (e2) { err.querySelector('span').textContent = 'Erro de conexão. Tente novamente.'; err.style.display = 'flex'; }
+          finally { btn.disabled = false; }
+        });
+      })();
+    </script>
+</body>
+</html>

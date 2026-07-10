@@ -702,17 +702,19 @@ async function ativarNuvem() {
   try {
     const r = await fetch('/api/me', { credentials: 'same-origin', cache: 'no-store' });
     if (!r.ok) {
-      // Não autenticado no servidor: garante que só a tela de login apareça.
+      // Sem sessão válida: volta pra página de login (o servidor serve login.html).
       try { localStorage.removeItem('rt_logged_user'); } catch (e) {}
       loggedUser = null;
-      if (typeof verificarSessao === 'function') verificarSessao();
-      return; // NÃO carrega estado (o servidor só devolveria o público)
+      window.location.replace('/');
+      return;
     }
     const me = await r.json();
     if (me && me.user) {
       if (typeof criarSessaoComExpiracao === 'function') criarSessaoComExpiracao(me.user);
       else { try { localStorage.setItem('rt_logged_user', JSON.stringify(me.user)); } catch (e) {} }
       loggedUser = me.user;
+      // Confirma a exibição do app (esconde a tela de login interna, monta cabeçalho/menu)
+      if (typeof verificarSessao === 'function') verificarSessao();
     }
   } catch (e) { /* sem rede: segue com o cache local */ }
 
