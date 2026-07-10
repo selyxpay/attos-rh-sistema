@@ -254,10 +254,10 @@ function loadState() {
   if (!state.bancoTalentos) state.bancoTalentos = [];
 }
 
-function saveState() {
+function saveState(upsertIds) {
   localStorage.setItem(STATE_KEY, JSON.stringify(state));
   if (window.RTCloud && RTCloud.configured) {
-    RTCloud.saveState(state, { merge: true });
+    RTCloud.saveState(state, { merge: true, upsertIds: upsertIds || [] });
     RTCloud.flush();
   }
 }
@@ -369,8 +369,26 @@ document.getElementById('form-talento').addEventListener('submit', function(e) {
     visualizadoPorRecrutador: false,
   };
 
-  state.bancoTalentos.push(talento);
-  saveState();
+  // Dedup por telefone: se já existe alguém com este número, ATUALIZA e sobe como
+  // recém-cadastrado (não cria duplicado). Senão, adiciona novo.
+  const _soDig = v => String(v == null ? '' : v).replace(/\D/g, '');
+  const telDig = _soDig(talento.telefone);
+  const existente = telDig ? state.bancoTalentos.find(t => _soDig(t.telefone) === telDig) : null;
+  if (existente) {
+    Object.assign(existente, {
+      nome: talento.nome, cpf: talento.cpf, sexo: talento.sexo, cep: talento.cep,
+      rua: talento.rua, numero: talento.numero, bairro: talento.bairro,
+      cidade: talento.cidade, estado: talento.estado,
+      dataCadastro: talento.dataCadastro, dataCadastroISO: talento.dataCadastroISO,
+      recrutadorId: talento.recrutadorId || existente.recrutadorId,
+      origemLink: talento.origemLink,
+      visualizadoPorRecrutador: false
+    });
+    saveState([existente.id]); // upsert do existente para propagar a atualização
+  } else {
+    state.bancoTalentos.push(talento);
+    saveState();
+  }
 
   // Parabéns screen + WhatsApp dinâmico
   const rec = recrutadorLinkId && state ? (state.recrutadores || []).find(r => r.id === recrutadorLinkId) : null;

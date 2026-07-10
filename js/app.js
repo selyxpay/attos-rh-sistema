@@ -7408,7 +7408,10 @@ function setupImportarBT() {
           return '';
         };
 
-        let inseridos = 0;
+        if (!state.bancoTalentos) state.bancoTalentos = [];
+        const _soDig = v => String(v == null ? '' : v).replace(/\D/g, '');
+        const telsExistentes = new Set(state.bancoTalentos.map(t => _soDig(t.telefone)).filter(Boolean));
+        let inseridos = 0, duplicados = 0;
         const erros = [];
 
         rows.forEach((row, i) => {
@@ -7436,10 +7439,16 @@ function setupImportarBT() {
             origemLink:   'importacao_lote',
           };
 
-          if (!state.bancoTalentos) state.bancoTalentos = [];
+          // Dedup por telefone: se o número já está no banco, ignora (não duplica)
+          const telDig = _soDig(talento.telefone);
+          if (telDig && telsExistentes.has(telDig)) { duplicados++; return; }
+
           state.bancoTalentos.push(talento);
+          if (telDig) telsExistentes.add(telDig);
           inseridos++;
         });
+
+        if (duplicados) erros.push('ℹ️ ' + duplicados + ' contato(s) ignorado(s): telefone já estava no banco (evita duplicado).');
 
         saveState();
         setupBTFilters();
