@@ -2115,13 +2115,14 @@ function setupEventListeners() {
   if (loginForm) {
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const userVal = document.getElementById('login-username').value.trim();
+      // Usuário sem diferenciar maiúsculas/minúsculas (o cadastro salva em minúsculas)
+      const userVal = document.getElementById('login-username').value.trim().toLowerCase();
       const passVal = document.getElementById('login-password').value.trim();
       const loginError = document.getElementById('login-error-msg');
       const submitBtn = loginForm.querySelector('button[type="submit"]');
 
       // Bloqueio administrativo permanente (registrado no funcionário)
-      const fAlvo = state.funcionarios.find(f => f.login === userVal);
+      const fAlvo = state.funcionarios.find(f => (f.login || '').toLowerCase() === userVal);
       if (fAlvo && fAlvo.bloqueadoLogin) {
         mostrarErroLogin('Acesso bloqueado por excesso de tentativas. Procure um administrador.');
         return;
@@ -2140,8 +2141,8 @@ function setupEventListeners() {
       if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = '0.6'; }
 
       try {
-        // Encontrar usuário pelo login (comparação case-sensitive)
-        const userFound = state.funcionarios.find(f => f.login === userVal);
+        // Encontrar usuário pelo login (sem diferenciar maiúsculas/minúsculas)
+        const userFound = state.funcionarios.find(f => (f.login || '').toLowerCase() === userVal);
 
         // Verificar senha (com suporte a hash SHA-256 e texto puro legado)
         let senhaCorreta = false;
