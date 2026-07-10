@@ -6330,6 +6330,7 @@ window.abrirModalGerenciarFuncionario = function(funcId) {
   if (vincSel) {
     const atual = (state.recrutadores || []).find(r => r.usuarioId === func.id || (r.loginVinculado && r.loginVinculado === func.login));
     vincSel.innerHTML = '<option value="">— Sem vínculo —</option>' +
+      `<option value="__novo__">➕ Criar painel próprio para "${escapeHTML(func.nome)}"</option>` +
       (state.recrutadores || []).map(r => {
         const ocupadoPorOutro = !!(r.usuarioId && r.usuarioId !== func.id);
         const sel = atual && atual.id === r.id ? 'selected' : '';
@@ -6446,7 +6447,21 @@ function salvarPermissoesFuncionario() {
       if (r.usuarioId === func.id) { r.usuarioId = null; if (r.loginVinculado === func.login) r.loginVinculado = ''; }
     });
     const novoRecId = vincSel.value;
-    if (novoRecId) {
+    if (novoRecId === '__novo__') {
+      // Cria um PAINEL PRÓPRIO com o nome do funcionário e vincula a ele
+      if (!state.recrutadores) state.recrutadores = [];
+      const cores = ['#a855f7', '#22c55e', '#3b82f6', '#f97316', '#ef4444', '#0ea5e9', '#f59e0b', '#8b5cf6', '#10b981', '#ec4899'];
+      state.recrutadores.push({
+        id: 'rec-' + Date.now(),
+        nome: func.nome,
+        cor: 'custom',
+        corHex: cores[state.recrutadores.length % cores.length],
+        whatsapp: func.telefone || '',
+        usuarioId: func.id,
+        loginVinculado: func.login
+      });
+      registrarLogGlobal(`Criou o painel próprio (Meu Painel) de "${func.nome}".`, 'funcionarios');
+    } else if (novoRecId) {
       const rec = (state.recrutadores || []).find(r => r.id === novoRecId);
       if (rec) { rec.usuarioId = func.id; rec.loginVinculado = func.login; }
     }
