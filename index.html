@@ -889,6 +889,7 @@
                                             <option value="dp">Departamento Pessoal (DP)</option>
                                             <option value="comissao">Comissão (Estatísticas)</option>
                                             <option value="administracao">Administração / Gestão</option>
+                                            <option value="clinica">Clínica (Exame Médico)</option>
                                         </select>
                                     </div>
                                     <div class="form-group">
@@ -1294,6 +1295,14 @@
                                         <option value="3">3º Turno</option>
                                         <option value="revezamento">Revezamento</option>
                                     </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Data de Início do Funcionário</label>
+                                    <input type="date" id="exame-form-data-inicio" class="form-control">
+                                </div>
+                                <div class="form-group exame-form-full">
+                                    <label>Observação para a Clínica</label>
+                                    <textarea id="exame-form-obs-selecao" class="form-control" rows="3" style="resize:vertical;" placeholder="Anotações que a clínica deve ver (ex: função, restrições, urgência do exame...)"></textarea>
                                 </div>
                                 <div class="form-group exame-form-full">
                                     <label>Responsável (Seleção)</label>
@@ -2481,6 +2490,7 @@
                                 <option value="dp">Departamento Pessoal (DP)</option>
                                 <option value="comissao">Comissão (Estatísticas)</option>
                                 <option value="administracao">Administração / Gestão</option>
+                                <option value="clinica">Clínica (Exame Médico)</option>
                             </select>
                         </div>
                         <div class="form-group">

@@ -5135,7 +5135,8 @@ function renderFuncionarios() {
     'administracao': 'Gestão Executiva',
     'selecao': 'Recrutamento & Seleção',
     'dp': 'Departamento Pessoal',
-    'comissao': 'Comissões & Estatísticas'
+    'comissao': 'Comissões & Estatísticas',
+    'clinica': 'Clínica Médica'
   };
 
   // Exibe apenas funcionários ativos/inativos na lista principal (não os pendentes)
@@ -6620,7 +6621,7 @@ function salvarPermissoesFuncionario() {
 }
 
 function deptoLabelSimples(d) {
-  return ({ administracao: 'Administração', selecao: 'Seleção', dp: 'Departamento Pessoal', comissao: 'Comissão' })[d] || d || '—';
+  return ({ administracao: 'Administração', selecao: 'Seleção', dp: 'Departamento Pessoal', comissao: 'Comissão', clinica: 'Clínica Médica' })[d] || d || '—';
 }
 
 // ==========================================================================
@@ -7015,7 +7016,8 @@ window.abrirModalMeuPerfil = function() {
     'administracao': 'Gestão Executiva',
     'selecao': 'Recrutamento & Seleção',
     'dp': 'Departamento Pessoal',
-    'comissao': 'Comissões & Estatísticas'
+    'comissao': 'Comissões & Estatísticas',
+    'clinica': 'Clínica Médica'
   };
   if (g('perfil-depto')) g('perfil-depto').textContent = deptoLabels[loggedUser.departamento] || loggedUser.departamento;
   if (g('perfil-cargo')) g('perfil-cargo').textContent = loggedUser.cargo || 'Colaborador';
@@ -9294,7 +9296,8 @@ function abrirModalNovoExame() {
 
   // Limpar campos
   ['exame-form-nome','exame-form-cpf','exame-form-nasc','exame-form-rg',
-   'exame-form-tel','exame-form-pai','exame-form-mae','exame-form-turno'].forEach(id => {
+   'exame-form-tel','exame-form-pai','exame-form-mae','exame-form-turno',
+   'exame-form-data-inicio','exame-form-obs-selecao'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -9335,6 +9338,8 @@ function salvarNovoExame() {
     telefone: tel,
     empresa: emp,
     turno,
+    dataInicio: document.getElementById('exame-form-data-inicio')?.value || '',
+    observacaoSelecao: document.getElementById('exame-form-obs-selecao')?.value.trim() || '',
     responsavelSelecao: loggedUser ? loggedUser.nome : 'Sistema',
     responsavelLogin: loggedUser ? loggedUser.login : '',
     status: 'aguardando',
@@ -9402,6 +9407,18 @@ function abrirModalDetalheExame(exameId) {
       }
     }
 
+    // Observação escrita pela Seleção para a Clínica ler (sempre visível se houver)
+    let obsSelecaoHtml = '';
+    if (ex.observacaoSelecao) {
+      obsSelecaoHtml = `
+        <div style="margin-top:16px;background:rgba(37, 99, 235, 0.05);border:1px solid rgba(37, 99, 235, 0.2);padding:14px;border-radius:10px;">
+          <h5 style="margin:0 0 6px;font-size:12px;font-weight:700;color:#2563EB;display:flex;align-items:center;gap:6px;">
+            <i class="fa-solid fa-clipboard-list"></i> Observação da Seleção (para a Clínica)
+          </h5>
+          <p style="margin:0;font-size:13px;color:#1E293B;white-space:pre-wrap;font-weight:500;">${escapeHTML(ex.observacaoSelecao)}</p>
+        </div>`;
+    }
+
     // Área de observações
     let obsHtml = '';
     if (podeEnviarLaudo && ex.status === 'aguardando') {
@@ -9446,12 +9463,14 @@ function abrirModalDetalheExame(exameId) {
             </div>
             <div class="exame-campo"><span class="exame-campo-label">Empresa</span><span class="exame-campo-valor">${ex.empresa || '—'}</span></div>
             <div class="exame-campo"><span class="exame-campo-label">Turno</span><span class="exame-campo-valor">${_formatarTurno(ex.turno)}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Data de Início</span><span class="exame-campo-valor">${ex.dataInicio ? _formatarDataBR(ex.dataInicio) : '—'}</span></div>
             <div class="exame-campo"><span class="exame-campo-label">Responsável (Seleção)</span><span class="exame-campo-valor">${ex.responsavelSelecao || '—'}</span></div>
             <div class="exame-campo"><span class="exame-campo-label">Solicitado em</span><span class="exame-campo-valor">${_formatarDataHoraBR(ex.dataCadastro)}</span></div>
             <div class="exame-campo"><span class="exame-campo-label">Resultado enviado em</span><span class="exame-campo-valor">${ex.dataConclusao ? _formatarDataHoraBR(ex.dataConclusao) : 'Aguardando'}</span></div>
           </div>
         </div>
       </div>
+      ${obsSelecaoHtml}
       <div class="exame-detalhe-laudo">
         <h4><i class="fa-solid fa-file-medical"></i> Laudo do Exame</h4>
         ${pdfHtml}
