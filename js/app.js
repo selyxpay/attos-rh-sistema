@@ -9153,6 +9153,25 @@ function _formatarDataBR(d) {
   return `${dd}/${m}/${y}`;
 }
 
+// Sub-aba ativa do Exame Médico: pendentes | concluidos | todos | relatorio
+let _exameSubAba = 'pendentes';
+
+function trocarSubAbaExame(sub) {
+  _exameSubAba = sub;
+  document.querySelectorAll('#exame-subtabs .exame-subtab').forEach(b => {
+    b.classList.toggle('active', b.dataset.subaba === sub);
+  });
+  const ehRelatorio = (sub === 'relatorio');
+  const vLista = document.getElementById('exame-view-lista');
+  const vRel   = document.getElementById('exame-view-relatorio');
+  if (vLista) vLista.style.display = ehRelatorio ? 'none' : '';
+  if (vRel)   vRel.style.display   = ehRelatorio ? '' : 'none';
+
+  if (ehRelatorio) gerarRelatorioExame();
+  else _renderExameLista();
+}
+window.trocarSubAbaExame = trocarSubAbaExame;
+
 // Render principal da aba Exame Médico
 function renderExameMedico() {
   garantirExamesMedicos();
@@ -9180,16 +9199,17 @@ function renderExameMedico() {
     }
   }
 
-  // Popular filtro de empresas
-  const selEmpresa = document.getElementById('exame-filtro-empresa');
-  if (selEmpresa && state.empresas) {
-    const empresasUsadas = [...new Set((state.examesMedicos || []).map(e => e.empresa).filter(Boolean))];
-    selEmpresa.innerHTML = '<option value="">Todas as empresas</option>' +
-      empresasUsadas.map(emp => `<option value="${emp}">${emp}</option>`).join('');
-  }
+  // Popular filtros de empresa (lista e relatório) com as empresas realmente usadas
+  const empresasUsadas = [...new Set((state.examesMedicos || []).map(e => e.empresa).filter(Boolean))];
+  const opcoesEmpresa = '<option value="">Todas as empresas</option>' +
+    empresasUsadas.map(emp => `<option value="${escapeHTML(emp)}">${escapeHTML(emp)}</option>`).join('');
+  ['exame-filtro-empresa', 'exame-rel-empresa'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (sel) { const atual = sel.value; sel.innerHTML = opcoesEmpresa; sel.value = atual; }
+  });
 
-  // Listeners de filtro (garante 1 vez só)
-  ['exame-busca', 'exame-filtro-status', 'exame-filtro-empresa'].forEach(id => {
+  // Listeners da lista (garante 1 vez só)
+  ['exame-busca', 'exame-filtro-empresa'].forEach(id => {
     const el = document.getElementById(id);
     if (el && !el.dataset.listenerOk) {
       el.addEventListener('input', _renderExameLista);
@@ -9198,11 +9218,20 @@ function renderExameMedico() {
     }
   });
 
-  // Atualizar KPIs
+  // Listeners do relatório: mudar qualquer filtro já regera o resultado
+  ['exame-rel-de', 'exame-rel-ate', 'exame-rel-base', 'exame-rel-status', 'exame-rel-empresa'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.dataset.listenerOk) {
+      el.addEventListener('change', gerarRelatorioExame);
+      el.dataset.listenerOk = '1';
+    }
+  });
+
+  // Atualizar KPIs e contadores das sub-abas
   _renderExameKPIs();
 
-  // Renderizar lista
-  _renderExameLista();
+  // Renderizar a sub-aba ativa
+  trocarSubAbaExame(_exameSubAba);
 }
 
 // Atualiza os KPIs
@@ -9216,7 +9245,159 @@ function _renderExameKPIs() {
   setEl('kpi-exame-total', todos.length);
   setEl('kpi-exame-aguardando', aguardando);
   setEl('kpi-exame-concluido', concluido);
+  // Contadores das sub-abas
+  setEl('exame-count-pendentes', aguardando);
+  setEl('exame-count-concluidos', concluido);
+  setEl('exame-count-todos', todos.length);
 }
+
+// ── RELATÓRIO DE EXAMES POR PERÍODO ────────────────────────────────────────
+
+// Aplica os filtros do relatório (período, data-base, status, empresa).
+// A data-base define QUAL data conta para o período: a da solicitação
+// (dataCadastro) ou a do resultado (dataConclusao).
+function _exameRelatorioLista() {
+  garantirExamesMedicos();
+  const de   = document.getElementById('exame-rel-de')?.value || '';
+  const ate  = document.getElementById('exame-rel-ate')?.value || '';
+  const base = document.getElementById('exame-rel-base')?.value || 'dataCadastro';
+  const st   = document.getElementById('exame-rel-status')?.value || '';
+  const emp  = document.getElementById('exame-rel-empresa')?.value || '';
+
+  const ini = de  ? new Date(de  + 'T00:00:00') : null;  // dia inteiro
+  const fim = ate ? new Date(ate + 'T23:59:59') : null;
+
+  return (state.examesMedicos || []).filter(ex => {
+    if (st && ex.status !== st) return false;
+    if (emp && ex.empresa !== emp) return false;
+    if (ini || fim) {
+      const ref = ex[base];
+      if (!ref) return false; // sem a data de referência → fora do período
+      const d = new Date(ref);
+      if (isNaN(d)) return false;
+      if (ini && d < ini) return false;
+      if (fim && d > fim) return false;
+    }
+    return true;
+  }).sort((a, b) => new Date(b.dataCadastro || 0) - new Date(a.dataCadastro || 0));
+}
+
+function gerarRelatorioExame() {
+  const lista = _exameRelatorioLista();
+  const concluidos = lista.filter(e => e.status === 'concluido').length;
+  const pendentes  = lista.filter(e => e.status === 'aguardando').length;
+
+  const resumo = document.getElementById('exame-rel-resumo');
+  if (resumo) {
+    resumo.innerHTML = `
+      <div class="exame-kpi-row" style="margin-top:16px;">
+        <div class="exame-kpi-card exame-kpi-total">
+          <div class="exame-kpi-icon"><i class="fa-solid fa-list-check"></i></div>
+          <div class="exame-kpi-info">
+            <span class="exame-kpi-num">${lista.length}</span>
+            <span class="exame-kpi-label">No período</span>
+          </div>
+        </div>
+        <div class="exame-kpi-card exame-kpi-concluido">
+          <div class="exame-kpi-icon"><i class="fa-solid fa-circle-check"></i></div>
+          <div class="exame-kpi-info">
+            <span class="exame-kpi-num">${concluidos}</span>
+            <span class="exame-kpi-label">Concluídos</span>
+          </div>
+        </div>
+        <div class="exame-kpi-card exame-kpi-aguardando">
+          <div class="exame-kpi-icon"><i class="fa-solid fa-clock"></i></div>
+          <div class="exame-kpi-info">
+            <span class="exame-kpi-num">${pendentes}</span>
+            <span class="exame-kpi-label">Não concluídos</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  const cont = document.getElementById('exame-rel-lista');
+  if (!cont) return;
+
+  if (!lista.length) {
+    cont.innerHTML = `
+      <div class="exame-empty-state">
+        <i class="fa-solid fa-chart-simple"></i>
+        <p>Nenhum exame encontrado nesse período. Ajuste as datas ou os filtros.</p>
+      </div>`;
+    return;
+  }
+
+  cont.innerHTML = `
+    <div class="table-scroll-container" style="margin-top:16px;">
+      <table class="excel-table">
+        <thead>
+          <tr>
+            <th>Candidato</th><th>CPF</th><th>Telefone</th><th>Empresa</th><th>Turno</th>
+            <th>Início</th><th>Responsável</th><th>Solicitado em</th><th>Resultado em</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${lista.map(ex => `
+            <tr>
+              <td style="font-weight:600;">${escapeHTML(ex.nomeCompleto || '—')}</td>
+              <td>${escapeHTML(ex.cpf || '—')}</td>
+              <td>${escapeHTML(ex.telefone || '—')}</td>
+              <td>${escapeHTML(ex.empresa || '—')}</td>
+              <td>${escapeHTML(_formatarTurno(ex.turno))}</td>
+              <td>${ex.dataInicio ? escapeHTML(_formatarDataBR(ex.dataInicio)) : '—'}</td>
+              <td>${escapeHTML(ex.responsavelSelecao || '—')}</td>
+              <td>${escapeHTML(_formatarDataHoraBR(ex.dataCadastro))}</td>
+              <td>${ex.dataConclusao ? escapeHTML(_formatarDataHoraBR(ex.dataConclusao)) : '—'}</td>
+              <td>${ex.status === 'concluido'
+                    ? '<span class="badge badge-green">Concluído</span>'
+                    : '<span class="badge badge-red">Não concluído</span>'}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+window.gerarRelatorioExame = gerarRelatorioExame;
+
+// Baixa em Excel (.xlsx) todos os exames do período filtrado — um candidato por linha.
+function exportarRelatorioExameExcel() {
+  if (typeof XLSX === 'undefined') {
+    alert('O componente de Excel não carregou. Atualize a página (Ctrl+Shift+R) e tente de novo.');
+    return;
+  }
+  const lista = _exameRelatorioLista();
+  if (!lista.length) { alert('Nenhum exame no período selecionado para exportar.'); return; }
+
+  const linhas = lista.map(ex => ({
+    'Candidato': ex.nomeCompleto || '',
+    'CPF': ex.cpf || '',
+    'RG': ex.rg || '',
+    'Data de Nascimento': ex.dataNascimento ? _formatarDataBR(ex.dataNascimento) : '',
+    'Telefone': ex.telefone || '',
+    'Nome do Pai': ex.nomePai || '',
+    'Nome da Mãe': ex.nomeMae || '',
+    'Empresa': ex.empresa || '',
+    'Turno': _formatarTurno(ex.turno),
+    'Data de Início': ex.dataInicio ? _formatarDataBR(ex.dataInicio) : '',
+    'Responsável (Seleção)': ex.responsavelSelecao || '',
+    'Observação para a Clínica': ex.observacaoSelecao || '',
+    'Status': ex.status === 'concluido' ? 'Concluído' : 'Não concluído',
+    'Solicitado em': _formatarDataHoraBR(ex.dataCadastro),
+    'Resultado enviado em': ex.dataConclusao ? _formatarDataHoraBR(ex.dataConclusao) : '',
+    'Observação da Clínica': ex.observacao || '',
+    'Arquivo do Laudo': ex.pdfNome || ''
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(linhas);
+  ws['!cols'] = Object.keys(linhas[0]).map(k => ({ wch: Math.max(14, k.length + 2) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Exames Médicos');
+
+  const de  = document.getElementById('exame-rel-de')?.value || '';
+  const ate = document.getElementById('exame-rel-ate')?.value || '';
+  const periodo = (de || ate) ? `_${de || 'inicio'}_a_${ate || 'hoje'}` : '';
+  XLSX.writeFile(wb, `exames_medicos${periodo}.xlsx`);
+}
+window.exportarRelatorioExameExcel = exportarRelatorioExameExcel;
 
 // Renderiza a lista filtrada de exames
 function _renderExameLista() {
@@ -9224,17 +9405,14 @@ function _renderExameLista() {
 
   const isClinica = _examePerfilClinica();
   const busca  = (document.getElementById('exame-busca')?.value || '').toLowerCase().trim();
-  const status = document.getElementById('exame-filtro-status')?.value || '';
   const empresa = document.getElementById('exame-filtro-empresa')?.value || '';
 
   let lista = [...state.examesMedicos];
 
-  // A clínica vê apenas os aguardando por padrão (mas pode filtrar)
-  if (isClinica && !status) {
-    lista = lista.filter(e => e.status === 'aguardando');
-  } else if (status) {
-    lista = lista.filter(e => e.status === status);
-  }
+  // A sub-aba define o status exibido ("todos" não filtra)
+  if (_exameSubAba === 'pendentes')  lista = lista.filter(e => e.status === 'aguardando');
+  else if (_exameSubAba === 'concluidos') lista = lista.filter(e => e.status === 'concluido');
+
   if (empresa) lista = lista.filter(e => e.empresa === empresa);
   if (busca) {
     lista = lista.filter(e =>
@@ -9255,10 +9433,22 @@ function _renderExameLista() {
   if (!container) return;
 
   if (lista.length === 0) {
+    let msg;
+    if (_exameSubAba === 'pendentes') {
+      msg = isClinica
+        ? 'Nenhum candidato aguardando exame no momento.'
+        : 'Nenhum exame pendente — todos os resultados já foram enviados.';
+    } else if (_exameSubAba === 'concluidos') {
+      msg = 'Nenhum exame concluído ainda. Assim que a clínica anexar o laudo, ele aparece aqui.';
+    } else {
+      msg = isClinica
+        ? 'Nenhum exame encontrado.'
+        : 'Nenhum exame cadastrado ainda. Clique em <strong>"Novo Exame"</strong> para começar.';
+    }
     container.innerHTML = `
       <div class="exame-empty-state">
         <i class="fa-solid fa-hospital-user"></i>
-        <p>${isClinica ? 'Nenhum candidato aguardando exame no momento.' : 'Nenhum exame cadastrado ainda. Clique em <strong>"Novo Exame"</strong> para começar.'}</p>
+        <p>${msg}</p>
       </div>`;
     return;
   }

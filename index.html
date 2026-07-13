@@ -1206,33 +1206,86 @@
                             </div>
                         </div>
 
-                        <!-- Filtros -->
-                        <div class="exame-filtros-bar" id="exame-filtros-bar">
-                            <div class="exame-filtro-group">
-                                <i class="fa-solid fa-magnifying-glass"></i>
-                                <input type="text" id="exame-busca" class="exame-filtro-input" placeholder="Buscar por nome, CPF ou telefone...">
+                        <!-- Sub-abas: Não Concluídos / Concluídos / Todos / Relatório -->
+                        <div class="exame-subtabs" id="exame-subtabs">
+                            <button type="button" class="exame-subtab active" data-subaba="pendentes" onclick="trocarSubAbaExame('pendentes')">
+                                <i class="fa-solid fa-clock"></i> Não Concluídos
+                                <span class="exame-subtab-count" id="exame-count-pendentes">0</span>
+                            </button>
+                            <button type="button" class="exame-subtab" data-subaba="concluidos" onclick="trocarSubAbaExame('concluidos')">
+                                <i class="fa-solid fa-circle-check"></i> Concluídos
+                                <span class="exame-subtab-count" id="exame-count-concluidos">0</span>
+                            </button>
+                            <button type="button" class="exame-subtab" data-subaba="todos" onclick="trocarSubAbaExame('todos')">
+                                <i class="fa-solid fa-list"></i> Todos
+                                <span class="exame-subtab-count" id="exame-count-todos">0</span>
+                            </button>
+                            <button type="button" class="exame-subtab" data-subaba="relatorio" onclick="trocarSubAbaExame('relatorio')">
+                                <i class="fa-solid fa-chart-simple"></i> Relatório
+                            </button>
+                        </div>
+
+                        <!-- VIEW: Lista de exames -->
+                        <div id="exame-view-lista">
+                            <div class="exame-filtros-bar" id="exame-filtros-bar">
+                                <div class="exame-filtro-group">
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                    <input type="text" id="exame-busca" class="exame-filtro-input" placeholder="Buscar por nome, CPF ou telefone...">
+                                </div>
+                                <div class="exame-filtro-group">
+                                    <i class="fa-solid fa-building"></i>
+                                    <select id="exame-filtro-empresa" class="exame-filtro-select">
+                                        <option value="">Todas as empresas</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="exame-filtro-group">
-                                <i class="fa-solid fa-filter"></i>
-                                <select id="exame-filtro-status" class="exame-filtro-select">
-                                    <option value="">Todos os status</option>
-                                    <option value="aguardando">Aguardando</option>
-                                    <option value="concluido">Concluído</option>
-                                </select>
-                            </div>
-                            <div class="exame-filtro-group">
-                                <i class="fa-solid fa-building"></i>
-                                <select id="exame-filtro-empresa" class="exame-filtro-select">
-                                    <option value="">Todas as empresas</option>
-                                </select>
+
+                            <div class="exame-table-wrapper">
+                                <div id="exame-lista-container">
+                                    <!-- Gerado por JS -->
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Tabela / Lista de exames -->
-                        <div class="exame-table-wrapper">
-                            <div id="exame-lista-container">
-                                <!-- Gerado por JS -->
+                        <!-- VIEW: Relatório por período -->
+                        <div id="exame-view-relatorio" style="display:none;">
+                            <div class="exame-filtros-bar">
+                                <div class="exame-filtro-group">
+                                    <label for="exame-rel-de">De</label>
+                                    <input type="date" id="exame-rel-de" class="exame-filtro-input">
+                                </div>
+                                <div class="exame-filtro-group">
+                                    <label for="exame-rel-ate">Até</label>
+                                    <input type="date" id="exame-rel-ate" class="exame-filtro-input">
+                                </div>
+                                <div class="exame-filtro-group">
+                                    <i class="fa-regular fa-calendar"></i>
+                                    <select id="exame-rel-base" class="exame-filtro-select" title="Qual data usar para filtrar o período">
+                                        <option value="dataCadastro">Período pela data da solicitação</option>
+                                        <option value="dataConclusao">Período pela data do resultado</option>
+                                    </select>
+                                </div>
+                                <div class="exame-filtro-group">
+                                    <i class="fa-solid fa-filter"></i>
+                                    <select id="exame-rel-status" class="exame-filtro-select">
+                                        <option value="">Todos os status</option>
+                                        <option value="concluido">Somente concluídos</option>
+                                        <option value="aguardando">Somente não concluídos</option>
+                                    </select>
+                                </div>
+                                <div class="exame-filtro-group">
+                                    <i class="fa-solid fa-building"></i>
+                                    <select id="exame-rel-empresa" class="exame-filtro-select">
+                                        <option value="">Todas as empresas</option>
+                                    </select>
+                                </div>
+                                <button type="button" class="btn btn-success" onclick="exportarRelatorioExameExcel()">
+                                    <i class="fa-solid fa-file-excel"></i> Baixar Excel
+                                </button>
                             </div>
+
+                            <div id="exame-rel-resumo"><!-- KPIs do período (JS) --></div>
+                            <div id="exame-rel-lista"><!-- Tabela do período (JS) --></div>
                         </div>
                     </div>
                 </section>

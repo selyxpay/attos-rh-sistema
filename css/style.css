@@ -3929,3 +3929,70 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 
+
+/* ── Sub-abas do Exame Médico (Não Concluídos / Concluídos / Todos / Relatório) ── */
+.exame-subtabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--color-glass-border, #E2E8F0);
+    padding-bottom: 2px;
+}
+
+.exame-subtab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 10px 10px 0 0;
+    background: transparent;
+    color: var(--text-secondary, #64748B);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+}
+
+.exame-subtab:hover {
+    background: var(--surface-2, rgba(15, 23, 42, 0.04));
+    color: var(--color-text-title, #0F172A);
+}
+
+.exame-subtab.active {
+    background: var(--color-white, #FFFFFF);
+    color: var(--primary, #2563EB);
+    border-color: var(--color-glass-border, #E2E8F0);
+    box-shadow: 0 -2px 0 var(--primary, #2563EB) inset;
+}
+
+.exame-subtab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: var(--surface-2, rgba(15, 23, 42, 0.08));
+    color: inherit;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.exame-subtab.active .exame-subtab-count {
+    background: rgba(37, 99, 235, 0.12);
+    color: var(--primary, #2563EB);
+}
+
+/* No celular, as sub-abas rolam na horizontal em vez de quebrar a tela */
+@media (max-width: 768px) {
+    .exame-subtabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .exame-subtab { flex: 0 0 auto; }
+}
