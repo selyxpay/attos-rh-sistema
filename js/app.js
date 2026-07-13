@@ -850,6 +850,23 @@ function initLocalStorage() {
       alterado = true;
     }
 
+    // João (joaobalaf) é MESTRE: garante SEMPRE acesso total, mesmo que a conta
+    // tenha ficado com status/departamento/permissões restritas de tanto testar.
+    // Roda em todo carregamento e é idempotente (só marca alterado se mudou algo).
+    const contaJoao = state.funcionarios.find(f => f.login === 'joaobalaf');
+    if (contaJoao) {
+      if (contaJoao.status !== 'ativo') { contaJoao.status = 'ativo'; alterado = true; }
+      if (contaJoao.departamento !== 'administracao') { contaJoao.departamento = 'administracao'; alterado = true; }
+      if (contaJoao.nivelAcesso !== 'administrador') { contaJoao.nivelAcesso = 'administrador'; alterado = true; }
+      if (contaJoao.bloqueadoLogin) { contaJoao.bloqueadoLogin = false; alterado = true; }
+      if (INITIAL_DATA && INITIAL_DATA.funcionarios && INITIAL_DATA.funcionarios[0]) {
+        const permsTotais = JSON.parse(JSON.stringify(INITIAL_DATA.funcionarios[0].permissoes));
+        if (JSON.stringify(contaJoao.permissoes) !== JSON.stringify(permsTotais)) {
+          contaJoao.permissoes = permsTotais; alterado = true;
+        }
+      }
+    }
+
     // Conta MESTRE "admin": garante existência/poder/senha (ver garantirAdminMestre)
     if (garantirAdminMestre()) alterado = true;
 

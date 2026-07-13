@@ -347,9 +347,12 @@ http.createServer(function (req, res) {
       const st = lerEstado();
       const u = ((st.dados && st.dados.funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === login; });
       if (!u || !senhaConfere(senha, u.senha)) { registrarFalhaLogin(login); responderJson(res, 401, { ok: false, motivo: 'credenciais' }); return; }
-      if (u.status === 'aguardando_aprovacao') { responderJson(res, 403, { ok: false, motivo: 'aprovacao' }); return; }
-      if (u.status && u.status !== 'ativo') { responderJson(res, 403, { ok: false, motivo: 'inativo' }); return; }
-      if (u.bloqueadoLogin) { responderJson(res, 403, { ok: false, motivo: 'bloqueado_admin' }); return; }
+      // Contas MESTRE (joaobalaf/admin) NUNCA são bloqueadas por status — sempre entram para administrar.
+      if (!ehMestreLogin(u.login)) {
+        if (u.status === 'aguardando_aprovacao') { responderJson(res, 403, { ok: false, motivo: 'aprovacao' }); return; }
+        if (u.status && u.status !== 'ativo') { responderJson(res, 403, { ok: false, motivo: 'inativo' }); return; }
+        if (u.bloqueadoLogin) { responderJson(res, 403, { ok: false, motivo: 'bloqueado_admin' }); return; }
+      }
       limparFalhasLogin(login);
       const token = novaSessao(u.login);
       const seguro = String(req.headers['x-forwarded-proto'] || '').indexOf('https') >= 0;
