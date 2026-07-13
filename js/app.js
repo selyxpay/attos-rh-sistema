@@ -251,9 +251,11 @@ function isAbaAutorizada(abaId) {
   if (abaId === 'lixeira') return ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao';
   if (abaId === 'controle-acesso') return podeGerenciarHorarios();
   if (abaId === 'cadastros-exata') return ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao';
-  if (abaId === 'exame-medico') return [
-    'clinica', 'selecao', 'administracao'
-  ].includes(loggedUser.departamento) || ehMestre(loggedUser.login);
+  // Exame Médico: liberado por departamento (clínica/seleção/administração) OU
+  // pela permissão granular marcada no cadastro do funcionário.
+  if (abaId === 'exame-medico') return ehMestre(loggedUser.login)
+    || ['clinica', 'selecao', 'administracao'].includes(loggedUser.departamento)
+    || hasPermission('exame_medico', 'visualizar');
   if (ehMestre(loggedUser.login)) return true;
   const depto = loggedUser.departamento;
   if (depto === 'administracao') return true;
@@ -5070,6 +5072,23 @@ function fecharModalVaga() {
 }
 
 // GESTÃO DE COLABORADORES INTERNOS (CRUD)
+// Só mestre e administração enxergam TODOS os funcionários. Os demais (ex.: o
+// representante do departamento) só veem as pessoas do próprio departamento.
+function _verTodosFuncionarios() {
+  return !!(loggedUser && (
+    ehMestre(loggedUser.login) ||
+    loggedUser.departamento === 'administracao' ||
+    hasPermission('sistema', 'perms')
+  ));
+}
+// usarSolicitado=true para a lista de pendentes (que ainda usa o departamento pedido no cadastro)
+function _funcionariosVisiveis(lista, usarSolicitado) {
+  if (!loggedUser) return [];
+  if (_verTodosFuncionarios()) return lista;
+  const meuDepto = loggedUser.departamento;
+  return lista.filter(f => (usarSolicitado ? (f.departamentoSolicitado || f.departamento) : f.departamento) === meuDepto);
+}
+
 function renderFuncionarios() {
   // --- Card de Funcionários Aguardando Aprovação ---
   const pendingCard = document.getElementById('func-pending-approvals-card');
@@ -5080,7 +5099,7 @@ function renderFuncionarios() {
     hasPermission('funcionarios', 'aprovar')
   );
 
-  const pendentes = state.funcionarios.filter(f => f.status === 'aguardando_aprovacao');
+  const pendentes = _funcionariosVisiveis(state.funcionarios.filter(f => f.status === 'aguardando_aprovacao'), true);
 
   const pendCountEl = document.getElementById('func-pending-count');
   if (pendCountEl) pendCountEl.textContent = pendentes.length > 0 ? `${pendentes.length} nova(s)` : '';
@@ -5156,8 +5175,9 @@ function renderFuncionarios() {
     'clinica': 'Clínica Médica'
   };
 
-  // Exibe apenas funcionários ativos/inativos na lista principal (não os pendentes)
-  const funcExibir = state.funcionarios.filter(f => f.status !== 'aguardando_aprovacao');
+  // Exibe apenas funcionários ativos/inativos na lista principal (não os pendentes),
+  // já restrito ao departamento de quem está logado (mestre/admin veem todos).
+  const funcExibir = _funcionariosVisiveis(state.funcionarios.filter(f => f.status !== 'aguardando_aprovacao'), false);
 
   tbody.innerHTML = funcExibir.map(f => {
     const isSelf = loggedUser && loggedUser.id === f.id;
@@ -5709,6 +5729,7 @@ const AREAS_SISTEMA = {
   graficos: 'Gráficos',
   candidatos: 'Candidatos',
   funcionarios: 'Funcionários',
+  exame_medico: 'Exame Médico',
   sistema: 'Sistema',
   exportacoes: 'Exportações'
 };
@@ -6454,8 +6475,9 @@ window.abrirModalGerenciarFuncionario = function(funcId) {
   const func = state.funcionarios.find(f => f.id === funcId);
   if (!func) return;
 
-  // Restrição de representante: só pode gerenciar do próprio depto
-  if (loggedUser && loggedUser.representanteDepto && !hasPermission('sistema', 'perms')) {
+  // Só mestre/administração (ou quem tem permissão de sistema) gerencia qualquer um.
+  // Os demais — inclusive o representante — só gerenciam o próprio departamento.
+  if (loggedUser && !_verTodosFuncionarios()) {
     if (func.departamento !== loggedUser.departamento) {
       alert('Você só pode gerenciar funcionários do seu próprio departamento.');
       return;
@@ -9089,16 +9111,24 @@ function garantirExamesMedicos() {
 function _examePerfilClinica() {
   return loggedUser && loggedUser.departamento === 'clinica';
 }
+// Quem pode SOLICITAR um exame novo: seleção/administração/mestre OU permissão "criar" marcada.
 function _examePerfilSelecao() {
-  return loggedUser && (
+  return !!(loggedUser && (
     loggedUser.departamento === 'selecao' ||
     loggedUser.departamento === 'administracao' ||
-    ehMestre(loggedUser.login)
-  );
+    ehMestre(loggedUser.login) ||
+    hasPermission('exame_medico', 'criar')
+  ));
 }
-// Quem pode ENVIAR o laudo do resultado: a clínica OU admin/master (ex.: clínica manda por WhatsApp e o admin anexa)
+// Quem pode ANEXAR o laudo do resultado: a clínica, admin/mestre (ex.: clínica manda por
+// WhatsApp e o admin anexa) OU quem tiver a permissão "editar" marcada no cadastro.
 function _examePodeEnviarLaudo() {
-  return _examePerfilClinica() || (loggedUser && (loggedUser.departamento === 'administracao' || ehMestre(loggedUser.login)));
+  return !!(loggedUser && (
+    _examePerfilClinica() ||
+    loggedUser.departamento === 'administracao' ||
+    ehMestre(loggedUser.login) ||
+    hasPermission('exame_medico', 'editar')
+  ));
 }
 // Formata ISO -> DD/MM/AAAA HH:MM (data e hora com minutos)
 function _formatarDataHoraBR(iso) {
