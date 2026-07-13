@@ -209,6 +209,9 @@
                     <li class="nav-item" data-aba="cadastros-exata" id="nav-item-cadastros-exata" style="display:none;">
                         <a href="#"><i class="fa-solid fa-file-invoice"></i> <span>Cadastros Exata</span></a>
                     </li>
+                    <li class="nav-item" data-aba="exame-medico" id="nav-item-exame-medico">
+                        <a href="#"><i class="fa-solid fa-hospital"></i> <span>Exame Médico</span></a>
+                    </li>
                 </ul>
             </nav>
             
@@ -1157,6 +1160,180 @@
                         <div id="cadastros-exata-conteudo"></div>
                     </div>
                 </section>
+
+                <!-- ABA: EXAME MÉDICO -->
+                <section id="aba-exame-medico" class="aba-content">
+                    <div class="exame-medico-wrapper">
+                        <!-- Header da aba -->
+                        <div class="exame-header-area">
+                            <div class="exame-header-left">
+                                <div class="exame-header-icon">
+                                    <i class="fa-solid fa-hospital"></i>
+                                </div>
+                                <div>
+                                    <h1 class="exame-titulo">Exame Médico Admissional</h1>
+                                    <p class="exame-subtitulo" id="exame-subtitulo-desc">Gerencie os exames médicos dos candidatos</p>
+                                </div>
+                            </div>
+                            <div class="exame-header-right" id="exame-header-actions">
+                                <!-- Botoes injetados por JS conforme perfil -->
+                            </div>
+                        </div>
+
+                        <!-- Cards de resumo (KPIs) -->
+                        <div class="exame-kpi-row" id="exame-kpi-row">
+                            <div class="exame-kpi-card exame-kpi-total">
+                                <div class="exame-kpi-icon"><i class="fa-solid fa-list-check"></i></div>
+                                <div class="exame-kpi-info">
+                                    <span class="exame-kpi-num" id="kpi-exame-total">0</span>
+                                    <span class="exame-kpi-label">Total</span>
+                                </div>
+                            </div>
+                            <div class="exame-kpi-card exame-kpi-aguardando">
+                                <div class="exame-kpi-icon"><i class="fa-solid fa-clock"></i></div>
+                                <div class="exame-kpi-info">
+                                    <span class="exame-kpi-num" id="kpi-exame-aguardando">0</span>
+                                    <span class="exame-kpi-label">Aguardando</span>
+                                </div>
+                            </div>
+                            <div class="exame-kpi-card exame-kpi-concluido">
+                                <div class="exame-kpi-icon"><i class="fa-solid fa-circle-check"></i></div>
+                                <div class="exame-kpi-info">
+                                    <span class="exame-kpi-num" id="kpi-exame-concluido">0</span>
+                                    <span class="exame-kpi-label">Concluídos</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Filtros -->
+                        <div class="exame-filtros-bar" id="exame-filtros-bar">
+                            <div class="exame-filtro-group">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="exame-busca" class="exame-filtro-input" placeholder="Buscar por nome, CPF ou telefone...">
+                            </div>
+                            <div class="exame-filtro-group">
+                                <i class="fa-solid fa-filter"></i>
+                                <select id="exame-filtro-status" class="exame-filtro-select">
+                                    <option value="">Todos os status</option>
+                                    <option value="aguardando">Aguardando</option>
+                                    <option value="concluido">Concluído</option>
+                                </select>
+                            </div>
+                            <div class="exame-filtro-group">
+                                <i class="fa-solid fa-building"></i>
+                                <select id="exame-filtro-empresa" class="exame-filtro-select">
+                                    <option value="">Todas as empresas</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Tabela / Lista de exames -->
+                        <div class="exame-table-wrapper">
+                            <div id="exame-lista-container">
+                                <!-- Gerado por JS -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Modal: Novo Exame Médico (Seleção) -->
+                <div id="modal-novo-exame" class="modal-overlay" style="display:none;" onclick="if(event.target===this)fecharModalNovoExame()">
+                    <div class="modal-exame-box">
+                        <div class="modal-exame-header">
+                            <div style="display:flex;align-items:center;gap:12px;">
+                                <div class="modal-exame-icon"><i class="fa-solid fa-file-medical"></i></div>
+                                <div>
+                                    <h2 style="margin:0;font-size:20px;">Novo Exame Médico</h2>
+                                    <p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary);">Preencha os dados do candidato para a clínica</p>
+                                </div>
+                            </div>
+                            <button class="modal-exame-close" onclick="fecharModalNovoExame()"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="modal-exame-body">
+                            <div class="exame-form-grid">
+                                <div class="form-group exame-form-full">
+                                    <label>Nome Completo *</label>
+                                    <input type="text" id="exame-form-nome" class="form-control" placeholder="Nome completo do candidato">
+                                </div>
+                                <div class="form-group">
+                                    <label>CPF *</label>
+                                    <input type="text" id="exame-form-cpf" class="form-control" placeholder="000.000.000-00" oninput="mascaraCPF(this)">
+                                </div>
+                                <div class="form-group">
+                                    <label>Data de Nascimento</label>
+                                    <input type="date" id="exame-form-nasc" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label>RG</label>
+                                    <input type="text" id="exame-form-rg" class="form-control" placeholder="Número do RG">
+                                </div>
+                                <div class="form-group">
+                                    <label>Telefone / WhatsApp *</label>
+                                    <input type="text" id="exame-form-tel" class="form-control" placeholder="(11) 90000-0000" oninput="mascaraTelefone(this)">
+                                </div>
+                                <div class="form-group">
+                                    <label>Nome do Pai</label>
+                                    <input type="text" id="exame-form-pai" class="form-control" placeholder="Nome do pai">
+                                </div>
+                                <div class="form-group">
+                                    <label>Nome da Mãe</label>
+                                    <input type="text" id="exame-form-mae" class="form-control" placeholder="Nome da mãe">
+                                </div>
+                                <div class="form-group">
+                                    <label>Empresa *</label>
+                                    <select id="exame-form-empresa" class="form-control">
+                                        <option value="">Selecione a empresa...</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Turno de Trabalho *</label>
+                                    <select id="exame-form-turno" class="form-control">
+                                        <option value="">Selecione o turno...</option>
+                                        <option value="1">1º Turno</option>
+                                        <option value="2">2º Turno</option>
+                                        <option value="3">3º Turno</option>
+                                        <option value="revezamento">Revezamento</option>
+                                    </select>
+                                </div>
+                                <div class="form-group exame-form-full">
+                                    <label>Responsável (Seleção)</label>
+                                    <input type="text" id="exame-form-responsavel" class="form-control" readonly style="background:var(--surface-2,rgba(0,0,0,.05));color:var(--text-secondary);cursor:default;">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-exame-footer">
+                            <button class="btn btn-outline" onclick="fecharModalNovoExame()"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+                            <button class="btn btn-primary" onclick="salvarNovoExame()"><i class="fa-solid fa-floppy-disk"></i> Salvar Exame</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal: Detalhe do Exame (Clínica + Seleção) -->
+                <div id="modal-detalhe-exame" class="modal-overlay" style="display:none;" onclick="if(event.target===this)fecharModalDetalheExame()">
+                    <div class="modal-exame-box modal-exame-box-detalhe">
+                        <div class="modal-exame-header">
+                            <div style="display:flex;align-items:center;gap:12px;">
+                                <div class="modal-exame-icon modal-exame-icon-hospital"><i class="fa-solid fa-hospital"></i></div>
+                                <div>
+                                    <h2 style="margin:0;font-size:20px;" id="detalhe-exame-nome-titulo">Candidato</h2>
+                                    <p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary);" id="detalhe-exame-empresa-turno"></p>
+                                </div>
+                            </div>
+                            <button class="modal-exame-close" onclick="fecharModalDetalheExame()"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="modal-exame-body">
+                            <div id="detalhe-exame-conteudo">
+                                <!-- Gerado por JS -->
+                            </div>
+                        </div>
+                        <div class="modal-exame-footer" id="detalhe-exame-footer">
+                            <!-- Botoes gerados por JS conforme perfil -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input file oculto para upload do PDF/Imagem do exame -->
+                <input type="file" id="input-pdf-exame" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none;" onchange="processarUploadPdfExame(this)">
 
                 <!-- ABA: CONFIGURAÇÕES (SOMENTE ADMIN) -->
                 <section id="aba-configuracoes" class="aba-content">

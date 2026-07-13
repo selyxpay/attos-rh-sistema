@@ -133,6 +133,7 @@ body::before {
   100% { transform: translateX(150%) skewX(-25deg); }
 }
 
+/* Shimmer aplicado apenas nos cards maiores (não em kanban-card pois há centenas) */
 .card-glass::after,
 .kpi-card::after,
 .vaga-card::after,
@@ -155,6 +156,8 @@ body::before {
   animation: shimmer-wave 7s infinite ease-in-out !important;
   pointer-events: none !important;
   z-index: 10 !important;
+  /* Promove a animação para a GPU (compositor thread) */
+  will-change: transform !important;
 }
 
 /* 3. DETALHES DO CANDIDATO E MODAIS (FUNDO SÓLIDO TOTAL CONTRASTE E PRESERVAÇÃO DE CORES) */

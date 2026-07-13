@@ -218,7 +218,8 @@ function verificarSessao() {
           'administracao': 'Gestão Executiva',
           'selecao': 'Recrutamento & Seleção',
           'dp': 'Departamento Pessoal',
-          'comissao': 'Comissões & Estatísticas'
+          'comissao': 'Comissões & Estatísticas',
+          'clinica': 'Clínica Médica'
         };
         roleEl.textContent = deptoLabels[loggedUser.departamento] || 'Colaborador';
       }
@@ -250,6 +251,9 @@ function isAbaAutorizada(abaId) {
   if (abaId === 'lixeira') return ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao';
   if (abaId === 'controle-acesso') return podeGerenciarHorarios();
   if (abaId === 'cadastros-exata') return ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao';
+  if (abaId === 'exame-medico') return [
+    'clinica', 'selecao', 'administracao'
+  ].includes(loggedUser.departamento) || ehMestre(loggedUser.login);
   if (ehMestre(loggedUser.login)) return true;
   const depto = loggedUser.departamento;
   if (depto === 'administracao') return true;
@@ -320,10 +324,21 @@ function verificarPermissoesMenu() {
     navConfig.style.display = podeConfig ? '' : 'none';
   }
 
+  // Controle do menu Exame Médico
+  const navExame = document.getElementById('nav-item-exame-medico');
+  if (navExame) {
+    const podeExame = loggedUser && (
+      ehMestre(loggedUser.login) ||
+      ['clinica', 'selecao', 'administracao'].includes(loggedUser.departamento)
+    );
+    navExame.style.display = podeExame ? '' : 'none';
+  }
+
   if (!isAbaAutorizada(activeAba)) {
     let homeAba = 'dashboard';
     if (loggedUser.departamento === 'dp') homeAba = 'depto-pessoal';
     else if (loggedUser.departamento === 'comissao') homeAba = 'comissao';
+    else if (loggedUser.departamento === 'clinica') homeAba = 'exame-medico';
     else if (loggedUser.departamento === 'selecao') {
       const temVinculo = state && state.recrutadores && state.recrutadores.some(r => (r.usuarioId && r.usuarioId === loggedUser.id) || (r.loginVinculado && r.loginVinculado === loggedUser.login));
       if (temVinculo) homeAba = 'meu-painel';
@@ -718,6 +733,9 @@ async function ativarNuvem() {
     }
   } catch (e) { /* sem rede: segue com o cache local */ }
 
+  // Debounce para o render disparado pela nuvem: evita recarregar enquanto o
+  // usuário está com foco num campo (digitando), o que causava "travamento" visual.
+  let _remoteUpdateTimer = null;
   try {
     await RTCloud.init({
       onRemoteUpdate: (dados) => {
@@ -730,7 +748,21 @@ async function ativarNuvem() {
         }
         state = dados;
         try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (e) {}
-        renderCurrentAba();
+        // Só re-renderiza imediatamente se o usuário NÃO estiver digitando em algum campo
+        const focusedEl = document.activeElement;
+        const userEditando = focusedEl && (
+          focusedEl.tagName === 'INPUT' ||
+          focusedEl.tagName === 'TEXTAREA' ||
+          focusedEl.tagName === 'SELECT'
+        );
+        if (userEditando) {
+          // Adia o render para depois que o campo perder o foco (máximo 4s)
+          clearTimeout(_remoteUpdateTimer);
+          _remoteUpdateTimer = setTimeout(() => renderCurrentAba(), 4000);
+        } else {
+          clearTimeout(_remoteUpdateTimer);
+          renderCurrentAba();
+        }
       }
     });
     const nuvem = await RTCloud.loadState();
@@ -1425,7 +1457,14 @@ function setupNavigation() {
       document.querySelectorAll('.dashboard-sub-aba').forEach(c => c.classList.remove('active'));
       document.getElementById(`dash-sub-${subtabId}`).classList.add('active');
       activeDashboardSubTab = subtabId;
-      renderCurrentAba();
+      // Só renderiza a sub-aba ativa, sem recriar todos os gráficos do overview
+      if (subtabId === 'visao-geral') {
+        renderDashboardOverview();
+      } else if (subtabId === 'kanban') {
+        renderDashboardKanban();
+      } else {
+        renderCurrentAba();
+      }
     });
   });
 }
@@ -1474,7 +1513,8 @@ function switchAba(abaId) {
     'documentos': 'fa-solid fa-folder-open',
     'lixeira': 'fa-solid fa-trash-can',
     'controle-acesso': 'fa-solid fa-business-time',
-    'cadastros-exata': 'fa-solid fa-file-invoice'
+    'cadastros-exata': 'fa-solid fa-file-invoice',
+    'exame-medico': 'fa-solid fa-hospital'
   };
 
   const titleMap = {
@@ -1495,7 +1535,8 @@ function switchAba(abaId) {
     'documentos': 'R&T EMPREGOS — DOCUMENTOS NA NUVEM',
     'lixeira': 'R&T EMPREGOS — LIXEIRA',
     'controle-acesso': 'R&T EMPREGOS — CONTROLE DE ACESSO',
-    'cadastros-exata': 'R&T EMPREGOS — CADASTROS EXATA'
+    'cadastros-exata': 'R&T EMPREGOS — CADASTROS EXATA',
+    'exame-medico': 'R&T EMPREGOS — EXAME MÉDICO ADMISSIONAL'
   };
 
   if (headerIcon) headerIcon.className = `${iconMap[abaId] || 'fa-solid fa-building'} header-icon`;
@@ -1561,6 +1602,9 @@ function renderCurrentAba() {
       break;
     case 'cadastros-exata':
       renderCadastrosExata();
+      break;
+    case 'exame-medico':
+      renderExameMedico();
       break;
   }
 }
@@ -2500,50 +2544,52 @@ function createKanbanCardHtml(c) {
   `;
 }
 
-// Lógica de Drag & Drop Real
+// Lógica de Drag & Drop Real — usa delegação de eventos no wrapper do Kanban
+// para evitar empilhar centenas de listeners a cada renderização dos cards.
+let _dndInitialized = false;
 function setupDragAndDrop() {
-  const cards = document.querySelectorAll('.kanban-card');
-  const columns = document.querySelectorAll('.kanban-column');
-
-  cards.forEach(card => {
-    card.addEventListener('dragstart', (e) => {
+  // Delegação nos containers de cards (reciclada — não empilha)
+  const colunas = ['pendente', 'em_analise', 'entrevista', 'aprovado', 'reprovado'];
+  colunas.forEach(col => {
+    const container = document.getElementById(`cards-${col}`);
+    if (!container || container.dataset.dndWired) return;
+    container.dataset.dndWired = '1';
+    container.addEventListener('dragstart', (e) => {
+      const card = e.target.closest('.kanban-card');
+      if (!card) return;
       e.dataTransfer.setData('text/plain', card.getAttribute('data-id'));
       card.style.opacity = '0.5';
     });
-
-    card.addEventListener('dragend', () => {
-      card.style.opacity = '1';
+    container.addEventListener('dragend', (e) => {
+      const card = e.target.closest('.kanban-card');
+      if (card) card.style.opacity = '1';
     });
   });
 
+  // Listeners nas colunas (drop target) — também com guard
+  const columns = document.querySelectorAll('.kanban-column');
   columns.forEach(col => {
+    if (col.dataset.dndWired) return;
+    col.dataset.dndWired = '1';
     col.addEventListener('dragover', (e) => {
       e.preventDefault();
       col.style.backgroundColor = '#e2e8f0';
     });
-
     col.addEventListener('dragleave', () => {
       col.style.backgroundColor = '#f1f5f9';
     });
-
     col.addEventListener('drop', (e) => {
       e.preventDefault();
       col.style.backgroundColor = '#f1f5f9';
-      
       const candidateId = e.dataTransfer.getData('text/plain');
       const targetStatus = col.getAttribute('data-status');
-      
       const cand = state.candidatos.find(c => c.id === candidateId);
       if (cand && cand.status !== targetStatus) {
-        // Se mover para Reprovado de forma rápida, coloca motivo padrão
         if (targetStatus === 'reprovado' && !cand.motivoReprovacao) {
           cand.motivoReprovacao = 'Filtro e triagem rápida no Kanban.';
         }
-        
         cand.status = targetStatus;
-        cand.diasEtapa = 1; // reinicia contagem
-        
-        // Log de atividade
+        cand.diasEtapa = 1;
         if (!loggedUser || !ehMestre(loggedUser.login)) {
           state.atividades.unshift({
             id: `act-${Date.now()}`,
@@ -2551,7 +2597,6 @@ function setupDragAndDrop() {
             data: 'Agora'
           });
         }
-
         saveState();
         renderDashboardKanban();
       }
@@ -5665,7 +5710,8 @@ const ABA_PARA_AREA = {
   'documentos': 'dp',
   'lixeira': 'sistema',
   'controle-acesso': 'sistema',
-  'cadastros-exata': 'sistema'
+  'cadastros-exata': 'sistema',
+  'exame-medico': 'exame_medico'
 };
 
 function hasPermission(area, acao) {
@@ -8965,6 +9011,30 @@ function mascaraCNPJ(input) {
 }
 window.mascaraCNPJ = mascaraCNPJ;
 
+// Máscara CPF: 000.000.000-00 (usada no formulário de Exame Médico)
+function mascaraCPF(input) {
+  let v = input.value.replace(/\D/g, '').slice(0, 11);
+  v = v.replace(/^(\d{3})(\d)/, '$1.$2');
+  v = v.replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3');
+  v = v.replace(/\.(\d{3})(\d)/, '.$1-$2');
+  input.value = v;
+}
+window.mascaraCPF = mascaraCPF;
+
+// Máscara Telefone: (00) 00000-0000 (aceita fixo e celular)
+function mascaraTelefone(input) {
+  let v = input.value.replace(/\D/g, '').slice(0, 11);
+  if (v.length > 6) {
+    v = v.replace(/^(\d{2})(\d{4,5})(\d{0,4}).*/, '($1) $2-$3');
+  } else if (v.length > 2) {
+    v = v.replace(/^(\d{2})(\d{0,5})/, '($1) $2');
+  } else if (v.length > 0) {
+    v = v.replace(/^(\d{0,2})/, '($1');
+  }
+  input.value = v;
+}
+window.mascaraTelefone = mascaraTelefone;
+
 // Máscara CEP: 00000-000
 function mascaraCEPCliente(input) {
   let v = input.value.replace(/\D/g, '').slice(0, 8);
@@ -8985,6 +9055,545 @@ window.mascaraCEPCliente = mascaraCEPCliente;
     }
   }, true);
 })();
+
+
+// ==========================================================================
+// ABA: EXAME MÉDICO ADMISSIONAL
+// ==========================================================================
+
+// Garante que o campo examesMedicos existe no state
+function garantirExamesMedicos() {
+  if (!state.examesMedicos) state.examesMedicos = [];
+}
+
+// Perfil do usuário logado em relação aos exames
+function _examePerfilClinica() {
+  return loggedUser && loggedUser.departamento === 'clinica';
+}
+function _examePerfilSelecao() {
+  return loggedUser && (
+    loggedUser.departamento === 'selecao' ||
+    loggedUser.departamento === 'administracao' ||
+    ehMestre(loggedUser.login)
+  );
+}
+
+// Formata turno
+function _formatarTurno(t) {
+  const map = { '1': '1º Turno', '2': '2º Turno', '3': '3º Turno', 'revezamento': 'Revezamento' };
+  return map[t] || t || '—';
+}
+
+// Formata data YYYY-MM-DD para DD/MM/YYYY
+function _formatarDataBR(d) {
+  if (!d) return '—';
+  if (d.includes('/')) return d;
+  const [y, m, dd] = d.split('-');
+  return `${dd}/${m}/${y}`;
+}
+
+// Render principal da aba Exame Médico
+function renderExameMedico() {
+  garantirExamesMedicos();
+
+  const isClinica = _examePerfilClinica();
+  const isSelecao = _examePerfilSelecao();
+
+  // Subtítulo
+  const sub = document.getElementById('exame-subtitulo-desc');
+  if (sub) {
+    sub.textContent = isClinica
+      ? 'Veja os candidatos que precisam realizar o exame e anexe o laudo médico'
+      : 'Gerencie os candidatos enviados para exame médico admissional';
+  }
+
+  // Botões de ação no header
+  const actions = document.getElementById('exame-header-actions');
+  if (actions) {
+    if (isSelecao) {
+      actions.innerHTML = `<button class="btn btn-primary" onclick="abrirModalNovoExame()">
+        <i class="fa-solid fa-plus"></i> Novo Exame
+      </button>`;
+    } else {
+      actions.innerHTML = '';
+    }
+  }
+
+  // Popular filtro de empresas
+  const selEmpresa = document.getElementById('exame-filtro-empresa');
+  if (selEmpresa && state.empresas) {
+    const empresasUsadas = [...new Set((state.examesMedicos || []).map(e => e.empresa).filter(Boolean))];
+    selEmpresa.innerHTML = '<option value="">Todas as empresas</option>' +
+      empresasUsadas.map(emp => `<option value="${emp}">${emp}</option>`).join('');
+  }
+
+  // Listeners de filtro (garante 1 vez só)
+  ['exame-busca', 'exame-filtro-status', 'exame-filtro-empresa'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.dataset.listenerOk) {
+      el.addEventListener('input', _renderExameLista);
+      el.addEventListener('change', _renderExameLista);
+      el.dataset.listenerOk = '1';
+    }
+  });
+
+  // Atualizar KPIs
+  _renderExameKPIs();
+
+  // Renderizar lista
+  _renderExameLista();
+}
+
+// Atualiza os KPIs
+function _renderExameKPIs() {
+  garantirExamesMedicos();
+  const todos = state.examesMedicos;
+  const aguardando = todos.filter(e => e.status === 'aguardando').length;
+  const concluido = todos.filter(e => e.status === 'concluido').length;
+
+  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setEl('kpi-exame-total', todos.length);
+  setEl('kpi-exame-aguardando', aguardando);
+  setEl('kpi-exame-concluido', concluido);
+}
+
+// Renderiza a lista filtrada de exames
+function _renderExameLista() {
+  garantirExamesMedicos();
+
+  const isClinica = _examePerfilClinica();
+  const busca  = (document.getElementById('exame-busca')?.value || '').toLowerCase().trim();
+  const status = document.getElementById('exame-filtro-status')?.value || '';
+  const empresa = document.getElementById('exame-filtro-empresa')?.value || '';
+
+  let lista = [...state.examesMedicos];
+
+  // A clínica vê apenas os aguardando por padrão (mas pode filtrar)
+  if (isClinica && !status) {
+    lista = lista.filter(e => e.status === 'aguardando');
+  } else if (status) {
+    lista = lista.filter(e => e.status === status);
+  }
+  if (empresa) lista = lista.filter(e => e.empresa === empresa);
+  if (busca) {
+    lista = lista.filter(e =>
+      (e.nomeCompleto || '').toLowerCase().includes(busca) ||
+      (e.cpf || '').includes(busca) ||
+      (e.telefone || '').includes(busca)
+    );
+  }
+
+  // Ordenar: aguardando primeiro, depois por data
+  lista.sort((a, b) => {
+    if (a.status === 'aguardando' && b.status !== 'aguardando') return -1;
+    if (a.status !== 'aguardando' && b.status === 'aguardando') return 1;
+    return new Date(b.dataCadastro || 0) - new Date(a.dataCadastro || 0);
+  });
+
+  const container = document.getElementById('exame-lista-container');
+  if (!container) return;
+
+  if (lista.length === 0) {
+    container.innerHTML = `
+      <div class="exame-empty-state">
+        <i class="fa-solid fa-hospital-user"></i>
+        <p>${isClinica ? 'Nenhum candidato aguardando exame no momento.' : 'Nenhum exame cadastrado ainda. Clique em <strong>"Novo Exame"</strong> para começar.'}</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="exame-table-header">
+      <span>Candidato</span>
+      <span>CPF</span>
+      <span>Telefone</span>
+      <span>Empresa / Turno</span>
+      <span>Responsável</span>
+      <span>Status</span>
+      <span>Ação</span>
+    </div>
+    ${lista.map(ex => _renderExameRow(ex, isClinica)).join('')}
+  `;
+}
+
+// Renderiza uma linha da tabela
+function _renderExameRow(ex, isClinica) {
+  const statusBadge = ex.status === 'concluido'
+    ? `<span class="exame-badge exame-badge-ok"><i class="fa-solid fa-circle-check"></i> Concluído</span>`
+    : `<span class="exame-badge exame-badge-pend"><i class="fa-solid fa-clock"></i> Aguardando</span>`;
+
+  const btnLabel = isClinica
+    ? (ex.status === 'concluido' ? '<i class="fa-solid fa-eye"></i> Ver Laudo' : '<i class="fa-solid fa-file-arrow-up"></i> Anexar Laudo')
+    : '<i class="fa-solid fa-eye"></i> Detalhes';
+
+  const btnClass = isClinica && ex.status === 'aguardando' ? 'btn-exame-upload' : 'btn-exame-ver';
+
+  const sininhoHtml = ex.observacao
+    ? `<i class="fa-solid fa-bell exame-sininho-alert" title="Observação: ${escapeHTML(ex.observacao)}"></i>`
+    : '';
+
+  return `
+    <div class="exame-table-row">
+      <span class="exame-col-nome">
+        <span class="exame-avatar">${(ex.nomeCompleto || '?').charAt(0).toUpperCase()}</span>
+        <span class="exame-col-nome-texto">${ex.nomeCompleto || '—'} ${sininhoHtml}</span>
+      </span>
+      <span class="exame-col-cpf">${ex.cpf || '—'}</span>
+      <span class="exame-col-tel">
+        <a href="https://wa.me/55${(ex.telefone || '').replace(/\D/g,'')}?text=Ol%C3%A1+${encodeURIComponent(ex.nomeCompleto||'')}%2C+somos+da+cl%C3%ADnica+parceira+da+R%26T+Empregos.+Precisamos+agendar+seu+exame+m%C3%A9dico+admissional." target="_blank" class="exame-wpp-link" title="Abrir no WhatsApp">
+          <i class="fa-brands fa-whatsapp"></i> ${ex.telefone || '—'}
+        </a>
+      </span>
+      <span class="exame-col-empresa">
+        <strong>${ex.empresa || '—'}</strong><br>
+        <small>${_formatarTurno(ex.turno)}</small>
+      </span>
+      <span class="exame-col-resp">${ex.responsavelSelecao || '—'}</span>
+      <span class="exame-col-status">${statusBadge}</span>
+      <span class="exame-col-acao">
+        <button class="${btnClass}" onclick="abrirModalDetalheExame('${ex.id}')">${btnLabel}</button>
+      </span>
+    </div>
+  `;
+}
+
+// ── Modal: Novo Exame (Seleção) ────────────────────────────────────────────
+
+function abrirModalNovoExame() {
+  if (!_examePerfilSelecao()) return;
+
+  // Preencher responsável automaticamente
+  const resp = document.getElementById('exame-form-responsavel');
+  if (resp) resp.value = loggedUser ? loggedUser.nome : '';
+
+  // Popular select de empresas
+  const selEmp = document.getElementById('exame-form-empresa');
+  if (selEmp && state.empresas) {
+    selEmp.innerHTML = '<option value="">Selecione a empresa...</option>' +
+      state.empresas.map(e => `<option value="${e.nome}">${e.nome}</option>`).join('');
+  }
+
+  // Limpar campos
+  ['exame-form-nome','exame-form-cpf','exame-form-nasc','exame-form-rg',
+   'exame-form-tel','exame-form-pai','exame-form-mae','exame-form-turno'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  const modal = document.getElementById('modal-novo-exame');
+  if (modal) modal.style.display = 'flex';
+}
+window.abrirModalNovoExame = abrirModalNovoExame;
+
+function fecharModalNovoExame() {
+  const modal = document.getElementById('modal-novo-exame');
+  if (modal) modal.style.display = 'none';
+}
+window.fecharModalNovoExame = fecharModalNovoExame;
+
+function salvarNovoExame() {
+  const nome = document.getElementById('exame-form-nome')?.value.trim();
+  const cpf  = document.getElementById('exame-form-cpf')?.value.trim();
+  const tel  = document.getElementById('exame-form-tel')?.value.trim();
+  const emp  = document.getElementById('exame-form-empresa')?.value;
+  const turno = document.getElementById('exame-form-turno')?.value;
+
+  if (!nome || !cpf || !tel || !emp || !turno) {
+    alert('Preencha os campos obrigatórios: Nome, CPF, Telefone, Empresa e Turno.');
+    return;
+  }
+
+  garantirExamesMedicos();
+
+  const novoExame = {
+    id: `exame-${Date.now()}`,
+    nomeCompleto: nome,
+    cpf,
+    dataNascimento: document.getElementById('exame-form-nasc')?.value || '',
+    rg:   document.getElementById('exame-form-rg')?.value.trim() || '',
+    nomePai: document.getElementById('exame-form-pai')?.value.trim() || '',
+    nomeMae: document.getElementById('exame-form-mae')?.value.trim() || '',
+    telefone: tel,
+    empresa: emp,
+    turno,
+    responsavelSelecao: loggedUser ? loggedUser.nome : 'Sistema',
+    responsavelLogin: loggedUser ? loggedUser.login : '',
+    status: 'aguardando',
+    pdfExame: null,
+    pdfNome: '',
+    observacao: '',
+    dataCadastro: new Date().toISOString(),
+    dataConclusao: null
+  };
+
+  state.examesMedicos.push(novoExame);
+  saveState();
+  fecharModalNovoExame();
+  renderExameMedico();
+}
+window.salvarNovoExame = salvarNovoExame;
+
+// ── Modal: Detalhe do Exame ────────────────────────────────────────────────
+
+let _exameIdAtual = null;
+let _tempExameDoc = null; // Armazena temporariamente o documento anexado (base64) no modal
+
+function abrirModalDetalheExame(exameId) {
+  garantirExamesMedicos();
+  const ex = state.examesMedicos.find(e => e.id === exameId);
+  if (!ex) return;
+  _exameIdAtual = exameId;
+  _tempExameDoc = null; // Reseta temporário
+
+  const isClinica = _examePerfilClinica();
+
+  // Cabeçalho
+  const nomeEl = document.getElementById('detalhe-exame-nome-titulo');
+  if (nomeEl) nomeEl.textContent = ex.nomeCompleto || 'Candidato';
+  const subEl = document.getElementById('detalhe-exame-empresa-turno');
+  if (subEl) subEl.textContent = `${ex.empresa || ''}  •  ${_formatarTurno(ex.turno)}`;
+
+  // Conteúdo
+  const conteudo = document.getElementById('detalhe-exame-conteudo');
+  if (conteudo) {
+    let pdfHtml = '';
+
+    if (ex.status === 'concluido') {
+      const isImage = ex.pdfExame && (ex.pdfExame.startsWith('data:image/') || /\.(jpg|jpeg|png|webp)($|\?)/i.test(ex.pdfNome || ''));
+      const docIcon = isImage ? '<i class="fa-solid fa-file-image"></i>' : '<i class="fa-solid fa-file-pdf"></i>';
+      pdfHtml = `
+        <div class="exame-pdf-card">
+          <div class="exame-pdf-icon">${docIcon}</div>
+          <div class="exame-pdf-info">
+            <strong>${escapeHTML(ex.pdfNome || 'Laudo Médico')}</strong>
+            <span>Anexado em ${ex.dataConclusao ? _formatarDataBR(ex.dataConclusao.substring(0,10)) : '—'}</span>
+          </div>
+          <a href="${ex.pdfExame}" download="${ex.pdfNome || 'laudo-exame'}" class="btn btn-sm btn-outline exame-btn-download" title="Baixar documento">
+            <i class="fa-solid fa-download"></i> Baixar
+          </a>
+          <button class="btn btn-sm btn-primary" onclick="visualizarDocumentoExame('${exameId}')"><i class='fa-solid fa-eye'></i> Visualizar</button>
+        </div>`;
+    } else {
+      if (isClinica) {
+        // Área para a clínica selecionar o laudo
+        pdfHtml = `<div id="exame-upload-preview-container"></div>`;
+      } else {
+        pdfHtml = `<div class="exame-pdf-placeholder"><i class="fa-solid fa-file-medical"></i> Laudo não anexado ainda</div>`;
+      }
+    }
+
+    // Área de observações
+    let obsHtml = '';
+    if (isClinica && ex.status === 'aguardando') {
+      obsHtml = `
+        <div style="margin-top:16px;">
+          <label style="display:block;font-size:12px;font-weight:700;color:var(--color-text-title);margin-bottom:6px;">Observação / Anotação da Clínica (Opcional):</label>
+          <textarea id="detalhe-exame-obs-input" class="form-control" rows="3" style="width:100%;resize:vertical;font-size:13px;" placeholder="Ex: Apto com restrições, observações médicas..."></textarea>
+        </div>`;
+    } else if (ex.observacao) {
+      obsHtml = `
+        <div style="margin-top:16px;background:rgba(217, 119, 6, 0.05);border:1px solid rgba(217, 119, 6, 0.2);padding:14px;border-radius:10px;">
+          <h5 style="margin:0 0 6px;font-size:12px;font-weight:700;color:#D97706;display:flex;align-items:center;gap:6px;">
+            <i class="fa-solid fa-bell"></i> Observação da Clínica
+          </h5>
+          <p style="margin:0;font-size:13px;color:#1E293B;white-space:pre-wrap;font-weight:500;">${escapeHTML(ex.observacao)}</p>
+        </div>`;
+    }
+
+    conteudo.innerHTML = `
+      <div class="exame-detalhe-grid">
+        <div class="exame-detalhe-grupo">
+          <h4><i class="fa-solid fa-user"></i> Dados Pessoais</h4>
+          <div class="exame-detalhe-campos">
+            <div class="exame-campo"><span class="exame-campo-label">Nome Completo</span><span class="exame-campo-valor">${ex.nomeCompleto || '—'}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">CPF</span><span class="exame-campo-valor">${ex.cpf || '—'}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">RG</span><span class="exame-campo-valor">${ex.rg || '—'}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Data de Nascimento</span><span class="exame-campo-valor">${_formatarDataBR(ex.dataNascimento)}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Nome do Pai</span><span class="exame-campo-valor">${ex.nomePai || '—'}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Nome da Mãe</span><span class="exame-campo-valor">${ex.nomeMae || '—'}</span></div>
+          </div>
+        </div>
+        <div class="exame-detalhe-grupo">
+          <h4><i class="fa-solid fa-building"></i> Contratação & Contato</h4>
+          <div class="exame-detalhe-campos">
+            <div class="exame-campo">
+              <span class="exame-campo-label">Telefone / WhatsApp</span>
+              <span class="exame-campo-valor">
+                <a href="https://wa.me/55${(ex.telefone||'').replace(/\D/g,'')}" target="_blank" class="exame-wpp-link">
+                  <i class="fa-brands fa-whatsapp"></i> ${ex.telefone || '—'}
+                </a>
+              </span>
+            </div>
+            <div class="exame-campo"><span class="exame-campo-label">Empresa</span><span class="exame-campo-valor">${ex.empresa || '—'}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Turno</span><span class="exame-campo-valor">${_formatarTurno(ex.turno)}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Responsável (Seleção)</span><span class="exame-campo-valor">${ex.responsavelSelecao || '—'}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Cadastrado em</span><span class="exame-campo-valor">${ex.dataCadastro ? _formatarDataBR(ex.dataCadastro.substring(0,10)) : '—'}</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="exame-detalhe-laudo">
+        <h4><i class="fa-solid fa-file-medical"></i> Laudo do Exame</h4>
+        ${pdfHtml}
+        ${obsHtml}
+      </div>
+    `;
+  }
+
+  // Botões do rodapé
+  const footer = document.getElementById('detalhe-exame-footer');
+  if (footer) {
+    if (isClinica && ex.status === 'aguardando') {
+      footer.innerHTML = `
+        <button class="btn btn-outline" onclick="fecharModalDetalheExame()"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+        <button class="btn btn-success" id="btn-salvar-concluir-exame" onclick="salvarConclusaoExame()" disabled>
+          <i class="fa-solid fa-circle-check"></i> Salvar e Concluir Exame
+        </button>
+      `;
+      atualizarPreviewDocExame();
+    } else {
+      footer.innerHTML = `<button class="btn btn-outline" onclick="fecharModalDetalheExame()"><i class="fa-solid fa-xmark"></i> Fechar</button>`;
+    }
+  }
+
+  const modal = document.getElementById('modal-detalhe-exame');
+  if (modal) modal.style.display = 'flex';
+}
+window.abrirModalDetalheExame = abrirModalDetalheExame;
+
+function fecharModalDetalheExame() {
+  const modal = document.getElementById('modal-detalhe-exame');
+  if (modal) modal.style.display = 'none';
+  _exameIdAtual = null;
+  _tempExameDoc = null;
+}
+window.fecharModalDetalheExame = fecharModalDetalheExame;
+
+// Atualiza a visualização do arquivo selecionado temporariamente no modal
+function atualizarPreviewDocExame() {
+  const container = document.getElementById('exame-upload-preview-container');
+  if (!container) return;
+
+  if (_tempExameDoc) {
+    const isImage = _tempExameDoc.base64.startsWith('data:image/') || /\.(jpg|jpeg|png|webp)($|\?)/i.test(_tempExameDoc.name || '');
+    const docIcon = isImage ? '<i class="fa-solid fa-file-image"></i>' : '<i class="fa-solid fa-file-pdf"></i>';
+    container.innerHTML = `
+      <div class="exame-pdf-card" style="margin-top:10px;">
+        <div class="exame-pdf-icon" style="color: #2563EB;">${docIcon}</div>
+        <div class="exame-pdf-info">
+          <strong>${escapeHTML(_tempExameDoc.name)}</strong>
+          <span style="color:#059669;font-weight:600;"><i class="fa-solid fa-circle-check"></i> Pronto para salvar e concluir</span>
+        </div>
+        <button class="btn btn-sm btn-outline" onclick="window._tempExameDoc = null; atualizarPreviewDocExame();" style="border-color:#DC2626;color:#DC2626;">
+          <i class="fa-solid fa-trash-can"></i> Remover
+        </button>
+      </div>
+    `;
+    const btnSalvar = document.getElementById('btn-salvar-concluir-exame');
+    if (btnSalvar) btnSalvar.disabled = false;
+  } else {
+    container.innerHTML = `
+      <button class="btn btn-success" onclick="triggerUploadPdfExame()" style="width:100%;justify-content:center;">
+        <i class="fa-solid fa-file-arrow-up"></i> Selecionar Documento (PDF ou Imagem)
+      </button>
+      <div style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:6px;">Formatos aceitos: PDF, JPG, PNG, WEBP (máx. 10MB)</div>
+    `;
+    const btnSalvar = document.getElementById('btn-salvar-concluir-exame');
+    if (btnSalvar) btnSalvar.disabled = true;
+  }
+}
+window.atualizarPreviewDocExame = atualizarPreviewDocExame;
+
+// ── Upload do PDF/Imagem do Laudo ──────────────────────────────────────────
+
+function triggerUploadPdfExame() {
+  const input = document.getElementById('input-pdf-exame');
+  if (input) input.click();
+}
+window.triggerUploadPdfExame = triggerUploadPdfExame;
+
+async function processarUploadPdfExame(input) {
+  const file = input.files?.[0];
+  if (!file || !_exameIdAtual) return;
+
+  // Validação de tamanho (máx 10MB)
+  if (file.size > 10 * 1024 * 1024) {
+    alert('O arquivo deve ter no máximo 10MB.');
+    input.value = '';
+    return;
+  }
+  const ext = file.name.split('.').pop().toLowerCase();
+  const allowed = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
+  if (!allowed.includes(ext)) {
+    alert('Apenas arquivos PDF ou Imagens (JPG, PNG, WEBP) são aceitos.');
+    input.value = '';
+    return;
+  }
+
+  try {
+    const base64 = await fileToBase64(file);
+    _tempExameDoc = {
+      base64: base64,
+      name: file.name
+    };
+    input.value = '';
+    atualizarPreviewDocExame();
+  } catch (err) {
+    alert('Erro ao processar o arquivo: ' + (err.message || err));
+    input.value = '';
+  }
+}
+window.processarUploadPdfExame = processarUploadPdfExame;
+
+// Salva a conclusão do exame com o documento anexado e a observação opcional
+function salvarConclusaoExame() {
+  if (!_exameIdAtual || !_tempExameDoc) return;
+
+  garantirExamesMedicos();
+  const ex = state.examesMedicos.find(e => e.id === _exameIdAtual);
+  if (!ex) return;
+
+  const obs = document.getElementById('detalhe-exame-obs-input')?.value.trim() || '';
+
+  ex.pdfExame = _tempExameDoc.base64;
+  ex.pdfNome  = _tempExameDoc.name;
+  ex.observacao = obs;
+  ex.status   = 'concluido';
+  ex.dataConclusao = new Date().toISOString();
+
+  saveState();
+  fecharModalDetalheExame();
+  renderExameMedico();
+
+  // Feedback visual
+  setTimeout(() => {
+    const toast = document.createElement('div');
+    toast.className = 'exame-toast-ok';
+    toast.innerHTML = '<i class="fa-solid fa-circle-check"></i> Laudo do exame salvo e concluído com sucesso!';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3500);
+  }, 200);
+}
+window.salvarConclusaoExame = salvarConclusaoExame;
+
+// Visualizar documento (PDF ou Imagem) em nova janela
+function visualizarDocumentoExame(exameId) {
+  garantirExamesMedicos();
+  const ex = state.examesMedicos.find(e => e.id === exameId);
+  if (!ex || !ex.pdfExame) return;
+  const isImage = ex.pdfExame.startsWith('data:image/') || /\.(jpg|jpeg|png|webp)($|\?)/i.test(ex.pdfNome || '');
+  const w = window.open('');
+  if (w) {
+    if (isImage) {
+      w.document.write(`<div style="display:flex;justify-content:center;align-items:center;min-height:100vh;background:#0f172a;"><img src="${ex.pdfExame}" style="max-width:100%;max-height:100vh;object-fit:contain;box-shadow:0 10px 30px rgba(0,0,0,0.5);border-radius:8px;"></div>`);
+    } else {
+      w.document.write(`<iframe src="${ex.pdfExame}" style="width:100%;height:100vh;border:none;margin:0;padding:0;"></iframe>`);
+    }
+    w.document.title = ex.pdfNome || 'Documento do Exame';
+  }
+}
+window.visualizarDocumentoExame = visualizarDocumentoExame;
+
+
 
 
 

@@ -130,6 +130,33 @@ const INITIAL_DATA = {
         sistema: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
         exportacoes: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true }
       }
+    },
+    {
+      id: 'func-6',
+      nome: 'Clínica Médica RT',
+      email: 'clinica@rtempregos.com',
+      login: 'clinica',
+      senha: 'clinica123',
+      departamento: 'clinica',
+      cargo: 'Clínica Parceira',
+      status: 'ativo',
+      representanteDepto: false,
+      podeEditarPortalPublico: false,
+      permissoes: {
+        dashboard: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
+        vagas: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
+        banco_talentos: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
+        selecao: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
+        dp: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
+        comissao: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
+        relatorios: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
+        graficos: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
+        candidatos: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
+        funcionarios: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
+        sistema: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
+        exportacoes: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
+        exame_medico: { visualizar: true, criar: false, editar: true, excluir: false, aprovar: true, exportar: false, relatorios: false, perms: false }
+      }
     }
   ],
 
@@ -942,5 +969,8 @@ const INITIAL_DATA = {
       "perguntasFrequentes",
       "contato"
     ]
-  }
+  },
+
+  // Exames médicos admissionais
+  examesMedicos: []
 };

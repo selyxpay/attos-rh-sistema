@@ -229,18 +229,76 @@ const CHAVES_ESCRITA_PUBLICA = ['candidatos', 'bancoTalentos', 'fila', '_docsMet
 function garantirAdminServidor() {
   comTrava(function () {
     const st = lerEstado();
-    const d = st.dados || {};
-    if (!Array.isArray(d.funcionarios)) d.funcionarios = [];
-    const existe = d.funcionarios.some(function (f) { return (f.login || '').toLowerCase() === 'admin'; });
-    if (!existe) {
+    let d = st.dados || {};
+    let mudou = false;
+
+    if (!Array.isArray(d.funcionarios)) {
+      d.funcionarios = [];
+      mudou = true;
+    }
+
+    // Carrega contas iniciais e outros dados mock do data.js para o servidor (state.json)
+    try {
+      const vm = require('vm');
+      const dataPath = path.join(BASE, 'js', 'data.js');
+      if (fs.existsSync(dataPath)) {
+        const content = fs.readFileSync(dataPath, 'utf8');
+        const sandbox = {};
+        const initial = vm.runInNewContext(content + '\n;INITIAL_DATA;', sandbox);
+        if (initial && typeof initial === 'object') {
+          // Se o estado estiver vazio ou sem vagas/empresas, inicializa com todos os mocks
+          if (!d.vagas || d.vagas.length === 0) {
+            Object.keys(initial).forEach(function (k) {
+              if (d[k] === undefined || (Array.isArray(d[k]) && d[k].length === 0)) {
+                d[k] = JSON.parse(JSON.stringify(initial[k]));
+                mudou = true;
+              }
+            });
+            console.log('[RT] Dados mock iniciais importados de data.js.');
+          }
+
+          // Sincroniza cada funcionário do data.js para o state.json do servidor
+          if (Array.isArray(initial.funcionarios)) {
+            initial.funcionarios.forEach(function (fInit) {
+              const existe = d.funcionarios.some(function (f) {
+                return (f.login || '').toLowerCase() === (fInit.login || '').toLowerCase();
+              });
+              if (!existe) {
+                d.funcionarios.push(JSON.parse(JSON.stringify(fInit)));
+                mudou = true;
+                console.log('[RT] Conta importada para o servidor:', fInit.login);
+              }
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[RT] Erro ao sincronizar com data.js:', e);
+    }
+
+    const existeAdmin = d.funcionarios.some(function (f) { return (f.login || '').toLowerCase() === 'admin'; });
+    if (!existeAdmin) {
       d.funcionarios.push({
         id: 'func-admin', nome: 'Administrador', login: 'admin',
         senha: '6101ed3e13dcdc5ea80901f4c5e1c9152d55b33b077b9f0b6ec30e72bf082e08', // gruport07072026
         departamento: 'administracao', status: 'ativo', permissoes: {}
       });
-      gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-      console.log('[RT] Conta admin criada (primeiro uso).');
+      mudou = true;
+      console.log('[RT] Conta admin criada.');
     }
+
+    if (mudou) {
+      gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+    }
+
+    // Exibe lista amigável de usuários e senhas para o desenvolvedor local no console
+    console.log('\n==================================================');
+    console.log('CONTAS E SENHAS DISPONÍVEIS NO SERVIDOR:');
+    d.funcionarios.forEach(function (f) {
+      const senhaExibida = f.login === 'admin' ? 'gruport07072026' : (f.senha.length === 64 ? '(SHA-256)' : f.senha);
+      console.log(` - Login: ${f.login.padEnd(12)} | Senha: ${senhaExibida.padEnd(18)} | Departamento: ${f.departamento}`);
+    });
+    console.log('==================================================\n');
   });
 }
 
