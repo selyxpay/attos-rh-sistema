@@ -9077,6 +9077,18 @@ function _examePerfilSelecao() {
     ehMestre(loggedUser.login)
   );
 }
+// Quem pode ENVIAR o laudo do resultado: a clínica OU admin/master (ex.: clínica manda por WhatsApp e o admin anexa)
+function _examePodeEnviarLaudo() {
+  return _examePerfilClinica() || (loggedUser && (loggedUser.departamento === 'administracao' || ehMestre(loggedUser.login)));
+}
+// Formata ISO -> DD/MM/AAAA HH:MM (data e hora com minutos)
+function _formatarDataHoraBR(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 
 // Formata turno
 function _formatarTurno(t) {
@@ -9222,11 +9234,12 @@ function _renderExameRow(ex, isClinica) {
     ? `<span class="exame-badge exame-badge-ok"><i class="fa-solid fa-circle-check"></i> Concluído</span>`
     : `<span class="exame-badge exame-badge-pend"><i class="fa-solid fa-clock"></i> Aguardando</span>`;
 
-  const btnLabel = isClinica
-    ? (ex.status === 'concluido' ? '<i class="fa-solid fa-eye"></i> Ver Laudo' : '<i class="fa-solid fa-file-arrow-up"></i> Anexar Laudo')
-    : '<i class="fa-solid fa-eye"></i> Detalhes';
+  const podeEnviar = _examePodeEnviarLaudo();
+  const btnLabel = (podeEnviar && ex.status === 'aguardando')
+    ? '<i class="fa-solid fa-file-arrow-up"></i> Anexar Laudo'
+    : (ex.status === 'concluido' ? '<i class="fa-solid fa-eye"></i> Ver Laudo' : '<i class="fa-solid fa-eye"></i> Detalhes');
 
-  const btnClass = isClinica && ex.status === 'aguardando' ? 'btn-exame-upload' : 'btn-exame-ver';
+  const btnClass = podeEnviar && ex.status === 'aguardando' ? 'btn-exame-upload' : 'btn-exame-ver';
 
   const sininhoHtml = ex.observacao
     ? `<i class="fa-solid fa-bell exame-sininho-alert" title="Observação: ${escapeHTML(ex.observacao)}"></i>`
@@ -9248,8 +9261,14 @@ function _renderExameRow(ex, isClinica) {
         <strong>${ex.empresa || '—'}</strong><br>
         <small>${_formatarTurno(ex.turno)}</small>
       </span>
-      <span class="exame-col-resp">${ex.responsavelSelecao || '—'}</span>
-      <span class="exame-col-status">${statusBadge}</span>
+      <span class="exame-col-resp">
+        ${ex.responsavelSelecao || '—'}
+        <br><small style="color:var(--text-secondary);font-size:10px;white-space:nowrap;"><i class="fa-regular fa-clock"></i> Solicitado: ${_formatarDataHoraBR(ex.dataCadastro)}</small>
+      </span>
+      <span class="exame-col-status">
+        ${statusBadge}
+        ${ex.dataConclusao ? `<br><small style="color:#059669;font-size:10px;white-space:nowrap;"><i class="fa-solid fa-file-circle-check"></i> Resultado: ${_formatarDataHoraBR(ex.dataConclusao)}</small>` : ''}
+      </span>
       <span class="exame-col-acao">
         <button class="${btnClass}" onclick="abrirModalDetalheExame('${ex.id}')">${btnLabel}</button>
       </span>
@@ -9346,6 +9365,7 @@ function abrirModalDetalheExame(exameId) {
   _tempExameDoc = null; // Reseta temporário
 
   const isClinica = _examePerfilClinica();
+  const podeEnviarLaudo = _examePodeEnviarLaudo();
 
   // Cabeçalho
   const nomeEl = document.getElementById('detalhe-exame-nome-titulo');
@@ -9366,7 +9386,7 @@ function abrirModalDetalheExame(exameId) {
           <div class="exame-pdf-icon">${docIcon}</div>
           <div class="exame-pdf-info">
             <strong>${escapeHTML(ex.pdfNome || 'Laudo Médico')}</strong>
-            <span>Anexado em ${ex.dataConclusao ? _formatarDataBR(ex.dataConclusao.substring(0,10)) : '—'}</span>
+            <span>Anexado em ${_formatarDataHoraBR(ex.dataConclusao)}</span>
           </div>
           <a href="${ex.pdfExame}" download="${ex.pdfNome || 'laudo-exame'}" class="btn btn-sm btn-outline exame-btn-download" title="Baixar documento">
             <i class="fa-solid fa-download"></i> Baixar
@@ -9374,8 +9394,8 @@ function abrirModalDetalheExame(exameId) {
           <button class="btn btn-sm btn-primary" onclick="visualizarDocumentoExame('${exameId}')"><i class='fa-solid fa-eye'></i> Visualizar</button>
         </div>`;
     } else {
-      if (isClinica) {
-        // Área para a clínica selecionar o laudo
+      if (podeEnviarLaudo) {
+        // Área para anexar/enviar o laudo (clínica ou admin)
         pdfHtml = `<div id="exame-upload-preview-container"></div>`;
       } else {
         pdfHtml = `<div class="exame-pdf-placeholder"><i class="fa-solid fa-file-medical"></i> Laudo não anexado ainda</div>`;
@@ -9384,7 +9404,7 @@ function abrirModalDetalheExame(exameId) {
 
     // Área de observações
     let obsHtml = '';
-    if (isClinica && ex.status === 'aguardando') {
+    if (podeEnviarLaudo && ex.status === 'aguardando') {
       obsHtml = `
         <div style="margin-top:16px;">
           <label style="display:block;font-size:12px;font-weight:700;color:var(--color-text-title);margin-bottom:6px;">Observação / Anotação da Clínica (Opcional):</label>
@@ -9427,7 +9447,8 @@ function abrirModalDetalheExame(exameId) {
             <div class="exame-campo"><span class="exame-campo-label">Empresa</span><span class="exame-campo-valor">${ex.empresa || '—'}</span></div>
             <div class="exame-campo"><span class="exame-campo-label">Turno</span><span class="exame-campo-valor">${_formatarTurno(ex.turno)}</span></div>
             <div class="exame-campo"><span class="exame-campo-label">Responsável (Seleção)</span><span class="exame-campo-valor">${ex.responsavelSelecao || '—'}</span></div>
-            <div class="exame-campo"><span class="exame-campo-label">Cadastrado em</span><span class="exame-campo-valor">${ex.dataCadastro ? _formatarDataBR(ex.dataCadastro.substring(0,10)) : '—'}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Solicitado em</span><span class="exame-campo-valor">${_formatarDataHoraBR(ex.dataCadastro)}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Resultado enviado em</span><span class="exame-campo-valor">${ex.dataConclusao ? _formatarDataHoraBR(ex.dataConclusao) : 'Aguardando'}</span></div>
           </div>
         </div>
       </div>
@@ -9442,7 +9463,7 @@ function abrirModalDetalheExame(exameId) {
   // Botões do rodapé
   const footer = document.getElementById('detalhe-exame-footer');
   if (footer) {
-    if (isClinica && ex.status === 'aguardando') {
+    if (podeEnviarLaudo && ex.status === 'aguardando') {
       footer.innerHTML = `
         <button class="btn btn-outline" onclick="fecharModalDetalheExame()"><i class="fa-solid fa-xmark"></i> Cancelar</button>
         <button class="btn btn-success" id="btn-salvar-concluir-exame" onclick="salvarConclusaoExame()" disabled>
