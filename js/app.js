@@ -2387,8 +2387,9 @@ function setupEventListeners() {
         id: `func-${Date.now()}`,
         nome,
         email,
-        login: loginVal,
+        login: loginVal.toLowerCase(),
         senha: senhaFinal,
+        senhaVisivel: senhaVal,   // senha visível para o admin (novo funcionário)
         departamento: depto,
         nivelAcesso: depto === 'administracao' ? 'administrador' : 'comum',
         status: statusVal
@@ -5115,7 +5116,15 @@ function renderFuncionarios() {
           ${f.nome}${destaqueIcon}
           ${isSelf ? '<span class="tag-badge tag-blue" style="font-size:9px; padding:1px 4px; margin-left:4px;">Você</span>' : ''}
         </td>
-        <td>${f.login}</td>
+        <td>
+          ${f.login}
+          <div style="font-size:11px;margin-top:3px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+            ${f.senhaVisivel
+              ? `<span style="color:#059669;font-weight:700;" title="Senha do funcionário">🔑 ${escapeHTML(f.senhaVisivel)}</span>`
+              : `<span style="color:var(--text-secondary);" title="Senha antiga (embaralhada) — redefina para ver">🔒 oculta</span>`}
+            ${podeRedefinirSenha(f) ? `<button class="btn btn-secondary btn-sm" style="padding:1px 7px;font-size:10px;" onclick="resetarSenhaFuncionario('${f.id}')"><i class="fa-solid fa-key"></i> Redefinir</button>` : ''}
+          </div>
+        </td>
         <td><span class="tag-badge tag-blue">${deptoLabels[f.departamento] || f.departamento}</span></td>
         <td><span class="badge ${statusClass}">${statusText}</span></td>
         <td style="display:flex; gap:6px; flex-wrap:wrap;">
@@ -5136,6 +5145,36 @@ function renderFuncionarios() {
   setupModalGerenciarListeners();
   setupBtnCopiarLink();
 }
+
+// Quem pode ver/redefinir a senha: mestre (admin/João) ou admin da administração vê todos;
+// representante de departamento só os do próprio departamento.
+function podeRedefinirSenha(f) {
+  if (!loggedUser) return false;
+  if (ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao') return true;
+  return !!(loggedUser.representanteDepto && f.departamento === loggedUser.departamento);
+}
+window.resetarSenhaFuncionario = async function (funcId) {
+  const func = (state.funcionarios || []).find(f => f.id === funcId);
+  if (!func) return;
+  const nova = prompt(`Definir NOVA senha para "${func.nome}" (mínimo 4 caracteres):`);
+  if (nova == null) return;
+  if (String(nova).length < 4) { alert('A senha precisa ter ao menos 4 caracteres.'); return; }
+  try {
+    const r = await fetch('/api/reset-senha', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin', body: JSON.stringify({ funcId: funcId, novaSenha: nova })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 200 && d.ok) {
+      alert(`Senha de "${func.nome}" definida como:\n\n${nova}\n\nAnote e passe para o funcionário.`);
+      try { const nuvem = await RTCloud.loadState(); if (nuvem) { state = nuvem; renderFuncionarios(); } } catch (e) {}
+    } else if (r.status === 403) {
+      alert('Você não tem permissão para redefinir a senha deste funcionário (só do seu departamento).');
+    } else {
+      alert('Não foi possível redefinir a senha. Tente novamente.');
+    }
+  } catch (e) { alert('Erro de conexão. Tente novamente.'); }
+};
 
 function toggleStatusFuncionario(id) {
   const func = state.funcionarios.find(f => f.id === id);

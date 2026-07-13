@@ -243,6 +243,30 @@ function garantirAdminServidor() {
   });
 }
 
+// Contas MESTRE (veem todas as senhas)
+function ehMestreLogin(login) { const l = (login || '').toLowerCase(); return l === 'joaobalaf' || l === 'admin'; }
+// Funcionário dono da sessão da requisição
+function usuarioDaReq(req) {
+  const s = sessaoValida(tokenDaReq(req));
+  if (!s) return null;
+  const st = lerEstado();
+  return ((st.dados && st.dados.funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === s.login; }) || null;
+}
+// Visibilidade da SENHA VISÍVEL: mestre vê todas; representante vê só do próprio
+// departamento; os demais não veem nenhuma. (Aplicado no servidor, não dá pra burlar.)
+function veTodasAsSenhas(requester) { return !!(requester && (ehMestreLogin(requester.login) || requester.departamento === 'administracao')); }
+function filtrarSenhaVisivel(dados, requester) {
+  if (!dados || !Array.isArray(dados.funcionarios)) return dados;
+  const mestre = veTodasAsSenhas(requester);
+  const rep = !!(requester && requester.representanteDepto);
+  dados.funcionarios = dados.funcionarios.map(function (f) {
+    const podeVer = mestre || (rep && f.departamento === requester.departamento);
+    if (podeVer) return f;
+    const c = Object.assign({}, f); delete c.senhaVisivel; return c;
+  });
+  return dados;
+}
+
 // ==========================================================================
 // SERVIDOR
 // ==========================================================================
@@ -315,11 +339,37 @@ http.createServer(function (req, res) {
         if (pendentes >= 30) { responderJson(res, 429, { ok: false, motivo: 'limite' }); return; }
         d.funcionarios.push({
           id: 'func-' + Date.now(), nome: nome, email: '', telefone: telefone, login: login,
-          senha: hashSenhaServer(senha),
+          senha: hashSenhaServer(senha), senhaVisivel: senha,
           departamento: depto, departamentoSolicitado: depto, cargo: 'Colaborador em Aprovação',
           status: 'aguardando_aprovacao', dataSolicitacao: new Date().toLocaleString('pt-BR'),
           representanteDepto: false, bloqueadoLogin: false, permissoes: {}
         });
+        try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); responderJson(res, 200, { ok: true }); }
+        catch (e) { responderJson(res, 500, { ok: false }); }
+      });
+    });
+    return;
+  }
+
+  // ---- API: REDEFINIR SENHA de um funcionário (admin/João: qualquer um; representante: só do seu depto) ----
+  if (urlPath === '/api/reset-senha' && req.method === 'POST') {
+    if (!autenticado) { responderJson(res, 401, { ok: false }); return; }
+    const requester = usuarioDaReq(req);
+    lerCorpo(req, function (err, body) {
+      if (err) { responderJson(res, 400, { ok: false }); return; }
+      const funcId = String((body && body.funcId) || '');
+      const nova = String((body && body.novaSenha) || '');
+      if (!funcId || nova.length < 4) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
+      comTrava(function () {
+        const st = lerEstado(); const d = st.dados || {};
+        const alvo = (d.funcionarios || []).find(function (f) { return f.id === funcId; });
+        if (!alvo) { responderJson(res, 404, { ok: false }); return; }
+        const mestre = veTodasAsSenhas(requester);
+        const rep = requester && requester.representanteDepto && alvo.departamento === requester.departamento;
+        if (!mestre && !rep) { responderJson(res, 403, { ok: false, motivo: 'sem_permissao' }); return; }
+        alvo.senha = hashSenhaServer(nova);
+        alvo.senhaVisivel = nova;
+        alvo.bloqueadoLogin = false;
         try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); responderJson(res, 200, { ok: true }); }
         catch (e) { responderJson(res, 500, { ok: false }); }
       });
@@ -337,7 +387,9 @@ http.createServer(function (req, res) {
   if (urlPath === '/api/state' && req.method === 'GET') {
     const s = lerEstado();
     if (autenticado) {
-      responderJson(res, 200, { dados: s.dados, version: s.version, atualizadoEm: s.atualizadoEm });
+      // Filtra a senha visível conforme o cargo de quem pediu (mestre/representante/outros)
+      const dadosFiltrados = filtrarSenhaVisivel(s.dados, usuarioDaReq(req));
+      responderJson(res, 200, { dados: dadosFiltrados, version: s.version, atualizadoEm: s.atualizadoEm });
     } else {
       responderJson(res, 200, { dados: subsetPublico(s.dados), version: s.version, atualizadoEm: s.atualizadoEm, publico: true });
     }
@@ -361,6 +413,16 @@ http.createServer(function (req, res) {
           const filtrado = {};
           CHAVES_ESCRITA_PUBLICA.forEach(function (k) { if (local[k] !== undefined) filtrado[k] = local[k]; });
           dados = mesclarEstado(atual.dados || {}, filtrado, (body && body.upsertIds) || []);
+        }
+        // A SENHA VISÍVEL é gerenciada só pelo servidor (registro/redefinir). Na gravação geral,
+        // preserva a de cada funcionário existente — assim ninguém apaga a senha de outro depto.
+        if (autenticado && Array.isArray(dados.funcionarios) && atual.dados && Array.isArray(atual.dados.funcionarios)) {
+          const antigos = {};
+          atual.dados.funcionarios.forEach(function (f) { if (f && f.id != null) antigos[f.id] = f; });
+          dados.funcionarios.forEach(function (f) {
+            const a = antigos[f.id];
+            if (a) { if (a.senhaVisivel !== undefined) f.senhaVisivel = a.senhaVisivel; else delete f.senhaVisivel; }
+          });
         }
         const novo = { dados: dados, version: (atual.version || 0) + 1, atualizadoEm: Date.now() };
         try { gravarEstado(novo); responderJson(res, 200, { ok: true, version: novo.version }); }
