@@ -9600,17 +9600,27 @@ window.salvarConclusaoExame = salvarConclusaoExame;
 function visualizarDocumentoExame(exameId) {
   garantirExamesMedicos();
   const ex = state.examesMedicos.find(e => e.id === exameId);
-  if (!ex || !ex.pdfExame) return;
-  const isImage = ex.pdfExame.startsWith('data:image/') || /\.(jpg|jpeg|png|webp)($|\?)/i.test(ex.pdfNome || '');
-  const w = window.open('');
-  if (w) {
-    if (isImage) {
-      w.document.write(`<div style="display:flex;justify-content:center;align-items:center;min-height:100vh;background:#0f172a;"><img src="${ex.pdfExame}" style="max-width:100%;max-height:100vh;object-fit:contain;box-shadow:0 10px 30px rgba(0,0,0,0.5);border-radius:8px;"></div>`);
-    } else {
-      w.document.write(`<iframe src="${ex.pdfExame}" style="width:100%;height:100vh;border:none;margin:0;padding:0;"></iframe>`);
-    }
-    w.document.title = ex.pdfNome || 'Documento do Exame';
+  if (!ex || !ex.pdfExame) { alert('Documento não encontrado.'); return; }
+  let src = ex.pdfExame;
+  // Documento recém-anexado (ainda não sincronizado) vem como base64. Navegadores
+  // bloqueiam abrir "data:" direto numa aba -> converte para Blob URL.
+  if (src.indexOf('data:') === 0) {
+    try {
+      const virgula = src.indexOf(',');
+      const mime = (src.slice(0, virgula).match(/data:([^;]+)/) || [])[1] || 'application/octet-stream';
+      const bin = atob(src.slice(virgula + 1));
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      src = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    } catch (e) { /* se falhar, mantém o data: original */ }
+  } else if (src.charAt(0) === '/') {
+    // URL relativa do /uploads -> absoluta, para abrir corretamente em nova aba.
+    src = window.location.origin + src;
   }
+  // Abre direto numa nova aba: o navegador renderiza PDF/imagem nativamente e
+  // isso NÃO é bloqueado pelo X-Frame-Options/CSP (que só valem para iframes).
+  const w = window.open(src, '_blank');
+  if (!w) alert('Não foi possível abrir o documento. Habilite os pop-ups para este site e tente novamente.');
 }
 window.visualizarDocumentoExame = visualizarDocumentoExame;
 
