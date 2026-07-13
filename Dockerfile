@@ -6,6 +6,7 @@ WORKDIR /app
 # Arquivos do site + servidor (o server.cjs usa só Node puro, sem instalar nada)
 COPY server.cjs ./
 COPY index.html login.html candidato.html talento.html fila-display.html ./
+COPY robots.txt sitemap.xml ./
 COPY css ./css
 COPY js  ./js
 COPY img ./img

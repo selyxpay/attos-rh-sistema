@@ -5118,12 +5118,11 @@ function renderFuncionarios() {
         </td>
         <td>
           ${f.login}
-          <div style="font-size:11px;margin-top:3px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
-            ${f.senhaVisivel
-              ? `<span style="color:#059669;font-weight:700;" title="Senha do funcionário">🔑 ${escapeHTML(f.senhaVisivel)}</span>`
-              : `<span style="color:var(--text-secondary);" title="Senha antiga (embaralhada) — redefina para ver">🔒 oculta</span>`}
-            ${podeRedefinirSenha(f) ? `<button class="btn btn-secondary btn-sm" style="padding:1px 7px;font-size:10px;" onclick="resetarSenhaFuncionario('${f.id}')"><i class="fa-solid fa-key"></i> Redefinir</button>` : ''}
-          </div>
+          ${podeRedefinirSenha(f) ? `
+          <div style="margin-top:3px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" style="padding:1px 7px;font-size:10px;" onclick="verSenhaFuncionario('${f.id}')"><i class="fa-solid fa-eye"></i> Ver senha</button>
+            <button class="btn btn-secondary btn-sm" style="padding:1px 7px;font-size:10px;" onclick="resetarSenhaFuncionario('${f.id}')"><i class="fa-solid fa-key"></i> Redefinir</button>
+          </div>` : ''}
         </td>
         <td><span class="tag-badge tag-blue">${deptoLabels[f.departamento] || f.departamento}</span></td>
         <td><span class="badge ${statusClass}">${statusText}</span></td>
@@ -5146,13 +5145,29 @@ function renderFuncionarios() {
   setupBtnCopiarLink();
 }
 
-// Quem pode ver/redefinir a senha: mestre (admin/João) ou admin da administração vê todos;
-// representante de departamento só os do próprio departamento.
+// Quem pode ver/redefinir a senha: mestre (admin/João) ou administração vê todos.
+// Os demais só se estiverem MARCADOS (podeVerSenhas) e forem do MESMO departamento.
 function podeRedefinirSenha(f) {
   if (!loggedUser) return false;
   if (ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao') return true;
-  return !!(loggedUser.representanteDepto && f.departamento === loggedUser.departamento);
+  return !!(loggedUser.podeVerSenhas && f.departamento === loggedUser.departamento);
 }
+window.verSenhaFuncionario = async function (funcId) {
+  const func = (state.funcionarios || []).find(f => f.id === funcId);
+  try {
+    const r = await fetch('/api/ver-senha', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin', body: JSON.stringify({ funcId: funcId })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 200 && d.ok) {
+      if (d.senha) alert(`Senha de "${func ? func.nome : ''}":\n\n${d.senha}`);
+      else alert('Esta conta tem senha antiga (embaralhada) e não dá para ver. Clique em "Redefinir" para definir uma nova.');
+    } else if (r.status === 403) {
+      alert('Você não tem permissão para ver a senha deste funcionário.');
+    } else { alert('Não foi possível ver a senha.'); }
+  } catch (e) { alert('Erro de conexão. Tente novamente.'); }
+};
 window.resetarSenhaFuncionario = async function (funcId) {
   const func = (state.funcionarios || []).find(f => f.id === funcId);
   if (!func) return;
@@ -6392,6 +6407,8 @@ window.abrirModalGerenciarFuncionario = function(funcId) {
   document.getElementById('gerenciar-func-cargo').value = func.cargo || '';
   document.getElementById('gerenciar-func-status').value = func.status || 'ativo';
   document.getElementById('gerenciar-func-representante').checked = func.representanteDepto || false;
+  const _chkVerSenhas = document.getElementById('gerenciar-func-ver-senhas');
+  if (_chkVerSenhas) _chkVerSenhas.checked = !!func.podeVerSenhas;
 
 
   // Garantir permissões definidas
@@ -6506,10 +6523,12 @@ function salvarPermissoesFuncionario() {
     });
   }
 
+  const _chkVS = document.getElementById('gerenciar-func-ver-senhas');
   func.departamento = novoDepto;
   func.cargo = novoCargo;
   func.status = novoStatus;
   func.representanteDepto = novoRep;
+  func.podeVerSenhas = _chkVS ? _chkVS.checked : (func.podeVerSenhas || false);
   func.permissoes = novasPerms;
 
   // Vínculo de recrutadora (Meu Painel) — define usuarioId no recrutador escolhido

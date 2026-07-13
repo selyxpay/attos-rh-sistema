@@ -37,6 +37,7 @@ const MIME = {
   '.ico': 'image/x-icon',
   '.pdf': 'application/pdf',
   '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
 };
 
 // ==========================================================================
@@ -255,14 +256,17 @@ function usuarioDaReq(req) {
 // Visibilidade da SENHA VISÍVEL: mestre vê todas; representante vê só do próprio
 // departamento; os demais não veem nenhuma. (Aplicado no servidor, não dá pra burlar.)
 function veTodasAsSenhas(requester) { return !!(requester && (ehMestreLogin(requester.login) || requester.departamento === 'administracao')); }
-function filtrarSenhaVisivel(dados, requester) {
+// Só vê senha quem: é mestre/administração, OU foi MARCADO (podeVerSenhas) e é do mesmo departamento.
+function podeVerSenhaDe(requester, alvo) {
+  if (veTodasAsSenhas(requester)) return true;
+  return !!(requester && requester.podeVerSenhas && alvo && alvo.departamento === requester.departamento);
+}
+// A senha visível NUNCA vai junto com o estado — só via /api/ver-senha (que registra o acesso).
+function filtrarSenhaVisivel(dados) {
   if (!dados || !Array.isArray(dados.funcionarios)) return dados;
-  const mestre = veTodasAsSenhas(requester);
-  const rep = !!(requester && requester.representanteDepto);
   dados.funcionarios = dados.funcionarios.map(function (f) {
-    const podeVer = mestre || (rep && f.departamento === requester.departamento);
-    if (podeVer) return f;
-    const c = Object.assign({}, f); delete c.senhaVisivel; return c;
+    if (f && f.senhaVisivel !== undefined) { const c = Object.assign({}, f); delete c.senhaVisivel; return c; }
+    return f;
   });
   return dados;
 }
@@ -364,14 +368,44 @@ http.createServer(function (req, res) {
         const st = lerEstado(); const d = st.dados || {};
         const alvo = (d.funcionarios || []).find(function (f) { return f.id === funcId; });
         if (!alvo) { responderJson(res, 404, { ok: false }); return; }
-        const mestre = veTodasAsSenhas(requester);
-        const rep = requester && requester.representanteDepto && alvo.departamento === requester.departamento;
-        if (!mestre && !rep) { responderJson(res, 403, { ok: false, motivo: 'sem_permissao' }); return; }
+        if (!podeVerSenhaDe(requester, alvo)) { responderJson(res, 403, { ok: false, motivo: 'sem_permissao' }); return; }
         alvo.senha = hashSenhaServer(nova);
         alvo.senhaVisivel = nova;
         alvo.bloqueadoLogin = false;
         try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); responderJson(res, 200, { ok: true }); }
         catch (e) { responderJson(res, 500, { ok: false }); }
+      });
+    });
+    return;
+  }
+
+  // ---- API: VER a senha de um funcionário (registra QUEM viu, DE QUEM, quando e IP) ----
+  if (urlPath === '/api/ver-senha' && req.method === 'POST') {
+    if (!autenticado) { responderJson(res, 401, { ok: false }); return; }
+    const requester = usuarioDaReq(req);
+    lerCorpo(req, function (err, body) {
+      if (err) { responderJson(res, 400, { ok: false }); return; }
+      const funcId = String((body && body.funcId) || '');
+      comTrava(function () {
+        const st = lerEstado(); const d = st.dados || {};
+        const alvo = (d.funcionarios || []).find(function (f) { return f.id === funcId; });
+        if (!alvo) { responderJson(res, 404, { ok: false }); return; }
+        if (!podeVerSenhaDe(requester, alvo)) { responderJson(res, 403, { ok: false, motivo: 'sem_permissao' }); return; }
+        // Auditoria: registra a visualização (contas mestre são "fantasma" — não registram)
+        if (requester && !ehMestreLogin(requester.login)) {
+          if (!Array.isArray(d.logs)) d.logs = [];
+          const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+          d.logs.unshift({
+            id: 'log-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+            data: new Date().toLocaleString('pt-BR'),
+            usuario: requester.nome || requester.login,
+            acao: 'Visualizou a senha de "' + (alvo.nome || alvo.login) + '" (' + (alvo.login || '') + ').',
+            categoria: 'seguranca',
+            ip: ip
+          });
+          try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); } catch (e) {}
+        }
+        responderJson(res, 200, { ok: true, senha: alvo.senhaVisivel || null });
       });
     });
     return;
@@ -387,8 +421,8 @@ http.createServer(function (req, res) {
   if (urlPath === '/api/state' && req.method === 'GET') {
     const s = lerEstado();
     if (autenticado) {
-      // Filtra a senha visível conforme o cargo de quem pediu (mestre/representante/outros)
-      const dadosFiltrados = filtrarSenhaVisivel(s.dados, usuarioDaReq(req));
+      // A senha visível é removida daqui — só sai pela rota /api/ver-senha (com registro)
+      const dadosFiltrados = filtrarSenhaVisivel(s.dados);
       responderJson(res, 200, { dados: dadosFiltrados, version: s.version, atualizadoEm: s.atualizadoEm });
     } else {
       responderJson(res, 200, { dados: subsetPublico(s.dados), version: s.version, atualizadoEm: s.atualizadoEm, publico: true });
