@@ -122,6 +122,18 @@
 
   /* Evita textos minúsculos */
   .vaga-desc, .banco-cand-sub { font-size: 13px; }
+
+  /* ---------- Robustez geral no celular ---------- */
+  /* Nunca rola a página na horizontal */
+  html, body { max-width: 100vw; overflow-x: hidden; }
+  img { max-width: 100%; height: auto; }
+  /* Login e cadastro roláveis (o formulário de cadastro é longo) */
+  .login-overlay-full { overflow-y: auto !important; -webkit-overflow-scrolling: touch; align-items: flex-start !important; padding: 24px 0 !important; }
+  .login-glass-box { margin: 0 auto; }
+  /* Header: itens lado a lado sem estourar */
+  .app-header { display: flex; align-items: center; gap: 8px; }
+  /* Tabelas largas rolam dentro de si (não empurram a página) */
+  .excel-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
 
 /* ---------- Celulares bem pequenos: até 380px ---------- */
