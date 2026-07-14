@@ -4149,3 +4149,228 @@ h1, h2, h3, h4, h5, h6 {
     .equip-check-grid { grid-template-columns: 1fr 1fr; }
     .equip-fotos-preview, .equip-galeria { grid-template-columns: 1fr 1fr; }
 }
+
+/* ==========================================================================
+   CORREÇÃO GLOBAL — ícones e setas atrapalhando a leitura dentro dos campos
+   Antes: a seta nativa do <select> ficava POR CIMA do texto da opção, e o
+   recuo do ícone era aplicado mesmo em campos sem ícone.
+   ========================================================================== */
+
+/* Todo <select> ganha seta própria e espaço reservado à direita.
+   O :focus precisa repetir a seta porque as regras antigas usam o atalho
+   "background:", que apaga a imagem de fundo. */
+select.form-control,
+select.form-control:focus,
+select.form-control-login,
+select.form-control-login:focus,
+select.exame-filtro-select,
+select.exame-filtro-select:focus {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    padding-right: 38px;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 13px center;
+    background-size: 13px;
+}
+
+/* O recuo à esquerda só vale quando existe MESMO um ícone antes do campo */
+.exame-filtro-input,
+.exame-filtro-select {
+    padding-left: 14px;
+}
+.exame-filtro-group > i ~ .exame-filtro-input,
+.exame-filtro-group > i ~ .exame-filtro-select {
+    padding-left: 40px;
+}
+
+/* Campos de data: o seletor de calendário do navegador fica à direita */
+.exame-filtro-input[type="date"],
+input.form-control[type="date"] {
+    padding-right: 10px;
+}
+
+/* Rótulos curtos ("De", "Até") ao lado do campo, sem espremer o texto */
+.exame-filtro-group > label {
+    flex: 0 0 auto;
+    margin-right: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary, #64748B);
+    white-space: nowrap;
+}
+
+/* A lupa da busca não pode cobrir o texto digitado */
+.search-input-wrapper input {
+    padding-left: 40px;
+}
+
+/* ── Chave Entrega / Devolução (interruptor deslizante) ─────────────────── */
+.equip-switch {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 4px;
+    margin-top: 6px;
+    border-radius: 999px;
+    background: var(--surface-2, #F1F5F9);
+    border: 1px solid var(--color-glass-border, #E2E8F0);
+    max-width: 420px;
+    user-select: none;
+}
+.equip-switch-thumb {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: calc(50% - 4px);
+    height: calc(100% - 8px);
+    border-radius: 999px;
+    background: var(--color-white, #FFFFFF);
+    transition: transform .24s cubic-bezier(.4, 0, .2, 1), background-color .24s ease, box-shadow .24s ease;
+    z-index: 0;
+}
+.equip-switch[data-ativo="entrega"] .equip-switch-thumb {
+    transform: translateX(0);
+    background: #ECFDF5;
+    box-shadow: 0 2px 10px rgba(5, 150, 105, .22);
+}
+.equip-switch[data-ativo="devolucao"] .equip-switch-thumb {
+    transform: translateX(100%);
+    background: #FFF7ED;
+    box-shadow: 0 2px 10px rgba(217, 119, 6, .22);
+}
+.equip-switch-opt {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 11px 12px;
+    border: none;
+    background: transparent;
+    border-radius: 999px;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text-secondary, #64748B);
+    cursor: pointer;
+    transition: color .2s ease;
+}
+.equip-switch[data-ativo="entrega"]   .equip-switch-opt[data-tipo="entrega"]   { color: #059669; }
+.equip-switch[data-ativo="devolucao"] .equip-switch-opt[data-tipo="devolucao"] { color: #D97706; }
+
+/* ── Cartões do topo clicáveis (Todos / Entregas / Devoluções) ──────────── */
+.equip-kpi-btn {
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    position: relative;
+}
+.equip-kpi-btn.active {
+    border-color: var(--primary, #2563EB);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.10), var(--shadow-premium, 0 10px 30px rgba(15, 23, 42, 0.04));
+}
+.equip-kpi-btn.active::after {
+    content: "";
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    bottom: 0;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+    background: var(--primary, #2563EB);
+}
+
+/* ── Visualizador de fotos (lightbox dentro do sistema) ─────────────────── */
+.equip-lightbox {
+    position: relative;
+    width: min(94vw, 980px);
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    background: #0F172A;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .45);
+}
+.equip-lightbox-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .14);
+    color: #FFFFFF;
+    font-size: 15px;
+    cursor: pointer;
+}
+.equip-lightbox-close:hover { background: rgba(255, 255, 255, .28); }
+.equip-lightbox-body {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    overflow: auto;
+    min-height: 240px;
+}
+.equip-lightbox-body img {
+    max-width: 100%;
+    max-height: 74vh;
+    object-fit: contain;
+    border-radius: 8px;
+}
+.equip-lightbox-pdf {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #E2E8F0;
+    text-align: center;
+    padding: 30px;
+}
+.equip-lightbox-pdf i { font-size: 54px; color: #F87171; }
+.equip-lightbox-pdf span { font-size: 12.5px; color: #94A3B8; }
+.equip-lightbox-bar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    background: #1E293B;
+    border-top: 1px solid rgba(255, 255, 255, .08);
+}
+.equip-lightbox-nome {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #E2E8F0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 40%;
+}
+.equip-lightbox-acoes {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.equip-lightbox-contador {
+    font-size: 12px;
+    font-weight: 700;
+    color: #94A3B8;
+    min-width: 54px;
+    text-align: center;
+}
+
+@media (max-width: 768px) {
+    .equip-lightbox { width: 100vw; max-height: 100vh; border-radius: 0; }
+    .equip-lightbox-nome { max-width: 100%; }
+    .equip-lightbox-bar { justify-content: center; }
+}

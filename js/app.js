@@ -9243,6 +9243,26 @@ function _equipBadgeEstado(estado) {
 let _equipEditandoId = null;
 let _equipCandidatoId = null;
 let _equipFotos = [];   // [{ nome, arquivo }] — arquivo = base64 ou /uploads/..
+let _equipFiltroTipo = '';   // '' (todos) | 'entrega' | 'devolucao' — vem dos KPIs clicáveis
+
+// Chave Entrega/Devolução do formulário
+function setTipoEquipamento(tipo) {
+  const sw = document.getElementById('equip-switch');
+  if (sw) sw.dataset.ativo = tipo;
+  const hid = document.getElementById('equip-form-tipo');
+  if (hid) hid.value = tipo;
+}
+window.setTipoEquipamento = setTipoEquipamento;
+
+// Os cartões do topo (Todos / Entregas / Devoluções) funcionam como filtro
+function filtrarTipoEquipamento(tipo) {
+  _equipFiltroTipo = tipo;
+  document.querySelectorAll('#equip-kpi-row .equip-kpi-btn').forEach(b => {
+    b.classList.toggle('active', (b.dataset.tipo || '') === tipo);
+  });
+  _renderEquipLista();
+}
+window.filtrarTipoEquipamento = filtrarTipoEquipamento;
 
 // ── Render principal da aba ───────────────────────────────────────────────
 function renderEquipamentos() {
@@ -9262,7 +9282,7 @@ function renderEquipamentos() {
     selItem.dataset.pronto = '1';
   }
 
-  ['equip-f-busca', 'equip-f-tipo', 'equip-f-item', 'equip-f-estado', 'equip-f-de', 'equip-f-ate'].forEach(id => {
+  ['equip-f-busca', 'equip-f-item', 'equip-f-estado', 'equip-f-de', 'equip-f-ate'].forEach(id => {
     const el = document.getElementById(id);
     if (el && !el.dataset.listenerOk) {
       el.addEventListener('input', _renderEquipLista);
@@ -9272,15 +9292,15 @@ function renderEquipamentos() {
   });
 
   _renderEquipKPIs();
-  _renderEquipLista();
+  filtrarTipoEquipamento(_equipFiltroTipo);   // marca o cartão ativo e renderiza a lista
 }
 
 function limparFiltrosEquipamento() {
-  ['equip-f-busca', 'equip-f-tipo', 'equip-f-item', 'equip-f-estado', 'equip-f-de', 'equip-f-ate'].forEach(id => {
+  ['equip-f-busca', 'equip-f-item', 'equip-f-estado', 'equip-f-de', 'equip-f-ate'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  _renderEquipLista();
+  filtrarTipoEquipamento('');   // volta para "Todos os registros" e já re-renderiza
 }
 window.limparFiltrosEquipamento = limparFiltrosEquipamento;
 
@@ -9296,7 +9316,7 @@ function _equipListaFiltrada() {
   garantirEquipamentos();
   const v = id => (document.getElementById(id)?.value || '').trim();
   const busca  = v('equip-f-busca').toLowerCase();
-  const tipo   = v('equip-f-tipo');
+  const tipo   = _equipFiltroTipo;   // definido pelos cartões clicáveis do topo
   const item   = v('equip-f-item');
   const estado = v('equip-f-estado');
   const de     = v('equip-f-de');
@@ -9395,9 +9415,13 @@ function abrirModalEquipamento(id) {
   g('equip-form-id').value          = reg ? reg.id : '';
   g('equip-form-cpf').value         = reg ? (reg.cpf || '') : '';
   g('equip-form-nome').value        = reg ? (reg.nome || '') : '';
-  g('equip-form-responsavel').value = reg ? (reg.responsavel || '') : (loggedUser ? loggedUser.nome : '');
-  g('equip-form-tipo').value        = reg ? (reg.tipo || '') : '';
   g('equip-form-dados').value       = reg ? (reg.dados || '') : '';
+
+  // Responsável: sempre quem está logado. Campo travado, não editável.
+  g('equip-form-responsavel').value = loggedUser ? loggedUser.nome : '';
+
+  // Chave Entrega/Devolução (novo registro começa em "Entrega")
+  setTipoEquipamento(reg ? (reg.tipo || 'entrega') : 'entrega');
   g('equip-form-estado').value      = reg ? (reg.estado || '') : '';
   g('equip-form-obs').value         = reg ? (reg.observacoes || '') : '';
   g('equip-form-outros').value      = reg ? (reg.equipamentoOutros || '') : '';
@@ -9525,14 +9549,14 @@ function _renderPreviewFotosEquip() {
   }).join('');
 }
 
-// Abre a foto/arquivo numa aba nova (X-Frame-Options/CSP impedem iframe)
-function visualizarFotoEquipamento(id, i) {
-  garantirEquipamentos();
-  const reg = state.equipamentos.find(e => e.id === id);
-  const f = reg && (reg.fotos || [])[i];
-  if (!f || !f.arquivo) { alert('Arquivo não encontrado.'); return; }
+// ── Visualizador de fotos DENTRO do sistema (lightbox) ────────────────────
+let _equipFotoReg = null;   // registro aberto no visualizador
+let _equipFotoIdx = 0;      // foto atual
 
-  let src = f.arquivo;
+// Converte o arquivo guardado (base64 ou /uploads/..) num endereço que o
+// navegador consegue abrir numa aba nova sem esbarrar no CSP.
+function _equipFotoSrcAbsoluto(f) {
+  let src = (f && f.arquivo) || '';
   if (src.indexOf('data:') === 0) {
     try {
       const virgula = src.indexOf(',');
@@ -9540,15 +9564,72 @@ function visualizarFotoEquipamento(id, i) {
       const bin = atob(src.slice(virgula + 1));
       const bytes = new Uint8Array(bin.length);
       for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
-      src = URL.createObjectURL(new Blob([bytes], { type: mime }));
-    } catch (e) { /* mantém o data: original */ }
-  } else if (src.charAt(0) === '/') {
-    src = window.location.origin + src;
+      return URL.createObjectURL(new Blob([bytes], { type: mime }));
+    } catch (e) { return src; }
   }
-  const w = window.open(src, '_blank');
-  if (!w) alert('Habilite os pop-ups deste site para ampliar o arquivo.');
+  if (src.charAt(0) === '/') return window.location.origin + src;
+  return src;
 }
-window.visualizarFotoEquipamento = visualizarFotoEquipamento;
+
+function abrirFotoEquipamento(id, i) {
+  garantirEquipamentos();
+  const reg = state.equipamentos.find(e => e.id === id);
+  if (!reg || !(reg.fotos || []).length) { alert('Arquivo não encontrado.'); return; }
+  _equipFotoReg = reg;
+  _equipFotoIdx = Math.max(0, Math.min(i || 0, reg.fotos.length - 1));
+  _renderFotoEquipamento();
+  const m = document.getElementById('modal-equip-foto');
+  if (m) m.style.display = 'flex';
+}
+window.abrirFotoEquipamento = abrirFotoEquipamento;
+
+function _renderFotoEquipamento() {
+  if (!_equipFotoReg) return;
+  const fotos = _equipFotoReg.fotos || [];
+  const f = fotos[_equipFotoIdx];
+  if (!f) return;
+
+  const body = document.getElementById('equip-lightbox-body');
+  if (body) {
+    body.innerHTML = _equipEhImagem(f)
+      ? `<img src="${f.arquivo}" alt="${escapeHTML(f.nome)}">`
+      : `<div class="equip-lightbox-pdf">
+           <i class="fa-solid fa-file-pdf"></i>
+           <strong>${escapeHTML(f.nome)}</strong>
+           <span>PDF não é exibido aqui dentro. Use "Abrir em nova aba".</span>
+         </div>`;
+  }
+  const nomeEl = document.getElementById('equip-lightbox-nome');
+  if (nomeEl) nomeEl.textContent = f.nome || '';
+  const contEl = document.getElementById('equip-lightbox-contador');
+  if (contEl) contEl.textContent = `${_equipFotoIdx + 1} / ${fotos.length}`;
+}
+
+function navegarFotoEquipamento(passo) {
+  if (!_equipFotoReg) return;
+  const total = (_equipFotoReg.fotos || []).length;
+  if (total < 2) return;
+  _equipFotoIdx = (_equipFotoIdx + passo + total) % total;   // circula
+  _renderFotoEquipamento();
+}
+window.navegarFotoEquipamento = navegarFotoEquipamento;
+
+function abrirFotoEquipamentoNovaAba() {
+  if (!_equipFotoReg) return;
+  const f = (_equipFotoReg.fotos || [])[_equipFotoIdx];
+  if (!f) return;
+  const w = window.open(_equipFotoSrcAbsoluto(f), '_blank');
+  if (!w) alert('Habilite os pop-ups deste site para abrir o arquivo em outra aba.');
+}
+window.abrirFotoEquipamentoNovaAba = abrirFotoEquipamentoNovaAba;
+
+function fecharFotoEquipamento() {
+  const m = document.getElementById('modal-equip-foto');
+  if (m) m.style.display = 'none';
+  _equipFotoReg = null;
+  _equipFotoIdx = 0;
+}
+window.fecharFotoEquipamento = fecharFotoEquipamento;
 
 // ── Salvar ────────────────────────────────────────────────────────────────
 function salvarEquipamento() {
@@ -9557,15 +9638,16 @@ function salvarEquipamento() {
 
   const cpf         = (g('equip-form-cpf')?.value || '').trim();
   const nome        = (g('equip-form-nome')?.value || '').trim();
-  const responsavel = (g('equip-form-responsavel')?.value || '').trim();
   const dados       = (g('equip-form-dados')?.value || '').trim();
   const tipo        = g('equip-form-tipo')?.value || '';
+  // O responsável NÃO vem do formulário: é sempre quem está logado.
+  const responsavel = loggedUser ? loggedUser.nome : 'Sistema';
   const estado      = g('equip-form-estado')?.value || '';
   const observacoes = (g('equip-form-obs')?.value || '').trim();
   const outros      = (g('equip-form-outros')?.value || '').trim();
   const itens = Array.from(document.querySelectorAll('.equip-item-chk:checked')).map(c => c.value);
 
-  if (!nome || !cpf || !responsavel || !dados) { alert('Preencha os campos obrigatórios: Nome, CPF, Responsável e Dados.'); return; }
+  if (!nome || !cpf || !dados) { alert('Preencha os campos obrigatórios: Nome, CPF e Dados.'); return; }
   if (!tipo)   { alert('Escolha o tipo de registro: Entrega ou Devolução.'); return; }
   if (!itens.length) { alert('Marque pelo menos um equipamento.'); return; }
   if (itens.includes('outros') && !outros) { alert('Você marcou "Outros" — descreva qual é o equipamento.'); return; }
@@ -9666,7 +9748,7 @@ function abrirVerEquipamento(id) {
              : `<div class="equip-foto-pdf"><i class="fa-solid fa-file-pdf"></i></div>`;
            return `
              <button type="button" class="equip-galeria-item" title="Ampliar ${escapeHTML(f.nome)}"
-                     onclick="visualizarFotoEquipamento('${reg.id}', ${i})">
+                     onclick="abrirFotoEquipamento('${reg.id}', ${i})">
                ${thumb}
                <span class="equip-foto-nome">${escapeHTML(f.nome)}</span>
                <span class="equip-galeria-zoom"><i class="fa-solid fa-magnifying-glass-plus"></i> Ampliar</span>

@@ -1181,29 +1181,32 @@
                             </div>
                         </div>
 
-                        <!-- KPIs -->
-                        <div class="exame-kpi-row">
-                            <div class="exame-kpi-card exame-kpi-total">
+                        <!-- KPIs clicáveis: funcionam como filtro (Todos / Entregas / Devoluções) -->
+                        <div class="exame-kpi-row" id="equip-kpi-row">
+                            <button type="button" class="exame-kpi-card exame-kpi-total equip-kpi-btn active"
+                                    data-tipo="" onclick="filtrarTipoEquipamento('')">
                                 <div class="exame-kpi-icon"><i class="fa-solid fa-list-check"></i></div>
                                 <div class="exame-kpi-info">
                                     <span class="exame-kpi-num" id="kpi-equip-total">0</span>
-                                    <span class="exame-kpi-label">Total de registros</span>
+                                    <span class="exame-kpi-label">Todos os registros</span>
                                 </div>
-                            </div>
-                            <div class="exame-kpi-card exame-kpi-concluido">
+                            </button>
+                            <button type="button" class="exame-kpi-card exame-kpi-concluido equip-kpi-btn"
+                                    data-tipo="entrega" onclick="filtrarTipoEquipamento('entrega')">
                                 <div class="exame-kpi-icon"><i class="fa-solid fa-hand-holding-hand"></i></div>
                                 <div class="exame-kpi-info">
                                     <span class="exame-kpi-num" id="kpi-equip-entregas">0</span>
                                     <span class="exame-kpi-label">Entregas</span>
                                 </div>
-                            </div>
-                            <div class="exame-kpi-card exame-kpi-aguardando">
+                            </button>
+                            <button type="button" class="exame-kpi-card exame-kpi-aguardando equip-kpi-btn"
+                                    data-tipo="devolucao" onclick="filtrarTipoEquipamento('devolucao')">
                                 <div class="exame-kpi-icon"><i class="fa-solid fa-rotate-left"></i></div>
                                 <div class="exame-kpi-info">
                                     <span class="exame-kpi-num" id="kpi-equip-devolucoes">0</span>
                                     <span class="exame-kpi-label">Devoluções</span>
                                 </div>
-                            </div>
+                            </button>
                         </div>
 
                         <!-- Filtros de pesquisa -->
@@ -1211,14 +1214,6 @@
                             <div class="exame-filtro-group">
                                 <i class="fa-solid fa-magnifying-glass"></i>
                                 <input type="text" id="equip-f-busca" class="exame-filtro-input" placeholder="Buscar por nome, CPF ou responsável...">
-                            </div>
-                            <div class="exame-filtro-group">
-                                <i class="fa-solid fa-right-left"></i>
-                                <select id="equip-f-tipo" class="exame-filtro-select">
-                                    <option value="">Entrega e Devolução</option>
-                                    <option value="entrega">Somente Entregas</option>
-                                    <option value="devolucao">Somente Devoluções</option>
-                                </select>
                             </div>
                             <div class="exame-filtro-group">
                                 <i class="fa-solid fa-box"></i>
@@ -1271,27 +1266,38 @@
                         <div class="modal-exame-body">
                             <input type="hidden" id="equip-form-id">
                             <div class="exame-form-grid">
+                                <!-- Chave Entrega / Devolução — primeiro campo do formulário -->
+                                <div class="form-group exame-form-full">
+                                    <label>Tipo de registro *</label>
+                                    <div class="equip-switch" id="equip-switch" data-ativo="entrega">
+                                        <span class="equip-switch-thumb"></span>
+                                        <button type="button" class="equip-switch-opt" data-tipo="entrega" onclick="setTipoEquipamento('entrega')">
+                                            <i class="fa-solid fa-hand-holding-hand"></i> Entrega
+                                        </button>
+                                        <button type="button" class="equip-switch-opt" data-tipo="devolucao" onclick="setTipoEquipamento('devolucao')">
+                                            <i class="fa-solid fa-rotate-left"></i> Devolução
+                                        </button>
+                                    </div>
+                                    <input type="hidden" id="equip-form-tipo" value="entrega">
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Nome Completo *</label>
+                                    <input type="text" id="equip-form-nome" class="form-control" placeholder="Nome completo do colaborador">
+                                </div>
                                 <div class="form-group">
                                     <label>CPF *</label>
                                     <input type="text" id="equip-form-cpf" class="form-control" placeholder="000.000.000-00"
                                            oninput="mascaraCPF(this); buscarColaboradorPorCPFEquip()">
                                     <small id="equip-vinculo-msg" style="display:block;margin-top:4px;font-size:11px;color:var(--text-secondary);"></small>
                                 </div>
-                                <div class="form-group">
-                                    <label>Nome Completo *</label>
-                                    <input type="text" id="equip-form-nome" class="form-control" placeholder="Nome completo do colaborador">
-                                </div>
-                                <div class="form-group">
-                                    <label>Responsável pela captação/entrega *</label>
-                                    <input type="text" id="equip-form-responsavel" class="form-control" placeholder="Quem do DP fez o atendimento">
-                                </div>
-                                <div class="form-group">
-                                    <label>Tipo de registro *</label>
-                                    <select id="equip-form-tipo" class="form-control">
-                                        <option value="">Selecione...</option>
-                                        <option value="entrega">Entrega</option>
-                                        <option value="devolucao">Devolução</option>
-                                    </select>
+                                <div class="form-group exame-form-full">
+                                    <label>Responsável pela captação/entrega</label>
+                                    <input type="text" id="equip-form-responsavel" class="form-control" readonly tabindex="-1"
+                                           style="background:var(--surface-2,rgba(0,0,0,.05));color:var(--text-secondary);cursor:default;">
+                                    <small style="display:block;margin-top:4px;font-size:11px;color:var(--text-secondary);">
+                                        <i class="fa-solid fa-lock"></i> Preenchido automaticamente com quem está logado. Não é editável.
+                                    </small>
                                 </div>
                                 <div class="form-group exame-form-full">
                                     <label>Dados *</label>
@@ -1364,6 +1370,32 @@
                             <div id="equip-ver-conteudo"><!-- Gerado por JS --></div>
                         </div>
                         <div class="modal-exame-footer" id="equip-ver-footer"><!-- Botões por JS --></div>
+                    </div>
+                </div>
+
+                <!-- Visualizador de fotos (abre dentro do próprio sistema) -->
+                <div id="modal-equip-foto" class="modal-overlay" style="display:none;z-index:2000;"
+                     onclick="if(event.target===this)fecharFotoEquipamento()">
+                    <div class="equip-lightbox">
+                        <button type="button" class="equip-lightbox-close" onclick="fecharFotoEquipamento()">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                        <div class="equip-lightbox-body" id="equip-lightbox-body"><!-- foto/PDF por JS --></div>
+                        <div class="equip-lightbox-bar">
+                            <span class="equip-lightbox-nome" id="equip-lightbox-nome"></span>
+                            <div class="equip-lightbox-acoes">
+                                <button type="button" class="btn btn-sm btn-outline" onclick="navegarFotoEquipamento(-1)">
+                                    <i class="fa-solid fa-chevron-left"></i> Anterior
+                                </button>
+                                <span class="equip-lightbox-contador" id="equip-lightbox-contador">1 / 1</span>
+                                <button type="button" class="btn btn-sm btn-outline" onclick="navegarFotoEquipamento(1)">
+                                    Próxima <i class="fa-solid fa-chevron-right"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-primary" onclick="abrirFotoEquipamentoNovaAba()">
+                                    <i class="fa-solid fa-up-right-from-square"></i> Abrir em nova aba
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
