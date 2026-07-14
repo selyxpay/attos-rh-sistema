@@ -2844,6 +2844,12 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Copy notification tooltips */
 .copy-tooltip-success {
+    /* AVISO FLUTUANTE ("copiado!"). Ele é position:fixed e fica sempre presente
+       na tela, mesmo escondido. Sem pointer-events:none ele INTERCEPTA o toque
+       de tudo que estiver embaixo — no celular ele cobria a faixa de baixo da
+       tela inteira e os botões ali simplesmente não respondiam. Um aviso nunca
+       deve receber clique. */
+    pointer-events: none;
     position: fixed;
     bottom: 24px;
     left: 50%;

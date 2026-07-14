@@ -47,7 +47,16 @@
   .app-container { display: block; }
   /* Conteúdo NUNCA por cima do menu (mantém contexto baixo) */
   .main-layout { width: 100%; min-width: 0; position: relative; z-index: 1; }
-  .content-viewport, .aba-content { position: relative; z-index: 1; }
+  /* IMPORTANTE: aqui NÃO pode entrar z-index numérico.
+     Um z-index no conteúdo cria um "contexto de empilhamento" que PRENDE tudo o
+     que está dentro dele — inclusive os modais de Exame Médico e de Equipamentos,
+     que ficam dentro da área de conteúdo no HTML. Preso nesse contexto, o modal
+     (z-index 1000) não conseguia subir acima do cabeçalho (z-index 100): o "X" de
+     fechar e o topo do modal ficavam ATRÁS do cabeçalho e não recebiam o toque.
+     Com z-index auto o modal volta a disputar no nível global e fica por cima.
+     O cabeçalho continua acima do conteúdo normal (ele é posicionado, z-index 100)
+     e o menu lateral (1300) continua acima de tudo. */
+  .content-viewport, .aba-content { position: relative; z-index: auto; }
 
   /* Header compacto (abaixo do menu aberto) */
   .app-header { padding: 10px 12px; position: sticky; top: 0; z-index: 100; }
@@ -148,3 +157,140 @@
 /* O botão hambúrguer (#sidebar-toggle) já existe; no desktop ele continua
    com o comportamento atual. A classe utilitária abaixo o esconde >1024px
    só se for marcado como exclusivo de mobile (não aplicado por padrão). */
+
+/* ==========================================================================
+   CELULAR — PARTE 2
+   Correções levantadas auditando o sistema no Chrome em 390x844 com toque.
+   Tudo dentro de @media: o desktop (>768px) não muda em nada.
+   ========================================================================== */
+@media (max-width: 768px) {
+
+  /* ---- Modais do Exame Médico e de Equipamentos ----------------------------
+     Estes modais usam .modal-exame-box (e NÃO .modal-box), então não pegavam
+     nenhuma regra de celular: ficavam mais altos que a tela, e o "X" de fechar
+     e os botões do rodapé caíam para fora da área visível. Agora ocupam a tela
+     inteira, com o miolo rolando e o rodapé sempre à vista. */
+  .modal-exame-box,
+  .modal-exame-box-detalhe {
+    max-width: 100% !important;
+    width: 100% !important;
+    height: 100vh; height: 100dvh;
+    max-height: 100vh; max-height: 100dvh;
+    border-radius: 0 !important;
+    display: flex;
+    flex-direction: column;
+    animation: none;                 /* menos trabalho de renderização no celular */
+  }
+  .modal-exame-header { flex: 0 0 auto; padding: 14px 16px; }
+  .modal-exame-body {
+    flex: 1 1 auto;
+    max-height: none !important;     /* tirava o calc(85vh - 140px) do desktop */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px;
+  }
+  .modal-exame-footer {
+    flex: 0 0 auto;
+    padding: 12px 16px;
+    gap: 8px;
+    background: var(--color-white, #FFFFFF);
+    border-top: 1px solid var(--color-glass-border, #E2E8F0);
+  }
+  .modal-exame-footer .btn { flex: 1; justify-content: center; min-height: 44px; }
+
+  /* Formulários e detalhes dos modais: uma coluna só */
+  .exame-form-grid,
+  .exame-detalhe-grid { grid-template-columns: 1fr !important; }
+
+  /* KPIs do Exame/Equipamentos: 2 por linha (no desktop são 3 ou 4) */
+  .exame-kpi-row { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+  .exame-kpi-card { padding: 12px !important; gap: 10px; }
+  .exame-kpi-icon { width: 34px !important; height: 34px !important; min-width: 34px; font-size: 14px !important; }
+  .exame-kpi-num { font-size: 20px !important; }
+  .exame-kpi-label { font-size: 10.5px !important; line-height: 1.2; }
+
+  /* ---- Lista de exames: a grade de 7 colunas vira CARD ---------------------
+     2.3fr 1.1fr 1.4fr 1.7fr 1.4fr 1fr 1.1fr não cabe em 390px de jeito nenhum. */
+  .exame-table-header { display: none !important; }
+  .exame-table-row {
+    display: block !important;
+    padding: 14px 16px !important;
+    border-bottom: 8px solid var(--surface-2, #F1F5F9);
+  }
+  .exame-table-row > span { display: block; width: 100%; margin-bottom: 8px; }
+  .exame-table-row > span:last-child { margin-bottom: 0; }
+  .exame-col-nome { font-size: 15px; font-weight: 700; }
+  .exame-table-row .btn { width: 100%; justify-content: center; min-height: 44px; }
+
+  /* Barras de filtro: um campo por linha, botão largura cheia */
+  .exame-filtros-bar { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 14px; }
+  .exame-filtro-group { width: 100%; min-width: 0; flex: 1 1 auto; }
+  .exame-filtros-bar .btn { width: 100%; justify-content: center; min-height: 44px; }
+
+  /* Cabeçalho das abas Exame/Equipamentos empilha */
+  .exame-header-area { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .exame-header-right { width: 100%; }
+  .exame-header-right .btn { width: 100%; justify-content: center; }
+  .exame-titulo { font-size: 20px; }
+
+  /* Chaves deslizantes (Entrega/Devolução, Online/Presencial) na largura toda */
+  .equip-switch { max-width: 100%; }
+
+  /* ---- Tabelas ------------------------------------------------------------
+     Antes o .excel-table virava display:block, o que desmonta o alinhamento das
+     células (thead/tbody/tr continuam com display de tabela). Quem deve rolar é
+     o container em volta — e todas as tabelas do sistema já estão dentro de um. */
+  .excel-table { display: table !important; overflow: visible !important; width: 100%; }
+  .table-scroll-container { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+
+  /* ---- Alvos de toque -----------------------------------------------------
+     Botões pequenos (30px) são difíceis de acertar com o dedo. */
+  .btn-sm, .btn.btn-sm { min-height: 40px !important; padding: 8px 12px !important; font-size: 12px !important; }
+  .modal-close-btn, .modal-exame-close, .equip-lightbox-close {
+    min-width: 40px !important; min-height: 40px !important;
+    display: inline-flex !important; align-items: center; justify-content: center;
+  }
+  .equip-lightbox-acoes .btn { flex: 1; min-height: 40px; }
+
+  /* Painel da Seleção na ficha (enviar para exame) e cartões-filtro */
+  .equip-kpi-btn { text-align: left; }
+  .equip-check-grid { grid-template-columns: 1fr 1fr; }
+  .equip-check { min-height: 44px; }
+}
+
+/* ==========================================================================
+   CELULAR — PARTE 3: alvos de toque
+   Vários botões do sistema não usam a classe .btn (uns são <button> puro com
+   estilo inline, outros usam classes próprias como .btn-exame-upload). Por isso
+   as regras antigas de .btn não os alcançavam e eles ficavam com ~30px de altura,
+   difíceis de acertar com o dedo. Aqui a altura mínima vale para QUALQUER botão.
+   ========================================================================== */
+@media (max-width: 768px) {
+
+  button,
+  .btn,
+  [role="button"],
+  input[type="submit"],
+  input[type="button"] {
+    min-height: 40px;
+  }
+
+  /* Botões da lista de exames (classes próprias, fora do padrão .btn) */
+  .btn-exame-upload,
+  .btn-exame-ver {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Exceção: o "x" de remover foto fica DENTRO da miniatura — 40px cobriria a
+     imagem inteira. Fica num tamanho intermediário, ainda tocável. */
+  .equip-foto-remover {
+    min-height: 30px;
+    width: 30px;
+    height: 30px;
+  }
+}
