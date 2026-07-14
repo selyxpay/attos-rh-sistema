@@ -253,10 +253,11 @@ function isAbaAutorizada(abaId) {
   if (abaId === 'cadastros-exata') return ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao';
   // Equipamentos: módulo do Departamento Pessoal. A Seleção não enxerga.
   if (abaId === 'equipamentos') return podeVerEquipamentos();
-  // Exame Médico: liberado por departamento (clínica/seleção/administração) OU
-  // pela permissão granular marcada no cadastro do funcionário.
+  // Exame Médico: clínica (anexa o laudo online), seleção (envia o candidato),
+  // DP (anexa a foto da ficha nos exames presenciais) e administração.
+  // Também vale a permissão granular marcada no cadastro do funcionário.
   if (abaId === 'exame-medico') return ehMestre(loggedUser.login)
-    || ['clinica', 'selecao', 'administracao'].includes(loggedUser.departamento)
+    || ['clinica', 'selecao', 'dp', 'administracao'].includes(loggedUser.departamento)
     || hasPermission('exame_medico', 'visualizar');
   if (ehMestre(loggedUser.login)) return true;
   const depto = loggedUser.departamento;
@@ -4508,6 +4509,9 @@ function abrirDrawerDetalhes(candidatoId) {
 
   // Histórico de equipamentos deste colaborador (aba "Equipamentos" da ficha)
   _renderEquipamentosFicha(cand);
+
+  // Painel da Seleção: enviar este candidato para o exame médico
+  _renderPainelExameSelecao(cand);
 
   // Reseta Abas do Drawer
   document.querySelectorAll('.drawer-tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -9284,6 +9288,162 @@ function _examePodeEnviarLaudo() {
     hasPermission('exame_medico', 'editar')
   ));
 }
+
+// Quem anexa o laudo DESTE exame, conforme a modalidade:
+//   ONLINE     → a clínica anexa pelo sistema.
+//   PRESENCIAL → a clínica NÃO anexa nada. O candidato traz a ficha em mãos e o
+//                Depto. Pessoal fotografa e anexa aqui.
+// Administração e mestre anexam em qualquer caso.
+function _examePodeEnviarLaudoDo(ex) {
+  if (!loggedUser) return false;
+  if (ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao') return true;
+  if (hasPermission('exame_medico', 'editar')) return true;
+  if (ex && ex.modalidade === 'presencial') return loggedUser.departamento === 'dp';
+  return _examePerfilClinica();
+}
+// ── Painel da SELEÇÃO na ficha do candidato: enviar para exame médico ─────
+
+// Quem pode ENVIAR um candidato para o exame (a partir da ficha)
+function _examePodeEnviarCandidato() {
+  return !!(loggedUser && (
+    loggedUser.departamento === 'selecao' ||
+    loggedUser.departamento === 'administracao' ||
+    ehMestre(loggedUser.login) ||
+    hasPermission('exame_medico', 'criar')
+  ));
+}
+
+function setModalidadeExame(m) {
+  const sw = document.getElementById('exame-sel-switch');
+  if (sw) sw.dataset.ativo = m;
+  const hid = document.getElementById('exame-sel-modalidade');
+  if (hid) hid.value = m;
+  const ajuda = document.getElementById('exame-sel-ajuda');
+  if (ajuda) {
+    ajuda.innerHTML = (m === 'presencial')
+      ? '<i class="fa-solid fa-circle-info"></i> A clínica <strong>não anexa nada</strong>. O candidato traz a ficha em mãos e o <strong>Depto. Pessoal</strong> tira a foto e anexa aqui para concluir.'
+      : '<i class="fa-solid fa-circle-info"></i> A <strong>clínica</strong> entra no sistema e anexa o laudo do exame.';
+  }
+}
+window.setModalidadeExame = setModalidadeExame;
+
+function _toggleExameSelecao() {
+  const chk = document.getElementById('exame-sel-marcar');
+  const campos = document.getElementById('exame-sel-campos');
+  if (campos) campos.style.display = (chk && chk.checked) ? '' : 'none';
+}
+window._toggleExameSelecao = _toggleExameSelecao;
+
+function _renderPainelExameSelecao(cand) {
+  const painel = document.getElementById('exame-selecao-panel');
+  if (!painel) return;
+
+  // O painel é exclusivo de quem pode enviar (Seleção / administração / mestre)
+  if (!cand || !_examePodeEnviarCandidato()) { painel.style.display = 'none'; return; }
+  painel.style.display = 'block';
+
+  garantirExamesMedicos();
+  const jaEnviado = (state.examesMedicos || []).find(e => e.candidatoId === cand.id);
+  const boxJa = document.getElementById('exame-selecao-ja-enviado');
+  const form  = document.getElementById('exame-selecao-form');
+
+  if (jaEnviado) {
+    if (form) form.style.display = 'none';
+    if (boxJa) {
+      boxJa.style.display = 'block';
+      const ok = jaEnviado.status === 'concluido';
+      const cor = ok ? '#059669' : '#D97706';
+      boxJa.innerHTML = `
+        <div style="padding:12px;border-radius:10px;background:${cor}14;border:1px solid ${cor}40;">
+          <div style="font-size:12px;font-weight:700;color:${cor};margin-bottom:6px;">
+            <i class="fa-solid ${ok ? 'fa-circle-check' : 'fa-clock'}"></i>
+            ${ok ? 'Exame concluído' : 'Enviado — aguardando o laudo'}
+          </div>
+          <div style="font-size:11.5px;color:var(--text-secondary);line-height:1.7;">
+            Clínica: <strong>${escapeHTML(jaEnviado.clinica || '—')}</strong><br>
+            Como será feito: <strong>${jaEnviado.modalidade === 'presencial' ? 'Presencial (o DP anexa a foto)' : 'Online (a clínica anexa)'}</strong><br>
+            Enviado em: <strong>${_formatarDataHoraBR(jaEnviado.dataCadastro)}</strong>
+            ${jaEnviado.dataConclusao ? `<br>Resultado em: <strong>${_formatarDataHoraBR(jaEnviado.dataConclusao)}</strong>` : ''}
+          </div>
+          <button type="button" class="btn btn-sm btn-secondary" style="margin-top:10px;"
+                  onclick="fecharDrawerDetalhes(); abrirModalDetalheExame('${jaEnviado.id}')">
+            <i class="fa-solid fa-eye"></i> Abrir o exame
+          </button>
+        </div>`;
+    }
+    return;
+  }
+
+  // Ainda não enviado → mostra o formulário zerado
+  if (boxJa) boxJa.style.display = 'none';
+  if (form) form.style.display = '';
+
+  const chk = document.getElementById('exame-sel-marcar');
+  if (chk) chk.checked = false;
+  _toggleExameSelecao();
+
+  const sel = document.getElementById('exame-sel-clinica');
+  if (sel) {
+    sel.innerHTML = '<option value="">Selecione a clínica...</option>' +
+      CLINICAS_PARCEIRAS.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join('');
+  }
+  setModalidadeExame('online');
+}
+
+function enviarCandidatoParaExame() {
+  if (!_examePodeEnviarCandidato()) { alert('Você não tem permissão para enviar candidatos ao exame médico.'); return; }
+
+  const cand = (state.candidatos || []).find(c => c.id === currentCandidateId)
+            || (state.bancoTalentos || []).find(c => c.id === currentCandidateId);
+  if (!cand) { alert('Candidato não encontrado.'); return; }
+
+  const clinica    = document.getElementById('exame-sel-clinica')?.value || '';
+  const modalidade = document.getElementById('exame-sel-modalidade')?.value || 'online';
+  if (!clinica) { alert('Escolha a clínica médica.'); return; }
+
+  garantirExamesMedicos();
+  if (state.examesMedicos.some(e => e.candidatoId === cand.id)) {
+    alert('Este candidato já foi enviado para o exame médico.');
+    _renderPainelExameSelecao(cand);
+    return;
+  }
+
+  state.examesMedicos.push({
+    id: `exame-${Date.now()}`,
+    candidatoId: cand.id,               // vínculo com a ficha
+    nomeCompleto: cand.nome || '',
+    cpf: cand.cpf || '',
+    dataNascimento: cand.dataNascimento || '',
+    rg: cand.rg || '',
+    nomePai: cand.nomePai || '',
+    nomeMae: cand.nomeMae || '',
+    telefone: cand.telefone || '',
+    empresa: cand.empresa || '',
+    turno: cand.turno || '',
+    clinica: clinica,
+    modalidade: modalidade,             // 'online' (clínica anexa) | 'presencial' (DP anexa)
+    dataInicio: '',
+    observacaoSelecao: '',
+    responsavelSelecao: loggedUser ? loggedUser.nome : 'Sistema',
+    responsavelLogin: loggedUser ? loggedUser.login : '',
+    status: 'aguardando',
+    pdfExame: null,
+    pdfNome: '',
+    observacao: '',
+    dataCadastro: new Date().toISOString(),
+    dataConclusao: null
+  });
+
+  registrarLogGlobal(`Enviou "${cand.nome}" para exame médico — ${clinica} (${modalidade}).`, 'selecao');
+  saveState();
+  _renderPainelExameSelecao(cand);
+
+  alert(modalidade === 'presencial'
+    ? `"${cand.nome}" foi enviado para exame PRESENCIAL na ${clinica}.\n\nQuando ele trouxer a ficha, o Depto. Pessoal tira a foto e anexa no Exame Médico para concluir.`
+    : `"${cand.nome}" foi enviado para exame ONLINE na ${clinica}.\n\nA clínica vai anexar o laudo pelo sistema.`);
+}
+window.enviarCandidatoParaExame = enviarCandidatoParaExame;
+
 // Formata ISO -> DD/MM/AAAA HH:MM (data e hora com minutos)
 function _formatarDataHoraBR(iso) {
   if (!iso) return '—';
@@ -10280,6 +10440,12 @@ function _renderExameLista() {
 
   let lista = [...state.examesMedicos];
 
+  // PRIVACIDADE: cada clínica só enxerga os exames enviados PARA ELA.
+  // (Exames antigos, sem clínica definida, continuam visíveis para não sumirem.)
+  if (isClinica && loggedUser.instituicao) {
+    lista = lista.filter(e => !e.clinica || e.clinica === loggedUser.instituicao);
+  }
+
   // A sub-aba define o status exibido ("todos" não filtra)
   if (_exameSubAba === 'pendentes')  lista = lista.filter(e => e.status === 'aguardando');
   else if (_exameSubAba === 'concluidos') lista = lista.filter(e => e.status === 'concluido');
@@ -10344,7 +10510,7 @@ function _renderExameRow(ex, isClinica) {
     ? `<span class="exame-badge exame-badge-ok"><i class="fa-solid fa-circle-check"></i> Concluído</span>`
     : `<span class="exame-badge exame-badge-pend"><i class="fa-solid fa-clock"></i> Aguardando</span>`;
 
-  const podeEnviar = _examePodeEnviarLaudo();
+  const podeEnviar = _examePodeEnviarLaudoDo(ex);   // depende da modalidade do exame
   const btnLabel = (podeEnviar && ex.status === 'aguardando')
     ? '<i class="fa-solid fa-file-arrow-up"></i> Anexar Laudo'
     : (ex.status === 'concluido' ? '<i class="fa-solid fa-eye"></i> Ver Laudo' : '<i class="fa-solid fa-eye"></i> Detalhes');
@@ -10370,6 +10536,11 @@ function _renderExameRow(ex, isClinica) {
       <span class="exame-col-empresa">
         <strong>${ex.empresa || '—'}</strong><br>
         <small>${_formatarTurno(ex.turno)}</small>
+        ${ex.clinica ? `<br><small style="color:var(--text-secondary);"><i class="fa-solid fa-hospital"></i> ${escapeHTML(ex.clinica)}</small>` : ''}
+        ${ex.modalidade ? `<br><small style="font-weight:700;color:${ex.modalidade === 'presencial' ? '#7C3AED' : '#2563EB'};">
+            <i class="fa-solid ${ex.modalidade === 'presencial' ? 'fa-person-walking' : 'fa-cloud-arrow-up'}"></i>
+            ${ex.modalidade === 'presencial' ? 'Presencial (DP anexa)' : 'Online (clínica anexa)'}
+          </small>` : ''}
       </span>
       <span class="exame-col-resp">
         ${ex.responsavelSelecao || '—'}
@@ -10478,7 +10649,7 @@ function abrirModalDetalheExame(exameId) {
   _tempExameDoc = null; // Reseta temporário
 
   const isClinica = _examePerfilClinica();
-  const podeEnviarLaudo = _examePodeEnviarLaudo();
+  const podeEnviarLaudo = _examePodeEnviarLaudoDo(ex);   // depende da modalidade do exame
 
   // Cabeçalho
   const nomeEl = document.getElementById('detalhe-exame-nome-titulo');
@@ -10571,6 +10742,15 @@ function abrirModalDetalheExame(exameId) {
             </div>
             <div class="exame-campo"><span class="exame-campo-label">Empresa</span><span class="exame-campo-valor">${ex.empresa || '—'}</span></div>
             <div class="exame-campo"><span class="exame-campo-label">Turno</span><span class="exame-campo-valor">${_formatarTurno(ex.turno)}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Clínica</span><span class="exame-campo-valor">${escapeHTML(ex.clinica || '—')}</span></div>
+            <div class="exame-campo">
+              <span class="exame-campo-label">Como será feito</span>
+              <span class="exame-campo-valor" style="font-weight:700;color:${ex.modalidade === 'presencial' ? '#7C3AED' : '#2563EB'};">
+                ${ex.modalidade === 'presencial'
+                  ? 'Presencial — o Depto. Pessoal anexa a foto da ficha'
+                  : (ex.modalidade === 'online' ? 'Online — a clínica anexa o laudo' : '—')}
+              </span>
+            </div>
             <div class="exame-campo"><span class="exame-campo-label">Data de Início</span><span class="exame-campo-valor">${ex.dataInicio ? _formatarDataBR(ex.dataInicio) : '—'}</span></div>
             <div class="exame-campo"><span class="exame-campo-label">Responsável (Seleção)</span><span class="exame-campo-valor">${ex.responsavelSelecao || '—'}</span></div>
             <div class="exame-campo"><span class="exame-campo-label">Solicitado em</span><span class="exame-campo-valor">${_formatarDataHoraBR(ex.dataCadastro)}</span></div>

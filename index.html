@@ -1815,6 +1815,49 @@
                     </button>
                 </div>
 
+                <!-- Painel: Enviar para Exame Médico (SOMENTE Seleção) -->
+                <div id="exame-selecao-panel" class="cpf-consulta-panel" style="display:none;">
+                    <h4><i class="fa-solid fa-hospital"></i> Exame Médico Admissional</h4>
+
+                    <!-- Quando já foi enviado, mostra a situação no lugar do formulário -->
+                    <div id="exame-selecao-ja-enviado" style="display:none;"></div>
+
+                    <div id="exame-selecao-form">
+                        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;cursor:pointer;margin-bottom:12px;">
+                            <input type="checkbox" id="exame-sel-marcar" onchange="_toggleExameSelecao()" style="width:16px;height:16px;cursor:pointer;">
+                            <span>Enviar este candidato para fazer o exame médico</span>
+                        </label>
+
+                        <div id="exame-sel-campos" style="display:none;">
+                            <div class="form-group" style="margin-bottom:12px;">
+                                <label for="exame-sel-clinica">Clínica médica</label>
+                                <select id="exame-sel-clinica" class="form-control">
+                                    <option value="">Selecione a clínica...</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group" style="margin-bottom:12px;">
+                                <label>Como o exame será feito</label>
+                                <div class="equip-switch" id="exame-sel-switch" data-ativo="online">
+                                    <span class="equip-switch-thumb"></span>
+                                    <button type="button" class="equip-switch-opt" data-tipo="online" onclick="setModalidadeExame('online')">
+                                        <i class="fa-solid fa-cloud-arrow-up"></i> Online
+                                    </button>
+                                    <button type="button" class="equip-switch-opt" data-tipo="presencial" onclick="setModalidadeExame('presencial')">
+                                        <i class="fa-solid fa-person-walking"></i> Presencial
+                                    </button>
+                                </div>
+                                <input type="hidden" id="exame-sel-modalidade" value="online">
+                                <small id="exame-sel-ajuda" style="display:block;margin-top:8px;font-size:11px;color:var(--text-secondary);line-height:1.5;"></small>
+                            </div>
+
+                            <button type="button" class="btn btn-primary" style="width:100%;justify-content:center;" onclick="enviarCandidatoParaExame()">
+                                <i class="fa-solid fa-paper-plane"></i> Enviar para Exame Médico
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Alerta de devolução pelo DP -->
                 <div id="devolucao-alert-box" class="devolucao-alert" style="display: none;">
                     <div class="devolucao-alert-header">
