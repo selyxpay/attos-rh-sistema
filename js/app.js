@@ -9798,7 +9798,10 @@ function renderEquipamentos() {
   const actions = document.getElementById('equip-header-actions');
   if (actions) {
     actions.innerHTML = podeCriarEquipamento()
-      ? `<button class="btn btn-primary" onclick="abrirModalEquipamento()"><i class="fa-solid fa-plus"></i> Novo Registro</button>`
+      ? `<button class="btn btn-outline" onclick="abrirImportarEquip()" title="Trazer os registros do formulário antigo">
+           <i class="fa-solid fa-file-import"></i> Importar do sistema antigo
+         </button>
+         <button class="btn btn-primary" onclick="abrirModalEquipamento()"><i class="fa-solid fa-plus"></i> Novo Registro</button>`
       : '';
   }
 
@@ -10278,6 +10281,406 @@ async function salvarEquipamento() {
   }
 }
 window.salvarEquipamento = salvarEquipamento;
+
+// ==========================================================================
+// IMPORTAR REGISTROS DO SISTEMA ANTIGO (planilha do Google Forms + fotos do Drive)
+// ==========================================================================
+
+let _impLinhas = [];      // linhas da planilha
+let _impColunas = [];     // nomes das colunas encontradas
+let _impMapa = {};        // campo do sistema -> nome da coluna da planilha
+let _impFotos = new Map();// nome-do-arquivo (normalizado) -> File
+let _impRodando = false;
+
+// Campos do sistema que podem vir da planilha
+const IMP_CAMPOS = {
+  nome:        { rotulo: 'Nome do colaborador *', dicas: ['nome', 'colaborador', 'funcionario', 'candidato'] },
+  cpf:         { rotulo: 'CPF',                   dicas: ['cpf', 'documento'] },
+  tipo:        { rotulo: 'Entrega ou Devolução',  dicas: ['tipo', 'entrega', 'devolucao', 'devolução', 'registro'] },
+  equipamentos:{ rotulo: 'Equipamentos',          dicas: ['equipamento', 'item', 'material'] },
+  estado:      { rotulo: 'Estado',                dicas: ['estado', 'condicao', 'condição', 'conservacao'] },
+  responsavel: { rotulo: 'Responsável',           dicas: ['responsavel', 'responsável', 'atendente', 'entregue por'] },
+  data:        { rotulo: 'Data / hora',           dicas: ['carimbo', 'timestamp', 'data', 'hora'] },
+  observacoes: { rotulo: 'Observações',           dicas: ['observ', 'obs', 'comentario', 'comentário'] },
+  arquivo:     { rotulo: 'Arquivo(s) da foto',    dicas: ['arquivo', 'foto', 'imagem', 'anexo', 'upload'] }
+};
+
+function _impNorm(s) {
+  return String(s || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')  // tira acento
+    .toLowerCase().trim();
+}
+function _impNormArquivo(s) {
+  return _impNorm(s).replace(/\s+/g, ' ');
+}
+
+function abrirImportarEquip() {
+  if (!podeCriarEquipamento()) { alert('Você não tem permissão para importar registros.'); return; }
+  _impLinhas = []; _impColunas = []; _impMapa = {}; _impFotos = new Map(); _impRodando = false;
+  ['imp-passo-2', 'imp-passo-3', 'imp-passo-4', 'imp-progresso'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  const p1 = document.getElementById('imp-passo-1'); if (p1) p1.style.display = '';
+  ['imp-planilha-info', 'imp-fotos-info', 'imp-resumo', 'imp-previa'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.innerHTML = '';
+  });
+  const btn = document.getElementById('imp-btn-importar'); if (btn) btn.style.display = 'none';
+  const m = document.getElementById('modal-importar-equip'); if (m) m.style.display = 'flex';
+}
+window.abrirImportarEquip = abrirImportarEquip;
+
+function fecharImportarEquip() {
+  if (_impRodando && !confirm('A importação está em andamento. Cancelar agora pode deixar registros pela metade. Fechar mesmo assim?')) return;
+  const m = document.getElementById('modal-importar-equip'); if (m) m.style.display = 'none';
+  _impLinhas = []; _impFotos = new Map(); _impRodando = false;
+}
+window.fecharImportarEquip = fecharImportarEquip;
+
+// ── Passo 1: ler a planilha ───────────────────────────────────────────────
+function impLerPlanilha(input) {
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  if (typeof XLSX === 'undefined') { alert('O componente de planilha não carregou. Atualize a página (Ctrl+Shift+R).'); return; }
+
+  const leitor = new FileReader();
+  leitor.onload = e => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      // raw:false -> datas e números já vêm como texto formatado (evita número serial do Excel)
+      _impLinhas = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+      if (!_impLinhas.length) { alert('A planilha está vazia.'); return; }
+      _impColunas = Object.keys(_impLinhas[0]);
+
+      const info = document.getElementById('imp-planilha-info');
+      if (info) info.innerHTML = `<div class="imp-ok"><i class="fa-solid fa-circle-check"></i>
+        <strong>${escapeHTML(file.name)}</strong> — ${_impLinhas.length} linha(s), ${_impColunas.length} coluna(s).</div>`;
+
+      _impAdivinharColunas();
+      _impRenderMapeamento();
+      document.getElementById('imp-passo-2').style.display = '';
+      document.getElementById('imp-passo-3').style.display = '';
+    } catch (err) {
+      alert('Não foi possível ler a planilha: ' + (err.message || err));
+    }
+  };
+  leitor.readAsArrayBuffer(file);
+}
+window.impLerPlanilha = impLerPlanilha;
+
+// Tenta casar cada campo do sistema com uma coluna da planilha, pelo nome
+function _impAdivinharColunas() {
+  _impMapa = {};
+  Object.entries(IMP_CAMPOS).forEach(([campo, def]) => {
+    const achou = _impColunas.find(col => {
+      const c = _impNorm(col);
+      return def.dicas.some(d => c.includes(_impNorm(d)));
+    });
+    _impMapa[campo] = achou || '';
+  });
+}
+
+function _impRenderMapeamento() {
+  const box = document.getElementById('imp-mapeamento');
+  if (!box) return;
+  const opcoes = c => '<option value="">— não tenho essa coluna —</option>' +
+    _impColunas.map(col => `<option value="${escapeHTML(col)}" ${col === _impMapa[c] ? 'selected' : ''}>${escapeHTML(col)}</option>`).join('');
+
+  box.innerHTML = Object.entries(IMP_CAMPOS).map(([campo, def]) => `
+    <div class="imp-mapa-linha">
+      <label>${def.rotulo}</label>
+      <select class="form-control" data-campo="${campo}" onchange="_impMapa[this.dataset.campo]=this.value; _impPreVisualizar();">
+        ${opcoes(campo)}
+      </select>
+    </div>`).join('');
+}
+
+// ── Passo 3: receber as fotos ─────────────────────────────────────────────
+function impReceberFotos(input) {
+  const arquivos = Array.from(input.files || []);
+  input.value = '';
+  if (!arquivos.length) return;
+
+  _impFotos = new Map();
+  arquivos.forEach(f => _impFotos.set(_impNormArquivo(f.name), f));
+
+  const total = arquivos.reduce((s, f) => s + f.size, 0);
+  const info = document.getElementById('imp-fotos-info');
+  if (info) info.innerHTML = `<div class="imp-ok"><i class="fa-solid fa-circle-check"></i>
+    <strong>${arquivos.length}</strong> arquivo(s) selecionado(s) — ${(total / 1048576).toFixed(0)} MB no total.</div>`;
+
+  document.getElementById('imp-passo-4').style.display = '';
+  _impPreVisualizar();
+}
+window.impReceberFotos = impReceberFotos;
+
+// Acha o(s) arquivo(s) de uma linha: primeiro pelo nome exato da coluna "Arquivo",
+// senão tenta achar uma foto cujo nome contenha o nome da pessoa.
+function _impFotosDaLinha(linha) {
+  const achados = [];
+  const bruto = String(linha[_impMapa.arquivo] || '').trim();
+
+  if (bruto) {
+    // pode vir "a.jpg, b.jpg" ou um por linha
+    bruto.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean).forEach(pedaco => {
+      // ignora links do Drive (não dá para casar por eles)
+      if (/^https?:\/\//i.test(pedaco)) return;
+      const f = _impFotos.get(_impNormArquivo(pedaco));
+      if (f) achados.push(f);
+    });
+  }
+
+  if (!achados.length) {
+    // Plano B: nome da pessoa dentro do nome do arquivo
+    const nome = _impNorm(linha[_impMapa.nome]);
+    if (nome.length >= 5) {
+      for (const [chave, f] of _impFotos) {
+        if (chave.includes(nome)) { achados.push(f); break; }
+      }
+    }
+  }
+  return achados;
+}
+
+function _impTipo(txt) {
+  const t = _impNorm(txt);
+  if (t.includes('devol')) return 'devolucao';
+  return 'entrega';   // padrão
+}
+function _impEstado(txt) {
+  const t = _impNorm(txt);
+  if (t.includes('danific')) return 'danificado';
+  if (t.includes('ruim') || t.includes('pessim')) return 'ruim';
+  if (t.includes('regular') || t.includes('medio')) return 'regular';
+  return 'bom';       // padrão
+}
+function _impItens(txt) {
+  const t = _impNorm(txt);
+  const achados = [];
+  if (t.includes('yubico') || t.includes('yubi')) achados.push('yubico');
+  if (t.includes('cartao') || t.includes('cracha') || t.includes('acesso')) achados.push('cartao_acesso');
+  if (t.includes('bota') || t.includes('calcado') || t.includes('sapato')) achados.push('bota');
+  if (t.includes('uniforme') || t.includes('camisa') || t.includes('calca')) achados.push('uniforme');
+  if (t.includes('colete')) achados.push('colete');
+  if (!achados.length && t) achados.push('outros');
+  return achados;
+}
+function _impData(v) {
+  if (!v) return new Date().toISOString();
+  if (v instanceof Date && !isNaN(v)) return v.toISOString();
+  const s = String(v).trim();
+  // DD/MM/AAAA HH:MM(:SS)
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (m) {
+    const d = new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
+    if (!isNaN(d)) return d.toISOString();
+  }
+  const d2 = new Date(s);
+  return isNaN(d2) ? new Date().toISOString() : d2.toISOString();
+}
+// Chave para não importar o mesmo registro duas vezes
+function _impChave(linha) {
+  const cpf = String(linha[_impMapa.cpf] || '').replace(/\D/g, '');
+  const nome = _impNorm(linha[_impMapa.nome]);
+  return `${cpf || nome}|${_impData(linha[_impMapa.data]).slice(0, 16)}`;
+}
+
+// ── Passo 4: conferência ──────────────────────────────────────────────────
+function _impPreVisualizar() {
+  const resumo = document.getElementById('imp-resumo');
+  const previa = document.getElementById('imp-previa');
+  const btn = document.getElementById('imp-btn-importar');
+  if (!resumo || !previa) return;
+
+  if (!_impMapa.nome) {
+    resumo.innerHTML = `<div class="imp-erro"><i class="fa-solid fa-triangle-exclamation"></i> Escolha a coluna do <strong>nome</strong> no passo 2.</div>`;
+    previa.innerHTML = ''; if (btn) btn.style.display = 'none';
+    return;
+  }
+
+  garantirEquipamentos();
+  const jaExistem = new Set((state.equipamentos || []).map(e => e.chaveImport).filter(Boolean));
+
+  let comFoto = 0, semFoto = 0, duplicados = 0, semNome = 0;
+  const usados = new Set();
+  const amostra = [];
+
+  _impLinhas.forEach((linha, i) => {
+    const nome = String(linha[_impMapa.nome] || '').trim();
+    if (!nome) { semNome++; return; }
+    if (jaExistem.has(_impChave(linha))) { duplicados++; return; }
+    const fotos = _impFotosDaLinha(linha);
+    fotos.forEach(f => usados.add(_impNormArquivo(f.name)));
+    if (fotos.length) comFoto++; else semFoto++;
+    if (amostra.length < 5) {
+      amostra.push({
+        nome,
+        cpf: String(linha[_impMapa.cpf] || '—'),
+        tipo: EQUIP_TIPOS[_impTipo(linha[_impMapa.tipo])],
+        itens: _equipNomesItens(_impItens(linha[_impMapa.equipamentos])),
+        estado: EQUIP_ESTADOS[_impEstado(linha[_impMapa.estado])],
+        data: _formatarDataHoraBR(_impData(linha[_impMapa.data])),
+        fotos: fotos.length
+      });
+    }
+  });
+
+  const fotosSobrando = _impFotos.size - usados.size;
+  const aImportar = comFoto + semFoto;
+
+  resumo.innerHTML = `
+    <div class="imp-kpis">
+      <div class="imp-kpi imp-kpi-ok"><span>${aImportar}</span><small>vão ser importados</small></div>
+      <div class="imp-kpi"><span>${comFoto}</span><small>com foto</small></div>
+      <div class="imp-kpi ${semFoto ? 'imp-kpi-alerta' : ''}"><span>${semFoto}</span><small>sem foto</small></div>
+      <div class="imp-kpi ${duplicados ? 'imp-kpi-alerta' : ''}"><span>${duplicados}</span><small>já importados</small></div>
+    </div>
+    ${semNome ? `<div class="imp-erro"><i class="fa-solid fa-triangle-exclamation"></i> ${semNome} linha(s) sem nome serão puladas.</div>` : ''}
+    ${fotosSobrando > 0 ? `<div class="imp-aviso"><i class="fa-solid fa-circle-info"></i> ${fotosSobrando} foto(s) não casaram com nenhuma linha. Confira a coluna "Arquivo(s) da foto" no passo 2.</div>` : ''}
+    ${semFoto ? `<div class="imp-aviso"><i class="fa-solid fa-circle-info"></i> Os ${semFoto} registros sem foto serão importados mesmo assim — você anexa a foto depois, editando o registro.</div>` : ''}
+  `;
+
+  previa.innerHTML = !amostra.length ? '' : `
+    <p class="imp-ajuda" style="margin-top:14px;"><strong>Prévia dos primeiros registros:</strong></p>
+    <div class="table-scroll-container">
+      <table class="excel-table">
+        <thead><tr><th>Nome</th><th>CPF</th><th>Tipo</th><th>Equipamentos</th><th>Estado</th><th>Data</th><th>Fotos</th></tr></thead>
+        <tbody>${amostra.map(a => `
+          <tr>
+            <td style="font-weight:600;">${escapeHTML(a.nome)}</td>
+            <td>${escapeHTML(a.cpf)}</td><td>${a.tipo}</td>
+            <td>${escapeHTML(a.itens)}</td><td>${a.estado}</td><td>${a.data}</td>
+            <td>${a.fotos ? `<span style="color:#059669;font-weight:700;">${a.fotos}</span>` : '<span style="color:#D97706;">0</span>'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  if (btn) btn.style.display = aImportar > 0 ? '' : 'none';
+}
+window._impPreVisualizar = _impPreVisualizar;
+
+// Sobe um arquivo e devolve o link /uploads/.. (nunca guarda base64 no estado)
+async function _impSubirArquivo(file) {
+  const base64 = await fileToBase64(file);   // valida tamanho e cabeçalho real
+  const r = await fetch('/api/upload', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin', body: JSON.stringify({ dataUrl: base64, hint: 'equip' })
+  });
+  if (!r.ok) throw new Error('falha ao enviar a foto (HTTP ' + r.status + ')');
+  const d = await r.json();
+  if (!d.url) throw new Error('o servidor não devolveu o link da foto');
+  return d.url;
+}
+
+// ── Importação em blocos, com progresso ───────────────────────────────────
+async function importarEquipamentosAgora() {
+  if (_impRodando) return;
+  if (!podeCriarEquipamento()) { alert('Você não tem permissão para importar registros.'); return; }
+  garantirEquipamentos();
+
+  const jaExistem = new Set((state.equipamentos || []).map(e => e.chaveImport).filter(Boolean));
+  const fila = _impLinhas.filter(l => String(l[_impMapa.nome] || '').trim() && !jaExistem.has(_impChave(l)));
+  if (!fila.length) { alert('Não há nada novo para importar.'); return; }
+
+  _impRodando = true;
+  ['imp-passo-1', 'imp-passo-2', 'imp-passo-3', 'imp-passo-4'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  document.getElementById('imp-progresso').style.display = '';
+  document.getElementById('imp-btn-importar').style.display = 'none';
+
+  const barra = document.getElementById('imp-barra-fill');
+  const txt = document.getElementById('imp-progresso-txt');
+  const autor = loggedUser ? loggedUser.nome : 'Importação';
+  const BLOCO = 20;   // grava no servidor a cada 20 registros
+
+  let feitos = 0, comErro = 0;
+  const erros = [];
+
+  try {
+    for (let i = 0; i < fila.length; i++) {
+      const linha = fila[i];
+      const nome = String(linha[_impMapa.nome] || '').trim();
+
+      if (txt) txt.textContent = `${i + 1} de ${fila.length} — ${nome}`;
+      if (barra) barra.style.width = `${Math.round(((i) / fila.length) * 100)}%`;
+
+      try {
+        // Sobe as fotos desta linha (viram link; nada de base64 no estado)
+        const fotos = [];
+        for (const f of _impFotosDaLinha(linha)) {
+          const url = await _impSubirArquivo(f);
+          fotos.push({ nome: f.name, arquivo: url });
+        }
+
+        const itens = _impItens(linha[_impMapa.equipamentos]);
+        const dataISO = _impData(linha[_impMapa.data]);
+        state.equipamentos.push({
+          id: `equip-imp-${Date.now()}-${i}`,
+          chaveImport: _impChave(linha),              // impede importar duas vezes
+          nome,
+          cpf: String(linha[_impMapa.cpf] || '').trim(),
+          candidatoId: null,
+          responsavel: String(linha[_impMapa.responsavel] || '').trim() || autor,
+          tipo: _impTipo(linha[_impMapa.tipo]),
+          equipamentos: itens,
+          equipamentoOutros: itens.includes('outros') ? String(linha[_impMapa.equipamentos] || '').trim() : '',
+          estado: _impEstado(linha[_impMapa.estado]),
+          observacoes: String(linha[_impMapa.observacoes] || '').trim(),
+          fotos,
+          usuarioCadastro: autor,
+          usuarioLogin: loggedUser ? loggedUser.login : '',
+          dataCadastro: dataISO,                      // preserva a data original do Forms
+          importadoEm: new Date().toISOString(),
+          historico: []
+        });
+        feitos++;
+      } catch (e) {
+        comErro++;
+        erros.push(`${nome}: ${e.message || e}`);
+      }
+
+      // Grava no servidor de tempos em tempos (se cair a internet, não perde tudo)
+      if ((i + 1) % BLOCO === 0 || i === fila.length - 1) {
+        if (txt) txt.textContent = `Gravando no servidor... (${feitos} de ${fila.length})`;
+        if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
+          await RTCloud.salvarAgora(state);
+        }
+      }
+    }
+
+    if (barra) barra.style.width = '100%';
+    registrarLogGlobal(`Importou ${feitos} registro(s) de equipamento do sistema antigo.`, 'dp');
+    if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
+      await RTCloud.salvarAgora(state);
+    }
+
+    _impRodando = false;
+    fecharImportarEquip();
+    limparFiltrosEquipamento();
+    renderEquipamentos();
+
+    alert(
+      `Importação concluída!\n\n` +
+      `${feitos} registro(s) importado(s) com sucesso.` +
+      (comErro ? `\n${comErro} com problema:\n- ${erros.slice(0, 5).join('\n- ')}${erros.length > 5 ? `\n(e mais ${erros.length - 5})` : ''}` : '')
+    );
+  } catch (e) {
+    _impRodando = false;
+    if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
+      try { await RTCloud.salvarAgora(state); } catch (_) {}
+    }
+    renderEquipamentos();
+    alert(
+      `A importação parou no meio.\n\nMotivo: ${e.message || e}\n\n` +
+      `Os ${feitos} registro(s) já importados FORAM salvos. ` +
+      `Pode rodar a importação de novo com a mesma planilha — o sistema pula os que já entraram.`
+    );
+  }
+}
+window.importarEquipamentosAgora = importarEquipamentosAgora;
 
 // ── Excluir ───────────────────────────────────────────────────────────────
 function excluirEquipamento(id) {
