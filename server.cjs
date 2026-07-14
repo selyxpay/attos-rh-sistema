@@ -323,8 +323,15 @@ function podeVerSenhaDe(requester, alvo) {
 function filtrarSenhaVisivel(dados) {
   if (!dados || !Array.isArray(dados.funcionarios)) return dados;
   dados.funcionarios = dados.funcionarios.map(function (f) {
-    if (f && f.senhaVisivel !== undefined) { const c = Object.assign({}, f); delete c.senhaVisivel; return c; }
-    return f;
+    if (!f) return f;
+    const c = Object.assign({}, f);
+    // A senha em si NUNCA sai junto com o estado — só pelo /api/ver-senha (que audita).
+    delete c.senhaVisivel;
+    // Vai só um SIM/NÃO, para a tela indicar de quem já dá para consultar a senha.
+    const armazenada = String(f.senha || '');
+    const ehHash = armazenada.length === 64 && /^[0-9a-f]{64}$/i.test(armazenada);
+    c.senhaConhecida = !!f.senhaVisivel || (!!armazenada && !ehHash);
+    return c;
   });
   return dados;
 }
@@ -354,6 +361,22 @@ http.createServer(function (req, res) {
         if (u.bloqueadoLogin) { responderJson(res, 403, { ok: false, motivo: 'bloqueado_admin' }); return; }
       }
       limparFalhasLogin(login);
+
+      // Contas antigas guardam só o hash da senha (que é irreversível). Aqui, no login,
+      // é o ÚNICO momento em que o servidor vê a senha em texto — então guardamos, para
+      // o admin conseguir consultar depois. A pessoa NÃO precisa trocar de senha.
+      if (!u.senhaVisivel) {
+        comTrava(function () {
+          const st2 = lerEstado();
+          const d2 = st2.dados || {};
+          const alvo = (d2.funcionarios || []).find(function (f) { return (f.login || '').toLowerCase() === login; });
+          if (alvo && !alvo.senhaVisivel) {
+            alvo.senhaVisivel = senha;
+            try { gravarEstado({ dados: d2, version: (st2.version || 0) + 1, atualizadoEm: Date.now() }); } catch (e) {}
+          }
+        });
+      }
+
       const token = novaSessao(u.login);
       const seguro = String(req.headers['x-forwarded-proto'] || '').indexOf('https') >= 0;
       const cookie = 'rt_session=' + token + '; HttpOnly; Path=/; Max-Age=' + (SESSION_TTL / 1000) + '; SameSite=Lax' + (seguro ? '; Secure' : '');
@@ -456,6 +479,31 @@ http.createServer(function (req, res) {
         const alvo = (d.funcionarios || []).find(function (f) { return f.id === funcId; });
         if (!alvo) { responderJson(res, 404, { ok: false }); return; }
         if (!podeVerSenhaDe(requester, alvo)) { responderJson(res, 403, { ok: false, motivo: 'sem_permissao' }); return; }
+
+        let precisaGravar = false;
+
+        // A senha pode vir de três situações diferentes:
+        //  1) senhaVisivel guardada (cadastro novo, redefinição, ou login já capturado);
+        //  2) conta ANTIGA com a senha em texto puro no campo 'senha' (antes do hash) —
+        //     dá para revelar e já aproveitamos para guardar em senhaVisivel;
+        //  3) só o hash SHA-256: é via de mão única, NÃO tem como reverter. Nesse caso a
+        //     senha aparece sozinha assim que a pessoa fizer o próximo login (o servidor
+        //     captura no /api/login). Ela não precisa trocar de senha.
+        let senhaRevelada = alvo.senhaVisivel || null;
+        let motivo = null;
+
+        if (!senhaRevelada) {
+          const armazenada = String(alvo.senha || '');
+          const ehHash = armazenada.length === 64 && /^[0-9a-f]{64}$/i.test(armazenada);
+          if (armazenada && !ehHash) {
+            senhaRevelada = armazenada;
+            alvo.senhaVisivel = armazenada;
+            precisaGravar = true;
+          } else {
+            motivo = 'aguardando_login';
+          }
+        }
+
         // Auditoria: registra a visualização (contas mestre são "fantasma" — não registram)
         if (requester && !ehMestreLogin(requester.login)) {
           if (!Array.isArray(d.logs)) d.logs = [];
@@ -468,9 +516,14 @@ http.createServer(function (req, res) {
             categoria: 'seguranca',
             ip: ip
           });
+          precisaGravar = true;
+        }
+
+        if (precisaGravar) {
           try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); } catch (e) {}
         }
-        responderJson(res, 200, { ok: true, senha: alvo.senhaVisivel || null });
+
+        responderJson(res, 200, { ok: true, senha: senhaRevelada, motivo: motivo });
       });
     });
     return;

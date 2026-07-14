@@ -5236,6 +5236,9 @@ function renderFuncionarios() {
           <div style="margin-top:3px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
             <button class="btn btn-secondary btn-sm" style="padding:1px 7px;font-size:10px;" onclick="verSenhaFuncionario('${f.id}')"><i class="fa-solid fa-eye"></i> Ver senha</button>
             <button class="btn btn-secondary btn-sm" style="padding:1px 7px;font-size:10px;" onclick="resetarSenhaFuncionario('${f.id}')"><i class="fa-solid fa-key"></i> Redefinir</button>
+            ${f.senhaConhecida === false
+              ? '<span title="Senha antiga (embaralhada). Aparece aqui assim que a pessoa fizer o próximo login — ela não precisa trocar de senha." style="font-size:9.5px;font-weight:700;color:#D97706;background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.3);padding:1px 6px;border-radius:8px;"><i class="fa-solid fa-hourglass-half"></i> aguardando login</span>'
+              : '<span title="A senha desta conta pode ser consultada." style="font-size:9.5px;font-weight:700;color:#059669;background:rgba(5,150,105,.12);border:1px solid rgba(5,150,105,.3);padding:1px 6px;border-radius:8px;"><i class="fa-solid fa-check"></i> disponível</span>'}
           </div>` : ''}
         </td>
         <td>
@@ -5386,8 +5389,24 @@ window.verSenhaFuncionario = async function (funcId) {
     });
     const d = await r.json().catch(() => ({}));
     if (r.status === 200 && d.ok) {
-      if (d.senha) alert(`Senha de "${func ? func.nome : ''}":\n\n${d.senha}`);
-      else alert('Esta conta tem senha antiga (embaralhada) e não dá para ver. Clique em "Redefinir" para definir uma nova.');
+      const nome = func ? func.nome : '';
+      if (d.senha) {
+        alert(`Senha de "${nome}":\n\n${d.senha}`);
+      } else if (d.motivo === 'aguardando_login') {
+        // Senha guardada só como hash (via de mão única). O sistema captura sozinho
+        // no próximo login da pessoa — ela NÃO precisa trocar de senha.
+        alert(
+          `A senha de "${nome}" ainda não pode ser exibida.\n\n` +
+          `Essa conta é antiga e a senha está embaralhada (isso é de mão única — nem o sistema consegue desembaralhar).\n\n` +
+          `O QUE FAZER:\n` +
+          `Peça para "${nome}" entrar no sistema uma vez com a senha que ele já usa.\n` +
+          `Assim que ele logar, o sistema guarda a senha e ela passa a aparecer aqui para sempre.\n` +
+          `Ele NÃO precisa trocar de senha.\n\n` +
+          `Se ele esqueceu a senha, use o botão "Redefinir" para criar uma nova.`
+        );
+      } else {
+        alert('Não foi possível ver a senha desta conta.');
+      }
     } else if (r.status === 403) {
       alert('Você não tem permissão para ver a senha deste funcionário.');
     } else { alert('Não foi possível ver a senha.'); }
