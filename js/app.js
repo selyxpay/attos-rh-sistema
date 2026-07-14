@@ -10286,6 +10286,7 @@ window.salvarEquipamento = salvarEquipamento;
 // IMPORTAR REGISTROS DO SISTEMA ANTIGO (planilha do Google Forms + fotos do Drive)
 // ==========================================================================
 
+let _impAbas = [];        // abas encontradas na planilha (a do Forms tem mais de uma)
 let _impLinhas = [];      // linhas da planilha
 let _impColunas = [];     // nomes das colunas encontradas
 let _impMapa = {};        // campo do sistema -> nome da coluna da planilha
@@ -10351,20 +10352,25 @@ function impLerPlanilha(input) {
   leitor.onload = e => {
     try {
       const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      // raw:false -> datas e números já vêm como texto formatado (evita número serial do Excel)
-      _impLinhas = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
-      if (!_impLinhas.length) { alert('A planilha está vazia.'); return; }
-      _impColunas = Object.keys(_impLinhas[0]);
 
-      const info = document.getElementById('imp-planilha-info');
-      if (info) info.innerHTML = `<div class="imp-ok"><i class="fa-solid fa-circle-check"></i>
-        <strong>${escapeHTML(file.name)}</strong> — ${_impLinhas.length} linha(s), ${_impColunas.length} coluna(s).</div>`;
+      // A planilha do Forms costuma ter MAIS DE UMA aba. Escolhemos a que tem mais
+      // linhas E que contenha uma coluna de arquivo/foto — e ainda deixamos o usuário
+      // trocar, caso a escolha automática não seja a certa.
+      _impAbas = wb.SheetNames.map(nome => {
+        const linhas = XLSX.utils.sheet_to_json(wb.Sheets[nome], { defval: '', raw: false });
+        const colunas = linhas.length ? Object.keys(linhas[0]) : [];
+        const temArquivo = colunas.some(c => /arquivo|foto|imagem|anexo/i.test(c));
+        return { nome, linhas, colunas, temArquivo };
+      }).filter(a => a.linhas.length);
 
-      _impAdivinharColunas();
-      _impRenderMapeamento();
-      document.getElementById('imp-passo-2').style.display = '';
-      document.getElementById('imp-passo-3').style.display = '';
+      if (!_impAbas.length) { alert('A planilha está vazia.'); return; }
+
+      // melhor aba: a que tem coluna de arquivo; empatando, a com mais linhas
+      const melhor = _impAbas.slice().sort((a, b) =>
+        (b.temArquivo - a.temArquivo) || (b.linhas.length - a.linhas.length)
+      )[0];
+
+      _impUsarAba(melhor.nome, file.name);
     } catch (err) {
       alert('Não foi possível ler a planilha: ' + (err.message || err));
     }
@@ -10372,6 +10378,45 @@ function impLerPlanilha(input) {
   leitor.readAsArrayBuffer(file);
 }
 window.impLerPlanilha = impLerPlanilha;
+
+function _impUsarAba(nomeAba, nomeArquivo) {
+  const aba = _impAbas.find(a => a.nome === nomeAba);
+  if (!aba) return;
+  _impLinhas = aba.linhas;
+  _impColunas = aba.colunas;
+
+  const info = document.getElementById('imp-planilha-info');
+  if (info) {
+    const seletor = _impAbas.length > 1 ? `
+      <div class="imp-mapa-linha" style="margin-top:10px;">
+        <label>Sua planilha tem mais de uma aba. Usar qual?</label>
+        <select class="form-control" onchange="_impUsarAba(this.value)">
+          ${_impAbas.map(a => `
+            <option value="${escapeHTML(a.nome)}" ${a.nome === nomeAba ? 'selected' : ''}>
+              ${escapeHTML(a.nome)} — ${a.linhas.length} linha(s)${a.temArquivo ? ' ✓ tem a coluna do arquivo' : ''}
+            </option>`).join('')}
+        </select>
+      </div>` : '';
+
+    info.innerHTML = `
+      <div class="imp-ok"><i class="fa-solid fa-circle-check"></i>
+        <strong>${escapeHTML(nomeArquivo || 'Planilha')}</strong> — aba <strong>${escapeHTML(nomeAba)}</strong>:
+        ${_impLinhas.length} linha(s), ${_impColunas.length} coluna(s).
+      </div>
+      ${aba.temArquivo ? '' : `<div class="imp-aviso"><i class="fa-solid fa-triangle-exclamation"></i>
+        Esta aba não parece ter a coluna com o nome das fotos (ARQUIVO). Confira se é a aba certa.</div>`}
+      ${seletor}`;
+  }
+
+  _impAdivinharColunas();
+  _impRenderMapeamento();
+  document.getElementById('imp-passo-2').style.display = '';
+  document.getElementById('imp-passo-3').style.display = '';
+  _impFotos = new Map();
+  const fi = document.getElementById('imp-fotos-info'); if (fi) fi.innerHTML = '';
+  const p4 = document.getElementById('imp-passo-4'); if (p4) p4.style.display = 'none';
+}
+window._impUsarAba = _impUsarAba;
 
 // Nome de coluna sem acento, minúsculo e sem pontuação no fim ("Nome completo:" -> "nome completo")
 function _impNormCol(s) {
