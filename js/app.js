@@ -1574,6 +1574,9 @@ function switchAba(abaId) {
 }
 
 function renderCurrentAba() {
+  // O monitor de pedidos de senha só roda na aba Funcionários
+  if (activeAba !== 'funcionarios') pararMonitorPedidosSenha();
+
   switch (activeAba) {
     case 'dashboard':
       renderDashboardOverview();
@@ -5266,6 +5269,9 @@ function renderFuncionarios() {
     `;
   }).join('');
 
+  // Pedidos de nova senha: fica olhando enquanto a aba estiver aberta
+  iniciarMonitorPedidosSenha();
+
   // Campo "Nome da clínica" no cadastro: só aparece quando o depto é Clínica
   const selDeptoNovo = document.getElementById('func-depto');
   if (selDeptoNovo && !selDeptoNovo.dataset.clinicaOk) {
@@ -5277,6 +5283,104 @@ function renderFuncionarios() {
   // Configurar listeners do modal Gerenciar (garante que esteja configurado)
   setupModalGerenciarListeners();
   setupBtnCopiarLink();
+}
+
+// ── Pedidos de redefinição de senha (aprovação do admin) ──────────────────
+// Os pedidos NÃO ficam no estado normal: o token de redefinição é secreto e não
+// pode viajar junto com os dados que todo funcionário logado recebe. Por isso o
+// painel busca a lista numa rota própria, que só o admin acessa.
+let _pedidosSenhaTimer = null;
+
+function podeAprovarSenha() {
+  return !!(loggedUser && (ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao'));
+}
+
+async function carregarPedidosSenha() {
+  const card = document.getElementById('card-pedidos-senha');
+  if (!card) return;
+  if (!podeAprovarSenha()) { card.style.display = 'none'; return; }
+
+  try {
+    const r = await fetch('/api/solicitacoes-senha', { credentials: 'same-origin' });
+    if (!r.ok) { card.style.display = 'none'; return; }
+    const d = await r.json().catch(() => ({}));
+    _renderPedidosSenha((d && d.pedidos) || []);
+  } catch (e) { /* sem rede: tenta de novo no próximo ciclo */ }
+}
+window.carregarPedidosSenha = carregarPedidosSenha;
+
+function _renderPedidosSenha(pedidos) {
+  const card = document.getElementById('card-pedidos-senha');
+  const tbody = document.getElementById('lista-pedidos-senha');
+  const cnt = document.getElementById('pedidos-senha-count');
+  if (!card || !tbody) return;
+
+  // Mostra os pendentes primeiro; some quando não há nada recente
+  const relevantes = pedidos.filter(p => ['pendente', 'aprovada'].includes(p.status));
+  if (!relevantes.length) { card.style.display = 'none'; return; }
+
+  card.style.display = 'block';
+  const pendentes = relevantes.filter(p => p.status === 'pendente').length;
+  if (cnt) cnt.textContent = pendentes ? `${pendentes} aguardando você` : 'liberados';
+
+  tbody.innerHTML = relevantes.map(p => {
+    const quando = _formatarDataHoraBR(new Date(p.criadoEm || 0).toISOString());
+    const pend = p.status === 'pendente';
+    const situacao = pend
+      ? '<span class="badge badge-red">Esperando você liberar</span>'
+      : `<span class="badge badge-green">Liberado — criando a senha</span>`;
+    return `
+      <tr>
+        <td style="font-weight:600;">${escapeHTML(p.nome || '—')}</td>
+        <td>${escapeHTML(p.login || '—')}</td>
+        <td>${escapeHTML(deptoLabelSimples(p.departamento))}</td>
+        <td>${quando}</td>
+        <td>${situacao}</td>
+        <td>
+          ${pend ? `
+            <button class="btn btn-primary btn-sm" style="padding:2px 8px;font-size:11px;"
+                    onclick="responderPedidoSenha('${p.id}', 'aprovar')">
+              <i class="fa-solid fa-unlock"></i> Liberar
+            </button>
+            <button class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:11px;margin-left:6px;"
+                    onclick="responderPedidoSenha('${p.id}', 'recusar')">
+              <i class="fa-solid fa-ban"></i> Recusar
+            </button>`
+            : `<small style="color:var(--text-secondary);">Liberado por ${escapeHTML(p.aprovadoPor || '—')}</small>`}
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+window.responderPedidoSenha = async function (id, acao) {
+  if (acao === 'recusar' && !confirm('Recusar este pedido de nova senha?')) return;
+  try {
+    const r = await fetch('/api/aprovar-senha', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin', body: JSON.stringify({ id: id, acao: acao })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 200 && d.ok) {
+      await carregarPedidosSenha();
+      if (acao === 'aprovar') alert('Liberado! A tela da pessoa vai mudar sozinha em alguns segundos para ela criar a nova senha.');
+    } else if (r.status === 403) {
+      alert('Você não tem permissão para liberar redefinição de senha.');
+    } else if (r.status === 409) {
+      alert('Este pedido já foi tratado.');
+      await carregarPedidosSenha();
+    } else { alert('Não foi possível responder ao pedido.'); }
+  } catch (e) { alert('Erro de conexão. Tente novamente.'); }
+};
+
+// Enquanto a aba Funcionários estiver aberta, fica de olho em novos pedidos
+function iniciarMonitorPedidosSenha() {
+  if (_pedidosSenhaTimer) return;
+  if (!podeAprovarSenha()) return;
+  carregarPedidosSenha();
+  _pedidosSenhaTimer = setInterval(carregarPedidosSenha, 8000);
+}
+function pararMonitorPedidosSenha() {
+  if (_pedidosSenhaTimer) { clearInterval(_pedidosSenhaTimer); _pedidosSenhaTimer = null; }
 }
 
 // ── Clínicas parceiras (Exame Médico) ─────────────────────────────────────

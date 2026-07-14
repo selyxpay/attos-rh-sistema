@@ -320,6 +320,28 @@ function podeVerSenhaDe(requester, alvo) {
   return !!(requester && requester.podeVerSenhas && alvo && alvo.departamento === requester.departamento);
 }
 // A senha visível NUNCA vai junto com o estado — só via /api/ver-senha (que registra o acesso).
+// ==========================================================================
+// PEDIDOS DE REDEFINIÇÃO DE SENHA (com aprovação do admin)
+// Ficam em arquivo PRÓPRIO, fora do state.json. Assim o token secreto nunca
+// viaja junto com os dados que todo funcionário logado recebe.
+// ==========================================================================
+const PEDIDOS_FILE = path.join(DATA_DIR, 'pedidos-senha.json');
+const TTL_APROVACAO = 30 * 60 * 1000;        // aprovação vale 30 min
+const TTL_PEDIDO    = 24 * 60 * 60 * 1000;   // pedido some depois de 24 h
+const MAX_PENDENTES = 20;
+
+let pedidos = [];
+try { pedidos = JSON.parse(fs.readFileSync(PEDIDOS_FILE, 'utf8')) || []; } catch (e) { pedidos = []; }
+function salvarPedidos() { try { fs.writeFileSync(PEDIDOS_FILE, JSON.stringify(pedidos)); } catch (e) {} }
+
+function limparPedidos() {
+  const agora = Date.now();
+  pedidos.forEach(function (p) {
+    if (p.status === 'aprovada' && (agora - (p.aprovadoEm || 0)) > TTL_APROVACAO) p.status = 'expirada';
+  });
+  pedidos = pedidos.filter(function (p) { return (agora - (p.criadoEm || 0)) < TTL_PEDIDO; });
+}
+
 function filtrarSenhaVisivel(dados) {
   if (!dados || !Array.isArray(dados.funcionarios)) return dados;
   dados.funcionarios = dados.funcionarios.map(function (f) {
@@ -409,6 +431,143 @@ http.createServer(function (req, res) {
   }
 
   // ---- API: auto-cadastro de funcionário (público, mas SEMPRE cria pendente e SEM permissões) ----
+  // ---- 1) A pessoa pede para redefinir a senha (tela de login, sem estar logada) ----
+  if (urlPath === '/api/solicitar-senha' && req.method === 'POST') {
+    lerCorpo(req, function (err, body) {
+      if (err) { responderJson(res, 400, { ok: false }); return; }
+      const login = String((body && body.login) || '').trim().toLowerCase();
+      if (!login) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
+
+      limparPedidos();
+      const token = crypto.randomBytes(24).toString('hex');
+      const st = lerEstado();
+      const u = (((st.dados || {}).funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === login; });
+
+      // Contas MESTRE não usam este fluxo (são justamente quem aprova).
+      const pendentes = pedidos.filter(function (p) { return p.status === 'pendente'; }).length;
+      if (u && !ehMestreLogin(u.login) && pendentes < MAX_PENDENTES) {
+        // Um pedido pendente por pessoa: o novo substitui o anterior.
+        pedidos = pedidos.filter(function (p) { return !(p.login === login && p.status === 'pendente'); });
+        pedidos.unshift({
+          id: 'sol-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+          token: token, login: login, nome: u.nome || login,
+          departamento: u.departamento || '',
+          status: 'pendente', criadoEm: Date.now(), aprovadoPor: '', aprovadoEm: 0
+        });
+        salvarPedidos();
+      }
+      // Resposta SEMPRE igual: não revelamos se o usuário existe (evita descobrir logins).
+      responderJson(res, 200, { ok: true, token: token });
+    });
+    return;
+  }
+
+  // ---- 2) A tela de espera pergunta, de tempos em tempos, se já foi aprovado ----
+  if (urlPath === '/api/status-senha' && req.method === 'GET') {
+    limparPedidos();
+    const q = req.url.indexOf('?') >= 0 ? req.url.slice(req.url.indexOf('?') + 1) : '';
+    const token = decodeURIComponent((/(?:^|&)token=([^&]*)/.exec(q) || [])[1] || '');
+    const p = pedidos.find(function (x) { return x.token === token; });
+    // Token desconhecido responde "pendente" — assim não dá para descobrir nada por aqui.
+    responderJson(res, 200, { ok: true, status: p ? p.status : 'pendente' });
+    return;
+  }
+
+  // ---- 3) O admin aprova ou recusa, pelo painel ----
+  if (urlPath === '/api/aprovar-senha' && req.method === 'POST') {
+    if (!autenticado) { responderJson(res, 401, { ok: false }); return; }
+    const requester = usuarioDaReq(req);
+    if (!veTodasAsSenhas(requester)) { responderJson(res, 403, { ok: false, motivo: 'sem_permissao' }); return; }
+    lerCorpo(req, function (err, body) {
+      if (err) { responderJson(res, 400, { ok: false }); return; }
+      const id = String((body && body.id) || '');
+      const recusar = String((body && body.acao) || '') === 'recusar';
+      limparPedidos();
+      const p = pedidos.find(function (x) { return x.id === id; });
+      if (!p) { responderJson(res, 404, { ok: false }); return; }
+      if (p.status !== 'pendente') { responderJson(res, 409, { ok: false, motivo: 'ja_tratada' }); return; }
+
+      p.status = recusar ? 'recusada' : 'aprovada';
+      p.aprovadoPor = requester.nome || requester.login;
+      p.aprovadoEm = Date.now();
+      salvarPedidos();
+
+      comTrava(function () {
+        const st = lerEstado(); const d = st.dados || {};
+        if (!Array.isArray(d.logs)) d.logs = [];
+        d.logs.unshift({
+          id: 'log-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+          data: new Date().toLocaleString('pt-BR'),
+          usuario: requester.nome || requester.login,
+          acao: (recusar ? 'Recusou' : 'Liberou') + ' a redefinição de senha de "' + p.nome + '" (' + p.login + ').',
+          categoria: 'seguranca'
+        });
+        try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); } catch (e) {}
+      });
+      responderJson(res, 200, { ok: true });
+    });
+    return;
+  }
+
+  // ---- Lista os pedidos para o painel do admin (sem os tokens) ----
+  if (urlPath === '/api/solicitacoes-senha' && req.method === 'GET') {
+    if (!autenticado) { responderJson(res, 401, { ok: false }); return; }
+    const requester = usuarioDaReq(req);
+    if (!veTodasAsSenhas(requester)) { responderJson(res, 403, { ok: false }); return; }
+    limparPedidos();
+    responderJson(res, 200, {
+      ok: true,
+      pedidos: pedidos.map(function (p) {
+        return { id: p.id, nome: p.nome, login: p.login, departamento: p.departamento,
+                 status: p.status, criadoEm: p.criadoEm, aprovadoPor: p.aprovadoPor, aprovadoEm: p.aprovadoEm };
+      })
+    });
+    return;
+  }
+
+  // ---- 4) Aprovado: a pessoa define a nova senha (só com o token do pedido dela) ----
+  if (urlPath === '/api/definir-senha' && req.method === 'POST') {
+    lerCorpo(req, function (err, body) {
+      if (err) { responderJson(res, 400, { ok: false }); return; }
+      const token = String((body && body.token) || '');
+      const nova = String((body && body.senha) || '');
+      if (!token || nova.length < 6) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
+
+      limparPedidos();
+      const p = pedidos.find(function (x) { return x.token === token; });
+      if (!p) { responderJson(res, 403, { ok: false, motivo: 'nao_aprovada' }); return; }
+      if (p.status === 'expirada') { responderJson(res, 403, { ok: false, motivo: 'expirada' }); return; }
+      if (p.status !== 'aprovada') { responderJson(res, 403, { ok: false, motivo: 'nao_aprovada' }); return; }
+
+      comTrava(function () {
+        const st = lerEstado(); const d = st.dados || {};
+        const u = ((d.funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === p.login; });
+        if (!u) { responderJson(res, 404, { ok: false }); return; }
+
+        u.senha = hashSenhaServer(nova);
+        u.senhaVisivel = nova;          // o admin continua conseguindo consultar
+        u.bloqueadoLogin = false;
+
+        if (!Array.isArray(d.logs)) d.logs = [];
+        d.logs.unshift({
+          id: 'log-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+          data: new Date().toLocaleString('pt-BR'),
+          usuario: u.nome || u.login,
+          acao: 'Redefiniu a própria senha (liberado por ' + (p.aprovadoPor || '—') + ').',
+          categoria: 'seguranca'
+        });
+        try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); } catch (e) {}
+
+        p.status = 'concluida';
+        p.concluidoEm = Date.now();
+        salvarPedidos();
+        limparFalhasLogin(p.login);     // destrava eventual bloqueio por erro de senha
+        responderJson(res, 200, { ok: true, login: p.login });
+      });
+    });
+    return;
+  }
+
   if (urlPath === '/api/register-staff' && req.method === 'POST') {
     lerCorpo(req, function (err, body) {
       if (err) { responderJson(res, 400, { ok: false }); return; }

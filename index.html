@@ -915,6 +915,26 @@
                             </form>
                         </div>
                         
+                        <!-- Pedidos de redefinição de senha (aparecem sozinhos) -->
+                        <div class="func-list-card" id="card-pedidos-senha" style="display:none;">
+                            <h3 style="display:flex;align-items:center;gap:8px;">
+                                <i class="fa-solid fa-key" style="color:#D97706;"></i>
+                                Pedidos de nova senha
+                                <span id="pedidos-senha-count" style="font-size:11px;font-weight:700;color:#D97706;background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.3);padding:2px 8px;border-radius:10px;"></span>
+                            </h3>
+                            <p style="font-size:12px;color:var(--text-secondary);margin:6px 0 12px;">
+                                A pessoa está com a tela aberta esperando. Assim que você liberar, ela já cria a nova senha.
+                            </p>
+                            <div class="table-scroll-container">
+                                <table class="excel-table">
+                                    <thead>
+                                        <tr><th>Quem pediu</th><th>Usuário</th><th>Departamento</th><th>Quando</th><th>Situação</th><th>Ação</th></tr>
+                                    </thead>
+                                    <tbody id="lista-pedidos-senha"><!-- Injetado por JS --></tbody>
+                                </table>
+                            </div>
+                        </div>
+
                         <!-- Listagem / Tabela de funcionários -->
                         <div class="func-list-card">
                             <h3>Colaboradores Cadastrados</h3>

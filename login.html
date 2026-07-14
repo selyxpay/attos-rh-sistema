@@ -76,7 +76,81 @@
                 <div id="login-error-msg" class="login-error-alert" style="display:none;"><i class="fa-solid fa-circle-exclamation"></i> <span>Usuário ou senha incorretos!</span></div>
                 <button type="submit" class="btn-login-submit"><span>Entrar no Sistema</span> <i class="fa-solid fa-arrow-right"></i></button>
             </form>
-            <p style="margin-top:16px;font-size:12px;color:#94a3b8;">É funcionário novo? <a href="#" id="link-ir-cadastro" style="color:var(--primary);text-decoration:none;font-weight:600;">Cadastre-se por aqui</a></p>
+            <p style="margin-top:14px;font-size:12px;color:#94a3b8;">
+                Esqueceu a senha? <a href="#" id="link-esqueci-senha" style="color:var(--primary);text-decoration:none;font-weight:600;">Solicitar nova senha</a>
+            </p>
+            <p style="margin-top:8px;font-size:12px;color:#94a3b8;">É funcionário novo? <a href="#" id="link-ir-cadastro" style="color:var(--primary);text-decoration:none;font-weight:600;">Cadastre-se por aqui</a></p>
+        </div>
+    </div>
+
+    <!-- ESQUECI A SENHA — 3 etapas na mesma tela: pedir → aguardar aprovação → definir -->
+    <div id="esqueci-senha-screen" class="login-overlay-full" style="display:none;">
+        <div class="login-glass-box">
+            <div class="login-logo-area"><img src="img/logo-rt.png" class="logo-img" alt="R&amp;T Empregos"></div>
+
+            <!-- Etapa 1: pedir -->
+            <div id="es-etapa-pedir">
+                <h2 style="color:#f1f5f9;font-size:19px;margin-bottom:6px;">Esqueci minha senha</h2>
+                <p style="color:#94a3b8;font-size:12.5px;margin-bottom:18px;line-height:1.6;">
+                    Digite seu usuário. O administrador vai receber o pedido e liberar.
+                    <strong style="color:#cbd5e1;">Não feche esta tela</strong> — assim que ele aprovar, ela muda sozinha.
+                </p>
+                <div class="form-group" style="width:100%;display:flex;flex-direction:column;text-align:left;margin-bottom:14px;">
+                    <label for="es-login" style="color:#cbd5e1;font-size:13px;font-weight:500;"><i class="fa-solid fa-user"></i> Seu usuário</label>
+                    <input type="text" id="es-login" placeholder="Digite seu usuário..." class="form-control-login" autocomplete="username">
+                </div>
+                <div id="es-erro" class="login-error-alert" style="display:none;"><i class="fa-solid fa-circle-exclamation"></i> <span></span></div>
+                <button type="button" class="btn-login-submit" id="es-btn-pedir"><span>Solicitar liberação</span> <i class="fa-solid fa-paper-plane"></i></button>
+            </div>
+
+            <!-- Etapa 2: aguardando o admin aprovar (a tela se atualiza sozinha) -->
+            <div id="es-etapa-aguardando" style="display:none;">
+                <div style="font-size:44px;color:var(--primary);margin-bottom:12px;">
+                    <i class="fa-solid fa-hourglass-half fa-spin" style="--fa-animation-duration:2.5s;"></i>
+                </div>
+                <h2 style="color:#f1f5f9;font-size:19px;margin-bottom:6px;">Aguardando liberação</h2>
+                <p style="color:#94a3b8;font-size:12.5px;line-height:1.7;margin-bottom:16px;">
+                    Seu pedido foi enviado ao administrador.<br>
+                    <strong style="color:#cbd5e1;">Deixe esta tela aberta.</strong> Assim que ele liberar,
+                    ela muda sozinha para você criar a nova senha.
+                </p>
+                <p style="color:#64748b;font-size:11px;margin-bottom:16px;">
+                    Se não liberar, confira se digitou o usuário certo e tente de novo.
+                </p>
+                <button type="button" class="btn-login-submit" id="es-btn-cancelar"
+                        style="background:rgba(148,163,184,.15);color:#cbd5e1;">
+                    <span>Cancelar</span>
+                </button>
+            </div>
+
+            <!-- Etapa 3: liberado — criar a nova senha -->
+            <div id="es-etapa-nova" style="display:none;">
+                <div style="font-size:40px;color:#10b981;margin-bottom:10px;"><i class="fa-solid fa-circle-check"></i></div>
+                <h2 style="color:#f1f5f9;font-size:19px;margin-bottom:6px;">Liberado! Crie sua nova senha</h2>
+                <p style="color:#94a3b8;font-size:12.5px;margin-bottom:18px;">Mínimo de 6 caracteres.</p>
+                <div class="form-group" style="width:100%;display:flex;flex-direction:column;text-align:left;margin-bottom:12px;">
+                    <label for="es-senha1" style="color:#cbd5e1;font-size:13px;font-weight:500;"><i class="fa-solid fa-lock"></i> Nova senha</label>
+                    <input type="password" id="es-senha1" placeholder="Digite a nova senha..." class="form-control-login" autocomplete="new-password">
+                </div>
+                <div class="form-group" style="width:100%;display:flex;flex-direction:column;text-align:left;margin-bottom:12px;">
+                    <label for="es-senha2" style="color:#cbd5e1;font-size:13px;font-weight:500;"><i class="fa-solid fa-lock"></i> Repita a nova senha</label>
+                    <input type="password" id="es-senha2" placeholder="Digite de novo..." class="form-control-login" autocomplete="new-password">
+                </div>
+                <div id="es-erro-nova" class="login-error-alert" style="display:none;"><i class="fa-solid fa-circle-exclamation"></i> <span></span></div>
+                <button type="button" class="btn-login-submit" id="es-btn-salvar"><span>Salvar nova senha</span> <i class="fa-solid fa-check"></i></button>
+            </div>
+
+            <!-- Etapa final: pronto -->
+            <div id="es-etapa-ok" style="display:none;">
+                <div style="font-size:44px;color:#10b981;margin-bottom:12px;"><i class="fa-solid fa-circle-check"></i></div>
+                <h2 style="color:#f1f5f9;font-size:19px;margin-bottom:6px;">Senha alterada!</h2>
+                <p style="color:#94a3b8;font-size:12.5px;margin-bottom:18px;">Já pode entrar no sistema com a senha nova.</p>
+                <button type="button" class="btn-login-submit" id="es-btn-voltar-login"><span>Ir para o login</span> <i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+
+            <p style="margin-top:16px;font-size:12px;color:#94a3b8;">
+                <a href="#" id="es-link-voltar" style="color:var(--primary);text-decoration:none;font-weight:600;">Voltar ao login</a>
+            </p>
         </div>
     </div>
 
@@ -142,7 +216,12 @@
       (function () {
         var loginScreen = document.getElementById('login-screen');
         var regScreen = document.getElementById('staff-registration-screen');
-        function mostrarCadastro() { loginScreen.style.display = 'none'; regScreen.style.display = 'flex'; }
+        function mostrarCadastro() {
+          loginScreen.style.display = 'none';
+          var es = document.getElementById('esqueci-senha-screen');
+          if (es) es.style.display = 'none';
+          regScreen.style.display = 'flex';
+        }
         function mostrarLogin() { regScreen.style.display = 'none'; loginScreen.style.display = 'flex'; }
         if (new URLSearchParams(location.search).get('reg') === 'funcionarios') mostrarCadastro();
         document.getElementById('link-ir-cadastro').addEventListener('click', function (e) { e.preventDefault(); mostrarCadastro(); });
@@ -167,6 +246,124 @@
             else if (r.status === 429 || d.motivo === 'bloqueado') msg = 'Muitas tentativas. Aguarde cerca de 1 minuto.';
             err.querySelector('span').textContent = msg; err.style.display = 'flex';
           } catch (e2) { err.querySelector('span').textContent = 'Erro de conexão. Tente novamente.'; err.style.display = 'flex'; }
+          finally { btn.disabled = false; }
+        });
+
+        // ── ESQUECI A SENHA (pedir → aguardar aprovação → definir) ────────────
+        var esScreen = document.getElementById('esqueci-senha-screen');
+        var esToken = null;
+        var esTimer = null;
+
+        function esMostrarEtapa(qual) {
+          ['pedir', 'aguardando', 'nova', 'ok'].forEach(function (e) {
+            document.getElementById('es-etapa-' + e).style.display = (e === qual) ? 'block' : 'none';
+          });
+        }
+        function esErro(id, msg) {
+          var box = document.getElementById(id);
+          box.querySelector('span').textContent = msg;
+          box.style.display = 'flex';
+        }
+        function esPararPolling() { if (esTimer) { clearInterval(esTimer); esTimer = null; } }
+
+        function esVoltarLogin() {
+          esPararPolling();
+          esToken = null;
+          esScreen.style.display = 'none';
+          loginScreen.style.display = 'flex';
+          document.getElementById('es-login').value = '';
+          document.getElementById('es-senha1').value = '';
+          document.getElementById('es-senha2').value = '';
+          document.getElementById('es-erro').style.display = 'none';
+          document.getElementById('es-erro-nova').style.display = 'none';
+          esMostrarEtapa('pedir');
+        }
+
+        document.getElementById('link-esqueci-senha').addEventListener('click', function (e) {
+          e.preventDefault();
+          loginScreen.style.display = 'none';
+          regScreen.style.display = 'none';
+          esScreen.style.display = 'flex';
+          esMostrarEtapa('pedir');
+        });
+        document.getElementById('es-link-voltar').addEventListener('click', function (e) { e.preventDefault(); esVoltarLogin(); });
+        document.getElementById('es-btn-cancelar').addEventListener('click', esVoltarLogin);
+        document.getElementById('es-btn-voltar-login').addEventListener('click', esVoltarLogin);
+
+        // Etapa 1 — envia o pedido
+        document.getElementById('es-btn-pedir').addEventListener('click', async function () {
+          var login = document.getElementById('es-login').value.trim();
+          document.getElementById('es-erro').style.display = 'none';
+          if (!login) { esErro('es-erro', 'Digite o seu usuário.'); return; }
+          var btn = this; btn.disabled = true;
+          try {
+            var r = await fetch('/api/solicitar-senha', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ login: login })
+            });
+            var d = await r.json().catch(function () { return {}; });
+            if (r.status === 200 && d.ok && d.token) {
+              esToken = d.token;
+              esMostrarEtapa('aguardando');
+              esIniciarPolling();
+            } else {
+              esErro('es-erro', 'Não foi possível enviar o pedido. Tente de novo.');
+            }
+          } catch (e) { esErro('es-erro', 'Erro de conexão. Tente de novo.'); }
+          finally { btn.disabled = false; }
+        });
+
+        // Etapa 2 — fica perguntando ao servidor se o admin já liberou
+        function esIniciarPolling() {
+          esPararPolling();
+          esTimer = setInterval(async function () {
+            if (!esToken) { esPararPolling(); return; }
+            try {
+              var r = await fetch('/api/status-senha?token=' + encodeURIComponent(esToken));
+              var d = await r.json().catch(function () { return {}; });
+              if (!d.ok) return;
+              if (d.status === 'aprovada') {          // liberado! a tela troca sozinha
+                esPararPolling();
+                esMostrarEtapa('nova');
+                document.getElementById('es-senha1').focus();
+              } else if (d.status === 'recusada') {
+                esPararPolling();
+                esMostrarEtapa('pedir');
+                esErro('es-erro', 'O administrador não liberou o seu pedido. Fale com ele.');
+              } else if (d.status === 'expirada') {
+                esPararPolling();
+                esMostrarEtapa('pedir');
+                esErro('es-erro', 'O pedido expirou. Solicite de novo.');
+              }
+            } catch (e) { /* sem rede: tenta de novo no próximo ciclo */ }
+          }, 3000);
+        }
+
+        // Etapa 3 — define a nova senha
+        document.getElementById('es-btn-salvar').addEventListener('click', async function () {
+          var s1 = document.getElementById('es-senha1').value;
+          var s2 = document.getElementById('es-senha2').value;
+          document.getElementById('es-erro-nova').style.display = 'none';
+          if (s1.length < 6) { esErro('es-erro-nova', 'A senha precisa ter ao menos 6 caracteres.'); return; }
+          if (s1 !== s2) { esErro('es-erro-nova', 'As duas senhas não são iguais.'); return; }
+          var btn = this; btn.disabled = true;
+          try {
+            var r = await fetch('/api/definir-senha', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: esToken, senha: s1 })
+            });
+            var d = await r.json().catch(function () { return {}; });
+            if (r.status === 200 && d.ok) {
+              esToken = null;
+              esMostrarEtapa('ok');
+            } else if (d.motivo === 'expirada') {
+              esErro('es-erro-nova', 'A liberação expirou (vale 30 minutos). Solicite de novo.');
+            } else if (d.motivo === 'nao_aprovada') {
+              esErro('es-erro-nova', 'Este pedido não está liberado. Solicite de novo.');
+            } else {
+              esErro('es-erro-nova', 'Não foi possível salvar a senha. Tente de novo.');
+            }
+          } catch (e) { esErro('es-erro-nova', 'Erro de conexão. Tente de novo.'); }
           finally { btn.disabled = false; }
         });
 
