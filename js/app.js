@@ -10225,16 +10225,20 @@ async function salvarEquipamento() {
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...'; }
 
   try {
-    localStorage.setItem('rt_empregos_data', JSON.stringify(state));
-
     if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
-      await RTCloud.salvarAgora(state);        // aqui a foto sobe e o registro grava
+      // salvarAgora() converte base64 -> link /uploads/ ANTES de gravar no servidor.
+      // Só depois disso gravamos no localStorage — assim nunca salvamos base64
+      // pesado que estoura o limite de ~5 MB do navegador.
+      await RTCloud.salvarAgora(state);
     } else {
-      saveState();                             // sem nuvem: só o cache local
+      saveState();   // sem nuvem: só o cache local
     }
 
+    // Fotos já são links leves (/uploads/...) — agora cabe no localStorage
+    try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (_) {}
+
     fecharModalEquipamento();
-    limparFiltrosEquipamento();                // garante que o novo registro apareça na lista
+    limparFiltrosEquipamento();
     renderEquipamentos();
     alert('Registro salvo com sucesso!');
   } catch (e) {
