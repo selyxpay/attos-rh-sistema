@@ -4394,3 +4394,29 @@ input.form-control[type="date"] {
 }
 .equip-switch[data-ativo="online"]     .equip-switch-opt[data-tipo="online"]     { color: #2563EB; }
 .equip-switch[data-ativo="presencial"] .equip-switch-opt[data-tipo="presencial"] { color: #7C3AED; }
+
+/* Esconde o <input type="file"> SEM usar display:none.
+   Com display:none, Safari do iPhone e vários Androids ignoram o .click() e o
+   seletor de arquivo não abre. Assim ele fica invisível mas continua "existindo"
+   para o navegador, e o .click() funciona em qualquer celular. */
+.input-arquivo-oculto {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Botões de anexo do equipamento (Tirar foto / Escolher arquivo) */
+.equip-upload-botoes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+.equip-upload-botoes .btn { width: 100%; justify-content: center; }

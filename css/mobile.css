@@ -294,3 +294,64 @@
     height: 30px;
   }
 }
+
+/* ==========================================================================
+   CELULAR — PARTE 4
+   ========================================================================== */
+@media (max-width: 768px) {
+
+  /* ---- Barra lateral: não pode aparecer nenhuma "pontinha" quando fechada ---
+     O design-system.css põe margin:16px, border-radius e box-shadow com
+     !important na .sidebar. Como o translateX(-100%) desloca a caixa pela
+     largura DELA, a margem de 16px sobrava e deixava 16px da barra visíveis na
+     borda da tela — e a sombra ainda vazava por cima do conteúdo.
+     Aqui zeramos margem/borda/sombra quando fechada; a sombra só volta ao abrir. */
+  .sidebar {
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  body.menu-mobile-aberto .sidebar {
+    box-shadow: 4px 0 24px rgba(0, 0, 0, .45) !important;
+  }
+
+  /* ---- Cabeçalho: só a foto do usuário (o nome vira "quadradão" no celular) --
+     O nome e o cargo somem; fica só o avatar redondo. Tocando nele abre o
+     "Meu Perfil", que mostra o nome completo. */
+  .user-profile-badge {
+    padding: 0 !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    overflow: hidden;
+  }
+  .user-profile-badge .user-info,
+  .user-profile-badge > i.fa-chevron-down { display: none !important; }
+  .user-profile-badge .user-avatar { margin: 0 !important; }
+
+  /* Anexos: os dois botões um embaixo do outro (cabem melhor no dedo) */
+  .equip-upload-botoes { grid-template-columns: 1fr; }
+}
+
+/* ==========================================================================
+   CELULAR — PARTE 5: os "span 2" que quebravam as grades de 1 coluna
+   Sutileza do CSS Grid: pôr a grade em 1 coluna NÃO basta. Um item com
+   "grid-column: span 2" precisa de 2 colunas, então o navegador CRIA uma
+   segunda coluna implícita — e a grade volta a ter 2 colunas, agora
+   desalinhadas (ex.: 131px + 209px). Por isso o formulário de equipamentos
+   aparecia espremido e o campo "Estado" ficava com 131px de largura.
+   Aqui os itens largos passam a ocupar 1 coluna só.
+   ========================================================================== */
+@media (max-width: 768px) {
+  .exame-form-full,
+  .prev-grid .col-full,
+  .drawer-grid .col-span-2,
+  .form-group-grid .col-span-2,
+  .col-span-2 {
+    grid-column: span 1 !important;
+  }
+}

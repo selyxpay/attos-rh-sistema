@@ -1323,12 +1323,6 @@
                                     </small>
                                 </div>
                                 <div class="form-group exame-form-full">
-                                    <label>Dados *</label>
-                                    <textarea id="equip-form-dados" class="form-control" rows="3" style="resize:vertical;"
-                                              placeholder="Informações gerais sobre a entrega ou devolução"></textarea>
-                                </div>
-
-                                <div class="form-group exame-form-full">
                                     <label>Equipamentos envolvidos * <small style="font-weight:400;color:var(--text-secondary);">(marque quantos precisar)</small></label>
                                     <div id="equip-form-itens" class="equip-check-grid"><!-- checkboxes por JS --></div>
                                 </div>
@@ -1357,11 +1351,17 @@
                                 <div class="form-group exame-form-full">
                                     <label>📷 Protocolo / Equipamento *</label>
                                     <div class="equip-upload-box">
-                                        <button type="button" class="btn btn-success" style="width:100%;justify-content:center;"
-                                                onclick="document.getElementById('input-fotos-equip').click()">
-                                            <i class="fa-solid fa-camera"></i> Adicionar fotos / arquivos
-                                        </button>
-                                        <div id="equip-upload-hint" style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:6px;">
+                                        <div class="equip-upload-botoes">
+                                            <button type="button" class="btn btn-success"
+                                                    onclick="document.getElementById('input-camera-equip').click()">
+                                                <i class="fa-solid fa-camera"></i> Tirar foto
+                                            </button>
+                                            <button type="button" class="btn btn-outline"
+                                                    onclick="document.getElementById('input-fotos-equip').click()">
+                                                <i class="fa-solid fa-folder-open"></i> Escolher arquivo
+                                            </button>
+                                        </div>
+                                        <div id="equip-upload-hint" style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:8px;">
                                             Obrigatório. Até 10 arquivos, 10 MB cada. JPG, JPEG, PNG ou PDF.
                                         </div>
                                         <div id="equip-fotos-preview" class="equip-fotos-preview"><!-- previews por JS --></div>
@@ -1422,9 +1422,15 @@
                     </div>
                 </div>
 
-                <!-- Input oculto para as fotos do equipamento -->
-                <input type="file" id="input-fotos-equip" accept=".jpg,.jpeg,.png,.pdf" multiple style="display:none;"
-                       onchange="processarFotosEquipamento(this)">
+                <!-- Inputs de arquivo do equipamento.
+                     ATENÇÃO: NÃO usar display:none aqui. Com display:none, vários navegadores
+                     de celular (Safari do iPhone e Androids) IGNORAM o .click() e o seletor de
+                     arquivo simplesmente não abre — era por isso que a foto não anexava e o
+                     "Salvar" recusava o registro. A classe abaixo esconde sem tirar do fluxo. -->
+                <input type="file" id="input-camera-equip" accept="image/*" capture="environment"
+                       class="input-arquivo-oculto" onchange="processarFotosEquipamento(this)">
+                <input type="file" id="input-fotos-equip" accept=".jpg,.jpeg,.png,.pdf" multiple
+                       class="input-arquivo-oculto" onchange="processarFotosEquipamento(this)">
 
                 <!-- ABA: EXAME MÉDICO -->
                 <section id="aba-exame-medico" class="aba-content">
@@ -1659,7 +1665,7 @@
                 </div>
 
                 <!-- Input file oculto para upload do PDF/Imagem do exame -->
-                <input type="file" id="input-pdf-exame" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none;" onchange="processarUploadPdfExame(this)">
+                <input type="file" id="input-pdf-exame" accept=".pdf,.jpg,.jpeg,.png,.webp" class="input-arquivo-oculto" onchange="processarUploadPdfExame(this)">
 
                 <!-- ABA: CONFIGURAÇÕES (SOMENTE ADMIN) -->
                 <section id="aba-configuracoes" class="aba-content">

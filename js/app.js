@@ -9921,7 +9921,6 @@ function abrirModalEquipamento(id) {
   g('equip-form-id').value          = reg ? reg.id : '';
   g('equip-form-cpf').value         = reg ? (reg.cpf || '') : '';
   g('equip-form-nome').value        = reg ? (reg.nome || '') : '';
-  g('equip-form-dados').value       = reg ? (reg.dados || '') : '';
 
   // Responsável: sempre quem está logado. Campo travado, não editável.
   g('equip-form-responsavel').value = loggedUser ? loggedUser.nome : '';
@@ -10144,7 +10143,6 @@ function salvarEquipamento() {
 
   const cpf         = (g('equip-form-cpf')?.value || '').trim();
   const nome        = (g('equip-form-nome')?.value || '').trim();
-  const dados       = (g('equip-form-dados')?.value || '').trim();
   const tipo        = g('equip-form-tipo')?.value || '';
   // O responsável NÃO vem do formulário: é sempre quem está logado.
   const responsavel = loggedUser ? loggedUser.nome : 'Sistema';
@@ -10153,7 +10151,7 @@ function salvarEquipamento() {
   const outros      = (g('equip-form-outros')?.value || '').trim();
   const itens = Array.from(document.querySelectorAll('.equip-item-chk:checked')).map(c => c.value);
 
-  if (!nome || !cpf || !dados) { alert('Preencha os campos obrigatórios: Nome, CPF e Dados.'); return; }
+  if (!nome || !cpf) { alert('Preencha os campos obrigatórios: Nome e CPF.'); return; }
   if (!tipo)   { alert('Escolha o tipo de registro: Entrega ou Devolução.'); return; }
   if (!itens.length) { alert('Marque pelo menos um equipamento.'); return; }
   if (itens.includes('outros') && !outros) { alert('Você marcou "Outros" — descreva qual é o equipamento.'); return; }
@@ -10176,7 +10174,6 @@ function salvarEquipamento() {
       ['Nome', reg.nome, nome],
       ['CPF', reg.cpf, cpf],
       ['Responsável', reg.responsavel, responsavel],
-      ['Dados', reg.dados, dados],
       ['Tipo', EQUIP_TIPOS[reg.tipo] || '', EQUIP_TIPOS[tipo] || ''],
       ['Equipamentos', _equipNomesItens(reg.equipamentos, reg.equipamentoOutros), _equipNomesItens(itens, outrosFinal)],
       ['Estado', EQUIP_ESTADOS[reg.estado] || '', EQUIP_ESTADOS[estado] || ''],
@@ -10189,7 +10186,7 @@ function salvarEquipamento() {
     });
 
     Object.assign(reg, {
-      nome, cpf, responsavel, dados, tipo, estado, observacoes,
+      nome, cpf, responsavel, tipo, estado, observacoes,
       candidatoId: _equipCandidatoId || reg.candidatoId || null,
       equipamentos: itens,
       equipamentoOutros: outrosFinal,
@@ -10199,7 +10196,7 @@ function salvarEquipamento() {
   } else {
     state.equipamentos.push({
       id: `equip-${Date.now()}`,
-      nome, cpf, responsavel, dados, tipo, estado, observacoes,
+      nome, cpf, responsavel, tipo, estado, observacoes,
       candidatoId: _equipCandidatoId || null,
       equipamentos: itens,
       equipamentoOutros: outrosFinal,
@@ -10309,10 +10306,11 @@ function abrirVerEquipamento(id) {
         </div>
       </div>
 
-      <div class="exame-detalhe-laudo">
-        <h4><i class="fa-solid fa-align-left"></i> Dados</h4>
-        <p style="margin:0;font-size:13px;white-space:pre-wrap;">${escapeHTML(reg.dados || '—')}</p>
-      </div>
+      ${reg.dados ? `
+        <div class="exame-detalhe-laudo">
+          <h4><i class="fa-solid fa-align-left"></i> Dados</h4>
+          <p style="margin:0;font-size:13px;white-space:pre-wrap;">${escapeHTML(reg.dados)}</p>
+        </div>` : ''}
 
       ${reg.observacoes ? `
         <div class="exame-detalhe-laudo" style="margin-top:16px;">
