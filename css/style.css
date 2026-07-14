@@ -3996,3 +3996,156 @@ h1, h2, h3, h4, h5, h6 {
     }
     .exame-subtab { flex: 0 0 auto; }
 }
+
+/* ==========================================================================
+   MÓDULO: ENTREGA / DEVOLUÇÃO DE EQUIPAMENTOS (Departamento Pessoal)
+   ========================================================================== */
+
+/* Submenu recuado abaixo de "Depto. Pessoal" */
+.sidebar-nav .nav-item.nav-subitem > a {
+    padding-left: 34px;
+    font-size: 13px;
+    opacity: .92;
+}
+.sidebar-nav .nav-item.nav-subitem > a i {
+    font-size: 12px;
+}
+
+/* Checkboxes dos equipamentos */
+.equip-check-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+    margin-top: 6px;
+}
+.equip-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-glass-border, #E2E8F0);
+    border-radius: 10px;
+    background: var(--color-white, #FFFFFF);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color .15s ease, background-color .15s ease;
+}
+.equip-check:hover { border-color: var(--primary, #2563EB); }
+.equip-check input { width: 16px; height: 16px; cursor: pointer; flex: 0 0 auto; }
+.equip-check:has(input:checked) {
+    border-color: var(--primary, #2563EB);
+    background: rgba(37, 99, 235, 0.06);
+}
+
+/* Caixa de upload das fotos */
+.equip-upload-box {
+    border: 1px dashed var(--color-glass-border, #CBD5E1);
+    border-radius: 12px;
+    padding: 14px;
+    background: var(--surface-2, rgba(15, 23, 42, 0.02));
+}
+
+/* Miniaturas dos arquivos anexados no formulário */
+.equip-fotos-preview {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+.equip-foto-item {
+    position: relative;
+    border: 1px solid var(--color-glass-border, #E2E8F0);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--color-white, #FFFFFF);
+    display: flex;
+    flex-direction: column;
+}
+.equip-foto-item img {
+    width: 100%;
+    height: 84px;
+    object-fit: cover;
+    display: block;
+}
+.equip-foto-pdf {
+    width: 100%;
+    height: 84px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: #DC2626;
+    background: rgba(220, 38, 38, 0.06);
+}
+.equip-foto-nome {
+    display: block;
+    padding: 6px 8px;
+    font-size: 10.5px;
+    color: var(--text-secondary, #64748B);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.equip-foto-remover {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(220, 38, 38, 0.92);
+    color: #FFFFFF;
+    font-size: 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.equip-foto-remover:hover { background: #B91C1C; }
+
+/* Galeria na tela de visualização (clicar amplia em aba nova) */
+.equip-galeria {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+}
+.equip-galeria-item {
+    position: relative;
+    border: 1px solid var(--color-glass-border, #E2E8F0);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--color-white, #FFFFFF);
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+.equip-galeria-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+.equip-galeria-item img {
+    width: 100%;
+    height: 110px;
+    object-fit: cover;
+    display: block;
+}
+.equip-galeria-item .equip-foto-pdf { height: 110px; }
+.equip-galeria-zoom {
+    display: block;
+    padding: 6px 8px;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--primary, #2563EB);
+    border-top: 1px solid var(--color-glass-border, #E2E8F0);
+}
+
+@media (max-width: 768px) {
+    .equip-check-grid { grid-template-columns: 1fr 1fr; }
+    .equip-fotos-preview, .equip-galeria { grid-template-columns: 1fr 1fr; }
+}

@@ -251,6 +251,8 @@ function isAbaAutorizada(abaId) {
   if (abaId === 'lixeira') return ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao';
   if (abaId === 'controle-acesso') return podeGerenciarHorarios();
   if (abaId === 'cadastros-exata') return ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao';
+  // Equipamentos: módulo do Departamento Pessoal. A Seleção não enxerga.
+  if (abaId === 'equipamentos') return podeVerEquipamentos();
   // Exame Médico: liberado por departamento (clínica/seleção/administração) OU
   // pela permissão granular marcada no cadastro do funcionário.
   if (abaId === 'exame-medico') return ehMestre(loggedUser.login)
@@ -868,6 +870,9 @@ function initLocalStorage() {
         }
       }
     }
+
+    // Módulo de Equipamentos (Entrega/Devolução do DP)
+    if (!state.equipamentos) { state.equipamentos = []; alterado = true; }
 
     // Conta MESTRE "admin": garante existência/poder/senha (ver garantirAdminMestre)
     if (garantirAdminMestre()) alterado = true;
@@ -1533,7 +1538,8 @@ function switchAba(abaId) {
     'lixeira': 'fa-solid fa-trash-can',
     'controle-acesso': 'fa-solid fa-business-time',
     'cadastros-exata': 'fa-solid fa-file-invoice',
-    'exame-medico': 'fa-solid fa-hospital'
+    'exame-medico': 'fa-solid fa-hospital',
+    'equipamentos': 'fa-solid fa-boxes-packing'
   };
 
   const titleMap = {
@@ -1555,7 +1561,8 @@ function switchAba(abaId) {
     'lixeira': 'R&T EMPREGOS — LIXEIRA',
     'controle-acesso': 'R&T EMPREGOS — CONTROLE DE ACESSO',
     'cadastros-exata': 'R&T EMPREGOS — CADASTROS EXATA',
-    'exame-medico': 'R&T EMPREGOS — EXAME MÉDICO ADMISSIONAL'
+    'exame-medico': 'R&T EMPREGOS — EXAME MÉDICO ADMISSIONAL',
+    'equipamentos': 'R&T EMPREGOS — ENTREGA / DEVOLUÇÃO DE EQUIPAMENTOS'
   };
 
   if (headerIcon) headerIcon.className = `${iconMap[abaId] || 'fa-solid fa-building'} header-icon`;
@@ -1621,6 +1628,9 @@ function renderCurrentAba() {
       break;
     case 'cadastros-exata':
       renderCadastrosExata();
+      break;
+    case 'equipamentos':
+      renderEquipamentos();
       break;
     case 'exame-medico':
       renderExameMedico();
@@ -4488,6 +4498,9 @@ function abrirDrawerDetalhes(candidatoId) {
     });
   }
 
+  // Histórico de equipamentos deste colaborador (aba "Equipamentos" da ficha)
+  _renderEquipamentosFicha(cand);
+
   // Reseta Abas do Drawer
   document.querySelectorAll('.drawer-tab-btn').forEach(btn => btn.classList.remove('active'));
   document.querySelector('[data-drawer-tab="dados"]').classList.add('active');
@@ -5730,6 +5743,7 @@ const AREAS_SISTEMA = {
   candidatos: 'Candidatos',
   funcionarios: 'Funcionários',
   exame_medico: 'Exame Médico',
+  equipamentos: 'Equipamentos (DP)',
   sistema: 'Sistema',
   exportacoes: 'Exportações'
 };
@@ -5750,7 +5764,8 @@ const ABA_PARA_AREA = {
   'lixeira': 'sistema',
   'controle-acesso': 'sistema',
   'cadastros-exata': 'sistema',
-  'exame-medico': 'exame_medico'
+  'exame-medico': 'exame_medico',
+  'equipamentos': 'equipamentos'
 };
 
 function hasPermission(area, acao) {
@@ -9151,6 +9166,641 @@ function _formatarDataBR(d) {
   if (d.includes('/')) return d;
   const [y, m, dd] = d.split('-');
   return `${dd}/${m}/${y}`;
+}
+
+// ==========================================================================
+// MÓDULO: ENTREGA / DEVOLUÇÃO DE EQUIPAMENTOS (Departamento Pessoal)
+// ==========================================================================
+
+const EQUIP_ITENS = {
+  yubico: 'Yubico',
+  cartao_acesso: 'Cartão de acesso',
+  bota: 'Bota de segurança',
+  uniforme: 'Uniforme',
+  colete: 'Colete',
+  outros: 'Outros'
+};
+const EQUIP_ESTADOS = { bom: 'Bom', regular: 'Regular', ruim: 'Ruim', danificado: 'Danificado' };
+const EQUIP_TIPOS   = { entrega: 'Entrega', devolucao: 'Devolução' };
+
+// Limite por arquivo: fileToBase64 -> validarArquivoSeguro corta em 10 MB (checa
+// também o cabeçalho real do arquivo). O servidor aceita corpo de 45 MB e o
+// base64 infla ~33%, então 10 MB por arquivo passa com folga.
+const EQUIP_MAX_ARQUIVOS = 10;
+const EQUIP_MAX_MB = 10;
+
+function garantirEquipamentos() {
+  if (!state.equipamentos) state.equipamentos = [];
+  return state.equipamentos;
+}
+
+// ── Permissões ────────────────────────────────────────────────────────────
+// Só o DP (mais admin/mestre) acessa. A Seleção não enxerga o módulo.
+function podeVerEquipamentos() {
+  if (!loggedUser) return false;
+  if (ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao') return true;
+  if (loggedUser.departamento === 'dp') return true;
+  return hasPermission('equipamentos', 'visualizar');
+}
+// Usuário comum do DP: pode criar e consultar.
+function podeCriarEquipamento() {
+  if (!loggedUser) return false;
+  if (podeVerEquipamentos()) return true;
+  return hasPermission('equipamentos', 'criar');
+}
+// Administrador do DP (representante), administração e mestre: editar.
+function podeEditarEquipamento() {
+  if (!loggedUser) return false;
+  if (ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao') return true;
+  if (loggedUser.departamento === 'dp' && loggedUser.representanteDepto) return true;
+  return hasPermission('equipamentos', 'editar');
+}
+function podeExcluirEquipamento() {
+  if (!loggedUser) return false;
+  if (ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao') return true;
+  if (loggedUser.departamento === 'dp' && loggedUser.representanteDepto) return true;
+  return hasPermission('equipamentos', 'excluir');
+}
+
+// ── Utilidades ────────────────────────────────────────────────────────────
+function _equipNomesItens(itens, outros) {
+  const lista = (itens || []).map(k => (k === 'outros' && outros) ? `Outros: ${outros}` : (EQUIP_ITENS[k] || k));
+  return lista.join(', ') || '—';
+}
+function _equipBadgeTipo(tipo) {
+  return tipo === 'devolucao'
+    ? '<span class="exame-badge exame-badge-pend"><i class="fa-solid fa-rotate-left"></i> Devolução</span>'
+    : '<span class="exame-badge exame-badge-ok"><i class="fa-solid fa-hand-holding-hand"></i> Entrega</span>';
+}
+function _equipBadgeEstado(estado) {
+  const cores = { bom: '#059669', regular: '#0284C7', ruim: '#D97706', danificado: '#DC2626' };
+  const cor = cores[estado] || '#64748B';
+  return `<span style="display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;
+    color:${cor};background:${cor}1A;border:1px solid ${cor}33;">${EQUIP_ESTADOS[estado] || estado || '—'}</span>`;
+}
+
+// ── Estado do formulário ──────────────────────────────────────────────────
+let _equipEditandoId = null;
+let _equipCandidatoId = null;
+let _equipFotos = [];   // [{ nome, arquivo }] — arquivo = base64 ou /uploads/..
+
+// ── Render principal da aba ───────────────────────────────────────────────
+function renderEquipamentos() {
+  garantirEquipamentos();
+
+  const actions = document.getElementById('equip-header-actions');
+  if (actions) {
+    actions.innerHTML = podeCriarEquipamento()
+      ? `<button class="btn btn-primary" onclick="abrirModalEquipamento()"><i class="fa-solid fa-plus"></i> Novo Registro</button>`
+      : '';
+  }
+
+  const selItem = document.getElementById('equip-f-item');
+  if (selItem && !selItem.dataset.pronto) {
+    selItem.innerHTML = '<option value="">Todos os equipamentos</option>' +
+      Object.entries(EQUIP_ITENS).map(([k, n]) => `<option value="${k}">${n}</option>`).join('');
+    selItem.dataset.pronto = '1';
+  }
+
+  ['equip-f-busca', 'equip-f-tipo', 'equip-f-item', 'equip-f-estado', 'equip-f-de', 'equip-f-ate'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.dataset.listenerOk) {
+      el.addEventListener('input', _renderEquipLista);
+      el.addEventListener('change', _renderEquipLista);
+      el.dataset.listenerOk = '1';
+    }
+  });
+
+  _renderEquipKPIs();
+  _renderEquipLista();
+}
+
+function limparFiltrosEquipamento() {
+  ['equip-f-busca', 'equip-f-tipo', 'equip-f-item', 'equip-f-estado', 'equip-f-de', 'equip-f-ate'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  _renderEquipLista();
+}
+window.limparFiltrosEquipamento = limparFiltrosEquipamento;
+
+function _renderEquipKPIs() {
+  const todos = state.equipamentos || [];
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('kpi-equip-total', todos.length);
+  set('kpi-equip-entregas', todos.filter(e => e.tipo === 'entrega').length);
+  set('kpi-equip-devolucoes', todos.filter(e => e.tipo === 'devolucao').length);
+}
+
+function _equipListaFiltrada() {
+  garantirEquipamentos();
+  const v = id => (document.getElementById(id)?.value || '').trim();
+  const busca  = v('equip-f-busca').toLowerCase();
+  const tipo   = v('equip-f-tipo');
+  const item   = v('equip-f-item');
+  const estado = v('equip-f-estado');
+  const de     = v('equip-f-de');
+  const ate    = v('equip-f-ate');
+
+  const ini = de  ? new Date(de  + 'T00:00:00') : null;
+  const fim = ate ? new Date(ate + 'T23:59:59') : null;
+
+  return state.equipamentos.filter(r => {
+    if (tipo && r.tipo !== tipo) return false;
+    if (estado && r.estado !== estado) return false;
+    if (item && !(r.equipamentos || []).includes(item)) return false;
+    if (ini || fim) {
+      const d = new Date(r.dataCadastro || 0);
+      if (isNaN(d)) return false;
+      if (ini && d < ini) return false;
+      if (fim && d > fim) return false;
+    }
+    if (busca) {
+      const alvo = `${r.nome || ''} ${r.cpf || ''} ${r.responsavel || ''}`.toLowerCase();
+      if (!alvo.includes(busca)) return false;
+    }
+    return true;
+  }).sort((a, b) => new Date(b.dataCadastro || 0) - new Date(a.dataCadastro || 0));
+}
+
+function _renderEquipLista() {
+  const cont = document.getElementById('equip-lista-container');
+  if (!cont) return;
+  const lista = _equipListaFiltrada();
+
+  if (!lista.length) {
+    cont.innerHTML = `
+      <div class="exame-empty-state">
+        <i class="fa-solid fa-boxes-packing"></i>
+        <p>Nenhum registro encontrado. ${podeCriarEquipamento() ? 'Clique em <strong>"Novo Registro"</strong> para começar.' : ''}</p>
+      </div>`;
+    return;
+  }
+
+  cont.innerHTML = `
+    <div class="table-scroll-container">
+      <table class="excel-table">
+        <thead>
+          <tr>
+            <th>Nome</th><th>CPF</th><th>Tipo</th><th>Equipamentos</th>
+            <th>Estado</th><th>Responsável</th><th>Data</th><th>Hora</th><th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${lista.map(r => {
+            const d = new Date(r.dataCadastro || 0);
+            const p = n => String(n).padStart(2, '0');
+            const data = isNaN(d) ? '—' : `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+            const hora = isNaN(d) ? '—' : `${p(d.getHours())}:${p(d.getMinutes())}`;
+            return `
+              <tr>
+                <td style="font-weight:600;">${escapeHTML(r.nome || '—')}
+                  ${r.candidatoId ? '<i class="fa-solid fa-link" title="Vinculado à ficha do colaborador" style="color:#059669;font-size:10px;margin-left:4px;"></i>' : ''}
+                </td>
+                <td>${escapeHTML(r.cpf || '—')}</td>
+                <td>${_equipBadgeTipo(r.tipo)}</td>
+                <td style="max-width:260px;">${escapeHTML(_equipNomesItens(r.equipamentos, r.equipamentoOutros))}</td>
+                <td>${_equipBadgeEstado(r.estado)}</td>
+                <td>${escapeHTML(r.responsavel || '—')}</td>
+                <td>${data}</td>
+                <td>${hora}</td>
+                <td>
+                  <button class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px;"
+                          onclick="abrirVerEquipamento('${r.id}')">
+                    <i class="fa-solid fa-eye"></i> Ver
+                  </button>
+                </td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ── Formulário: abrir / fechar ────────────────────────────────────────────
+function abrirModalEquipamento(id) {
+  garantirEquipamentos();
+  const reg = id ? state.equipamentos.find(e => e.id === id) : null;
+  if (id && !reg) return;
+
+  if (reg && !podeEditarEquipamento()) { alert('Você não tem permissão para editar registros.'); return; }
+  if (!reg && !podeCriarEquipamento()) { alert('Você não tem permissão para criar registros.'); return; }
+
+  _equipEditandoId  = reg ? reg.id : null;
+  _equipCandidatoId = reg ? (reg.candidatoId || null) : null;
+  _equipFotos       = reg ? JSON.parse(JSON.stringify(reg.fotos || [])) : [];
+
+  const g = k => document.getElementById(k);
+  g('equip-modal-titulo').textContent = reg ? 'Editar Registro' : 'Novo Registro';
+  g('equip-form-id').value          = reg ? reg.id : '';
+  g('equip-form-cpf').value         = reg ? (reg.cpf || '') : '';
+  g('equip-form-nome').value        = reg ? (reg.nome || '') : '';
+  g('equip-form-responsavel').value = reg ? (reg.responsavel || '') : (loggedUser ? loggedUser.nome : '');
+  g('equip-form-tipo').value        = reg ? (reg.tipo || '') : '';
+  g('equip-form-dados').value       = reg ? (reg.dados || '') : '';
+  g('equip-form-estado').value      = reg ? (reg.estado || '') : '';
+  g('equip-form-obs').value         = reg ? (reg.observacoes || '') : '';
+  g('equip-form-outros').value      = reg ? (reg.equipamentoOutros || '') : '';
+  g('equip-vinculo-msg').textContent = '';
+
+  const marcados = reg ? (reg.equipamentos || []) : [];
+  g('equip-form-itens').innerHTML = Object.entries(EQUIP_ITENS).map(([k, nome]) => `
+    <label class="equip-check">
+      <input type="checkbox" class="equip-item-chk" value="${k}" ${marcados.includes(k) ? 'checked' : ''} onchange="_equipToggleOutros()">
+      <span>${nome}</span>
+    </label>`).join('');
+
+  _equipToggleOutros();
+  _renderPreviewFotosEquip();
+  if (reg && reg.cpf) buscarColaboradorPorCPFEquip();
+
+  g('modal-equipamento').style.display = 'flex';
+}
+window.abrirModalEquipamento = abrirModalEquipamento;
+
+function fecharModalEquipamento() {
+  const m = document.getElementById('modal-equipamento');
+  if (m) m.style.display = 'none';
+  _equipEditandoId = null;
+  _equipCandidatoId = null;
+  _equipFotos = [];
+}
+window.fecharModalEquipamento = fecharModalEquipamento;
+
+// Mostra o campo "Descreva o equipamento" só quando "Outros" está marcado
+function _equipToggleOutros() {
+  const marcado = !!document.querySelector('.equip-item-chk[value="outros"]:checked');
+  const wrap = document.getElementById('equip-outros-wrap');
+  if (wrap) wrap.style.display = marcado ? '' : 'none';
+}
+window._equipToggleOutros = _equipToggleOutros;
+
+// ── Integração com a ficha do colaborador (busca pelo CPF) ────────────────
+function buscarColaboradorPorCPFEquip() {
+  const cpfEl  = document.getElementById('equip-form-cpf');
+  const nomeEl = document.getElementById('equip-form-nome');
+  const msgEl  = document.getElementById('equip-vinculo-msg');
+  if (!cpfEl || !nomeEl || !msgEl) return;
+
+  const so = (cpfEl.value || '').replace(/\D/g, '');
+  _equipCandidatoId = null;
+  if (so.length !== 11) { msgEl.innerHTML = ''; return; }
+
+  const bate = c => c && !c.excluido && (c.cpf || '').replace(/\D/g, '') === so;
+  const cand = (state.candidatos || []).find(bate) || (state.bancoTalentos || []).find(bate);
+
+  if (cand) {
+    _equipCandidatoId = cand.id;
+    if (!nomeEl.value.trim()) nomeEl.value = cand.nome || '';
+    msgEl.innerHTML = `<span style="color:#059669;font-weight:600;"><i class="fa-solid fa-link"></i> Vinculado a ${escapeHTML(cand.nome || '')} — o registro aparece na ficha dele.</span>`;
+  } else {
+    msgEl.innerHTML = `<span style="color:var(--text-secondary);">CPF ainda não está no sistema — o registro será salvo sem vínculo com ficha.</span>`;
+  }
+}
+window.buscarColaboradorPorCPFEquip = buscarColaboradorPorCPFEquip;
+
+// ── Fotos ─────────────────────────────────────────────────────────────────
+async function processarFotosEquipamento(input) {
+  const arquivos = Array.from(input.files || []);
+  input.value = '';
+  if (!arquivos.length) return;
+
+  const permitidas = ['jpg', 'jpeg', 'png', 'pdf'];
+  for (const file of arquivos) {
+    if (_equipFotos.length >= EQUIP_MAX_ARQUIVOS) {
+      alert(`Você já anexou o máximo de ${EQUIP_MAX_ARQUIVOS} arquivos.`);
+      break;
+    }
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (!permitidas.includes(ext)) {
+      alert(`"${file.name}": só são aceitos JPG, JPEG, PNG ou PDF.`);
+      continue;
+    }
+    if (file.size > EQUIP_MAX_MB * 1024 * 1024) {
+      alert(`"${file.name}" tem ${(file.size / 1048576).toFixed(1)} MB. O limite é ${EQUIP_MAX_MB} MB por arquivo.`);
+      continue;
+    }
+    try {
+      const base64 = await fileToBase64(file);   // valida extensão, tamanho e cabeçalho real
+      _equipFotos.push({ nome: file.name, arquivo: base64 });
+    } catch (e) {
+      alert(`Não foi possível anexar "${file.name}": ${e.message || e}`);
+    }
+  }
+  _renderPreviewFotosEquip();
+}
+window.processarFotosEquipamento = processarFotosEquipamento;
+
+function removerFotoEquipamento(i) {
+  _equipFotos.splice(i, 1);
+  _renderPreviewFotosEquip();
+}
+window.removerFotoEquipamento = removerFotoEquipamento;
+
+function _equipEhImagem(f) {
+  return /^data:image\//.test(f.arquivo || '') || /\.(jpg|jpeg|png|webp)($|\?)/i.test(f.nome || '');
+}
+
+function _renderPreviewFotosEquip() {
+  const box = document.getElementById('equip-fotos-preview');
+  if (!box) return;
+  const hint = document.getElementById('equip-upload-hint');
+  if (hint) hint.textContent = `Obrigatório. ${_equipFotos.length}/${EQUIP_MAX_ARQUIVOS} anexados. Até ${EQUIP_MAX_MB} MB cada. JPG, JPEG, PNG ou PDF.`;
+
+  if (!_equipFotos.length) { box.innerHTML = ''; return; }
+
+  box.innerHTML = _equipFotos.map((f, i) => {
+    const img = _equipEhImagem(f);
+    const thumb = img
+      ? `<img src="${f.arquivo}" alt="${escapeHTML(f.nome)}">`
+      : `<div class="equip-foto-pdf"><i class="fa-solid fa-file-pdf"></i></div>`;
+    return `
+      <div class="equip-foto-item">
+        ${thumb}
+        <span class="equip-foto-nome" title="${escapeHTML(f.nome)}">${escapeHTML(f.nome)}</span>
+        <button type="button" class="equip-foto-remover" title="Remover" onclick="removerFotoEquipamento(${i})">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>`;
+  }).join('');
+}
+
+// Abre a foto/arquivo numa aba nova (X-Frame-Options/CSP impedem iframe)
+function visualizarFotoEquipamento(id, i) {
+  garantirEquipamentos();
+  const reg = state.equipamentos.find(e => e.id === id);
+  const f = reg && (reg.fotos || [])[i];
+  if (!f || !f.arquivo) { alert('Arquivo não encontrado.'); return; }
+
+  let src = f.arquivo;
+  if (src.indexOf('data:') === 0) {
+    try {
+      const virgula = src.indexOf(',');
+      const mime = (src.slice(0, virgula).match(/data:([^;]+)/) || [])[1] || 'application/octet-stream';
+      const bin = atob(src.slice(virgula + 1));
+      const bytes = new Uint8Array(bin.length);
+      for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
+      src = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    } catch (e) { /* mantém o data: original */ }
+  } else if (src.charAt(0) === '/') {
+    src = window.location.origin + src;
+  }
+  const w = window.open(src, '_blank');
+  if (!w) alert('Habilite os pop-ups deste site para ampliar o arquivo.');
+}
+window.visualizarFotoEquipamento = visualizarFotoEquipamento;
+
+// ── Salvar ────────────────────────────────────────────────────────────────
+function salvarEquipamento() {
+  garantirEquipamentos();
+  const g = k => document.getElementById(k);
+
+  const cpf         = (g('equip-form-cpf')?.value || '').trim();
+  const nome        = (g('equip-form-nome')?.value || '').trim();
+  const responsavel = (g('equip-form-responsavel')?.value || '').trim();
+  const dados       = (g('equip-form-dados')?.value || '').trim();
+  const tipo        = g('equip-form-tipo')?.value || '';
+  const estado      = g('equip-form-estado')?.value || '';
+  const observacoes = (g('equip-form-obs')?.value || '').trim();
+  const outros      = (g('equip-form-outros')?.value || '').trim();
+  const itens = Array.from(document.querySelectorAll('.equip-item-chk:checked')).map(c => c.value);
+
+  if (!nome || !cpf || !responsavel || !dados) { alert('Preencha os campos obrigatórios: Nome, CPF, Responsável e Dados.'); return; }
+  if (!tipo)   { alert('Escolha o tipo de registro: Entrega ou Devolução.'); return; }
+  if (!itens.length) { alert('Marque pelo menos um equipamento.'); return; }
+  if (itens.includes('outros') && !outros) { alert('Você marcou "Outros" — descreva qual é o equipamento.'); return; }
+  if (!estado) { alert('Selecione o estado dos equipamentos.'); return; }
+  if (!_equipFotos.length) { alert('É obrigatório anexar ao menos uma foto do protocolo/equipamento.'); return; }
+
+  const agora = new Date().toISOString();
+  const autor = loggedUser ? loggedUser.nome : 'Sistema';
+  const autorLogin = loggedUser ? loggedUser.login : '';
+  const outrosFinal = itens.includes('outros') ? outros : '';
+
+  if (_equipEditandoId) {
+    const reg = state.equipamentos.find(e => e.id === _equipEditandoId);
+    if (!reg) return;
+    if (!podeEditarEquipamento()) { alert('Você não tem permissão para editar registros.'); return; }
+
+    // Histórico permanente: guarda cada campo que mudou, com quem/quando
+    reg.historico = reg.historico || [];
+    [
+      ['Nome', reg.nome, nome],
+      ['CPF', reg.cpf, cpf],
+      ['Responsável', reg.responsavel, responsavel],
+      ['Dados', reg.dados, dados],
+      ['Tipo', EQUIP_TIPOS[reg.tipo] || '', EQUIP_TIPOS[tipo] || ''],
+      ['Equipamentos', _equipNomesItens(reg.equipamentos, reg.equipamentoOutros), _equipNomesItens(itens, outrosFinal)],
+      ['Estado', EQUIP_ESTADOS[reg.estado] || '', EQUIP_ESTADOS[estado] || ''],
+      ['Observações', reg.observacoes, observacoes],
+      ['Fotos', `${(reg.fotos || []).length} arquivo(s)`, `${_equipFotos.length} arquivo(s)`]
+    ].forEach(([campo, de, para]) => {
+      if ((de || '') !== (para || '')) {
+        reg.historico.push({ usuario: autor, login: autorLogin, data: agora, campo, de: de || '—', para: para || '—' });
+      }
+    });
+
+    Object.assign(reg, {
+      nome, cpf, responsavel, dados, tipo, estado, observacoes,
+      candidatoId: _equipCandidatoId || reg.candidatoId || null,
+      equipamentos: itens,
+      equipamentoOutros: outrosFinal,
+      fotos: _equipFotos
+    });
+    registrarLogGlobal(`Editou o registro de equipamento de "${nome}" (${EQUIP_TIPOS[tipo]}).`, 'dp');
+  } else {
+    state.equipamentos.push({
+      id: `equip-${Date.now()}`,
+      nome, cpf, responsavel, dados, tipo, estado, observacoes,
+      candidatoId: _equipCandidatoId || null,
+      equipamentos: itens,
+      equipamentoOutros: outrosFinal,
+      fotos: _equipFotos,
+      usuarioCadastro: autor,
+      usuarioLogin: autorLogin,
+      dataCadastro: agora,
+      historico: []
+    });
+    registrarLogGlobal(`Registrou ${EQUIP_TIPOS[tipo].toLowerCase()} de equipamento para "${nome}".`, 'dp');
+  }
+
+  saveState();
+  fecharModalEquipamento();
+  renderEquipamentos();
+}
+window.salvarEquipamento = salvarEquipamento;
+
+// ── Excluir ───────────────────────────────────────────────────────────────
+function excluirEquipamento(id) {
+  if (!podeExcluirEquipamento()) { alert('Você não tem permissão para excluir registros.'); return; }
+  garantirEquipamentos();
+  const reg = state.equipamentos.find(e => e.id === id);
+  if (!reg) return;
+  if (!confirm(`Excluir o registro de "${reg.nome}"? Essa ação não pode ser desfeita.`)) return;
+
+  state.equipamentos = state.equipamentos.filter(e => e.id !== id);
+  registrarLogGlobal(`Excluiu o registro de equipamento de "${reg.nome}".`, 'dp');
+  saveState();
+  fecharVerEquipamento();
+  renderEquipamentos();
+}
+window.excluirEquipamento = excluirEquipamento;
+
+// ── Visualizar registro completo ──────────────────────────────────────────
+function abrirVerEquipamento(id) {
+  garantirEquipamentos();
+  const reg = state.equipamentos.find(e => e.id === id);
+  if (!reg) return;
+
+  const tit = document.getElementById('equip-ver-titulo');
+  if (tit) tit.textContent = reg.nome || 'Registro';
+  const sub = document.getElementById('equip-ver-sub');
+  if (sub) sub.textContent = `${EQUIP_TIPOS[reg.tipo] || '—'}  •  CPF ${reg.cpf || '—'}  •  ${_formatarDataHoraBR(reg.dataCadastro)}`;
+
+  const fotosHtml = (reg.fotos || []).length
+    ? `<div class="equip-galeria">
+         ${(reg.fotos || []).map((f, i) => {
+           const img = _equipEhImagem(f);
+           const thumb = img
+             ? `<img src="${f.arquivo}" alt="${escapeHTML(f.nome)}">`
+             : `<div class="equip-foto-pdf"><i class="fa-solid fa-file-pdf"></i></div>`;
+           return `
+             <button type="button" class="equip-galeria-item" title="Ampliar ${escapeHTML(f.nome)}"
+                     onclick="visualizarFotoEquipamento('${reg.id}', ${i})">
+               ${thumb}
+               <span class="equip-foto-nome">${escapeHTML(f.nome)}</span>
+               <span class="equip-galeria-zoom"><i class="fa-solid fa-magnifying-glass-plus"></i> Ampliar</span>
+             </button>`;
+         }).join('')}
+       </div>`
+    : `<div class="exame-pdf-placeholder"><i class="fa-solid fa-image"></i> Sem arquivos anexados</div>`;
+
+  const histHtml = (reg.historico || []).length
+    ? `<div class="exame-detalhe-laudo" style="margin-top:16px;">
+         <h4><i class="fa-solid fa-clock-rotate-left"></i> Histórico de alterações</h4>
+         <div class="table-scroll-container">
+           <table class="excel-table">
+             <thead><tr><th>Quando</th><th>Quem</th><th>Campo</th><th>De</th><th>Para</th></tr></thead>
+             <tbody>
+               ${(reg.historico || []).slice().reverse().map(h => `
+                 <tr>
+                   <td>${_formatarDataHoraBR(h.data)}</td>
+                   <td>${escapeHTML(h.usuario || '—')}</td>
+                   <td style="font-weight:600;">${escapeHTML(h.campo || '—')}</td>
+                   <td style="color:#DC2626;">${escapeHTML(h.de || '—')}</td>
+                   <td style="color:#059669;">${escapeHTML(h.para || '—')}</td>
+                 </tr>`).join('')}
+             </tbody>
+           </table>
+         </div>
+       </div>`
+    : '';
+
+  const cont = document.getElementById('equip-ver-conteudo');
+  if (cont) {
+    cont.innerHTML = `
+      <div class="exame-detalhe-grid">
+        <div class="exame-detalhe-grupo">
+          <h4><i class="fa-solid fa-user"></i> Colaborador</h4>
+          <div class="exame-detalhe-campos">
+            <div class="exame-campo"><span class="exame-campo-label">Nome</span><span class="exame-campo-valor">${escapeHTML(reg.nome || '—')}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">CPF</span><span class="exame-campo-valor">${escapeHTML(reg.cpf || '—')}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Vínculo com ficha</span><span class="exame-campo-valor">${reg.candidatoId ? '<span style="color:#059669;font-weight:600;">Sim</span>' : 'Sem vínculo'}</span></div>
+          </div>
+        </div>
+        <div class="exame-detalhe-grupo">
+          <h4><i class="fa-solid fa-boxes-packing"></i> Registro</h4>
+          <div class="exame-detalhe-campos">
+            <div class="exame-campo"><span class="exame-campo-label">Tipo</span><span class="exame-campo-valor">${_equipBadgeTipo(reg.tipo)}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Equipamentos</span><span class="exame-campo-valor">${escapeHTML(_equipNomesItens(reg.equipamentos, reg.equipamentoOutros))}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Estado</span><span class="exame-campo-valor">${_equipBadgeEstado(reg.estado)}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Responsável</span><span class="exame-campo-valor">${escapeHTML(reg.responsavel || '—')}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Registrado por</span><span class="exame-campo-valor">${escapeHTML(reg.usuarioCadastro || '—')}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Data e hora</span><span class="exame-campo-valor">${_formatarDataHoraBR(reg.dataCadastro)}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="exame-detalhe-laudo">
+        <h4><i class="fa-solid fa-align-left"></i> Dados</h4>
+        <p style="margin:0;font-size:13px;white-space:pre-wrap;">${escapeHTML(reg.dados || '—')}</p>
+      </div>
+
+      ${reg.observacoes ? `
+        <div class="exame-detalhe-laudo" style="margin-top:16px;">
+          <h4><i class="fa-solid fa-note-sticky"></i> Observações</h4>
+          <p style="margin:0;font-size:13px;white-space:pre-wrap;">${escapeHTML(reg.observacoes)}</p>
+        </div>` : ''}
+
+      <div class="exame-detalhe-laudo" style="margin-top:16px;">
+        <h4><i class="fa-solid fa-camera"></i> Protocolo / Equipamento (${(reg.fotos || []).length})</h4>
+        ${fotosHtml}
+      </div>
+
+      ${histHtml}`;
+  }
+
+  const footer = document.getElementById('equip-ver-footer');
+  if (footer) {
+    footer.innerHTML = `
+      <button class="btn btn-outline" onclick="fecharVerEquipamento()"><i class="fa-solid fa-xmark"></i> Fechar</button>
+      ${podeEditarEquipamento() ? `<button class="btn btn-primary" onclick="fecharVerEquipamento(); abrirModalEquipamento('${reg.id}')"><i class="fa-solid fa-pen"></i> Editar</button>` : ''}
+      ${podeExcluirEquipamento() ? `<button class="btn btn-danger" onclick="excluirEquipamento('${reg.id}')"><i class="fa-solid fa-trash-can"></i> Excluir</button>` : ''}`;
+  }
+
+  const m = document.getElementById('modal-equipamento-ver');
+  if (m) m.style.display = 'flex';
+}
+window.abrirVerEquipamento = abrirVerEquipamento;
+
+function fecharVerEquipamento() {
+  const m = document.getElementById('modal-equipamento-ver');
+  if (m) m.style.display = 'none';
+}
+window.fecharVerEquipamento = fecharVerEquipamento;
+
+// ── Aba "Equipamentos" dentro da ficha do colaborador ─────────────────────
+function _renderEquipamentosFicha(cand) {
+  const cont = document.getElementById('det-equip-lista');
+  const cnt  = document.getElementById('det-equip-count');
+  if (!cont) return;
+
+  garantirEquipamentos();
+  const cpfCand = (cand?.cpf || '').replace(/\D/g, '');
+  const registros = (state.equipamentos || []).filter(r =>
+    (cand && r.candidatoId && r.candidatoId === cand.id) ||
+    (cpfCand && (r.cpf || '').replace(/\D/g, '') === cpfCand)
+  ).sort((a, b) => new Date(b.dataCadastro || 0) - new Date(a.dataCadastro || 0));
+
+  if (cnt) cnt.textContent = registros.length;
+
+  if (!registros.length) {
+    cont.innerHTML = `<p style="font-size:13px;color:var(--text-secondary);">Nenhum equipamento entregue ou devolvido para este colaborador.</p>`;
+    return;
+  }
+
+  cont.innerHTML = `
+    <div class="table-scroll-container">
+      <table class="excel-table">
+        <thead><tr><th>Data</th><th>Tipo</th><th>Equipamentos</th><th>Estado</th><th>Responsável</th><th>Ação</th></tr></thead>
+        <tbody>
+          ${registros.map(r => `
+            <tr>
+              <td>${_formatarDataHoraBR(r.dataCadastro)}</td>
+              <td>${_equipBadgeTipo(r.tipo)}</td>
+              <td>${escapeHTML(_equipNomesItens(r.equipamentos, r.equipamentoOutros))}</td>
+              <td>${_equipBadgeEstado(r.estado)}</td>
+              <td>${escapeHTML(r.responsavel || '—')}</td>
+              <td>
+                <button class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px;"
+                        onclick="abrirVerEquipamento('${r.id}')">
+                  <i class="fa-solid fa-eye"></i> Abrir
+                </button>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
 }
 
 // Sub-aba ativa do Exame Médico: pendentes | concluidos | todos | relatorio

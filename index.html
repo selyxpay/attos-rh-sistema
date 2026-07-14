@@ -170,6 +170,9 @@
                     <li class="nav-item" data-aba="depto-pessoal">
                         <a href="#"><i class="fa-solid fa-building-user"></i> <span>Depto. Pessoal</span></a>
                     </li>
+                    <li class="nav-item nav-subitem" data-aba="equipamentos" id="nav-item-equipamentos">
+                        <a href="#"><i class="fa-solid fa-boxes-packing"></i> <span>Entrega/Devolução de Equipamentos</span></a>
+                    </li>
                     <li class="nav-item" data-aba="relatorios">
                         <a href="#"><i class="fa-solid fa-chart-line"></i> <span>Relatórios</span></a>
                     </li>
@@ -1162,6 +1165,212 @@
                     </div>
                 </section>
 
+                <!-- ABA: ENTREGA / DEVOLUÇÃO DE EQUIPAMENTOS (Departamento Pessoal) -->
+                <section id="aba-equipamentos" class="aba-content">
+                    <div class="exame-medico-wrapper">
+                        <div class="exame-header-area">
+                            <div class="exame-header-left">
+                                <div class="exame-header-icon"><i class="fa-solid fa-boxes-packing"></i></div>
+                                <div>
+                                    <h1 class="exame-titulo">Entrega / Devolução de Equipamentos</h1>
+                                    <p class="exame-subtitulo">Registro e histórico de equipamentos entregues e devolvidos pelos colaboradores</p>
+                                </div>
+                            </div>
+                            <div class="exame-header-right" id="equip-header-actions">
+                                <!-- Botão "Novo Registro" injetado por JS conforme permissão -->
+                            </div>
+                        </div>
+
+                        <!-- KPIs -->
+                        <div class="exame-kpi-row">
+                            <div class="exame-kpi-card exame-kpi-total">
+                                <div class="exame-kpi-icon"><i class="fa-solid fa-list-check"></i></div>
+                                <div class="exame-kpi-info">
+                                    <span class="exame-kpi-num" id="kpi-equip-total">0</span>
+                                    <span class="exame-kpi-label">Total de registros</span>
+                                </div>
+                            </div>
+                            <div class="exame-kpi-card exame-kpi-concluido">
+                                <div class="exame-kpi-icon"><i class="fa-solid fa-hand-holding-hand"></i></div>
+                                <div class="exame-kpi-info">
+                                    <span class="exame-kpi-num" id="kpi-equip-entregas">0</span>
+                                    <span class="exame-kpi-label">Entregas</span>
+                                </div>
+                            </div>
+                            <div class="exame-kpi-card exame-kpi-aguardando">
+                                <div class="exame-kpi-icon"><i class="fa-solid fa-rotate-left"></i></div>
+                                <div class="exame-kpi-info">
+                                    <span class="exame-kpi-num" id="kpi-equip-devolucoes">0</span>
+                                    <span class="exame-kpi-label">Devoluções</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Filtros de pesquisa -->
+                        <div class="exame-filtros-bar">
+                            <div class="exame-filtro-group">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="equip-f-busca" class="exame-filtro-input" placeholder="Buscar por nome, CPF ou responsável...">
+                            </div>
+                            <div class="exame-filtro-group">
+                                <i class="fa-solid fa-right-left"></i>
+                                <select id="equip-f-tipo" class="exame-filtro-select">
+                                    <option value="">Entrega e Devolução</option>
+                                    <option value="entrega">Somente Entregas</option>
+                                    <option value="devolucao">Somente Devoluções</option>
+                                </select>
+                            </div>
+                            <div class="exame-filtro-group">
+                                <i class="fa-solid fa-box"></i>
+                                <select id="equip-f-item" class="exame-filtro-select">
+                                    <option value="">Todos os equipamentos</option>
+                                </select>
+                            </div>
+                            <div class="exame-filtro-group">
+                                <i class="fa-solid fa-star-half-stroke"></i>
+                                <select id="equip-f-estado" class="exame-filtro-select">
+                                    <option value="">Todos os estados</option>
+                                    <option value="bom">Bom</option>
+                                    <option value="regular">Regular</option>
+                                    <option value="ruim">Ruim</option>
+                                    <option value="danificado">Danificado</option>
+                                </select>
+                            </div>
+                            <div class="exame-filtro-group">
+                                <label for="equip-f-de">De</label>
+                                <input type="date" id="equip-f-de" class="exame-filtro-input">
+                            </div>
+                            <div class="exame-filtro-group">
+                                <label for="equip-f-ate">Até</label>
+                                <input type="date" id="equip-f-ate" class="exame-filtro-input">
+                            </div>
+                            <button type="button" class="btn btn-outline" onclick="limparFiltrosEquipamento()">
+                                <i class="fa-solid fa-eraser"></i> Limpar
+                            </button>
+                        </div>
+
+                        <div class="exame-table-wrapper">
+                            <div id="equip-lista-container"><!-- Gerado por JS --></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Modal: Novo / Editar Registro de Equipamento -->
+                <div id="modal-equipamento" class="modal-overlay" style="display:none;" onclick="if(event.target===this)fecharModalEquipamento()">
+                    <div class="modal-exame-box">
+                        <div class="modal-exame-header">
+                            <div style="display:flex;align-items:center;gap:12px;">
+                                <div class="modal-exame-icon"><i class="fa-solid fa-boxes-packing"></i></div>
+                                <div>
+                                    <h2 style="margin:0;font-size:20px;" id="equip-modal-titulo">Novo Registro</h2>
+                                    <p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary);">Entrega ou devolução de equipamentos</p>
+                                </div>
+                            </div>
+                            <button class="modal-exame-close" onclick="fecharModalEquipamento()"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="modal-exame-body">
+                            <input type="hidden" id="equip-form-id">
+                            <div class="exame-form-grid">
+                                <div class="form-group">
+                                    <label>CPF *</label>
+                                    <input type="text" id="equip-form-cpf" class="form-control" placeholder="000.000.000-00"
+                                           oninput="mascaraCPF(this); buscarColaboradorPorCPFEquip()">
+                                    <small id="equip-vinculo-msg" style="display:block;margin-top:4px;font-size:11px;color:var(--text-secondary);"></small>
+                                </div>
+                                <div class="form-group">
+                                    <label>Nome Completo *</label>
+                                    <input type="text" id="equip-form-nome" class="form-control" placeholder="Nome completo do colaborador">
+                                </div>
+                                <div class="form-group">
+                                    <label>Responsável pela captação/entrega *</label>
+                                    <input type="text" id="equip-form-responsavel" class="form-control" placeholder="Quem do DP fez o atendimento">
+                                </div>
+                                <div class="form-group">
+                                    <label>Tipo de registro *</label>
+                                    <select id="equip-form-tipo" class="form-control">
+                                        <option value="">Selecione...</option>
+                                        <option value="entrega">Entrega</option>
+                                        <option value="devolucao">Devolução</option>
+                                    </select>
+                                </div>
+                                <div class="form-group exame-form-full">
+                                    <label>Dados *</label>
+                                    <textarea id="equip-form-dados" class="form-control" rows="3" style="resize:vertical;"
+                                              placeholder="Informações gerais sobre a entrega ou devolução"></textarea>
+                                </div>
+
+                                <div class="form-group exame-form-full">
+                                    <label>Equipamentos envolvidos * <small style="font-weight:400;color:var(--text-secondary);">(marque quantos precisar)</small></label>
+                                    <div id="equip-form-itens" class="equip-check-grid"><!-- checkboxes por JS --></div>
+                                </div>
+                                <div class="form-group exame-form-full" id="equip-outros-wrap" style="display:none;">
+                                    <label>Descreva o equipamento *</label>
+                                    <input type="text" id="equip-form-outros" class="form-control" placeholder="Qual outro equipamento?">
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Estado dos equipamentos *</label>
+                                    <select id="equip-form-estado" class="form-control">
+                                        <option value="">Selecione...</option>
+                                        <option value="bom">Bom</option>
+                                        <option value="regular">Regular</option>
+                                        <option value="ruim">Ruim</option>
+                                        <option value="danificado">Danificado</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group exame-form-full">
+                                    <label>Observações <small style="font-weight:400;color:var(--text-secondary);">(opcional)</small></label>
+                                    <textarea id="equip-form-obs" class="form-control" rows="3" style="resize:vertical;"
+                                              placeholder="Qualquer observação adicional"></textarea>
+                                </div>
+
+                                <div class="form-group exame-form-full">
+                                    <label>📷 Protocolo / Equipamento *</label>
+                                    <div class="equip-upload-box">
+                                        <button type="button" class="btn btn-success" style="width:100%;justify-content:center;"
+                                                onclick="document.getElementById('input-fotos-equip').click()">
+                                            <i class="fa-solid fa-camera"></i> Adicionar fotos / arquivos
+                                        </button>
+                                        <div id="equip-upload-hint" style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:6px;">
+                                            Obrigatório. Até 10 arquivos, 10 MB cada. JPG, JPEG, PNG ou PDF.
+                                        </div>
+                                        <div id="equip-fotos-preview" class="equip-fotos-preview"><!-- previews por JS --></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-exame-footer">
+                            <button class="btn btn-outline" onclick="fecharModalEquipamento()"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+                            <button class="btn btn-primary" onclick="salvarEquipamento()"><i class="fa-solid fa-floppy-disk"></i> Salvar Registro</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal: Visualizar Registro de Equipamento -->
+                <div id="modal-equipamento-ver" class="modal-overlay" style="display:none;" onclick="if(event.target===this)fecharVerEquipamento()">
+                    <div class="modal-exame-box modal-exame-box-detalhe">
+                        <div class="modal-exame-header">
+                            <div style="display:flex;align-items:center;gap:12px;">
+                                <div class="modal-exame-icon"><i class="fa-solid fa-boxes-packing"></i></div>
+                                <div>
+                                    <h2 style="margin:0;font-size:20px;" id="equip-ver-titulo">Registro</h2>
+                                    <p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary);" id="equip-ver-sub"></p>
+                                </div>
+                            </div>
+                            <button class="modal-exame-close" onclick="fecharVerEquipamento()"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="modal-exame-body">
+                            <div id="equip-ver-conteudo"><!-- Gerado por JS --></div>
+                        </div>
+                        <div class="modal-exame-footer" id="equip-ver-footer"><!-- Botões por JS --></div>
+                    </div>
+                </div>
+
+                <!-- Input oculto para as fotos do equipamento -->
+                <input type="file" id="input-fotos-equip" accept=".jpg,.jpeg,.png,.pdf" multiple style="display:none;"
+                       onchange="processarFotosEquipamento(this)">
+
                 <!-- ABA: EXAME MÉDICO -->
                 <section id="aba-exame-medico" class="aba-content">
                     <div class="exame-medico-wrapper">
@@ -1584,6 +1793,7 @@
                 <div class="drawer-tabs">
                     <button class="drawer-tab-btn active" data-drawer-tab="dados">Dados Pessoais</button>
                     <button class="drawer-tab-btn" data-drawer-tab="documentos">Documentos (<span id="det-doc-count">6</span>)</button>
+                    <button class="drawer-tab-btn" data-drawer-tab="equipamentos">Equipamentos (<span id="det-equip-count">0</span>)</button>
                     <button class="drawer-tab-btn" data-drawer-tab="historico">Histórico</button>
                 </div>
                 
@@ -1875,6 +2085,15 @@
                 </div>
                 
                 <!-- Conteúdo Tab: Histórico/Auditoria -->
+                <div class="drawer-tab-content" id="drawer-content-equipamentos">
+                    <div class="timeline-container">
+                        <h4 style="margin-bottom: 16px;">Equipamentos entregues e devolvidos</h4>
+                        <div id="det-equip-lista">
+                            <!-- Histórico de equipamentos do colaborador (JS) -->
+                        </div>
+                    </div>
+                </div>
+
                 <div class="drawer-tab-content" id="drawer-content-historico">
                     <div class="timeline-container">
                         <h4 style="margin-bottom: 16px;">Histórico de Ações e Auditoria</h4>
