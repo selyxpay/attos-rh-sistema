@@ -174,9 +174,9 @@ function fileToBase64(file) {
       if (!allowedExtensions.includes(extension)) {
         return reject(new Error(`Formato inválido para "${file.name}". Apenas JPG, JPEG, PNG, PDF ou WEBP são aceitos.`));
       }
-      const maxSize = 10 * 1024 * 1024;
+      const maxSize = 500 * 1024 * 1024; // 500 MB — sem limite prático
       if (file.size > maxSize) {
-        return reject(new Error(`O arquivo "${file.name}" ultrapassa o limite máximo permitido de 10MB.`));
+        return reject(new Error(`O arquivo "${file.name}" ultrapassa o limite de 500 MB.`));
       }
     }
 
@@ -9690,10 +9690,9 @@ const EQUIP_ESTADOS = { bom: 'Bom', regular: 'Regular', ruim: 'Ruim', danificado
 const EQUIP_TIPOS   = { entrega: 'Entrega', devolucao: 'Devolução' };
 
 // Limite por arquivo: fileToBase64 -> validarArquivoSeguro corta em 10 MB (checa
-// também o cabeçalho real do arquivo). O servidor aceita corpo de 45 MB e o
-// base64 infla ~33%, então 10 MB por arquivo passa com folga.
-const EQUIP_MAX_ARQUIVOS = 10;
-const EQUIP_MAX_MB = 10;
+// Sem limite prático: até 50 arquivos por registro, sem restrição de tamanho por arquivo.
+const EQUIP_MAX_ARQUIVOS = 50;
+const EQUIP_MAX_MB = 200;
 
 function garantirEquipamentos() {
   if (!state.equipamentos) state.equipamentos = [];

@@ -15,7 +15,7 @@ const BASE = path.resolve(__dirname);
 const DATA_DIR = process.env.DATA_DIR || path.join(BASE, 'server-data');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
-const LIMITE_CORPO = 45 * 1024 * 1024; // 45 MB (fotos base64 grandes)
+const LIMITE_CORPO = 500 * 1024 * 1024; // 500 MB — sem limite prático
 
 // Garante as pastas de dados
 try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (e) {}
