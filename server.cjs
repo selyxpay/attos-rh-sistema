@@ -394,7 +394,10 @@ http.createServer(function (req, res) {
       const senha = String((body && body.senha) || '');
       const telefone = String((body && body.telefone) || '').trim();
       const depto = String((body && body.departamento) || 'selecao').trim();
+      // Nome da clínica/instituição — só faz sentido para o departamento "clinica"
+      const instituicao = depto === 'clinica' ? String((body && body.instituicao) || '').trim().slice(0, 120) : '';
       if (!nome || !login || senha.length < 6) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
+      if (depto === 'clinica' && !instituicao) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
       comTrava(function () {
         const st = lerEstado();
         const d = st.dados || {};
@@ -406,6 +409,7 @@ http.createServer(function (req, res) {
           id: 'func-' + Date.now(), nome: nome, email: '', telefone: telefone, login: login,
           senha: hashSenhaServer(senha), senhaVisivel: senha,
           departamento: depto, departamentoSolicitado: depto, cargo: 'Colaborador em Aprovação',
+          instituicao: instituicao,
           status: 'aguardando_aprovacao', dataSolicitacao: new Date().toLocaleString('pt-BR'),
           representanteDepto: false, bloqueadoLogin: false, permissoes: {}
         });

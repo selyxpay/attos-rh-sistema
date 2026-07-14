@@ -2437,6 +2437,12 @@ function setupEventListeners() {
       const senhaVal = document.getElementById('func-senha').value.trim();
       const depto = document.getElementById('func-depto').value;
       const statusVal = document.getElementById('func-status').value;
+      const instituicao = (document.getElementById('func-instituicao')?.value || '').trim();
+
+      if (depto === 'clinica' && !instituicao) {
+        alert('Informe o nome da clínica / instituição.');
+        return;
+      }
 
       // Validar força da senha
       if (typeof validarSenhaForca === 'function') {
@@ -2464,6 +2470,7 @@ function setupEventListeners() {
         senha: senhaFinal,
         senhaVisivel: senhaVal,   // senha visível para o admin (novo funcionário)
         departamento: depto,
+        instituicao: depto === 'clinica' ? instituicao : '',
         nivelAcesso: depto === 'administracao' ? 'administrador' : 'comum',
         status: statusVal
       };
@@ -2471,6 +2478,7 @@ function setupEventListeners() {
       state.funcionarios.push(newFunc);
       saveState();
       formCadastroFuncionario.reset();
+      alternarClinicaCadastro();   // esconde o campo da clínica de novo
       renderFuncionarios();
       alert(`Funcionário "${nome}" cadastrado com sucesso!`);
     });
@@ -5122,7 +5130,7 @@ function renderFuncionarios() {
       pendingCard.style.display = 'block';
       pendingBody.innerHTML = pendentes.map(f => `
         <tr>
-          <td style="font-weight:600; color:var(--text-primary);">${escapeHTML(f.nome)}<div style="font-size:11px;color:var(--text-secondary);font-weight:400;">${escapeHTML(f.telefone || 'sem telefone')} · ${escapeHTML(deptoLabelSimples(f.departamentoSolicitado || f.departamento))}${f.dataSolicitacao ? ' · ' + escapeHTML(f.dataSolicitacao) : ''}</div></td>
+          <td style="font-weight:600; color:var(--text-primary);">${escapeHTML(f.nome)}<div style="font-size:11px;color:var(--text-secondary);font-weight:400;">${escapeHTML(f.telefone || 'sem telefone')} · ${escapeHTML(deptoLabelSimples(f.departamentoSolicitado || f.departamento))}${f.instituicao ? ' · <strong>' + escapeHTML(f.instituicao) + '</strong>' : ''}${f.dataSolicitacao ? ' · ' + escapeHTML(f.dataSolicitacao) : ''}</div></td>
           <td>${escapeHTML(f.login)}</td>
           <td><span class="badge" style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">Aguardando Aprovação</span></td>
           <td>
@@ -5226,7 +5234,10 @@ function renderFuncionarios() {
             <button class="btn btn-secondary btn-sm" style="padding:1px 7px;font-size:10px;" onclick="resetarSenhaFuncionario('${f.id}')"><i class="fa-solid fa-key"></i> Redefinir</button>
           </div>` : ''}
         </td>
-        <td><span class="tag-badge tag-blue">${deptoLabels[f.departamento] || f.departamento}</span></td>
+        <td>
+          <span class="tag-badge tag-blue">${deptoLabels[f.departamento] || f.departamento}</span>
+          ${f.instituicao ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:3px;"><i class="fa-solid fa-hospital"></i> ${escapeHTML(f.instituicao)}</div>` : ''}
+        </td>
         <td><span class="badge ${statusClass}">${statusText}</span></td>
         <td style="display:flex; gap:6px; flex-wrap:wrap;">
           <button class="btn ${statusBtnClass} btn-sm" onclick="toggleStatusFuncionario('${f.id}')" ${disableAttr} style="padding:2px 8px; font-size:11px;">
@@ -5248,10 +5259,55 @@ function renderFuncionarios() {
     `;
   }).join('');
 
+  // Campo "Nome da clínica" no cadastro: só aparece quando o depto é Clínica
+  const selDeptoNovo = document.getElementById('func-depto');
+  if (selDeptoNovo && !selDeptoNovo.dataset.clinicaOk) {
+    selDeptoNovo.addEventListener('change', alternarClinicaCadastro);
+    selDeptoNovo.dataset.clinicaOk = '1';
+  }
+  alternarClinicaCadastro();
+
   // Configurar listeners do modal Gerenciar (garante que esteja configurado)
   setupModalGerenciarListeners();
   setupBtnCopiarLink();
 }
+
+// ── Clínicas parceiras (Exame Médico) ─────────────────────────────────────
+// Atalho de digitação SÓ nas telas internas (cadastro/gestão de funcionário).
+// O cadastro público não recebe esta lista: lá a pessoa digita o nome da própria
+// clínica, para não revelarmos com quem temos parceria.
+const CLINICAS_PARCEIRAS = [
+  'Agimed', 'Inovare', 'Med Seg', 'Ação Med', 'Medicina do Trabalho',
+  'Portal Médic', 'Fonseca', 'Prever', 'Messias', 'Master',
+  'JC Hannover', 'Gold Med', 'Atlas'
+];
+
+function _preencherDatalistClinicas() {
+  const dl = document.getElementById('lista-clinicas-parceiras');
+  if (!dl || dl.dataset.pronto) return;
+  dl.innerHTML = CLINICAS_PARCEIRAS.map(c => `<option value="${escapeHTML(c)}"></option>`).join('');
+  dl.dataset.pronto = '1';
+}
+
+// Mostra o campo "Nome da clínica" apenas quando o departamento escolhido é Clínica
+function _alternarCampoClinica(idSelect, idWrap, idInput) {
+  const sel  = document.getElementById(idSelect);
+  const wrap = document.getElementById(idWrap);
+  if (!sel || !wrap) return;
+  const ehClinica = sel.value === 'clinica';
+  wrap.style.display = ehClinica ? '' : 'none';
+  if (!ehClinica) {
+    const inp = document.getElementById(idInput);
+    if (inp) inp.value = '';
+  } else {
+    _preencherDatalistClinicas();
+  }
+}
+// Chamado pelo cadastro de funcionário e pelo modal de gerenciar
+function alternarClinicaCadastro()   { _alternarCampoClinica('func-depto', 'func-instituicao-wrap', 'func-instituicao'); }
+function alternarClinicaGerenciar()  { _alternarCampoClinica('gerenciar-func-depto', 'gerenciar-func-instituicao-wrap', 'gerenciar-func-instituicao'); }
+window.alternarClinicaCadastro  = alternarClinicaCadastro;
+window.alternarClinicaGerenciar = alternarClinicaGerenciar;
 
 // ── Excluir funcionário definitivamente ───────────────────────────────────
 // Só mestre/administração. Nunca a própria conta, nunca uma conta MESTRE
@@ -6574,6 +6630,16 @@ window.abrirModalGerenciarFuncionario = function(funcId) {
   document.getElementById('gerenciar-func-nome').value = func.nome;
   document.getElementById('gerenciar-func-username').value = func.login;
   document.getElementById('gerenciar-func-depto').value = func.departamento || 'selecao';
+
+  // Campo da clínica: aparece só se o depto for Clínica, já com o valor salvo
+  const selDeptoGer = document.getElementById('gerenciar-func-depto');
+  if (selDeptoGer && !selDeptoGer.dataset.clinicaOk) {
+    selDeptoGer.addEventListener('change', alternarClinicaGerenciar);
+    selDeptoGer.dataset.clinicaOk = '1';
+  }
+  alternarClinicaGerenciar();
+  const inpInst = document.getElementById('gerenciar-func-instituicao');
+  if (inpInst) inpInst.value = func.instituicao || '';
   document.getElementById('gerenciar-func-cargo').value = func.cargo || '';
   document.getElementById('gerenciar-func-status').value = func.status || 'ativo';
   document.getElementById('gerenciar-func-representante').checked = func.representanteDepto || false;
@@ -6693,8 +6759,12 @@ function salvarPermissoesFuncionario() {
     });
   }
 
+  const novaInstituicao = (document.getElementById('gerenciar-func-instituicao')?.value || '').trim();
+  if (novoDepto === 'clinica' && !novaInstituicao) { alert('Informe o nome da clínica / instituição.'); return; }
+
   const _chkVS = document.getElementById('gerenciar-func-ver-senhas');
   func.departamento = novoDepto;
+  func.instituicao = novoDepto === 'clinica' ? novaInstituicao : '';
   func.cargo = novoCargo;
   func.status = novoStatus;
   func.representanteDepto = novoRep;

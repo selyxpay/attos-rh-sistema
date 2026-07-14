@@ -903,6 +903,12 @@
                                         </select>
                                     </div>
                                 </div>
+                                <!-- Só aparece quando o departamento é Clínica -->
+                                <div class="form-group mt-3" id="func-instituicao-wrap" style="display:none;">
+                                    <label for="func-instituicao">Nome da clínica / instituição *</label>
+                                    <input type="text" id="func-instituicao" class="form-control" list="lista-clinicas-parceiras"
+                                           placeholder="Digite ou escolha a clínica..." autocomplete="off">
+                                </div>
                                 <button type="submit" class="btn btn-primary mt-4" style="width: 100%;">
                                     <i class="fa-solid fa-user-plus"></i> Cadastrar Funcionário
                                 </button>
@@ -2799,6 +2805,17 @@
                             <input type="text" id="gerenciar-func-cargo" required class="form-control" placeholder="Ex: Analista de Recrutamento">
                         </div>
                     </div>
+
+                    <!-- Só aparece quando o departamento é Clínica -->
+                    <div class="form-group mt-3" id="gerenciar-func-instituicao-wrap" style="display:none;">
+                        <label for="gerenciar-func-instituicao">Nome da clínica / instituição *</label>
+                        <input type="text" id="gerenciar-func-instituicao" class="form-control" list="lista-clinicas-parceiras"
+                               placeholder="Digite ou escolha a clínica..." autocomplete="off">
+                    </div>
+
+                    <!-- Atalho das clínicas parceiras: existe só nas telas internas (admin).
+                         O cadastro público NÃO tem esta lista — lá a pessoa digita o nome. -->
+                    <datalist id="lista-clinicas-parceiras"></datalist>
 
                     <div class="form-group-grid mt-3">
                         <div class="form-group">
