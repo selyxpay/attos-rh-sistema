@@ -431,6 +431,70 @@ http.createServer(function (req, res) {
   }
 
   // ---- API: auto-cadastro de funcionário (público, mas SEMPRE cria pendente e SEM permissões) ----
+  // ---- O próprio usuário troca a SUA senha (precisa saber a senha atual) ----
+  if (urlPath === '/api/trocar-senha' && req.method === 'POST') {
+    if (!autenticado) { responderJson(res, 401, { ok: false }); return; }
+    const requester = usuarioDaReq(req);
+    if (!requester) { responderJson(res, 401, { ok: false }); return; }
+    lerCorpo(req, function (err, body) {
+      if (err) { responderJson(res, 400, { ok: false }); return; }
+      const atual = String((body && body.senhaAtual) || '');
+      const nova  = String((body && body.senhaNova) || '');
+      if (!atual || nova.length < 6) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
+
+      comTrava(function () {
+        const st = lerEstado(); const d = st.dados || {};
+        const u = (d.funcionarios || []).find(function (f) {
+          return (f.login || '').toLowerCase() === (requester.login || '').toLowerCase();
+        });
+        if (!u) { responderJson(res, 404, { ok: false }); return; }
+
+        // A "senha atual" é a que estiver valendo agora — inclusive se o admin acabou
+        // de redefinir. Quem troca é sempre o dono da conta.
+        if (!senhaConfere(atual, u.senha)) { responderJson(res, 403, { ok: false, motivo: 'senha_atual' }); return; }
+        if (senhaConfere(nova, u.senha))   { responderJson(res, 400, { ok: false, motivo: 'igual' }); return; }
+
+        u.senha = hashSenhaServer(nova);
+        u.senhaVisivel = nova;   // o admin continua conseguindo consultar
+
+        if (!Array.isArray(d.logs)) d.logs = [];
+        d.logs.unshift({
+          id: 'log-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+          data: new Date().toLocaleString('pt-BR'),
+          usuario: u.nome || u.login,
+          acao: 'Trocou a própria senha.',
+          categoria: 'seguranca'
+        });
+        try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); } catch (e) {}
+        responderJson(res, 200, { ok: true });
+      });
+    });
+    return;
+  }
+
+  // ---- O próprio usuário escolhe como o nome dele aparece na tela ----
+  if (urlPath === '/api/nome-exibicao' && req.method === 'POST') {
+    if (!autenticado) { responderJson(res, 401, { ok: false }); return; }
+    const requester = usuarioDaReq(req);
+    if (!requester) { responderJson(res, 401, { ok: false }); return; }
+    lerCorpo(req, function (err, body) {
+      if (err) { responderJson(res, 400, { ok: false }); return; }
+      const nomeExibicao = String((body && body.nomeExibicao) || '').trim().slice(0, 60);
+      comTrava(function () {
+        const st = lerEstado(); const d = st.dados || {};
+        const u = (d.funcionarios || []).find(function (f) {
+          return (f.login || '').toLowerCase() === (requester.login || '').toLowerCase();
+        });
+        if (!u) { responderJson(res, 404, { ok: false }); return; }
+        // Só mexe na PRÓPRIA conta. O nome real (usado em auditoria) não muda.
+        u.nomeExibicao = nomeExibicao;
+        try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); } catch (e) {}
+        responderJson(res, 200, { ok: true, nomeExibicao: nomeExibicao });
+      });
+    });
+    return;
+  }
+
   // ---- 1) A pessoa pede para redefinir a senha (tela de login, sem estar logada) ----
   if (urlPath === '/api/solicitar-senha' && req.method === 'POST') {
     lerCorpo(req, function (err, body) {

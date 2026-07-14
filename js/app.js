@@ -212,7 +212,7 @@ function verificarSessao() {
       const roleEl = document.getElementById('header-user-role');
       const avatarEl = document.getElementById('header-user-avatar');
 
-      if (nameEl) nameEl.textContent = loggedUser.nome;
+      if (nameEl) nameEl.textContent = nomeExibido(loggedUser);
       if (roleEl) {
         const deptoLabels = {
           'administracao': 'Gestão Executiva',
@@ -5285,6 +5285,81 @@ function renderFuncionarios() {
   setupBtnCopiarLink();
 }
 
+// ── Meu Perfil: nome exibido e troca da própria senha ─────────────────────
+
+// Nome que aparece na tela. O nome REAL continua sendo usado na auditoria e nos
+// registros — só a exibição muda.
+function nomeExibido(u) {
+  if (!u) return 'Colaborador';
+  return (u.nomeExibicao && String(u.nomeExibicao).trim()) || u.nome || 'Colaborador';
+}
+
+function _perfilMsg(id, texto, ok) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = texto;
+  el.style.color = ok ? '#10b981' : '#ef4444';
+  el.style.display = 'block';
+}
+
+window.salvarNomeExibicao = async function () {
+  const inp = document.getElementById('perfil-nome-exibicao');
+  if (!inp) return;
+  const novo = inp.value.trim();
+  try {
+    const r = await fetch('/api/nome-exibicao', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin', body: JSON.stringify({ nomeExibicao: novo })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 200 && d.ok) {
+      if (loggedUser) loggedUser.nomeExibicao = d.nomeExibicao || '';
+      const f = (state.funcionarios || []).find(x => loggedUser && x.id === loggedUser.id);
+      if (f) f.nomeExibicao = d.nomeExibicao || '';
+
+      // Atualiza o topo e a saudação da dashboard na hora
+      const nameEl = document.getElementById('header-user-name');
+      if (nameEl) nameEl.textContent = nomeExibido(loggedUser);
+      const greet = document.getElementById('dash-welcome-title');
+      if (greet) greet.textContent = `Bem-vindo(a), ${nomeExibido(loggedUser)}! 👋`;
+
+      _perfilMsg('perfil-nome-msg', novo ? `Pronto! Agora você aparece como "${novo}".` : 'Voltou a usar seu nome completo.', true);
+    } else {
+      _perfilMsg('perfil-nome-msg', 'Não foi possível salvar. Tente de novo.', false);
+    }
+  } catch (e) { _perfilMsg('perfil-nome-msg', 'Erro de conexão. Tente de novo.', false); }
+};
+
+window.trocarMinhaSenha = async function () {
+  const atual = document.getElementById('perfil-senha-atual')?.value || '';
+  const nova  = document.getElementById('perfil-senha-nova')?.value || '';
+  const nova2 = document.getElementById('perfil-senha-nova2')?.value || '';
+
+  if (!atual) { _perfilMsg('perfil-senha-msg', 'Informe a sua senha atual.', false); return; }
+  if (nova.length < 6) { _perfilMsg('perfil-senha-msg', 'A nova senha precisa ter ao menos 6 caracteres.', false); return; }
+  if (nova !== nova2) { _perfilMsg('perfil-senha-msg', 'As duas senhas novas não são iguais.', false); return; }
+
+  try {
+    const r = await fetch('/api/trocar-senha', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin', body: JSON.stringify({ senhaAtual: atual, senhaNova: nova })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 200 && d.ok) {
+      ['perfil-senha-atual', 'perfil-senha-nova', 'perfil-senha-nova2'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+      });
+      _perfilMsg('perfil-senha-msg', 'Senha alterada! Use a nova no próximo login.', true);
+    } else if (d.motivo === 'senha_atual') {
+      _perfilMsg('perfil-senha-msg', 'A senha atual está errada.', false);
+    } else if (d.motivo === 'igual') {
+      _perfilMsg('perfil-senha-msg', 'A nova senha é igual à atual. Escolha outra.', false);
+    } else {
+      _perfilMsg('perfil-senha-msg', 'Não foi possível trocar a senha. Tente de novo.', false);
+    }
+  } catch (e) { _perfilMsg('perfil-senha-msg', 'Erro de conexão. Tente de novo.', false); }
+};
+
 // ── Pedidos de redefinição de senha (aprovação do admin) ──────────────────
 // Os pedidos NÃO ficam no estado normal: o token de redefinição é secreto e não
 // pode viajar junto com os dados que todo funcionário logado recebe. Por isso o
@@ -7332,6 +7407,15 @@ window.abrirModalMeuPerfil = function() {
   const g = id => document.getElementById(id);
   if (g('perfil-nome')) g('perfil-nome').textContent = loggedUser.nome;
   if (g('perfil-login')) g('perfil-login').textContent = loggedUser.login;
+
+  // Campos editáveis do perfil: nome exibido e troca de senha (começam limpos)
+  if (g('perfil-nome-exibicao')) g('perfil-nome-exibicao').value = loggedUser.nomeExibicao || '';
+  ['perfil-senha-atual', 'perfil-senha-nova', 'perfil-senha-nova2'].forEach(id => {
+    if (g(id)) g(id).value = '';
+  });
+  ['perfil-nome-msg', 'perfil-senha-msg'].forEach(id => {
+    if (g(id)) g(id).style.display = 'none';
+  });
   const deptoLabels = {
     'administracao': 'Gestão Executiva',
     'selecao': 'Recrutamento & Seleção',
@@ -7988,7 +8072,7 @@ function renderDashboardOverview() {
   // 1. Saudação do Usuário
   const greetingEl = document.getElementById('dash-welcome-title');
   if (greetingEl) {
-    greetingEl.textContent = `Bem-vindo(a), ${loggedUser ? loggedUser.nome : 'Colaborador'}! 👋`;
+    greetingEl.textContent = `Bem-vindo(a), ${nomeExibido(loggedUser)}! 👋`;
   }
 
   // 2. Cálculos dos KPIs

@@ -3028,6 +3028,46 @@
                     </div>
                 </div>
 
+                <!-- Como o nome aparece na tela -->
+                <div style="padding: 14px; background: rgba(255,255,255,0.04); border-radius: 10px; border: 1px solid var(--border-color);">
+                    <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
+                        <i class="fa-solid fa-id-badge" style="color: var(--primary);"></i> Como seu nome aparece
+                    </div>
+                    <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 10px;">
+                        É o nome que aparece no topo e na saudação da dashboard. Deixe em branco para usar seu nome completo.
+                    </p>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="text" id="perfil-nome-exibicao" class="form-control" maxlength="60"
+                               placeholder="Ex: Maria" style="flex: 1;">
+                        <button class="btn btn-primary btn-sm" onclick="salvarNomeExibicao()" style="white-space: nowrap;">
+                            <i class="fa-solid fa-check"></i> Salvar
+                        </button>
+                    </div>
+                    <div id="perfil-nome-msg" style="font-size: 11px; margin-top: 6px; display: none;"></div>
+                </div>
+
+                <!-- Trocar a própria senha -->
+                <div style="padding: 14px; background: rgba(255,255,255,0.04); border-radius: 10px; border: 1px solid var(--border-color);">
+                    <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
+                        <i class="fa-solid fa-key" style="color: var(--primary);"></i> Trocar minha senha
+                    </div>
+                    <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 10px;">
+                        Informe a senha que você usa hoje (mesmo se o administrador tiver redefinido) e crie a nova.
+                    </p>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <input type="password" id="perfil-senha-atual" class="form-control" autocomplete="current-password"
+                               placeholder="Senha atual">
+                        <input type="password" id="perfil-senha-nova" class="form-control" autocomplete="new-password"
+                               placeholder="Nova senha (mínimo 6 caracteres)">
+                        <input type="password" id="perfil-senha-nova2" class="form-control" autocomplete="new-password"
+                               placeholder="Repita a nova senha">
+                        <button class="btn btn-primary" onclick="trocarMinhaSenha()" style="justify-content: center;">
+                            <i class="fa-solid fa-shield-halved"></i> Salvar nova senha
+                        </button>
+                    </div>
+                    <div id="perfil-senha-msg" style="font-size: 11px; margin-top: 8px; display: none;"></div>
+                </div>
+
                 <!-- Tema claro / escuro -->
                 <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px; background: rgba(255,255,255,0.04); border-radius: 10px; border: 1px solid var(--border-color);">
                     <div>
