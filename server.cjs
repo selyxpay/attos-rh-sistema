@@ -15,7 +15,8 @@ const BASE = path.resolve(__dirname);
 const DATA_DIR = process.env.DATA_DIR || path.join(BASE, 'server-data');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
-const LIMITE_CORPO = 500 * 1024 * 1024; // 500 MB — sem limite prático
+const LIMITE_CORPO = 48 * 1024 * 1024;  // 48 MB. O corpo inteiro e montado na MEMORIA (data += chunk);
+// 500 MB viravam ~1 GB de RAM e derrubariam a VPS. 48 MB comporta 1 arquivo de 20 MB em base64 (~27 MB) com folga.
 
 // Garante as pastas de dados
 try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (e) {}

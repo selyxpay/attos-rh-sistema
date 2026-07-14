@@ -752,7 +752,7 @@ async function ativarNuvem() {
           return;
         }
         state = dados;
-        try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (e) {}
+        try { localStorage.setItem('rt_empregos_data', _estadoParaCache()); } catch (e) {}
         // Só re-renderiza imediatamente se o usuário NÃO estiver digitando em algum campo
         const focusedEl = document.activeElement;
         const userEditando = focusedEl && (
@@ -776,7 +776,7 @@ async function ativarNuvem() {
       state = nuvem;
       _cloudReady = true;
       const _ajustouAdmin = garantirAdminMestre();
-      try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (e) {}
+      try { localStorage.setItem('rt_empregos_data', _estadoParaCache()); } catch (e) {}
       if (_ajustouAdmin) RTCloud.saveState(state);
       renderCurrentAba();
     } else {
@@ -1047,11 +1047,33 @@ function initLocalStorage() {
   }
 }
 
+// Cache local SEM os arquivos gigantes.
+// Uma foto de 3 MB vira ~4 MB em base64 e o localStorage do navegador só aguenta
+// ~5 MB no total. As fotos vão para o servidor de qualquer jeito (viram link
+// /uploads/..), então não faz sentido guardá-las também no cache.
+function _estadoParaCache() {
+  return JSON.stringify(state, function (chave, valor) {
+    if (typeof valor === 'string' && valor.length > 4000 && valor.indexOf('data:') === 0) return '';
+    return valor;
+  });
+}
+
 function saveState() {
-  // localStorage = cache temporário (rápido e offline). A nuvem é a fonte principal.
-  localStorage.setItem('rt_empregos_data', JSON.stringify(state));
-  // Só envia à nuvem depois que ela foi carregada (evita o cache/semente local
-  // sobrescrever dados mais recentes do servidor — ver item 25.7).
+  // O cache local é só conveniência (rapidez/offline). A fonte da verdade é o servidor.
+  //
+  // ATENÇÃO: este setItem NÃO pode derrubar a função. Antes ele era a primeira linha
+  // e, quando a cota do navegador estourava (foto grande em base64), ele LANÇAVA um
+  // erro "The quota has been exceeded" e a execução morria ali — o envio ao servidor,
+  // logo abaixo, nunca acontecia. Era exatamente por isso que o registro "não salvava":
+  // aparecia na tela, mas nunca chegava no servidor.
+  try {
+    localStorage.setItem('rt_empregos_data', _estadoParaCache());
+  } catch (e) {
+    console.warn('[R&T] Cache local cheio — seguindo direto para o servidor.', e && e.message);
+    try { localStorage.removeItem('rt_empregos_data'); } catch (_) {}
+  }
+
+  // Envia ao servidor SEMPRE, mesmo que o cache local tenha falhado.
   if (window.RTCloud && RTCloud.configured && _cloudReady) RTCloud.saveState(state);
 }
 
@@ -2263,7 +2285,7 @@ function setupEventListeners() {
             if (_nuvem) {
               state = _nuvem;
               if (typeof garantirAdminMestre === 'function' && garantirAdminMestre()) RTCloud.saveState(state);
-              try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (e) {}
+              try { localStorage.setItem('rt_empregos_data', _estadoParaCache()); } catch (e) {}
             }
           } catch (e) {}
           _cloudReady = true;
@@ -6381,7 +6403,7 @@ function detectarAutoRegistro() {
       state.logs.unshift({ id: 'log-' + Date.now(), data: new Date().toLocaleString('pt-BR'), usuario: nome, acao: `Solicitou cadastro de acesso (${loginVal}) — aguardando aprovação.`, categoria: 'funcionarios' });
       // Gravação merge-safe: como o cadastro ocorre antes do login, evita
       // sobrescrever dados existentes na nuvem (une por id, só adiciona).
-      try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (e) {}
+      try { localStorage.setItem('rt_empregos_data', _estadoParaCache()); } catch (e) {}
       if (window.RTCloud && RTCloud.configured) { RTCloud.saveState(state, { merge: true }); RTCloud.flush(); }
       else saveState();
 
@@ -9691,8 +9713,8 @@ const EQUIP_TIPOS   = { entrega: 'Entrega', devolucao: 'Devolução' };
 
 // Limite por arquivo: fileToBase64 -> validarArquivoSeguro corta em 10 MB (checa
 // Sem limite prático: até 50 arquivos por registro, sem restrição de tamanho por arquivo.
-const EQUIP_MAX_ARQUIVOS = 50;
-const EQUIP_MAX_MB = 200;
+const EQUIP_MAX_ARQUIVOS = 20;
+const EQUIP_MAX_MB = 20;   // casa com o maxBytes do security.js e o LIMITE_CORPO do servidor
 
 function garantirEquipamentos() {
   if (!state.equipamentos) state.equipamentos = [];
@@ -10234,7 +10256,7 @@ async function salvarEquipamento() {
     }
 
     // Fotos já são links leves (/uploads/...) — agora cabe no localStorage
-    try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (_) {}
+    try { localStorage.setItem('rt_empregos_data', _estadoParaCache()); } catch (_) {}
 
     fecharModalEquipamento();
     limparFiltrosEquipamento();
@@ -10243,7 +10265,7 @@ async function salvarEquipamento() {
   } catch (e) {
     // Desfaz: nada de registro fantasma na tela que não existe no servidor.
     state.equipamentos = _copiaAntes;
-    try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (_) {}
+    try { localStorage.setItem('rt_empregos_data', _estadoParaCache()); } catch (_) {}
     renderEquipamentos();
     alert(
       'NÃO foi possível salvar o registro.\n\n' +
@@ -11091,8 +11113,8 @@ async function processarUploadPdfExame(input) {
   if (!file || !_exameIdAtual) return;
 
   // Validação de tamanho (máx 10MB)
-  if (file.size > 10 * 1024 * 1024) {
-    alert('O arquivo deve ter no máximo 10MB.');
+  if (file.size > EQUIP_MAX_MB * 1024 * 1024) {
+    alert(`O arquivo deve ter no máximo ${EQUIP_MAX_MB} MB.`);
     input.value = '';
     return;
   }

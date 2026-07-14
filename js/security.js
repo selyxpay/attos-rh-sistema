@@ -425,11 +425,11 @@ async function validarArquivoSeguro(file) {
   }
 
   // 2. Verifica tamanho máximo (5MB para documentos, 2MB para selfies)
-  const maxBytes = 10 * 1024 * 1024; // 10MB
+  const maxBytes = 20 * 1024 * 1024; // 20MB (bate com EQUIP_MAX_MB e com o LIMITE_CORPO do servidor)
   if (file.size > maxBytes) {
     return {
       valido: false,
-      mensagem: `O arquivo é muito grande (${(file.size / 1024 / 1024).toFixed(1)}MB). Máximo: 10MB.`,
+      mensagem: `O arquivo é muito grande (${(file.size / 1024 / 1024).toFixed(1)}MB). Máximo: 20MB.`,
       tipoDetectado: null
     };
   }
