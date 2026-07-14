@@ -10137,7 +10137,7 @@ function fecharFotoEquipamento() {
 window.fecharFotoEquipamento = fecharFotoEquipamento;
 
 // ── Salvar ────────────────────────────────────────────────────────────────
-function salvarEquipamento() {
+async function salvarEquipamento() {
   garantirEquipamentos();
   const g = k => document.getElementById(k);
 
@@ -10162,6 +10162,12 @@ function salvarEquipamento() {
   const autor = loggedUser ? loggedUser.nome : 'Sistema';
   const autorLogin = loggedUser ? loggedUser.login : '';
   const outrosFinal = itens.includes('outros') ? outros : '';
+
+  // Guarda uma cópia para poder DESFAZER se o servidor recusar o registro.
+  // Sem isso, o registro ficava só na tela e sumia depois — dando a impressão
+  // de que "salvou" quando na verdade nunca chegou no servidor.
+  const _copiaAntes = JSON.parse(JSON.stringify(state.equipamentos || []));
+  const _idNovo = `equip-${Date.now()}`;
 
   if (_equipEditandoId) {
     const reg = state.equipamentos.find(e => e.id === _equipEditandoId);
@@ -10195,7 +10201,7 @@ function salvarEquipamento() {
     registrarLogGlobal(`Editou o registro de equipamento de "${nome}" (${EQUIP_TIPOS[tipo]}).`, 'dp');
   } else {
     state.equipamentos.push({
-      id: `equip-${Date.now()}`,
+      id: _idNovo,
       nome, cpf, responsavel, tipo, estado, observacoes,
       candidatoId: _equipCandidatoId || null,
       equipamentos: itens,
@@ -10209,9 +10215,42 @@ function salvarEquipamento() {
     registrarLogGlobal(`Registrou ${EQUIP_TIPOS[tipo].toLowerCase()} de equipamento para "${nome}".`, 'dp');
   }
 
-  saveState();
-  fecharModalEquipamento();
-  renderEquipamentos();
+  // ── Envia e ESPERA o servidor confirmar ────────────────────────────────
+  // Antes: saveState() disparava e esquecia. Se o envio falhasse (internet ruim
+  // no celular, foto pesada), NINGUÉM avisava: o registro aparecia na tela mas
+  // nunca chegava no servidor. Agora esperamos a confirmação e, se falhar,
+  // desfazemos e dizemos o motivo — com o formulário ainda preenchido.
+  const btn = document.getElementById('btn-salvar-equipamento');
+  const textoOriginal = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...'; }
+
+  try {
+    localStorage.setItem('rt_empregos_data', JSON.stringify(state));
+
+    if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
+      await RTCloud.salvarAgora(state);        // aqui a foto sobe e o registro grava
+    } else {
+      saveState();                             // sem nuvem: só o cache local
+    }
+
+    fecharModalEquipamento();
+    limparFiltrosEquipamento();                // garante que o novo registro apareça na lista
+    renderEquipamentos();
+    alert('Registro salvo com sucesso!');
+  } catch (e) {
+    // Desfaz: nada de registro fantasma na tela que não existe no servidor.
+    state.equipamentos = _copiaAntes;
+    try { localStorage.setItem('rt_empregos_data', JSON.stringify(state)); } catch (_) {}
+    renderEquipamentos();
+    alert(
+      'NÃO foi possível salvar o registro.\n\n' +
+      'Motivo: ' + (e && e.message ? e.message : e) + '\n\n' +
+      'Seus dados continuam preenchidos no formulário. Confira a internet e toque em Salvar de novo.\n' +
+      'Se a foto for muito pesada, tente uma foto menor.'
+    );
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+  }
 }
 window.salvarEquipamento = salvarEquipamento;
 

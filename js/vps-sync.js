@@ -73,6 +73,24 @@ window.RTCloud = (function () {
     saveTimer = setTimeout(flush, SAVE_DEBOUNCE_MS);
   }
 
+  // -- Salva AGORA e ESPERA o servidor confirmar -------------------------------
+  // Diferente do saveState/flush (que engolem o erro e tentam de novo em silêncio),
+  // este LANÇA o erro. Serve para telas onde o usuário precisa saber, na hora, se o
+  // registro realmente entrou no servidor — em vez de achar que salvou e não ter salvo.
+  async function salvarAgora(state) {
+    clearTimeout(saveTimer);
+    pending = null; pendingMerge = false; pendingUpsert = [];
+    flushing = true;
+    try {
+      await processarDocumentos(state);   // sobe as fotos e troca o base64 por link
+      const res = await apiPost('/state', { dados: state, merge: false, upsertIds: [] });
+      if (res && res.version) lastVersion = res.version;
+      return res;
+    } finally {
+      flushing = false;
+    }
+  }
+
   async function flush() {
     if (!pending) return;
     const state = pending;
@@ -161,6 +179,7 @@ window.RTCloud = (function () {
     init: init,
     loadState: loadState,
     saveState: saveState,
+    salvarAgora: salvarAgora,
     flush: flush,
     listarDocumentos: listarDocumentos,
     horaServidor: horaServidor
