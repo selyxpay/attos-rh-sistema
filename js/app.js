@@ -10294,15 +10294,19 @@ let _impRodando = false;
 
 // Campos do sistema que podem vir da planilha
 const IMP_CAMPOS = {
-  nome:        { rotulo: 'Nome do colaborador *', dicas: ['nome', 'colaborador', 'funcionario', 'candidato'] },
-  cpf:         { rotulo: 'CPF',                   dicas: ['cpf', 'documento'] },
-  tipo:        { rotulo: 'Entrega ou Devolução',  dicas: ['tipo', 'entrega', 'devolucao', 'devolução', 'registro'] },
-  equipamentos:{ rotulo: 'Equipamentos',          dicas: ['equipamento', 'item', 'material'] },
-  estado:      { rotulo: 'Estado',                dicas: ['estado', 'condicao', 'condição', 'conservacao'] },
-  responsavel: { rotulo: 'Responsável',           dicas: ['responsavel', 'responsável', 'atendente', 'entregue por'] },
-  data:        { rotulo: 'Data / hora',           dicas: ['carimbo', 'timestamp', 'data', 'hora'] },
-  observacoes: { rotulo: 'Observações',           dicas: ['observ', 'obs', 'comentario', 'comentário'] },
-  arquivo:     { rotulo: 'Arquivo(s) da foto',    dicas: ['arquivo', 'foto', 'imagem', 'anexo', 'upload'] }
+  nome:        { rotulo: 'Nome do colaborador *',  dicas: ['nome completo', 'nome', 'colaborador', 'funcionario'] },
+  cpf:         { rotulo: 'CPF',                    dicas: ['cpf', 'documento'] },
+  tipo:        { rotulo: 'Entrega ou Devolução',   dicas: ['tipo de registro', 'tipo'] },
+  equipamentos:{ rotulo: 'Equipamentos',           dicas: ['equipamentos envolvidos', 'selecione os equipamentos', 'equipamento', 'item', 'material'] },
+  outros:      { rotulo: 'Se marcou "Outros"',     dicas: ['outros', 'descreva'] },
+  estado:      { rotulo: 'Estado',                 dicas: ['estado', 'condicao', 'conservacao'] },
+  responsavel: { rotulo: 'Responsável',            dicas: ['responsavel', 'recebimento', 'atendente'] },
+  // Duas datas: a REAL (quando a entrega aconteceu) e a do formulário (quando digitaram).
+  // Guardamos as duas — a do evento é a que vale no registro.
+  dataEvento:  { rotulo: 'Data da entrega/devolução', dicas: ['data'] },
+  data:        { rotulo: 'Carimbo (envio do formulário)', dicas: ['carimbo', 'timestamp'] },
+  observacoes: { rotulo: 'Observações',            dicas: ['observ', 'obs', 'comentario'] },
+  arquivo:     { rotulo: 'Arquivo(s) da foto *',   dicas: ['arquivo', 'foto', 'imagem', 'anexo', 'upload'] }
 };
 
 function _impNorm(s) {
@@ -10369,15 +10373,36 @@ function impLerPlanilha(input) {
 }
 window.impLerPlanilha = impLerPlanilha;
 
-// Tenta casar cada campo do sistema com uma coluna da planilha, pelo nome
+// Nome de coluna sem acento, minúsculo e sem pontuação no fim ("Nome completo:" -> "nome completo")
+function _impNormCol(s) {
+  return _impNorm(s).replace(/[:;.\-\s]+$/, '').trim();
+}
+
+// Casa cada campo do sistema com uma coluna da planilha.
+// Duas passadas: primeiro os nomes IDÊNTICOS, depois os parecidos. Isso evita, por
+// exemplo, que "Data da entrega" seja roubada pela coluna "Carimbo de data/hora"
+// (que também contém a palavra "data").
 function _impAdivinharColunas() {
   _impMapa = {};
-  Object.entries(IMP_CAMPOS).forEach(([campo, def]) => {
-    const achou = _impColunas.find(col => {
-      const c = _impNorm(col);
-      return def.dicas.some(d => c.includes(_impNorm(d)));
-    });
+  const usadas = new Set();
+  const campos = Object.entries(IMP_CAMPOS);
+
+  // 1ª passada: nome exatamente igual
+  campos.forEach(([campo, def]) => {
+    const achou = _impColunas.find(col =>
+      !usadas.has(col) && def.dicas.some(d => _impNormCol(col) === _impNormCol(d))
+    );
+    if (achou) { _impMapa[campo] = achou; usadas.add(achou); }
+  });
+
+  // 2ª passada: nome parecido (só nas colunas que sobraram)
+  campos.forEach(([campo, def]) => {
+    if (_impMapa[campo]) return;
+    const achou = _impColunas.find(col =>
+      !usadas.has(col) && def.dicas.some(d => _impNormCol(col).includes(_impNormCol(d)))
+    );
     _impMapa[campo] = achou || '';
+    if (achou) usadas.add(achou);
   });
 }
 
@@ -10466,24 +10491,37 @@ function _impItens(txt) {
   if (!achados.length && t) achados.push('outros');
   return achados;
 }
+// Lê data em DD/MM/AAAA ou DD/MM/AA, com ou sem hora. Devolve null se não der para ler.
 function _impData(v) {
-  if (!v) return new Date().toISOString();
+  if (!v) return null;
   if (v instanceof Date && !isNaN(v)) return v.toISOString();
   const s = String(v).trim();
-  // DD/MM/AAAA HH:MM(:SS)
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (!s) return null;
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
   if (m) {
-    const d = new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
+    let ano = +m[3];
+    if (ano < 100) ano += 2000;            // "28/05/26" -> 2026
+    const d = new Date(ano, +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
     if (!isNaN(d)) return d.toISOString();
   }
   const d2 = new Date(s);
-  return isNaN(d2) ? new Date().toISOString() : d2.toISOString();
+  return isNaN(d2) ? null : d2.toISOString();
 }
+
+// A data que vale no registro é a da ENTREGA/DEVOLUÇÃO. Se ela faltar, usa o carimbo
+// do formulário. Nunca inventa a data de hoje em cima de um registro antigo.
+function _impDataDoRegistro(linha) {
+  return _impData(linha[_impMapa.dataEvento])
+      || _impData(linha[_impMapa.data])
+      || null;
+}
+
 // Chave para não importar o mesmo registro duas vezes
 function _impChave(linha) {
   const cpf = String(linha[_impMapa.cpf] || '').replace(/\D/g, '');
   const nome = _impNorm(linha[_impMapa.nome]);
-  return `${cpf || nome}|${_impData(linha[_impMapa.data]).slice(0, 16)}`;
+  const carimbo = _impData(linha[_impMapa.data]) || _impDataDoRegistro(linha) || '';
+  return `${cpf || nome}|${carimbo.slice(0, 16)}`;
 }
 
 // ── Passo 4: conferência ──────────────────────────────────────────────────
@@ -10514,13 +10552,14 @@ function _impPreVisualizar() {
     fotos.forEach(f => usados.add(_impNormArquivo(f.name)));
     if (fotos.length) comFoto++; else semFoto++;
     if (amostra.length < 5) {
+      const dISO = _impDataDoRegistro(linha);
       amostra.push({
         nome,
         cpf: String(linha[_impMapa.cpf] || '—'),
         tipo: EQUIP_TIPOS[_impTipo(linha[_impMapa.tipo])],
-        itens: _equipNomesItens(_impItens(linha[_impMapa.equipamentos])),
+        itens: _equipNomesItens(_impItens(linha[_impMapa.equipamentos]), String(linha[_impMapa.outros] || '')),
         estado: EQUIP_ESTADOS[_impEstado(linha[_impMapa.estado])],
-        data: _formatarDataHoraBR(_impData(linha[_impMapa.data])),
+        data: dISO ? _formatarDataBR(dISO.slice(0, 10)) : '⚠ sem data',
         fotos: fotos.length
       });
     }
@@ -10616,7 +10655,12 @@ async function importarEquipamentosAgora() {
         }
 
         const itens = _impItens(linha[_impMapa.equipamentos]);
-        const dataISO = _impData(linha[_impMapa.data]);
+        const outrosTxt = String(linha[_impMapa.outros] || '').trim();
+        if (outrosTxt && !itens.includes('outros')) itens.push('outros');
+
+        const dataISO = _impDataDoRegistro(linha) || new Date().toISOString();
+        const carimbo = _impData(linha[_impMapa.data]);
+
         state.equipamentos.push({
           id: `equip-imp-${Date.now()}-${i}`,
           chaveImport: _impChave(linha),              // impede importar duas vezes
@@ -10626,13 +10670,14 @@ async function importarEquipamentosAgora() {
           responsavel: String(linha[_impMapa.responsavel] || '').trim() || autor,
           tipo: _impTipo(linha[_impMapa.tipo]),
           equipamentos: itens,
-          equipamentoOutros: itens.includes('outros') ? String(linha[_impMapa.equipamentos] || '').trim() : '',
+          equipamentoOutros: outrosTxt,
           estado: _impEstado(linha[_impMapa.estado]),
           observacoes: String(linha[_impMapa.observacoes] || '').trim(),
           fotos,
           usuarioCadastro: autor,
           usuarioLogin: loggedUser ? loggedUser.login : '',
-          dataCadastro: dataISO,                      // preserva a data original do Forms
+          dataCadastro: dataISO,                      // a data REAL da entrega/devolução
+          dataFormulario: carimbo || '',              // quando preencheram o formulário (guardado)
           importadoEm: new Date().toISOString(),
           historico: []
         });
