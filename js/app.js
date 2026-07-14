@@ -5130,6 +5130,12 @@ function renderFuncionarios() {
               style="padding:2px 8px; font-size:11px; background:var(--primary); border:none;">
               <i class="fa-solid fa-user-check"></i> Avaliar & Aprovar
             </button>
+            ${podeExcluirFuncionario(f) ? `
+              <button class="btn btn-danger btn-sm" onclick="excluirFuncionario('${f.id}')"
+                style="padding:2px 8px; font-size:11px; margin-left:6px;"
+                title="Apagar este cadastro definitivamente">
+                <i class="fa-solid fa-trash-can"></i> Excluir
+              </button>` : ''}
           </td>
         </tr>
       `).join('');
@@ -5231,6 +5237,12 @@ function renderFuncionarios() {
               <i class="fa-solid fa-shield-halved"></i> Permissões
             </button>
           ` : ''}
+          ${podeExcluirFuncionario(f) ? `
+            <button class="btn btn-danger btn-sm" onclick="excluirFuncionario('${f.id}')" style="padding:2px 8px; font-size:11px;"
+                    title="Apagar este funcionário e o histórico dele definitivamente">
+              <i class="fa-solid fa-trash-can"></i> Excluir
+            </button>
+          ` : ''}
         </td>
       </tr>
     `;
@@ -5240,6 +5252,63 @@ function renderFuncionarios() {
   setupModalGerenciarListeners();
   setupBtnCopiarLink();
 }
+
+// ── Excluir funcionário definitivamente ───────────────────────────────────
+// Só mestre/administração. Nunca a própria conta, nunca uma conta MESTRE
+// (apagar joaobalaf/admin trancaria todo mundo pra fora do sistema).
+function podeExcluirFuncionario(f) {
+  if (!loggedUser || !f) return false;
+  if (loggedUser.id === f.id) return false;          // não apaga a si mesmo
+  if (ehMestre(f.login)) return false;               // não apaga conta mestre
+  return ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao';
+}
+
+function excluirFuncionario(id) {
+  const f = (state.funcionarios || []).find(x => x.id === id);
+  if (!f) return;
+
+  if (!podeExcluirFuncionario(f)) {
+    if (loggedUser && loggedUser.id === f.id) alert('Você não pode excluir a sua própria conta.');
+    else if (ehMestre(f.login)) alert('Esta é uma conta mestre do sistema e não pode ser excluída.');
+    else alert('Você não tem permissão para excluir funcionários.');
+    return;
+  }
+
+  const qtdLogs = (state.logs || []).filter(l => l.usuario === f.nome).length;
+
+  if (!confirm(
+    `EXCLUIR DEFINITIVAMENTE "${f.nome}" (login: ${f.login})?\n\n` +
+    `Isso vai apagar de vez:\n` +
+    `  • a conta e o acesso dele ao sistema;\n` +
+    `  • o histórico de auditoria dele (${qtdLogs} registro(s));\n` +
+    `  • o vínculo dele com recrutador, se houver.\n\n` +
+    `NÃO tem como desfazer.`
+  )) return;
+
+  if (!confirm(`Tem certeza absoluta? "${f.nome}" será apagado para sempre.`)) return;
+
+  // Remove o funcionário
+  state.funcionarios = (state.funcionarios || []).filter(x => x.id !== id);
+
+  // Remove o histórico/auditoria dele
+  if (Array.isArray(state.logs)) {
+    state.logs = state.logs.filter(l => l.usuario !== f.nome);
+  }
+
+  // Desfaz o vínculo com recrutador (evita referência apontando pro nada)
+  (state.recrutadores || []).forEach(r => {
+    if (r.usuarioId === f.id) r.usuarioId = null;
+    if (r.loginVinculado === f.login) r.loginVinculado = '';
+  });
+
+  // Fica registrado QUEM apagou (a conta some, mas a responsabilidade não)
+  registrarLogGlobal(`Excluiu definitivamente o funcionário "${f.nome}" (${f.login}).`, 'funcionarios');
+
+  saveState();
+  renderFuncionarios();
+  alert(`"${f.nome}" foi excluído do sistema.`);
+}
+window.excluirFuncionario = excluirFuncionario;
 
 // Quem pode ver/redefinir a senha: mestre (admin/João) ou administração vê todos.
 // Os demais só se estiverem MARCADOS (podeVerSenhas) e forem do MESMO departamento.
