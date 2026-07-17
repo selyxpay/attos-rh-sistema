@@ -981,6 +981,7 @@ function initLocalStorage() {
     if (state.recrutadores) {
       state.recrutadores.forEach(r => {
         if (r.whatsapp === undefined) { r.whatsapp = ''; alterado = true; }
+        if (r.mensagemWhatsapp === undefined) { r.mensagemWhatsapp = ''; alterado = true; }
         if (r.loginVinculado === undefined) { r.loginVinculado = ''; alterado = true; }
         if (!r.templates) { r.templates = {}; alterado = true; }
         if (!r.disparosLog) { r.disparosLog = []; alterado = true; }
@@ -4802,6 +4803,20 @@ window.salvarBeneficiosSelecao = function() {
 // ==========================================================================
 
 let _waLogTimer = null;
+// Mensagem que o candidato envia para a recrutadora ao terminar a ficha
+// (usada pelo botão de WhatsApp no final do candidato.html)
+let _waMsgLogTimer = null;
+window.salvarMensagemWhatsappRecrutadora = function(recrutadorId, valor) {
+  const rec = (state.recrutadores || []).find(r => r.id === recrutadorId);
+  if (!rec) return;
+  rec.mensagemWhatsapp = String(valor || '').slice(0, 500);
+  saveState();
+  clearTimeout(_waMsgLogTimer);
+  _waMsgLogTimer = setTimeout(() => {
+    registrarLogGlobal(`Atualizou a mensagem de WhatsApp do perfil "${rec.nome}".`, 'meu_painel');
+  }, 2500);
+};
+
 window.salvarWhatsappRecrutadora = function(recrutadorId, valor) {
   const rec = (state.recrutadores || []).find(r => r.id === recrutadorId);
   if (!rec) return;
@@ -7775,6 +7790,16 @@ function renderBTPendentes() {
   }).join('');
 }
 
+// Monta o link do WhatsApp a partir de um telefone brasileiro em qualquer formato.
+// wa.me funciona nos três jeitos que a agência usa: WhatsApp Web no Chrome,
+// site do WhatsApp e aplicativo instalado — o próprio WhatsApp decide qual abrir.
+function _linkWa(telefone) {
+  const d = String(telefone || '').replace(/\D/g, '');
+  if (!d) return '';
+  return 'https://wa.me/' + (d.length >= 12 && d.indexOf('55') === 0 ? d : '55' + d);
+}
+window._linkWa = _linkWa;
+
 // Renderiza a seção do Banco de Talentos simples na aba Banco de Talentos
 function renderBancoTalentosSimples() {
   const container = document.getElementById('banco-talentos-simples-lista');
@@ -7840,6 +7865,9 @@ function renderBancoTalentosSimples() {
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
         ${proximaBadge}
+        ${t.telefone ? `<a href="${_linkWa(t.telefone)}" target="_blank" onclick="event.stopPropagation()" title="Chamar ${escapeHTML(t.nome || '')} no WhatsApp"
+          style="width:30px;height:30px;border-radius:50%;background:#25d366;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:15px;text-decoration:none;flex-shrink:0;">
+          <i class="fa-brands fa-whatsapp"></i></a>` : ''}
         <i class="fa-solid fa-chevron-right" style="color:var(--text-secondary);font-size:11px;"></i>
       </div>
     </div>`;
@@ -8754,28 +8782,56 @@ window.gerarSenhaFila = function(tipo) {
   return senha;
 };
 
+// Baia/guichê da operadora nesta estação (fica salvo neste computador)
+function _minhaBaia() {
+  try { return (localStorage.getItem('rt_fila_baia') || '').trim(); } catch (e) { return ''; }
+}
+window.salvarMinhaBaia = function(v) {
+  try { localStorage.setItem('rt_fila_baia', String(v || '').trim()); } catch (e) {}
+};
+
+function _registrarChamada(senha) {
+  senha.status    = 'chamada';
+  senha.chamadaEm = Date.now();
+  senha.baia      = _minhaBaia();
+  state.fila.ultimaChamada = {
+    numero: senha.numero, tipo: senha.tipo, nome: senha.nome,
+    baia: senha.baia, chamadaEm: senha.chamadaEm
+  };
+  saveState();
+  renderFila();
+  // IMPORTANTE: o anúncio (voz + telão) acontece SÓ no Painel (fila-display),
+  // que está aberto na TV ou no celular. Antes, _falarSenha() também falava
+  // aqui na máquina da operadora — por isso "chamava" no computador dela.
+}
+
 // Chama a próxima senha de um departamento
 window.chamarProximaSenha = function(tipo) {
   const proxima = (state.fila.senhas || []).find(s => s.tipo === tipo && s.status === 'aguardando');
   if (!proxima) { alert('Não há senhas aguardando para ' + (FILA_TIPO_LABEL[tipo] || tipo) + '.'); return; }
-  proxima.status    = 'chamada';
-  proxima.chamadaEm = Date.now();
-  state.fila.ultimaChamada = { numero: proxima.numero, tipo: proxima.tipo, nome: proxima.nome, chamadaEm: proxima.chamadaEm };
-  saveState();
-  renderFila();
-  _falarSenha(proxima.numero, proxima.nome, proxima.tipo);
+  _registrarChamada(proxima);
 };
 
 // Chama uma senha específica pelo ID
 window.chamarSenhaEspecifica = function(senhaId) {
   const senha = (state.fila.senhas || []).find(s => s.id === senhaId);
   if (!senha) return;
-  senha.status    = 'chamada';
-  senha.chamadaEm = Date.now();
-  state.fila.ultimaChamada = { numero: senha.numero, tipo: senha.tipo, nome: senha.nome, chamadaEm: senha.chamadaEm };
+  _registrarChamada(senha);
+};
+
+// Define/edita o nome do candidato de uma senha (o painel chama o nome junto)
+window.definirNomeSenha = function(senhaId) {
+  const senha = (state.fila.senhas || []).find(s => s.id === senhaId);
+  if (!senha) return;
+  const nome = prompt('Nome do candidato desta senha (' + senha.numero + '):', senha.nome || '');
+  if (nome === null) return;
+  senha.nome = String(nome).trim();
+  // Se essa senha é a que está no telão, atualiza o nome lá também
+  if (state.fila.ultimaChamada && state.fila.ultimaChamada.numero === senha.numero) {
+    state.fila.ultimaChamada.nome = senha.nome;
+  }
   saveState();
   renderFila();
-  _falarSenha(senha.numero, senha.nome, senha.tipo);
 };
 
 // Marca senha como atendida
@@ -8887,9 +8943,16 @@ function renderFila() {
       <p class="page-subtitle">Gerencie e chame senhas de atendimento para cada departamento</p>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      ${podeChamar ? `
+      <label style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:10px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);font-size:12px;font-weight:700;color:#10b981;">
+        <i class="fa-solid fa-location-dot"></i> Minha baia:
+        <input type="text" value="${_esc2(_minhaBaia())}" maxlength="12" placeholder="ex: 2"
+          oninput="salvarMinhaBaia(this.value)"
+          style="width:64px;padding:4px 8px;border-radius:7px;border:1px solid rgba(16,185,129,0.4);background:var(--bg-main);color:var(--text-primary);font-size:13px;font-weight:700;text-align:center;font-family:inherit;">
+      </label>` : ''}
       <a href="fila-display.html" target="_blank"
         style="padding:8px 16px;border-radius:10px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);color:#6366f1;text-decoration:none;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;">
-        <i class="fa-solid fa-tv"></i> Abrir Painel TV
+        <i class="fa-solid fa-tv"></i> Abrir Painel (TV ou Celular)
       </a>
       <button onclick="limparFilaCompleta()"
         style="padding:8px 14px;border-radius:10px;border:1px solid var(--border-color);background:transparent;color:var(--text-secondary);cursor:pointer;font-size:12px;font-family:inherit;">
@@ -8953,10 +9016,14 @@ function renderFila() {
             return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--bg-main);border:1px solid var(--border-color);">
               <div style="font-size:16px;font-weight:800;color:${cor};min-width:54px;">${_esc2(s.numero)}</div>
               <div style="flex:1;min-width:0;">
-                <div style="font-size:11px;font-weight:600;color:var(--text-secondary);">${FILA_TIPO_LABEL[s.tipo] || s.tipo}</div>
+                <div style="font-size:11px;font-weight:600;color:var(--text-secondary);">${FILA_TIPO_LABEL[s.tipo] || s.tipo}${s.nome ? ` · <span style="color:var(--text-primary);">${_esc2(s.nome)}</span>` : ''}</div>
                 <div style="font-size:10px;color:var(--text-secondary);opacity:.6;">${new Date(s.geradaEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
               </div>
               <div style="display:flex;gap:5px;">
+                ${podeChamar ? `<button onclick="definirNomeSenha('${s.id}')" title="${s.nome ? 'Editar o nome do candidato' : 'Colocar o nome do candidato (o painel chama o nome junto)'}"
+                  style="padding:5px 9px;border-radius:7px;border:1px solid var(--border-color);background:${s.nome ? 'rgba(16,185,129,0.1)' : 'transparent'};color:${s.nome ? '#10b981' : 'var(--text-secondary)'};cursor:pointer;font-size:11px;font-family:inherit;">
+                  <i class="fa-solid fa-user-pen"></i>
+                </button>` : ''}
                 ${podeChamar ? `<button onclick="chamarSenhaEspecifica('${s.id}')" title="Chamar agora"
                   style="padding:5px 9px;border-radius:7px;border:none;background:${cor};color:#fff;cursor:pointer;font-size:11px;font-family:inherit;">
                   <i class="fa-solid fa-bell"></i>
@@ -9171,6 +9238,20 @@ function _renderPainelCompleto(container, rec) {
           ${waAbrirBtn}
         </div>
         <p style="font-size:10px;color:var(--text-secondary);margin-top:6px;">Número salvo automaticamente ao digitar. Aparece como botão de contato no final dos formulários de candidatura.</p>
+
+        <div style="margin-top:14px;">
+          <div style="font-size:11px;font-weight:700;color:var(--text-primary);margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+            <i class="fa-solid fa-message" style="color:#25d366;"></i> Mensagem que o candidato vai te enviar
+          </div>
+          <textarea id="meu-painel-wa-msg" rows="3" class="form-control" style="width:100%;resize:vertical;font-size:12.5px;"
+            placeholder="Ex: Olá, {recrutadora}! Acabei de preencher minha ficha na R&T. Meu nome é {nome}."
+            oninput="salvarMensagemWhatsappRecrutadora('${rec.id}', this.value)">${_esc(rec.mensagemWhatsapp || '')}</textarea>
+          <p style="font-size:10px;color:var(--text-secondary);margin-top:6px;line-height:1.5;">
+            Salva sozinha ao digitar. Quando o candidato terminar a ficha pelo seu link, o WhatsApp abre com esta mensagem pronta para ele te enviar.
+            Use <strong>{nome}</strong> para o nome do candidato e <strong>{recrutadora}</strong> para o seu.
+            Em branco = mensagem padrão do sistema.
+          </p>
+        </div>
       </div>
     </div>
 

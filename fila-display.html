@@ -190,6 +190,26 @@
       max-width: 480px; line-height: 1.2;
     }
 
+    /* Baia/guichê da selecionadora — bem grande para ler de longe */
+    .tc-baia {
+      margin-top: 16px;
+      display: inline-flex; align-items: center; gap: 12px;
+      padding: 10px 26px; border-radius: 16px;
+      background: #059669; color: #fff;
+      font-size: clamp(26px, 4.2vw, 52px);
+      font-weight: 900; letter-spacing: 1px;
+      box-shadow: 0 8px 24px rgba(5, 150, 105, .35);
+      animation: breathe 1.2s ease-in-out 5;
+    }
+
+    /* Celular: telão empilha (senha em cima, fila embaixo) */
+    @media (max-width: 760px) {
+      html, body { overflow: auto; height: auto; }
+      .body { flex-direction: column !important; height: auto !important; }
+      .left { min-height: 46vh; }
+      .right { width: 100% !important; max-width: none !important; min-height: 40vh; }
+    }
+
     .idle-wrap {
       text-align: center; color: var(--muted);
       position: relative; z-index: 1;
@@ -447,13 +467,15 @@
 
   /* ── Voz ─────────────────────────────────────────────────────── */
   let _lid = null;
-  function speak(num, nome, tipo) {
+  function speak(num, nome, tipo, baia) {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const dept = tipo==='selecao'?'balcão de Seleção':tipo==='dp'?'Departamento Pessoal':'atendimento';
+    // Com baia definida, o candidato é chamado direto para a baia da selecionadora
+    const destino = baia ? `à baia ${baia}` : `ao ${dept}`;
     const txt = nome
-      ? `Senha ${num.replace('-',' ')}. ${nome}. Por favor, dirija-se ao ${dept}.`
-      : `Senha ${num.replace('-',' ')}. Por favor, dirija-se ao ${dept}.`;
+      ? `Senha ${num.replace('-',' ')}. ${nome}. Por favor, dirija-se ${destino}.`
+      : `Senha ${num.replace('-',' ')}. Por favor, dirija-se ${destino}.`;
     function say() {
       const u = new SpeechSynthesisUtterance(txt);
       u.lang='pt-BR'; u.rate=.88; u.pitch=1; u.volume=1;
@@ -487,6 +509,7 @@
     if (uc?.numero) {
       const bc = BCLS[uc.tipo]||'b-red';
       const nm = uc.nome ? `<div class="tc-nome">${uc.nome}</div>` : '';
+      const ba = uc.baia ? `<div class="tc-baia"><i class="fa-solid fa-location-dot"></i> BAIA ${uc.baia}</div>` : '';
       left.innerHTML = `
         <div class="atendendo-label">
           <i class="fa-solid fa-bell" style="animation:breathe 1s ease-in-out 4;"></i>
@@ -500,6 +523,7 @@
             ${LBL[uc.tipo]||uc.tipo}
           </span>
           ${nm}
+          ${ba}
         </div>`;
     } else {
       left.innerHTML = `
@@ -572,7 +596,7 @@
     const uc = state?.fila?.ultimaChamada;
     if (!uc) return;
     const id = uc.numero+'_'+(uc.chamadaEm||'');
-    if (id !== _lid) { _lid=id; speak(uc.numero, uc.nome, uc.tipo); }
+    if (id !== _lid) { _lid=id; speak(uc.numero, uc.nome, uc.tipo, uc.baia); }
   }
 
   /* ── Loop de atualização ─────────────────────────────────────── */

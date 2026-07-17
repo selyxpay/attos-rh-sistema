@@ -572,6 +572,17 @@ const STATE_KEY = 'rt_empregos_data';
 let _rtUpsertIds = [];  // ids de candidatos editados nesta página (força upsert na nuvem)
 let state = null;
 let recrutadorLinkId = null;
+
+// Mensagem que o candidato envia no WhatsApp da recrutadora ao terminar a ficha.
+// Se a recrutadora escreveu a dela no Meu Painel, usa a dela (com {nome} e
+// {recrutadora} trocados); senão usa o texto padrão.
+function montarMsgWa(rec, nomeCandidato, padrao) {
+  const custom = ((rec && rec.mensagemWhatsapp) || '').trim();
+  if (!custom) return encodeURIComponent(padrao);
+  return encodeURIComponent(custom
+    .replace(/\{nome\}/gi, String(nomeCandidato || '').split(' ')[0])
+    .replace(/\{recrutadora\}/gi, String((rec && rec.nome) || '').split(' ')[0]));
+}
 const modoPresencial = new URLSearchParams(window.location.search).get('presencial') === '1';
 let comoSoubeValue = '';
 
@@ -985,7 +996,8 @@ document.getElementById('form-candidato').addEventListener('submit', function(e)
       const _paraSub = document.getElementById('parabens-sub');
       if (_recBT && _recBT.whatsapp) {
         const _waNum = _recBT.whatsapp.replace(/\D/g, '');
-        const _waMsg = encodeURIComponent('Olá, ' + _recBT.nome.split(' ')[0] + '! Completei minha ficha de candidato na R&T Empregos. Meu nome é ' + existing.nome.split(' ')[0] + '. Gostaria de mais informações.');
+        const _waMsg = montarMsgWa(_recBT, existing.nome,
+          'Olá, ' + _recBT.nome.split(' ')[0] + '! Completei minha ficha de candidato na R&T Empregos. Meu nome é ' + existing.nome.split(' ')[0] + '. Gostaria de mais informações.');
         if (_waBtn) { _waBtn.href = 'https://wa.me/55' + _waNum + '?text=' + _waMsg; _waBtn.style.display = ''; }
         if (_paraSub) _paraSub.textContent = 'Sua ficha foi atualizada! Fale agora com nosso(a) selecionador(a) para dar continuidade ao processo.';
       } else {
@@ -1053,7 +1065,7 @@ document.getElementById('form-candidato').addEventListener('submit', function(e)
 
     if (rec && rec.whatsapp) {
       const waNum = rec.whatsapp.replace(/\D/g, '');
-      const waMsg = encodeURIComponent(
+      const waMsg = montarMsgWa(rec, novoCand.nome,
         'Olá, ' + rec.nome.split(' ')[0] + '! Acabei de preencher minha ficha de candidato na R&T Empregos. ' +
         'Meu nome é ' + novoCand.nome.split(' ')[0] + '. Gostaria de mais informações sobre as vagas disponíveis.'
       );
