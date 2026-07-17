@@ -776,8 +776,12 @@ async function ativarNuvem() {
       state = nuvem;
       _cloudReady = true;
       const _ajustouAdmin = garantirAdminMestre();
+      // Limpa os dados de exemplo TAMBÉM aqui: o estado da nuvem acabou de
+      // substituir o cache local, então a limpeza feita no initLocalStorage
+      // não vale para ele. Se removeu algo, persiste no servidor.
+      const _tirouExemplos = removerDadosDeExemplo();
       try { localStorage.setItem('rt_empregos_data', _estadoParaCache()); } catch (e) {}
-      if (_ajustouAdmin) RTCloud.saveState(state);
+      if (_ajustouAdmin || _tirouExemplos) RTCloud.saveState(state);
       renderCurrentAba();
     } else {
       _cloudReady = true;
@@ -788,6 +792,42 @@ async function ativarNuvem() {
     console.error('[RT Nuvem] Não foi possível ativar a sincronização:', e);
     _cloudReady = true;
   }
+}
+
+// ── Remove os dados de EXEMPLO que vinham de fábrica ────────────────────────
+// As empresas Mercado Livre/Amazon/Shopee/Magazine Luiza/DHL e as 5 vagas de
+// demonstração ocupavam os nomes e BLOQUEAVAM o cadastro dos clientes REAIS de
+// mesmo nome ("Já existe um cliente com esse nome ou CNPJ").
+// Remoção cirúrgica pelos IDs exatos dos exemplos: vagas/clientes criados de
+// verdade têm id com timestamp ('vaga-1784...', 'emp-1784...') e nunca batem.
+// PRECISA rodar também depois que a nuvem carrega (o estado do servidor
+// substitui o cache local, então a limpeza feita no cache não bastaria).
+function removerDadosDeExemplo() {
+  if (!state) return false;
+  let mudou = false;
+  const VAGAS_EXEMPLO = ['vaga-ml-op', 'vaga-az-aux', 'vaga-sp-sep', 'vaga-mg-aux', 'vaga-dh-op'];
+  const EMPRESAS_EXEMPLO = ['ml', 'az', 'sp', 'mg', 'dh'];
+  // Candidatos de demonstração têm id curto ('candidato-1'..'candidato-12');
+  // os reais usam timestamp de 13 dígitos.
+  const ehCandidatoExemplo = c => c && /^candidato-\d{1,6}$/.test(String(c.id || ''));
+
+  if (Array.isArray(state.vagas)) {
+    // Só remove a vaga de exemplo se NENHUM candidato real apontar para ela.
+    const temCandidatoReal = vagaId =>
+      (state.candidatos || []).concat(state.bancoTalentos || [])
+        .some(c => c && c.vagaId === vagaId && !ehCandidatoExemplo(c));
+    const antes = state.vagas.length;
+    state.vagas = state.vagas.filter(v => !(v && VAGAS_EXEMPLO.includes(v.id) && !temCandidatoReal(v.id)));
+    if (state.vagas.length !== antes) mudou = true;
+  }
+  if (Array.isArray(state.empresas)) {
+    // Só remove a empresa de exemplo se nenhuma vaga restante usar ela.
+    const emUso = empId => (state.vagas || []).some(v => v && v.empresaId === empId);
+    const antes = state.empresas.length;
+    state.empresas = state.empresas.filter(e => !(e && EMPRESAS_EXEMPLO.includes(e.id) && !emUso(e.id)));
+    if (state.empresas.length !== antes) mudou = true;
+  }
+  return mudou;
 }
 
 // 1. GERENCIAMENTO DE ESTADO E LOCALSTORAGE
@@ -874,6 +914,9 @@ function initLocalStorage() {
 
     // Módulo de Equipamentos (Entrega/Devolução do DP)
     if (!state.equipamentos) { state.equipamentos = []; alterado = true; }
+
+    // Remove os dados de exemplo que vinham de fábrica (ver removerDadosDeExemplo)
+    if (removerDadosDeExemplo()) alterado = true;
 
     // Conta MESTRE "admin": garante existência/poder/senha (ver garantirAdminMestre)
     if (garantirAdminMestre()) alterado = true;
@@ -1942,11 +1985,21 @@ function setupEventListeners() {
       const tipoContr = getTipoContratacao(vincSel ? vincSel.value : '');
       const vincCode = tipoContr ? tipoContr.vinculo : '';
       const funcExata = getFuncaoExata(g('vaga-add-funcao-codigo'));
+      // Campos do Exata: NÃO bloqueiam mais o cadastro da vaga. Eles só são
+      // obrigatórios de verdade na EXPORTAÇÃO para o Exata (exportarExata já
+      // valida e avisa o que falta). Aqui só avisamos e deixamos escolher.
       const erXata = [];
-      if (!g('vaga-add-funcao-codigo') || !funcExata) erXata.push('Selecione uma função válida do catálogo do Exata.');
-      else if (!funcExata.cbo) erXata.push('O CBO da função não foi identificado.');
-      if (!tipoContr) erXata.push('Selecione o tipo de contratação.');
-      if (erXata.length) { alert('Verifique as Informações para o Exata:\n\n• ' + erXata.join('\n• ')); return; }
+      if (!g('vaga-add-funcao-codigo') || !funcExata) erXata.push('Função do catálogo do Exata');
+      else if (!funcExata.cbo) erXata.push('CBO da função');
+      if (!tipoContr) erXata.push('Tipo de contratação');
+      if (erXata.length) {
+        const seguir = confirm(
+          'A vaga vai ser salva SEM estas informações do Exata:\n\n• ' + erXata.join('\n• ') +
+          '\n\nVocê pode preencher depois em "Configurar Exata" na própria vaga. ' +
+          'Só não dá para exportar candidatos ao Exata enquanto faltar.\n\nSalvar a vaga mesmo assim?'
+        );
+        if (!seguir) return;
+      }
 
       const novaVaga = {
         id: `vaga-${Date.now()}`,
@@ -2050,7 +2103,14 @@ function setupEventListeners() {
       const jaExiste = state.empresas.find(emp =>
         (cnpjNorm && emp.cnpj && emp.cnpj.replace(/\D/g, '') === cnpjNorm) ||
         (emp.nome && emp.nome.trim().toLowerCase() === nome.toLowerCase()));
-      if (jaExiste) { alert('Já existe um cliente com esse nome ou CNPJ.'); return; }
+      if (jaExiste) {
+        alert(
+          `Já existe o cliente "${jaExiste.nome}"` +
+          (jaExiste.cnpj ? ` (CNPJ ${jaExiste.cnpj})` : ' (sem CNPJ cadastrado)') +
+          ` na sua lista.\n\nSe for o mesmo cliente, use o que já está cadastrado — não precisa criar de novo.`
+        );
+        return;
+      }
 
       const novaEmpresa = {
         id: 'emp-' + Date.now(),
