@@ -11558,7 +11558,7 @@ function _ffDuplicidades(f) {
 }
 
 // ── Aba: render principal ──────────────────────────────────────────────────
-let _ffSubAba = 'minha-vez';
+let _ffSubAba = 'painel';
 let _ffPdfsTemp = [];        // Files escolhidos no modal de novo fluxo
 let _ffDetalheId = null;
 
@@ -11631,10 +11631,147 @@ function atualizarBadgeFluxoFinanceiro() {
   item.appendChild(b);
 }
 
+// ── PAINEL do módulo Fluxo Financeiro (dentro da própria aba) ──────────────
+// Visão de comando: quanto está parado em cada etapa, o que paga amanhã/hoje,
+// atrasados, gargalos e os últimos movimentos. Respeita a visibilidade da
+// pessoa (analista vê só o dele; supervisão/gerencial veem tudo).
+function _ffRenderPainel(cont) {
+  const fluxos = _ffVisiveis();
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const p = n => String(n).padStart(2, '0');
+  const ymd = d => `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  const hojeStr = ymd(hoje);
+  const amanhaStr = ymd(new Date(hoje.getTime() + 86400000));
+
+  const vivos = fluxos.filter(f => f.status !== 'reprovado');
+  const somaDe = arr => arr.reduce((s, f) => s + _ffTotal(f), 0);
+
+  const porEtapa = {
+    rascunho:               fluxos.filter(f => f.status === 'rascunho'),
+    aguardando_coordenacao: fluxos.filter(f => f.status === 'aguardando_coordenacao'),
+    aguardando_gestao:      fluxos.filter(f => f.status === 'aguardando_gestao'),
+    aguardando_financeiro:  fluxos.filter(f => f.status === 'aguardando_financeiro'),
+    pago:                   fluxos.filter(f => f.status === 'pago'),
+    finalizado:             fluxos.filter(f => f.status === 'finalizado'),
+    reprovado:              fluxos.filter(f => f.status === 'reprovado')
+  };
+  const minhaVez = fluxos.filter(f => _ffEhMinhaVez(f));
+  const pagaAmanha = fluxos.filter(f => f.dataPagamento === amanhaStr && !['finalizado', 'reprovado'].includes(f.status));
+  const pagaHoje   = fluxos.filter(f => f.dataPagamento === hojeStr && !['finalizado', 'reprovado'].includes(f.status));
+  const pagosHoje  = fluxos.filter(f => ['pago', 'finalizado'].includes(f.status) && f.dataPagamento === hojeStr);
+  const atrasados  = fluxos.filter(f => { const pz = _ffPrazo(f); return pz && pz.nivel === 'atrasado'; });
+  const semCompr   = fluxos.filter(f => f.status === 'pago');
+  const totalAberto = somaDe(vivos.filter(f => !['finalizado'].includes(f.status)));
+
+  // Card grande destacando o que exige ação da pessoa
+  const cardTop = (titulo, valor, sub, cor, icone, onclick) => `
+    <div ${onclick ? `onclick="${onclick}" style="cursor:pointer;"` : ''} class="ff-p-card" style="border-left:4px solid ${cor};">
+      <div class="ff-p-card-ico" style="color:${cor};background:${cor}18;"><i class="fa-solid ${icone}"></i></div>
+      <div style="flex:1;min-width:0;">
+        <div class="ff-p-card-num">${valor}</div>
+        <div class="ff-p-card-tit">${titulo}</div>
+        ${sub ? `<div class="ff-p-card-sub">${sub}</div>` : ''}
+      </div>
+    </div>`;
+
+  // Barra de etapas: quanto tem parado em cada fase (só as vivas)
+  const etapaCard = (chave, rot) => {
+    const arr = porEtapa[chave]; const st = FF_STATUS[chave];
+    return `<div onclick="_ffPainelIr('${chave}')" class="ff-p-etapa" style="cursor:pointer;">
+      <div class="ff-p-etapa-top"><span style="color:${st.cor};"><i class="fa-solid ${st.icone}"></i></span>
+        <span class="ff-p-etapa-n">${arr.length}</span></div>
+      <div class="ff-p-etapa-rot">${rot}</div>
+      <div class="ff-p-etapa-val">${arr.length ? _ffMoedaBR(somaDe(arr)) : '—'}</div>
+    </div>`;
+  };
+
+  // Próximos pagamentos (ordenados por data, os vivos)
+  const proximos = [...vivos]
+    .filter(f => f.dataPagamento)
+    .sort((a, b) => String(a.dataPagamento).localeCompare(String(b.dataPagamento)))
+    .slice(0, 6);
+
+  // Últimos movimentos (do histórico de todos os fluxos visíveis)
+  const movimentos = [];
+  fluxos.forEach(f => (f.historico || []).forEach(h => movimentos.push({ ...h, numero: f.numero })));
+  movimentos.sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
+
+  cont.innerHTML = `
+    <!-- Linha 1: cartões de comando -->
+    <div class="ff-p-topgrid">
+      ${cardTop('Aguardando VOCÊ', minhaVez.length, minhaVez.length ? _ffMoedaBR(somaDe(minhaVez)) + ' · toque para ver' : 'nada pendente 👌', '#D97706', 'fa-hand-point-right', minhaVez.length ? "trocarSubAbaFF('minha-vez')" : '')}
+      ${cardTop('Paga AMANHÃ', pagaAmanha.length, _ffMoedaBR(somaDe(pagaAmanha)) + (pagaHoje.length ? ` · ${pagaHoje.length} HOJE` : ''), '#2563EB', 'fa-calendar-day', '')}
+      ${cardTop('Atrasados', atrasados.length, atrasados.length ? _ffMoedaBR(somaDe(atrasados)) + ' — data já passou' : 'nenhum atraso', atrasados.length ? '#DC2626' : '#059669', atrasados.length ? 'fa-triangle-exclamation' : 'fa-circle-check', '')}
+      ${cardTop('Pago hoje', pagosHoje.length, _ffMoedaBR(somaDe(pagosHoje)), '#059669', 'fa-sack-dollar', '')}
+    </div>
+
+    <!-- Linha 2: onde o dinheiro está parado (por etapa) -->
+    <div class="exame-detalhe-laudo" style="margin-top:18px;">
+      <h4><i class="fa-solid fa-diagram-project"></i> Por etapa do fluxo — ${_ffMoedaBR(totalAberto)} em aberto</h4>
+      <div class="ff-p-etapas">
+        ${etapaCard('rascunho', 'Conferência DP')}
+        ${etapaCard('aguardando_coordenacao', 'Supervisão DP')}
+        ${etapaCard('aguardando_gestao', 'Gestão')}
+        ${etapaCard('aguardando_financeiro', 'Financeiro')}
+        ${etapaCard('pago', 'Falta comprovante')}
+        ${etapaCard('finalizado', 'Finalizados')}
+      </div>
+      ${porEtapa.reprovado.length ? `<div style="margin-top:10px;font-size:12px;color:#DC2626;font-weight:700;"><i class="fa-solid fa-circle-xmark"></i> ${porEtapa.reprovado.length} reprovado(s) — <a href="#" onclick="trocarSubAbaFF('problemas');return false;" style="color:#DC2626;">ver</a></div>` : ''}
+      ${semCompr.length ? `<div style="margin-top:6px;font-size:12px;color:#D97706;font-weight:700;"><i class="fa-solid fa-receipt"></i> ${semCompr.length} pago(s) aguardando comprovante</div>` : ''}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;" class="ff-p-2col">
+      <!-- Próximos pagamentos -->
+      <div class="exame-detalhe-laudo">
+        <h4><i class="fa-solid fa-calendar-check"></i> Próximos pagamentos</h4>
+        ${proximos.length ? `<div class="table-scroll-container"><table class="excel-table"><tbody>
+          ${proximos.map(f => {
+            const pz = _ffPrazo(f); const st = FF_STATUS[f.status] || FF_STATUS.rascunho;
+            return `<tr onclick="abrirDetalheFluxo('${f.id}')" style="cursor:pointer;">
+              <td style="white-space:nowrap;">${_formatarDataBR(f.dataPagamento)}${pz && pz.nivel !== 'ok' ? `<div style="font-size:10px;font-weight:800;color:${pz.cor};">${pz.rotulo}</div>` : ''}</td>
+              <td style="font-weight:600;">${escapeHTML(f.empresaNome)}</td>
+              <td>${escapeHTML(f.tipo)}</td>
+              <td style="font-weight:700;text-align:right;">${_ffMoedaBR(_ffTotal(f))}</td>
+              <td><span style="font-size:10px;font-weight:800;color:${st.cor};">${st.rotulo}</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody></table></div>` : `<p class="imp-ajuda">Nenhum pagamento agendado.</p>`}
+      </div>
+
+      <!-- Últimos movimentos -->
+      <div class="exame-detalhe-laudo">
+        <h4><i class="fa-solid fa-clock-rotate-left"></i> Últimos movimentos</h4>
+        ${movimentos.length ? `<div style="max-height:280px;overflow-y:auto;">
+          ${movimentos.slice(0, 12).map(m => `
+            <div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px dashed var(--border-color);font-size:12px;">
+              <span style="color:var(--text-secondary);white-space:nowrap;">${_formatarDataHoraBR(m.data)}</span>
+              <span style="min-width:0;"><strong>#${escapeHTML(m.numero)}</strong> · ${escapeHTML(m.usuario)} — ${escapeHTML(String(m.acao).slice(0, 70))}</span>
+            </div>`).join('')}
+        </div>` : `<p class="imp-ajuda">Sem movimentos ainda.</p>`}
+      </div>
+    </div>`;
+}
+
+// Clicar num card de etapa do painel leva para a lista filtrada certa
+window._ffPainelIr = function(chave) {
+  if (chave === 'rascunho' || chave === 'aguardando_coordenacao' || chave === 'aguardando_gestao' || chave === 'aguardando_financeiro') {
+    trocarSubAbaFF('andamento');
+  } else if (chave === 'pago' || chave === 'finalizado') {
+    trocarSubAbaFF('finalizados');
+  } else if (chave === 'reprovado') {
+    trocarSubAbaFF('problemas');
+  } else {
+    trocarSubAbaFF('todos');
+  }
+};
+
 function _ffRenderLista() {
   const cont = document.getElementById('ff-lista-container');
   if (!cont) return;
   garantirFluxoFinanceiro();
+
+  // Painel do próprio módulo (não é a dashboard geral do sistema)
+  if (_ffSubAba === 'painel') { _ffRenderPainel(cont); return; }
 
   // Planilha gerencial (Mayara/Matheus/admin): visão de auditoria com quem fez
   // o quê em cada etapa e os horários — pesquisável pelo Excel exportado.

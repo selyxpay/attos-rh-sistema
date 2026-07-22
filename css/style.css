@@ -4520,3 +4520,62 @@ input.form-control[type="date"] {
     font-weight: 800;
     animation: pulse 2s infinite;
 }
+
+/* ── Painel interno do Fluxo Financeiro ─────────────────────────────────── */
+.ff-p-topgrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+}
+.ff-p-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 14px;
+    background: var(--color-white, #FFFFFF);
+    border: 1px solid var(--color-glass-border, #E2E8F0);
+    box-shadow: var(--shadow-premium, 0 10px 30px rgba(15, 23, 42, 0.04));
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+.ff-p-card[style*="cursor:pointer"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+}
+.ff-p-card-ico {
+    width: 46px; height: 46px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+}
+.ff-p-card-num { font-size: 26px; font-weight: 900; color: var(--color-text-title, #0F172A); line-height: 1.1; }
+.ff-p-card-tit { font-size: 12px; font-weight: 700; color: var(--text-secondary, #64748B); text-transform: uppercase; letter-spacing: .4px; }
+.ff-p-card-sub { font-size: 11.5px; color: var(--text-secondary, #94A3B8); margin-top: 2px; }
+
+.ff-p-etapas {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+}
+.ff-p-etapa {
+    padding: 12px 10px;
+    border-radius: 11px;
+    background: var(--surface-2, #F8FAFC);
+    border: 1px solid var(--color-glass-border, #E2E8F0);
+    text-align: center;
+    transition: border-color .15s ease, background-color .15s ease;
+}
+.ff-p-etapa:hover { border-color: var(--primary, #2563EB); background: var(--color-white, #fff); }
+.ff-p-etapa-top { display: flex; align-items: center; justify-content: center; gap: 7px; }
+.ff-p-etapa-n { font-size: 22px; font-weight: 900; color: var(--color-text-title, #0F172A); }
+.ff-p-etapa-rot { font-size: 10.5px; font-weight: 700; color: var(--text-secondary, #64748B); margin-top: 3px; line-height: 1.2; }
+.ff-p-etapa-val { font-size: 11px; font-weight: 700; color: #059669; margin-top: 4px; }
+
+@media (max-width: 900px) {
+    .ff-p-topgrid { grid-template-columns: 1fr 1fr; }
+    .ff-p-etapas { grid-template-columns: 1fr 1fr 1fr; }
+    .ff-p-2col { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 480px) {
+    .ff-p-topgrid { grid-template-columns: 1fr; }
+    .ff-p-etapas { grid-template-columns: 1fr 1fr; }
+}
