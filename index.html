@@ -40,6 +40,8 @@
     <link rel="stylesheet" href="css/design-system.css">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
     <link rel="stylesheet" href="css/ux-enhancements.css">
+    <!-- Fluxo Financeiro — Estilos SaaS Premium -->
+    <link rel="stylesheet" href="css/fluxo-financeiro.css">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
     <link rel="stylesheet" href="css/mobile.css">
 </head>
@@ -1206,90 +1208,89 @@
 
                 <!-- ABA: FLUXO FINANCEIRO (Departamento Pessoal) -->
                 <section id="aba-fluxo-financeiro" class="aba-content">
-                    <div class="exame-medico-wrapper">
-                        <div class="exame-header-area">
-                            <div class="exame-header-left">
-                                <div class="exame-header-icon" style="background:linear-gradient(135deg,#059669,#10b981);"><i class="fa-solid fa-money-bill-transfer"></i></div>
+                    <div class="ff-container">
+                        <!-- Header Banner -->
+                        <div class="ff-header-banner">
+                            <div class="ff-header-left">
+                                <div class="ff-header-icon-badge"><i class="fa-solid fa-money-bill-transfer"></i></div>
                                 <div>
-                                    <h1 class="exame-titulo">Fluxo Financeiro</h1>
-                                    <p class="exame-subtitulo">Do relatório do Exata até o pagamento comprovado — conferência, aprovações e histórico</p>
+                                    <h1 class="ff-header-title">Fluxo Financeiro</h1>
+                                    <p class="ff-header-subtitle">Centralize, acompanhe e gerencie todos os pagamentos em um único lugar.</p>
                                 </div>
                             </div>
-                            <div class="exame-header-right" id="ff-header-actions"><!-- botão por JS conforme perfil --></div>
+                            <div class="ff-header-actions" id="ff-header-actions"><!-- botão por JS conforme perfil --></div>
                         </div>
 
-                        <!-- KPIs -->
-                        <div class="exame-kpi-row">
-                            <div class="exame-kpi-card exame-kpi-aguardando">
-                                <div class="exame-kpi-icon"><i class="fa-solid fa-user-clock"></i></div>
-                                <div class="exame-kpi-info">
-                                    <span class="exame-kpi-num" id="ff-kpi-minha-vez">0</span>
-                                    <span class="exame-kpi-label">Aguardando VOCÊ</span>
+                        <!-- KPIs Grid -->
+                        <div class="ff-kpis-grid">
+                            <div class="ff-kpi-card" style="border-left:4px solid #d97706;">
+                                <div class="ff-kpi-icon" style="background:rgba(217,119,6,0.1);color:#d97706;"><i class="fa-solid fa-user-clock"></i></div>
+                                <div>
+                                    <div class="ff-kpi-val" id="ff-kpi-minha-vez">0</div>
+                                    <div class="ff-kpi-lbl">Aguardando VOCÊ</div>
                                 </div>
                             </div>
-                            <div class="exame-kpi-card exame-kpi-aguardando">
-                                <div class="exame-kpi-icon"><i class="fa-solid fa-calendar-day"></i></div>
-                                <div class="exame-kpi-info">
-                                    <span class="exame-kpi-num" id="ff-kpi-amanha" style="font-size:16px;">—</span>
-                                    <span class="exame-kpi-label">Pagamentos de AMANHÃ (valor · qtd)</span>
+                            <div class="ff-kpi-card" style="border-left:4px solid #2563eb;">
+                                <div class="ff-kpi-icon" style="background:rgba(37,99,235,0.1);color:#2563eb;"><i class="fa-solid fa-calendar-day"></i></div>
+                                <div>
+                                    <div class="ff-kpi-val" id="ff-kpi-amanha" style="font-size:16px;">—</div>
+                                    <div class="ff-kpi-lbl">Pagamentos AMANHÃ</div>
                                 </div>
                             </div>
-                            <div class="exame-kpi-card exame-kpi-total">
-                                <div class="exame-kpi-icon"><i class="fa-solid fa-arrows-spin"></i></div>
-                                <div class="exame-kpi-info">
-                                    <span class="exame-kpi-num" id="ff-kpi-andamento">0</span>
-                                    <span class="exame-kpi-label">Em andamento</span>
+                            <div class="ff-kpi-card" style="border-left:4px solid #7c3aed;">
+                                <div class="ff-kpi-icon" style="background:rgba(124,58,237,0.1);color:#7c3aed;"><i class="fa-solid fa-arrows-spin"></i></div>
+                                <div>
+                                    <div class="ff-kpi-val" id="ff-kpi-andamento">0</div>
+                                    <div class="ff-kpi-lbl">Em andamento</div>
                                 </div>
                             </div>
-                            <div class="exame-kpi-card exame-kpi-concluido">
-                                <div class="exame-kpi-icon"><i class="fa-solid fa-sack-dollar"></i></div>
-                                <div class="exame-kpi-info">
-                                    <span class="exame-kpi-num" id="ff-kpi-hoje" style="font-size:17px;">R$ 0,00</span>
-                                    <span class="exame-kpi-label">Pagamentos hoje</span>
-                                </div>
-                            </div>
-                            <div class="exame-kpi-card exame-kpi-concluido">
-                                <div class="exame-kpi-icon"><i class="fa-solid fa-circle-check"></i></div>
-                                <div class="exame-kpi-info">
-                                    <span class="exame-kpi-num" id="ff-kpi-finalizados">0</span>
-                                    <span class="exame-kpi-label">Finalizados</span>
+                            <div class="ff-kpi-card" style="border-left:4px solid #059669;">
+                                <div class="ff-kpi-icon" style="background:rgba(5,150,105,0.1);color:#059669;"><i class="fa-solid fa-sack-dollar"></i></div>
+                                <div>
+                                    <div class="ff-kpi-val" id="ff-kpi-hoje" style="font-size:17px;">R$ 0,00</div>
+                                    <div class="ff-kpi-lbl">Pagamentos hoje</div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Sub-abas -->
-                        <div class="exame-subtabs" id="ff-subtabs">
-                            <button type="button" class="exame-subtab active" data-subaba="painel" onclick="trocarSubAbaFF('painel')">
+                        <!-- Sub-abas Nav -->
+                        <div class="ff-subtabs-nav" id="ff-subtabs">
+                            <button type="button" class="ff-tab-btn exame-subtab active" data-subaba="painel" onclick="trocarSubAbaFF('painel')">
                                 <i class="fa-solid fa-gauge-high"></i> Painel
                             </button>
-                            <button type="button" class="exame-subtab" data-subaba="minha-vez" onclick="trocarSubAbaFF('minha-vez')">
-                                <i class="fa-solid fa-user-clock"></i> Para você
-                                <span class="exame-subtab-count" id="ff-count-minha-vez">0</span>
+                            <button type="button" class="ff-tab-btn exame-subtab" data-subaba="minha-vez" onclick="trocarSubAbaFF('minha-vez')">
+                                <i class="fa-solid fa-user-clock"></i> Minhas Pendências
+                                <span class="ff-tab-badge exame-subtab-count" id="ff-count-minha-vez">0</span>
                             </button>
-                            <button type="button" class="exame-subtab" data-subaba="andamento" onclick="trocarSubAbaFF('andamento')">
+                            <button type="button" class="ff-tab-btn exame-subtab" data-subaba="andamento" onclick="trocarSubAbaFF('andamento')">
                                 <i class="fa-solid fa-arrows-spin"></i> Em andamento
-                                <span class="exame-subtab-count" id="ff-count-andamento">0</span>
+                                <span class="ff-tab-badge exame-subtab-count" id="ff-count-andamento">0</span>
                             </button>
-                            <button type="button" class="exame-subtab" data-subaba="finalizados" onclick="trocarSubAbaFF('finalizados')">
+                            <button type="button" class="ff-tab-btn exame-subtab" data-subaba="finalizados" onclick="trocarSubAbaFF('finalizados')">
                                 <i class="fa-solid fa-circle-check"></i> Pagos / Finalizados
-                                <span class="exame-subtab-count" id="ff-count-finalizados">0</span>
+                                <span class="ff-tab-badge exame-subtab-count" id="ff-count-finalizados">0</span>
                             </button>
-                            <button type="button" class="exame-subtab" data-subaba="problemas" onclick="trocarSubAbaFF('problemas')">
+                            <button type="button" class="ff-tab-btn exame-subtab" data-subaba="problemas" onclick="trocarSubAbaFF('problemas')">
                                 <i class="fa-solid fa-triangle-exclamation"></i> Reprovados
-                                <span class="exame-subtab-count" id="ff-count-problemas">0</span>
+                                <span class="ff-tab-badge exame-subtab-count" id="ff-count-problemas">0</span>
                             </button>
-                            <button type="button" class="exame-subtab" data-subaba="todos" onclick="trocarSubAbaFF('todos')">
+                            <button type="button" class="ff-tab-btn exame-subtab" data-subaba="todos" onclick="trocarSubAbaFF('todos')">
                                 <i class="fa-solid fa-list"></i> Todos
-                                <span class="exame-subtab-count" id="ff-count-todos">0</span>
+                                <span class="ff-tab-badge exame-subtab-count" id="ff-count-todos">0</span>
                             </button>
-                            <button type="button" class="exame-subtab" data-subaba="gerencial" style="display:none;" onclick="trocarSubAbaFF('gerencial')">
+                            <button type="button" class="ff-tab-btn exame-subtab" data-subaba="gerencial" style="display:none;" onclick="trocarSubAbaFF('gerencial')">
                                 <i class="fa-solid fa-table-cells"></i> Gerencial
+                            </button>
+                            <button type="button" class="ff-tab-btn exame-subtab" data-subaba="monitor" style="display:none;" onclick="trocarSubAbaFF('monitor')">
+                                <i class="fa-solid fa-tower-broadcast"></i> Monitoramento
+                            </button>
+                            <button type="button" class="ff-tab-btn exame-subtab" data-subaba="config" style="display:none;" onclick="trocarSubAbaFF('config')">
+                                <i class="fa-solid fa-sliders"></i> Configuração do Fluxo
                             </button>
                         </div>
 
-                        <div class="exame-table-wrapper">
-                            <div id="ff-lista-container"><!-- Gerado por JS --></div>
-                        </div>
+                        <!-- Lista / Conteúdo Ativo -->
+                        <div id="ff-lista-container"><!-- Gerado por JS --></div>
                     </div>
                 </section>
 
@@ -3180,7 +3181,7 @@
                         </div>
                         <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;padding:3px 0;">
                             <input type="checkbox" id="gflx-aprovar-supervisao">
-                            <span>Valida como <strong>Supervisão DP</strong> (a "Viviane" — aprova a 1ª etapa)</span>
+                            <span>Valida como <strong>Supervisão DP</strong> (aprova a 1ª etapa)</span>
                         </label>
                         <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;padding:3px 0;">
                             <input type="checkbox" id="gflx-aprovar-gestao">
@@ -3192,7 +3193,7 @@
                         </label>
                         <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;padding:3px 0;">
                             <input type="checkbox" id="gflx-ver-todos">
-                            <span><strong>Visão gerencial</strong> (o "Matheus"/"Mayara" — vê tudo + planilha gerencial + prévia)</span>
+                            <span><strong>Visão gerencial</strong> (vê tudo + planilha gerencial + monitoramento)</span>
                         </label>
                         <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
                             <label for="gflx-visibilidade" style="font-size:12px;font-weight:600;white-space:nowrap;">Enxerga quais fluxos:</label>
@@ -3203,7 +3204,7 @@
                                 <option value="todos">Todos os fluxos</option>
                             </select>
                         </div>
-                        <small style="color:var(--text-secondary); font-size:11px; display:block; margin-top:6px;">Sem nada marcado, valem os papéis padrão: DP cria; representante do DP valida; Administração é a Gestão; departamento Financeiro paga.</small>
+                        <small style="color:var(--text-secondary); font-size:11px; display:block; margin-top:6px;">Sem nada marcado, valem os papéis padrão: DP cria; representante do DP valida; Administração é a Gestão; departamento Financeiro paga. Para definir os responsáveis de cada etapa de forma central, use <strong>Fluxo Financeiro → Configuração do Fluxo</strong>.</small>
                     </div>
 
 

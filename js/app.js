@@ -11160,9 +11160,31 @@ const FF_STATUS = {
   aguardando_financeiro:  { rotulo: 'Aguardando Financeiro',          cor: '#0284C7', icone: 'fa-building-columns' },
   pago:                   { rotulo: 'Pago — falta o comprovante',     cor: '#059669', icone: 'fa-money-check-dollar' },
   finalizado:             { rotulo: 'Finalizado',                     cor: '#059669', icone: 'fa-circle-check' },
-  reprovado:              { rotulo: 'Reprovado',                      cor: '#DC2626', icone: 'fa-circle-xmark' }
+  reprovado:              { rotulo: 'Reprovado',                      cor: '#DC2626', icone: 'fa-circle-xmark' },
+  cancelado:              { rotulo: 'Cancelado',                      cor: '#6B7280', icone: 'fa-circle-minus' }
 };
 const FF_TIPOS_PADRAO = ['Salário', 'Adiantamento', 'Benefício', 'Reembolso', 'Férias', 'Rescisão', 'Vale-transporte', 'Vale-refeição', 'Outros'];
+
+// ── WORKFLOW DINÂMICO ──────────────────────────────────────────────────────
+// As 4 etapas são fixas (criação → Supervisão DP → Gestão → Financeiro), mas
+// QUEM é o responsável de cada uma é definido pelo ADMINISTRADOR — sem nome
+// fixo no código. Cada etapa guarda: setor, função (rótulo), a lista de logins
+// responsáveis e quais ações estão liberadas. Se a lista de responsáveis estiver
+// VAZIA, valem os papéis-padrão por departamento (retrocompatível — nada quebra).
+const FF_WORKFLOW_ETAPAS = ['criar', 'coordenacao', 'gestao', 'financeiro'];
+const FF_WORKFLOW_PADRAO = {
+  criar:       { setor: 'Departamento Pessoal', funcao: 'Analista de Departamento Pessoal', responsaveis: [] },
+  coordenacao: { setor: 'Departamento Pessoal', funcao: 'Gestor / Supervisor do DP',        responsaveis: [], aprovar: true, devolver: true, reprovar: true },
+  gestao:      { setor: 'Gestão',               funcao: 'Aprovador de Gestão',               responsaveis: [], aprovar: true, devolver: true, reprovar: true },
+  financeiro:  { setor: 'Financeiro',           funcao: 'Responsável pelo Pagamento',        responsaveis: [], pagar: true, comprovante: true, devolver: true }
+};
+// Status de "aguardando" → etapa do workflow (para saber quem é o responsável atual)
+const FF_STATUS_ETAPA = {
+  aguardando_coordenacao: 'coordenacao',
+  aguardando_gestao:      'gestao',
+  aguardando_financeiro:  'financeiro',
+  pago:                   'financeiro'
+};
 
 function garantirFluxoFinanceiro() {
   if (!state.fluxosFinanceiros) state.fluxosFinanceiros = [];
@@ -11170,6 +11192,14 @@ function garantirFluxoFinanceiro() {
   if (!Array.isArray(state.tiposPagamentoFluxo) || !state.tiposPagamentoFluxo.length) {
     state.tiposPagamentoFluxo = FF_TIPOS_PADRAO.slice();
   }
+  // Garante a estrutura do workflow (faz merge dos padrões sem apagar o que o admin já configurou)
+  if (!state.ffWorkflow || typeof state.ffWorkflow !== 'object') state.ffWorkflow = {};
+  FF_WORKFLOW_ETAPAS.forEach(id => {
+    const padrao = FF_WORKFLOW_PADRAO[id];
+    const atual = state.ffWorkflow[id] || {};
+    state.ffWorkflow[id] = Object.assign({}, padrao, atual);
+    if (!Array.isArray(state.ffWorkflow[id].responsaveis)) state.ffWorkflow[id].responsaveis = [];
+  });
   return state.fluxosFinanceiros;
 }
 
@@ -11185,44 +11215,67 @@ function garantirFluxoFinanceiro() {
 function _ffPerm(chave) {
   return !!(loggedUser && loggedUser.permissoesFluxo && loggedUser.permissoesFluxo[chave] === true);
 }
+// ── Workflow dinâmico: helpers de responsáveis/ações ───────────────────────
+function _ffCfg(etapaId) { garantirFluxoFinanceiro(); return (state.ffWorkflow && state.ffWorkflow[etapaId]) || {}; }
+function _ffResponsaveis(etapaId) { const r = _ffCfg(etapaId).responsaveis; return Array.isArray(r) ? r : []; }
+function _ffConfigurado(etapaId) { return _ffResponsaveis(etapaId).length > 0; }
+function _ffEhResponsavel(etapaId) { return !!(loggedUser && _ffResponsaveis(etapaId).includes(loggedUser.login)); }
+// Ação liberada naquela etapa (aprovar/devolver/reprovar/pagar/comprovante). Default: liberada.
+function _ffAcaoPermitida(etapaId, acao) { return _ffCfg(etapaId)[acao] !== false; }
+// Nome legível dos responsáveis configurados (para exibir "aguardando fulano")
+function _ffNomesResponsaveis(etapaId) {
+  return _ffResponsaveis(etapaId)
+    .map(login => { const f = (state.funcionarios || []).find(x => x.login === login); return f ? nomeExibido(f) : login; });
+}
+// Quem administra o workflow (define responsáveis/permissões): mestre ou administração
+function _ffPodeAdministrarWorkflow() {
+  return !!(loggedUser && (ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao'));
+}
+
 function _ffPodeVer() {
   if (!loggedUser) return false;
   return ehMestre(loggedUser.login)
     || ['dp', 'administracao', 'financeiro'].includes(loggedUser.departamento)
     || hasPermission('fluxo_financeiro', 'visualizar')
-    || _ffPerm('verTodos') || _ffPerm('aprovarSupervisao') || _ffPerm('aprovarGestao') || _ffPerm('processarPagamento');
+    || _ffPerm('verTodos') || _ffPerm('aprovarSupervisao') || _ffPerm('aprovarGestao') || _ffPerm('processarPagamento')
+    || _ffEhResponsavel('criar') || _ffEhResponsavel('coordenacao') || _ffEhResponsavel('gestao') || _ffEhResponsavel('financeiro');
 }
+// Etapa 1 — cria/confere/envia. Se o admin configurou responsáveis da criação,
+// só eles criam; senão, valem os papéis-padrão (DP / Administração).
 function _ffPodeCriar() {
   if (!loggedUser) return false;
-  return ehMestre(loggedUser.login)
-    || loggedUser.departamento === 'dp'
-    || loggedUser.departamento === 'administracao'
-    || hasPermission('fluxo_financeiro', 'criar');
+  if (ehMestre(loggedUser.login)) return true;
+  if (hasPermission('fluxo_financeiro', 'criar')) return true;
+  if (_ffConfigurado('criar')) return _ffEhResponsavel('criar');
+  return loggedUser.departamento === 'dp' || loggedUser.departamento === 'administracao';
 }
-// Etapa 2 — Supervisão DP (a "Viviane"): representante do DP, administração,
-// ou quem o admin marcou individualmente.
+// Etapa 2 — Supervisão DP. Se há responsáveis configurados, são eles; senão,
+// o padrão (representante do DP ou administração). O poder individual dado no
+// cadastro (aprovarSupervisao) sempre soma.
 function _ffEhCoordenacao() {
   if (!loggedUser) return false;
-  return ehMestre(loggedUser.login)
-    || (loggedUser.departamento === 'dp' && loggedUser.representanteDepto)
-    || loggedUser.departamento === 'administracao'
-    || _ffPerm('aprovarSupervisao');
+  if (ehMestre(loggedUser.login)) return true;
+  if (_ffPerm('aprovarSupervisao')) return true;
+  if (_ffConfigurado('coordenacao')) return _ffEhResponsavel('coordenacao');
+  return (loggedUser.departamento === 'dp' && loggedUser.representanteDepto) || loggedUser.departamento === 'administracao';
 }
 // Etapa 3 — Gestão
 function _ffEhGestao() {
   if (!loggedUser) return false;
-  return ehMestre(loggedUser.login)
-    || loggedUser.departamento === 'administracao'
-    || _ffPerm('aprovarGestao');
+  if (ehMestre(loggedUser.login)) return true;
+  if (_ffPerm('aprovarGestao')) return true;
+  if (_ffConfigurado('gestao')) return _ffEhResponsavel('gestao');
+  return loggedUser.departamento === 'administracao';
 }
 // Etapa 4/5 — Financeiro (processa, paga, anexa comprovante)
 function _ffEhFinanceiro() {
   if (!loggedUser) return false;
-  return ehMestre(loggedUser.login)
-    || loggedUser.departamento === 'financeiro'
-    || _ffPerm('processarPagamento');
+  if (ehMestre(loggedUser.login)) return true;
+  if (_ffPerm('processarPagamento')) return true;
+  if (_ffConfigurado('financeiro')) return _ffEhResponsavel('financeiro');
+  return loggedUser.departamento === 'financeiro';
 }
-// Visão gerencial (Mayara/Matheus): vê tudo, inclusive a planilha gerencial
+// Visão gerencial: vê tudo, inclusive a planilha gerencial e o monitoramento
 function _ffVeTudo() {
   if (!loggedUser) return false;
   return ehMestre(loggedUser.login)
@@ -11325,6 +11378,14 @@ function _ffChequeTotais(f) {
 function _ffHist(f, acao) {
   f.historico = f.historico || [];
   f.historico.push({ data: new Date().toISOString(), usuario: loggedUser ? nomeExibido(loggedUser) : 'Sistema', login: loggedUser ? loggedUser.login : '', acao });
+}
+// Registra no histórico que o processo caiu na fila de uma etapa (auditoria da
+// "notificação ao responsável"). Nomeia o setor e, se configurados, as pessoas.
+function _ffNotificar(f, etapaId) {
+  const c = _ffCfg(etapaId);
+  const nomes = _ffNomesResponsaveis(etapaId);
+  const alvo = nomes.length ? nomes.join(', ') : `${c.setor || ''} — ${c.funcao || 'responsável'}`.trim();
+  _ffHist(f, `Notificação enviada ao responsável (${c.setor || ''} · ${c.funcao || ''}): ${alvo}.`);
 }
 function _ffCompetenciaBR(c) {
   const m = String(c || '').match(/^(\d{4})-(\d{2})$/);
@@ -11615,10 +11676,10 @@ function renderFluxoFinanceiro() {
   const minhaVez   = fluxos.filter(f => _ffEhMinhaVez(f));
   const andamento  = fluxos.filter(f => ['rascunho', 'aguardando_coordenacao', 'aguardando_gestao', 'aguardando_financeiro'].includes(f.status));
   const finalizados = fluxos.filter(f => ['pago', 'finalizado'].includes(f.status));
-  const problemas  = fluxos.filter(f => f.status === 'reprovado');
+  const problemas  = fluxos.filter(f => ['reprovado', 'cancelado'].includes(f.status));
   const pagosHoje  = fluxos.filter(f => ['pago', 'finalizado'].includes(f.status) && f.dataPagamento === hojeStr)
                            .reduce((s, f) => s + _ffTotal(f), 0);
-  // PRÉVIA DE AMANHÃ (o painel do "Matheus"): tudo que tem pagamento marcado
+  // PRÉVIA DE AMANHÃ (visão gerencial): tudo que tem pagamento marcado
   // para amanhã e ainda está vivo no fluxo
   const deAmanha = fluxos.filter(f => f.dataPagamento === amanhaStr && f.status !== 'reprovado' && f.status !== 'finalizado');
   const valorAmanha = deAmanha.reduce((s, f) => s + _ffTotal(f), 0);
@@ -11635,9 +11696,14 @@ function renderFluxoFinanceiro() {
   set('ff-count-problemas', problemas.length);
   set('ff-count-todos', fluxos.length);
 
-  // Aba "Gerencial" (planilha) só para quem tem visão geral
+  // Aba "Gerencial" (planilha) e "Monitoramento" só para quem tem visão geral
   const abaGer = document.querySelector('#ff-subtabs [data-subaba="gerencial"]');
   if (abaGer) abaGer.style.display = _ffVeTudo() ? '' : 'none';
+  const abaMon = document.querySelector('#ff-subtabs [data-subaba="monitor"]');
+  if (abaMon) abaMon.style.display = _ffVeTudo() ? '' : 'none';
+  // Aba "Configuração do Fluxo" só para quem administra o workflow (admin/mestre)
+  const abaCfg = document.querySelector('#ff-subtabs [data-subaba="config"]');
+  if (abaCfg) abaCfg.style.display = _ffPodeAdministrarWorkflow() ? '' : 'none';
 
   atualizarBadgeFluxoFinanceiro();
   _ffRenderLista();
@@ -11690,25 +11756,24 @@ function _ffRenderPainel(cont) {
   const semCompr   = fluxos.filter(f => f.status === 'pago');
   const totalAberto = somaDe(vivos.filter(f => !['finalizado'].includes(f.status)));
 
-  // Card grande destacando o que exige ação da pessoa
-  const cardTop = (titulo, valor, sub, cor, icone, onclick) => `
-    <div ${onclick ? `onclick="${onclick}" style="cursor:pointer;"` : ''} class="ff-p-card" style="border-left:4px solid ${cor};">
-      <div class="ff-p-card-ico" style="color:${cor};background:${cor}18;"><i class="fa-solid ${icone}"></i></div>
-      <div style="flex:1;min-width:0;">
-        <div class="ff-p-card-num">${valor}</div>
-        <div class="ff-p-card-tit">${titulo}</div>
-        ${sub ? `<div class="ff-p-card-sub">${sub}</div>` : ''}
-      </div>
-    </div>`;
+  // Agrupamento por Empresa para o Pagamento de Amanhã
+  const empresasAmanha = {};
+  pagaAmanha.forEach(f => {
+    const nome = f.empresaNome || 'Outras Empresas';
+    if (!empresasAmanha[nome]) empresasAmanha[nome] = { qtd: 0, valor: 0 };
+    empresasAmanha[nome].qtd += (f.linhas || []).length;
+    empresasAmanha[nome].valor += _ffTotal(f);
+  });
+  const listaEmpresasAmanha = Object.entries(empresasAmanha);
 
   // Barra de etapas: quanto tem parado em cada fase (só as vivas)
   const etapaCard = (chave, rot) => {
     const arr = porEtapa[chave]; const st = FF_STATUS[chave];
-    return `<div onclick="_ffPainelIr('${chave}')" class="ff-p-etapa" style="cursor:pointer;">
-      <div class="ff-p-etapa-top"><span style="color:${st.cor};"><i class="fa-solid ${st.icone}"></i></span>
-        <span class="ff-p-etapa-n">${arr.length}</span></div>
-      <div class="ff-p-etapa-rot">${rot}</div>
-      <div class="ff-p-etapa-val">${arr.length ? _ffMoedaBR(somaDe(arr)) : '—'}</div>
+    return `<div onclick="_ffPainelIr('${chave}')" class="ff-etapa-card">
+      <div class="ff-etapa-card-top"><span style="color:${st.cor};"><i class="fa-solid ${st.icone}"></i></span>
+        <span class="ff-etapa-card-num">${arr.length}</span></div>
+      <div class="ff-etapa-card-lbl">${rot}</div>
+      <div class="ff-etapa-card-val">${arr.length ? _ffMoedaBR(somaDe(arr)) : '—'}</div>
     </div>`;
   };
 
@@ -11724,18 +11789,56 @@ function _ffRenderPainel(cont) {
   movimentos.sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
 
   cont.innerHTML = `
-    <!-- Linha 1: cartões de comando -->
-    <div class="ff-p-topgrid">
-      ${cardTop('Aguardando VOCÊ', minhaVez.length, minhaVez.length ? _ffMoedaBR(somaDe(minhaVez)) + ' · toque para ver' : 'nada pendente 👌', '#D97706', 'fa-hand-point-right', minhaVez.length ? "trocarSubAbaFF('minha-vez')" : '')}
-      ${cardTop('Paga AMANHÃ', pagaAmanha.length, _ffMoedaBR(somaDe(pagaAmanha)) + (pagaHoje.length ? ` · ${pagaHoje.length} HOJE` : ''), '#2563EB', 'fa-calendar-day', '')}
-      ${cardTop('Atrasados', atrasados.length, atrasados.length ? _ffMoedaBR(somaDe(atrasados)) + ' — data já passou' : 'nenhum atraso', atrasados.length ? '#DC2626' : '#059669', atrasados.length ? 'fa-triangle-exclamation' : 'fa-circle-check', '')}
-      ${cardTop('Pago hoje', pagosHoje.length, _ffMoedaBR(somaDe(pagosHoje)), '#059669', 'fa-sack-dollar', '')}
+    <!-- HERO CARD: PAGAMENTOS PARA AMANHÃ -->
+    <div class="ff-hero-amanha">
+      <div class="ff-hero-amanha-header">
+        <div class="ff-hero-amanha-title">
+          <i class="fa-solid fa-clock-rotate-left"></i> PAGAMENTOS PARA AMANHÃ
+        </div>
+        <div class="ff-hero-amanha-date-badge">
+          <i class="fa-solid fa-calendar-day"></i> ${_formatarDataBR(amanhaStr)}
+        </div>
+      </div>
+      
+      <div class="ff-hero-amanha-main">
+        <div class="ff-hero-amanha-bigval">
+          <div class="ff-hero-amanha-amount">${_ffMoedaBR(somaDe(pagaAmanha))}</div>
+          <div class="ff-hero-amanha-count">${pagaAmanha.length} processo(s) agendado(s)</div>
+          <div class="ff-hero-amanha-sublabel">VALOR TOTAL PREVISTO</div>
+        </div>
+
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
+            <i class="fa-solid fa-building"></i> Divisão por Empresa
+          </div>
+          ${listaEmpresasAmanha.length ? `
+            <div class="ff-company-grid">
+              ${listaEmpresasAmanha.map(([emp, d]) => `
+                <div class="ff-company-card">
+                  <div class="ff-company-name">${escapeHTML(emp)}</div>
+                  <div class="ff-company-qty">${d.qtd} pagamento(s)</div>
+                  <div class="ff-company-val">${_ffMoedaBR(d.valor)}</div>
+                </div>
+              `).join('')}
+            </div>
+          ` : `
+            <div style="font-size:12.5px;color:#94a3b8;padding:12px;background:#f8fafc;border-radius:10px;border:1px dashed #e2e8f0;">
+              Nenhum pagamento agendado especificamente para amanhã.
+            </div>
+          `}
+        </div>
+      </div>
     </div>
 
-    <!-- Linha 2: onde o dinheiro está parado (por etapa) -->
-    <div class="exame-detalhe-laudo" style="margin-top:18px;">
-      <h4><i class="fa-solid fa-diagram-project"></i> Por etapa do fluxo — ${_ffMoedaBR(totalAberto)} em aberto</h4>
-      <div class="ff-p-etapas">
+    <!-- PAINEL DE ETAPAS -->
+    <div class="exame-detalhe-laudo" style="margin-top:20px;background:#ffffff;border-radius:16px;border:1px solid #e2e8f0;padding:20px;">
+      <h4 style="display:flex;align-items:center;justify-content:space-between;margin:0 0 14px 0;">
+        <span><i class="fa-solid fa-diagram-project" style="color:#0284c7;"></i> Status dos Processos do Fluxo</span>
+        <span style="font-size:12px;font-weight:700;color:#059669;background:rgba(5,150,105,0.08);padding:4px 12px;border-radius:20px;">
+          ${_ffMoedaBR(totalAberto)} em aberto
+        </span>
+      </h4>
+      <div class="ff-etapas-summary-grid">
         ${etapaCard('rascunho', 'Conferência DP')}
         ${etapaCard('aguardando_coordenacao', 'Supervisão DP')}
         ${etapaCard('aguardando_gestao', 'Gestão')}
@@ -11743,38 +11846,52 @@ function _ffRenderPainel(cont) {
         ${etapaCard('pago', 'Falta comprovante')}
         ${etapaCard('finalizado', 'Finalizados')}
       </div>
-      ${porEtapa.reprovado.length ? `<div style="margin-top:10px;font-size:12px;color:#DC2626;font-weight:700;"><i class="fa-solid fa-circle-xmark"></i> ${porEtapa.reprovado.length} reprovado(s) — <a href="#" onclick="trocarSubAbaFF('problemas');return false;" style="color:#DC2626;">ver</a></div>` : ''}
-      ${semCompr.length ? `<div style="margin-top:6px;font-size:12px;color:#D97706;font-weight:700;"><i class="fa-solid fa-receipt"></i> ${semCompr.length} pago(s) aguardando comprovante</div>` : ''}
+      ${porEtapa.reprovado.length ? `<div style="margin-top:12px;font-size:12px;color:#DC2626;font-weight:700;"><i class="fa-solid fa-circle-xmark"></i> ${porEtapa.reprovado.length} reprovado(s) — <a href="#" onclick="trocarSubAbaFF('problemas');return false;" style="color:#DC2626;text-decoration:underline;">ver problemas</a></div>` : ''}
+      ${semCompr.length ? `<div style="margin-top:6px;font-size:12px;color:#D97706;font-weight:700;"><i class="fa-solid fa-receipt"></i> ${semCompr.length} pago(s) aguardando envio de comprovante</div>` : ''}
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;" class="ff-p-2col">
+    <!-- PRÓXIMOS PAGAMENTOS E ÚLTIMOS MOVIMENTOS -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px;" class="ff-p-2col">
       <!-- Próximos pagamentos -->
-      <div class="exame-detalhe-laudo">
-        <h4><i class="fa-solid fa-calendar-check"></i> Próximos pagamentos</h4>
-        ${proximos.length ? `<div class="table-scroll-container"><table class="excel-table"><tbody>
-          ${proximos.map(f => {
-            const pz = _ffPrazo(f); const st = FF_STATUS[f.status] || FF_STATUS.rascunho;
-            return `<tr onclick="abrirDetalheFluxo('${f.id}')" style="cursor:pointer;">
-              <td style="white-space:nowrap;">${_formatarDataBR(f.dataPagamento)}${pz && pz.nivel !== 'ok' ? `<div style="font-size:10px;font-weight:800;color:${pz.cor};">${pz.rotulo}</div>` : ''}</td>
-              <td style="font-weight:600;">${escapeHTML(f.empresaNome)}</td>
-              <td>${escapeHTML(f.tipo)}</td>
-              <td style="font-weight:700;text-align:right;">${_ffMoedaBR(_ffTotal(f))}</td>
-              <td><span style="font-size:10px;font-weight:800;color:${st.cor};">${st.rotulo}</span></td>
-            </tr>`;
-          }).join('')}
-        </tbody></table></div>` : `<p class="imp-ajuda">Nenhum pagamento agendado.</p>`}
+      <div class="ff-table-container" style="padding:18px;">
+        <h4 style="margin:0 0 14px 0;font-size:14px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px;">
+          <i class="fa-solid fa-calendar-check" style="color:#2563eb;"></i> Próximos Pagamentos
+        </h4>
+        ${proximos.length ? `
+          <div class="table-scroll-container">
+            <table class="ff-table">
+              <thead><tr><th>Data</th><th>Empresa</th><th>Tipo</th><th style="text-align:right;">Valor</th><th>Status</th></tr></thead>
+              <tbody>
+                ${proximos.map(f => {
+                  const pz = _ffPrazo(f); const st = FF_STATUS[f.status] || FF_STATUS.rascunho;
+                  return `<tr onclick="abrirDetalheFluxo('${f.id}')" style="cursor:pointer;">
+                    <td style="white-space:nowrap;font-weight:600;">${_formatarDataBR(f.dataPagamento)}${pz && pz.nivel !== 'ok' ? `<div class="ff-prazo-tag ff-prazo-${pz.nivel}">${pz.rotulo}</div>` : ''}</td>
+                    <td style="font-weight:700;">${escapeHTML(f.empresaNome)}</td>
+                    <td>${escapeHTML(f.tipo)}</td>
+                    <td style="text-align:right;" class="ff-val-destaque">${_ffMoedaBR(_ffTotal(f))}</td>
+                    <td><span class="ff-badge ff-badge-${f.status}" style="color:${st.cor};">${st.rotulo}</span></td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        ` : `<div class="ff-empty-box" style="padding:24px 12px;"><i class="fa-solid fa-calendar-xmark" style="font-size:24px;color:#cbd5e1;"></i><p style="margin:8px 0 0;font-size:12px;color:#94a3b8;">Nenhum pagamento agendado.</p></div>`}
       </div>
 
       <!-- Últimos movimentos -->
-      <div class="exame-detalhe-laudo">
-        <h4><i class="fa-solid fa-clock-rotate-left"></i> Últimos movimentos</h4>
-        ${movimentos.length ? `<div style="max-height:280px;overflow-y:auto;">
-          ${movimentos.slice(0, 12).map(m => `
-            <div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px dashed var(--border-color);font-size:12px;">
-              <span style="color:var(--text-secondary);white-space:nowrap;">${_formatarDataHoraBR(m.data)}</span>
-              <span style="min-width:0;"><strong>#${escapeHTML(m.numero)}</strong> · ${escapeHTML(m.usuario)} — ${escapeHTML(String(m.acao).slice(0, 70))}</span>
-            </div>`).join('')}
-        </div>` : `<p class="imp-ajuda">Sem movimentos ainda.</p>`}
+      <div class="ff-table-container" style="padding:18px;">
+        <h4 style="margin:0 0 14px 0;font-size:14px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px;">
+          <i class="fa-solid fa-clock-rotate-left" style="color:#7c3aed;"></i> Últimas Atividades
+        </h4>
+        ${movimentos.length ? `
+          <div style="max-height:300px;overflow-y:auto;padding-right:6px;">
+            ${movimentos.slice(0, 10).map(m => `
+              <div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px dashed #e2e8f0;font-size:12px;">
+                <span style="color:#94a3b8;white-space:nowrap;font-size:11px;">${_formatarDataHoraBR(m.data)}</span>
+                <span style="min-width:0;color:#334155;"><strong>#${escapeHTML(m.numero)}</strong> · <span style="color:#0f172a;font-weight:600;">${escapeHTML(m.usuario)}</span> — ${escapeHTML(String(m.acao).slice(0, 70))}</span>
+              </div>`).join('')}
+          </div>
+        ` : `<div class="ff-empty-box" style="padding:24px 12px;"><i class="fa-solid fa-history" style="font-size:24px;color:#cbd5e1;"></i><p style="margin:8px 0 0;font-size:12px;color:#94a3b8;">Sem histórico de atividades.</p></div>`}
       </div>
     </div>`;
 }
@@ -11792,6 +11909,148 @@ window._ffPainelIr = function(chave) {
   }
 };
 
+let _ffFiltroBusca = '';
+let _ffFiltroEmpresa = '';
+
+// Tempo decorrido humanizado ("há 2h 15min", "há 3 dias")
+function _ffTempoDesde(iso) {
+  if (!iso) return '—';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 0) return 'agora';
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return 'agora mesmo';
+  if (min < 60) return `há ${min}min`;
+  const h = Math.floor(min / 60);
+  if (h < 48) return `há ${h}h ${String(min % 60).padStart(2, '0')}min`;
+  return `há ${Math.floor(h / 24)} dias`;
+}
+function _ffEtapaAtualId(f) { return FF_STATUS_ETAPA[f && f.status] || null; }
+// "Desde quando" o processo está parado na etapa atual (envio, aprovação anterior, ou criação)
+function _ffAguardandoDesde(f) {
+  if (f.status === 'aguardando_coordenacao') return f.enviadoEm || f.criadoEm;
+  if (f.status === 'aguardando_gestao')      return (f.aprovacoes && f.aprovacoes.coordenacao && f.aprovacoes.coordenacao.em) || f.enviadoEm;
+  if (f.status === 'aguardando_financeiro' || f.status === 'pago') return (f.aprovacoes && f.aprovacoes.gestao && f.aprovacoes.gestao.em) || f.enviadoEm;
+  return f.criadoEm;
+}
+
+// ── CONFIGURAÇÃO DO FLUXO DE APROVAÇÃO (admin) ─────────────────────────────
+// O admin define QUEM é o responsável de cada etapa. Sem responsável marcado,
+// valem os papéis-padrão por departamento (retrocompatível). Salva na hora.
+function _ffRenderConfig(cont) {
+  garantirFluxoFinanceiro();
+  const ativos = (state.funcionarios || []).filter(f => f.status === 'ativo')
+    .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || '')));
+  const etapas = [
+    { id: 'criar',       n: '1', titulo: 'Criação / Conferência',  acoes: [] },
+    { id: 'coordenacao', n: '2', titulo: 'Supervisão do DP',       acoes: [['aprovar', 'Aprovar'], ['devolver', 'Devolver'], ['reprovar', 'Reprovar']] },
+    { id: 'gestao',      n: '3', titulo: 'Gestão',                 acoes: [['aprovar', 'Aprovar'], ['devolver', 'Devolver'], ['reprovar', 'Reprovar']] },
+    { id: 'financeiro',  n: '4', titulo: 'Financeiro',             acoes: [['pagar', 'Pagar'], ['comprovante', 'Anexar comprovante'], ['devolver', 'Devolver']] }
+  ];
+  const cardEtapa = e => {
+    const cfg = _ffCfg(e.id);
+    const resp = _ffResponsaveis(e.id);
+    const listaPessoas = ativos.map(fu => {
+      const marc = resp.includes(fu.login);
+      return `<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:8px;cursor:pointer;font-size:12.5px;${marc ? 'background:rgba(2,132,199,.10);' : ''}">
+        <input type="checkbox" ${marc ? 'checked' : ''} onchange="ffToggleResponsavel('${e.id}','${fu.login}')">
+        <span style="font-weight:${marc ? '700' : '500'};color:#0f172a;">${escapeHTML(nomeExibido(fu))}</span>
+        <span style="color:#94a3b8;font-size:11px;">@${escapeHTML(fu.login)} · ${escapeHTML(deptoLabelSimples(fu.departamento) || fu.departamento || '')}</span>
+      </label>`;
+    }).join('');
+    const acoesHtml = e.acoes.length ? `<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border-color);">
+      ${e.acoes.map(([k, rot]) => `<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+        <input type="checkbox" ${cfg[k] !== false ? 'checked' : ''} onchange="ffToggleAcaoEtapa('${e.id}','${k}')"> ${rot}</label>`).join('')}
+    </div>` : '';
+    return `<div style="border:1px solid var(--border-color);border-radius:12px;padding:14px;background:var(--card-bg,#fff);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <span style="width:26px;height:26px;border-radius:50%;background:#0284c7;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">${e.n}</span>
+        <div>
+          <div style="font-weight:800;font-size:14px;color:#0f172a;">${escapeHTML(e.titulo)}</div>
+          <div style="font-size:11px;color:#64748b;">Setor: ${escapeHTML(cfg.setor || '—')} · Função: ${escapeHTML(cfg.funcao || '—')}</div>
+        </div>
+      </div>
+      <div style="font-size:11px;font-weight:700;color:${resp.length ? '#0284c7' : '#D97706'};margin:6px 0;">
+        ${resp.length ? `<i class="fa-solid fa-user-check"></i> ${resp.length} responsável(is) definido(s)` : '<i class="fa-solid fa-triangle-exclamation"></i> Sem responsável — usando o padrão por departamento'}
+      </div>
+      <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border-color);border-radius:8px;padding:4px;">${listaPessoas || '<div style="padding:10px;color:#94a3b8;font-size:12px;">Nenhum funcionário ativo.</div>'}</div>
+      ${acoesHtml}
+    </div>`;
+  };
+  cont.innerHTML = `
+    <div style="margin-bottom:14px;">
+      <h3 style="margin:0 0 4px;font-size:16px;font-weight:800;color:#0f172a;"><i class="fa-solid fa-sliders" style="color:#0284c7;"></i> Configuração do Fluxo de Aprovação</h3>
+      <p style="margin:0;font-size:12.5px;color:#64748b;">Defina QUEM é o responsável de cada etapa. Se alguém sair da empresa, é só trocar aqui — o fluxo continua funcionando, sem mexer no sistema. As alterações são salvas na hora.</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;">
+      ${etapas.map(cardEtapa).join('')}
+    </div>`;
+}
+
+window.ffToggleResponsavel = async function(etapaId, login) {
+  if (!_ffPodeAdministrarWorkflow()) return;
+  garantirFluxoFinanceiro();
+  const et = state.ffWorkflow[etapaId];
+  if (!Array.isArray(et.responsaveis)) et.responsaveis = [];
+  const i = et.responsaveis.indexOf(login);
+  const fu = (state.funcionarios || []).find(x => x.login === login);
+  if (i >= 0) et.responsaveis.splice(i, 1);
+  else et.responsaveis.push(login);
+  registrarLogGlobal(`Fluxo Financeiro — ${i >= 0 ? 'removeu' : 'definiu'} "${fu ? fu.nome : login}" como responsável da etapa "${etapaId}".`, 'dp');
+  try {
+    if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') await RTCloud.salvarAgora(state);
+    else saveState();
+  } catch (e) { alert('Não salvou: ' + (e.message || e)); }
+  _ffRenderLista();
+};
+
+window.ffToggleAcaoEtapa = async function(etapaId, acao) {
+  if (!_ffPodeAdministrarWorkflow()) return;
+  garantirFluxoFinanceiro();
+  const et = state.ffWorkflow[etapaId];
+  et[acao] = (et[acao] === false);   // alterna (default é true)
+  try {
+    if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') await RTCloud.salvarAgora(state);
+    else saveState();
+  } catch (e) { alert('Não salvou: ' + (e.message || e)); }
+  _ffRenderLista();
+};
+
+// ── MONITORAMENTO DO WORKFLOW (admin) ──────────────────────────────────────
+// Onde está cada processo, com quem, há quanto tempo — para achar gargalos.
+function _ffRenderMonitor(cont) {
+  garantirFluxoFinanceiro();
+  const emAndamento = state.fluxosFinanceiros
+    .filter(f => ['aguardando_coordenacao', 'aguardando_gestao', 'aguardando_financeiro', 'pago'].includes(f.status))
+    .map(f => ({ f, desde: _ffAguardandoDesde(f) }))
+    .sort((a, b) => String(a.desde || '').localeCompare(String(b.desde || '')));   // mais parado primeiro
+  const linha = ({ f, desde }) => {
+    const st = FF_STATUS[f.status] || FF_STATUS.rascunho;
+    const etId = _ffEtapaAtualId(f);
+    const nomes = etId ? _ffNomesResponsaveis(etId) : [];
+    const cfg = etId ? _ffCfg(etId) : {};
+    const parado = Date.now() - new Date(desde || f.criadoEm).getTime();
+    const alerta = parado > 86400000 ? '#DC2626' : (parado > 14400000 ? '#D97706' : '#059669');   // >24h vermelho, >4h laranja
+    return `<tr>
+      <td style="font-weight:800;color:#0284c7;">#${escapeHTML(f.numero)}</td>
+      <td style="font-weight:700;">${escapeHTML(f.empresaNome || '—')}</td>
+      <td class="ff-val-destaque">${_ffMoedaBR(_ffTotal(f))}</td>
+      <td><span class="ff-badge" style="color:${st.cor};">${st.rotulo}</span><div style="font-size:10px;color:#64748b;">${escapeHTML(cfg.setor || '')}</div></td>
+      <td>${nomes.length ? escapeHTML(nomes.join(', ')) : `<span style="color:#94a3b8;">padrão (${escapeHTML(cfg.funcao || '')})</span>`}</td>
+      <td>${_formatarDataHoraBR(desde)}</td>
+      <td style="font-weight:800;color:${alerta};">${_ffTempoDesde(desde)}</td>
+    </tr>`;
+  };
+  cont.innerHTML = `
+    <div style="margin-bottom:14px;">
+      <h3 style="margin:0 0 4px;font-size:16px;font-weight:800;color:#0f172a;"><i class="fa-solid fa-tower-broadcast" style="color:#0284c7;"></i> Monitoramento do Workflow</h3>
+      <p style="margin:0;font-size:12.5px;color:#64748b;">Todo processo em andamento, com quem está parado e há quanto tempo. 🟢 no prazo · 🟡 mais de 4h · 🔴 mais de 24h.</p>
+    </div>
+    ${emAndamento.length ? `<div class="ff-table-container"><table class="ff-table">
+      <thead><tr><th>Nº</th><th>Empresa</th><th style="text-align:right;">Valor</th><th>Etapa atual</th><th>Responsável</th><th>Aguardando desde</th><th>Tempo parado</th></tr></thead>
+      <tbody>${emAndamento.map(linha).join('')}</tbody>
+    </table></div>` : `<div class="ff-empty-box"><div class="ff-empty-icon"><i class="fa-solid fa-mug-hot"></i></div><div class="ff-empty-title">Nada parado 👌</div><div class="ff-empty-text">Não há processos aguardando ação no momento.</div></div>`}`;
+}
+
 function _ffRenderLista() {
   const cont = document.getElementById('ff-lista-container');
   if (!cont) return;
@@ -11800,40 +12059,51 @@ function _ffRenderLista() {
   // Painel do próprio módulo (não é a dashboard geral do sistema)
   if (_ffSubAba === 'painel') { _ffRenderPainel(cont); return; }
 
-  // Planilha gerencial (Mayara/Matheus/admin): visão de auditoria com quem fez
-  // o quê em cada etapa e os horários — pesquisável pelo Excel exportado.
+  // Configuração do fluxo de aprovação (admin define os responsáveis de cada etapa)
+  if (_ffSubAba === 'config') {
+    if (!_ffPodeAdministrarWorkflow()) { cont.innerHTML = '<div class="ff-empty-box"><div class="ff-empty-title">Sem acesso</div><div class="ff-empty-text">Só o administrador configura o fluxo.</div></div>'; return; }
+    _ffRenderConfig(cont); return;
+  }
+  // Monitoramento do workflow (onde está cada processo e há quanto tempo)
+  if (_ffSubAba === 'monitor') {
+    if (!_ffVeTudo()) { cont.innerHTML = ''; return; }
+    _ffRenderMonitor(cont); return;
+  }
+
+  // Planilha gerencial (visão gerencial/admin): visão de auditoria completa
   if (_ffSubAba === 'gerencial') {
     if (!_ffVeTudo()) { cont.innerHTML = ''; return; }
     const todos = [...state.fluxosFinanceiros].sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')));
     const cel = (quem, quando) => quem
-      ? `<div style="font-weight:600;">${escapeHTML(quem)}</div><div style="font-size:10px;color:var(--text-secondary);">${_formatarDataHoraBR(quando)}</div>`
-      : '<span style="color:var(--text-secondary);">—</span>';
+      ? `<div style="font-weight:700;color:#0f172a;">${escapeHTML(quem)}</div><div style="font-size:10px;color:#64748b;">${_formatarDataHoraBR(quando)}</div>`
+      : '<span style="color:#cbd5e1;">—</span>';
     cont.innerHTML = `
-      <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
-        <button class="btn btn-sm btn-outline" style="border-color:#059669;color:#059669;" onclick="exportarGerencialExcel()">
-          <i class="fa-solid fa-file-excel"></i> Exportar planilha gerencial</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h3 style="margin:0;font-size:16px;font-weight:800;color:#0f172a;"><i class="fa-solid fa-table-cells" style="color:#0284c7;"></i> Visão Gerencial do Fluxo</h3>
+        <button class="btn btn-sm btn-outline" style="border-color:#059669;color:#059669;font-weight:700;" onclick="exportarGerencialExcel()">
+          <i class="fa-solid fa-file-excel"></i> Exportar planilha gerencial (.xlsx)</button>
       </div>
-      <div class="table-scroll-container">
-        <table class="excel-table">
-          <thead><tr><th>Nº</th><th>Empresa</th><th>Tipo</th><th>Pagamento</th><th>Valor</th><th>Analista (criou)</th><th>Supervisão DP</th><th>Gestão</th><th>Financeiro</th><th>Comprovante</th><th>Status</th><th></th></tr></thead>
+      <div class="ff-table-container">
+        <table class="ff-table">
+          <thead><tr><th>Nº</th><th>Empresa</th><th>Tipo</th><th>Pagamento</th><th>Valor</th><th>Analista (criou)</th><th>Supervisão DP</th><th>Gestão</th><th>Financeiro</th><th>Comprovante</th><th>Status</th><th>Ação</th></tr></thead>
           <tbody>
             ${todos.map(f => {
               const st = FF_STATUS[f.status] || FF_STATUS.rascunho;
               const prazo = _ffPrazo(f);
               return `<tr>
-                <td style="font-weight:800;">#${escapeHTML(f.numero)}</td>
-                <td style="font-weight:600;">${escapeHTML(f.empresaNome || '—')}</td>
+                <td style="font-weight:800;color:#0284c7;">#${escapeHTML(f.numero)}</td>
+                <td style="font-weight:700;color:#0f172a;">${escapeHTML(f.empresaNome || '—')}</td>
                 <td>${escapeHTML(f.tipo || '—')}</td>
                 <td>${f.dataPagamento ? _formatarDataBR(f.dataPagamento) : '—'}
-                  ${prazo && prazo.nivel !== 'ok' ? `<div style="font-size:10px;font-weight:800;color:${prazo.cor};">${prazo.rotulo}</div>` : ''}</td>
-                <td style="font-weight:700;">${_ffMoedaBR(_ffTotal(f))}</td>
+                  ${prazo && prazo.nivel !== 'ok' ? `<div class="ff-prazo-tag ff-prazo-${prazo.nivel}">${prazo.rotulo}</div>` : ''}</td>
+                <td class="ff-val-destaque">${_ffMoedaBR(_ffTotal(f))}</td>
                 <td>${cel(f.criadoPor, f.criadoEm)}</td>
                 <td>${cel(f.aprovacoes.coordenacao?.por, f.aprovacoes.coordenacao?.em)}</td>
                 <td>${cel(f.aprovacoes.gestao?.por, f.aprovacoes.gestao?.em)}</td>
                 <td>${cel(f.aprovacoes.pagamento?.por, f.aprovacoes.pagamento?.em)}</td>
-                <td>${f.comprovante ? cel('Anexado', f.comprovante.em) : '<span style="color:var(--text-secondary);">—</span>'}</td>
-                <td><span style="font-size:10px;font-weight:800;color:${st.cor};">${st.rotulo}</span></td>
-                <td><button class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px;" onclick="abrirDetalheFluxo('${f.id}')"><i class="fa-solid fa-eye"></i></button></td>
+                <td>${f.comprovante ? cel('Anexado', f.comprovante.em) : '<span style="color:#cbd5e1;">—</span>'}</td>
+                <td><span class="ff-badge ff-badge-${f.status}" style="color:${st.cor};">${st.rotulo}</span></td>
+                <td><button class="btn btn-secondary btn-sm" style="padding:4px 10px;font-size:11px;" onclick="abrirDetalheFluxo('${f.id}')"><i class="fa-solid fa-eye"></i> Abrir</button></td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -11846,39 +12116,88 @@ function _ffRenderLista() {
   if (_ffSubAba === 'minha-vez')   lista = lista.filter(f => _ffEhMinhaVez(f));
   if (_ffSubAba === 'andamento')   lista = lista.filter(f => ['rascunho', 'aguardando_coordenacao', 'aguardando_gestao', 'aguardando_financeiro'].includes(f.status));
   if (_ffSubAba === 'finalizados') lista = lista.filter(f => ['pago', 'finalizado'].includes(f.status));
-  if (_ffSubAba === 'problemas')   lista = lista.filter(f => f.status === 'reprovado');
+  if (_ffSubAba === 'problemas')   lista = lista.filter(f => ['reprovado', 'cancelado'].includes(f.status));
+
+  // Filtro dinâmico por busca rápida e empresa
+  if (_ffFiltroBusca) {
+    const q = _ffFiltroBusca.toLowerCase();
+    lista = lista.filter(f => (f.numero && f.numero.includes(q)) ||
+      (f.empresaNome && f.empresaNome.toLowerCase().includes(q)) ||
+      (f.tipo && f.tipo.toLowerCase().includes(q)) ||
+      (f.criadoPor && f.criadoPor.toLowerCase().includes(q)));
+  }
+  if (_ffFiltroEmpresa) {
+    lista = lista.filter(f => f.empresaNome === _ffFiltroEmpresa);
+  }
+
   lista.sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')));
 
+  const empresasUnicas = [...new Set(_ffVisiveis().map(f => f.empresaNome).filter(Boolean))];
+
+  // Barra de ferramentas (busca + filtro de empresa)
+  const toolbarHtml = `
+    <div class="ff-table-toolbar">
+      <div class="ff-search-box">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" class="ff-search-input" placeholder="Buscar por número, empresa, tipo..." value="${escapeHTML(_ffFiltroBusca)}" oninput="_ffFiltroBusca=this.value;_ffRenderLista();">
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <select class="ff-filter-select" onchange="_ffFiltroEmpresa=this.value;_ffRenderLista();">
+          <option value="">Todas as empresas</option>
+          ${empresasUnicas.map(e => `<option value="${escapeHTML(e)}" ${e === _ffFiltroEmpresa ? 'selected' : ''}>${escapeHTML(e)}</option>`).join('')}
+        </select>
+      </div>
+    </div>`;
+
   if (!lista.length) {
-    cont.innerHTML = `<div class="exame-empty-state"><i class="fa-solid fa-money-bill-transfer"></i>
-      <p>${_ffSubAba === 'minha-vez' ? 'Nada aguardando a sua ação. 👌' : 'Nenhum fluxo aqui ainda.'}
-      ${_ffPodeCriar() && _ffSubAba !== 'minha-vez' ? 'Clique em <strong>"Novo Fluxo Financeiro"</strong> para começar.' : ''}</p></div>`;
+    cont.innerHTML = toolbarHtml + `
+      <div class="ff-empty-box">
+        <div class="ff-empty-icon"><i class="fa-solid fa-money-bill-transfer"></i></div>
+        <div class="ff-empty-title">${_ffSubAba === 'minha-vez' ? 'Nada aguardando sua ação 👌' : 'Nenhum fluxo encontrado'}</div>
+        <div class="ff-empty-text">
+          ${_ffSubAba === 'minha-vez'
+            ? 'Todos os processos sob sua responsabilidade foram analisados.'
+            : 'Não há registros financeiros nesta categoria no momento.'}
+        </div>
+        ${_ffPodeCriar() && _ffSubAba !== 'minha-vez' ? `<button class="btn btn-primary" style="margin-top:16px;" onclick="abrirModalNovoFluxo()"><i class="fa-solid fa-plus"></i> Novo Fluxo Financeiro</button>` : ''}
+      </div>`;
     return;
   }
 
-  cont.innerHTML = `
-    <div class="table-scroll-container">
-      <table class="excel-table">
-        <thead><tr><th>Nº</th><th>Empresa</th><th>Tipo</th><th>Pagamento</th><th>Competência</th><th>Colab.</th><th>Valor total</th><th>Status</th><th>Ação</th></tr></thead>
+  // Callout de pendências: só na aba "Minhas Pendências", quando há algo aguardando VOCÊ
+  const minhasPend = lista.filter(f => _ffEhMinhaVez(f));
+  const calloutHtml = (_ffSubAba === 'minha-vez' && minhasPend.length) ? `
+    <div style="display:flex;align-items:center;gap:12px;background:linear-gradient(90deg,rgba(217,119,6,.12),rgba(217,119,6,.02));border:1px solid rgba(217,119,6,.35);border-left:5px solid #D97706;border-radius:12px;padding:12px 16px;margin-bottom:14px;">
+      <i class="fa-solid fa-bell" style="font-size:22px;color:#D97706;"></i>
+      <div><div style="font-weight:800;color:#0f172a;font-size:14px;">Você tem ${minhasPend.length} pendência(s) aguardando sua ação</div>
+        <div style="font-size:12px;color:#64748b;">Analise cada processo e aprove, devolva ou reprove.</div></div>
+    </div>` : '';
+
+  cont.innerHTML = calloutHtml + toolbarHtml + `
+    <div class="ff-table-container">
+      <table class="ff-table">
+        <thead><tr><th>Nº</th><th>Empresa</th><th>Tipo</th><th>Data Pagamento</th><th>Competência</th><th>Colab.</th><th style="text-align:right;">Valor Total</th><th>Status</th><th style="text-align:center;">Ação</th></tr></thead>
         <tbody>
           ${lista.map(f => {
             const st = FF_STATUS[f.status] || FF_STATUS.rascunho;
             const minha = _ffEhMinhaVez(f);
-            return `<tr ${minha ? 'style="background:rgba(217,119,6,.05);"' : ''}>
-              <td style="font-weight:800;">#${escapeHTML(f.numero)}</td>
-              <td style="font-weight:600;">${escapeHTML(f.empresaNome || '—')}</td>
+            return `<tr class="${minha ? 'ff-row-highlight' : ''}">
+              <td style="font-weight:800;color:#0284c7;">#${escapeHTML(f.numero)}</td>
+              <td style="font-weight:700;color:#0f172a;">${escapeHTML(f.empresaNome || '—')}</td>
               <td>${escapeHTML(f.tipo || '—')}</td>
               <td>${f.dataPagamento ? _formatarDataBR(f.dataPagamento) : '—'}</td>
               <td>${escapeHTML(_ffCompetenciaBR(f.competencia))}</td>
-              <td>${(f.linhas || []).length}</td>
-              <td style="font-weight:700;">${_ffMoedaBR(_ffTotal(f))}</td>
-              <td><span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;color:${st.cor};background:${st.cor}18;border:1px solid ${st.cor}40;">
-                <i class="fa-solid ${st.icone}"></i> ${st.rotulo}</span>
+              <td style="font-weight:600;">${(f.linhas || []).length}</td>
+              <td style="text-align:right;" class="ff-val-destaque">${_ffMoedaBR(_ffTotal(f))}</td>
+              <td>
+                <span class="ff-badge ff-badge-${f.status}" style="color:${st.cor};">
+                  <i class="fa-solid ${st.icone}"></i> ${st.rotulo}
+                </span>
                 ${minha ? '<div style="font-size:10px;font-weight:800;color:#D97706;margin-top:3px;"><i class="fa-solid fa-hand-point-right"></i> Sua vez</div>' : ''}
                 ${(() => { const pz = _ffPrazo(f); return pz && pz.nivel !== 'ok'
-                  ? `<div style="font-size:10px;font-weight:800;color:${pz.cor};margin-top:3px;"><i class="fa-solid fa-clock"></i> ${pz.rotulo}</div>` : ''; })()}
+                  ? `<div class="ff-prazo-tag ff-prazo-${pz.nivel}"><i class="fa-solid fa-clock"></i> ${pz.rotulo}</div>` : ''; })()}
               </td>
-              <td><button class="btn btn-secondary btn-sm" style="padding:2px 10px;font-size:11px;" onclick="abrirDetalheFluxo('${f.id}')"><i class="fa-solid fa-eye"></i> Abrir</button></td>
+              <td style="text-align:center;"><button class="btn btn-secondary btn-sm" style="padding:4px 12px;font-size:11px;" onclick="abrirDetalheFluxo('${f.id}')"><i class="fa-solid fa-eye"></i> Abrir</button></td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -12106,12 +12425,44 @@ function _ffRenderDetalhe() {
         ${pendencias && f.status === 'rascunho' ? `<span style="font-size:11px;font-weight:700;color:#D97706;"><i class="fa-solid fa-triangle-exclamation"></i> ${pendencias} registro(s) precisam de conferência</span>` : ''}
       </div>
 
-      <div class="ff-etapas">
-        ${etapas.map(e => `
-          <div class="ff-etapa ${e.ok ? 'ff-etapa-ok' : ''}">
-            <i class="fa-solid ${e.ok ? 'fa-circle-check' : 'fa-circle'}"></i>
-            <span>${e.rot}${e.quem ? `<small>${escapeHTML(e.quem)}</small>` : ''}</span>
-          </div>`).join('<div class="ff-etapa-seta"><i class="fa-solid fa-chevron-right"></i></div>')}
+      ${(() => {
+        const etId = _ffEtapaAtualId(f);
+        if (!etId) return '';
+        const nomes = _ffNomesResponsaveis(etId);
+        const cfg = _ffCfg(etId);
+        const desde = _ffAguardandoDesde(f);
+        if (_ffEhMinhaVez(f) && !_ffEhCriador(f)) {
+          return `<div style="display:flex;align-items:center;gap:12px;background:linear-gradient(90deg,rgba(217,119,6,.14),rgba(217,119,6,.02));border:1px solid rgba(217,119,6,.4);border-left:5px solid #D97706;border-radius:12px;padding:12px 16px;margin-bottom:14px;">
+            <i class="fa-solid fa-bell" style="font-size:22px;color:#D97706;"></i>
+            <div><div style="font-weight:800;color:#0f172a;font-size:14px;">AGUARDANDO SUA APROVAÇÃO</div>
+            <div style="font-size:12px;color:#64748b;">Setor: ${escapeHTML(cfg.setor || '')} · Aguardando ${_ffTempoDesde(desde)}</div></div>
+          </div>`;
+        }
+        return `<div style="font-size:12px;color:#64748b;margin-bottom:14px;">
+          <i class="fa-solid fa-user-clock" style="color:#D97706;"></i> Aguardando <strong>${nomes.length ? escapeHTML(nomes.join(', ')) : escapeHTML(cfg.funcao || 'responsável')}</strong> (${escapeHTML(cfg.setor || '')}) · ${_ffTempoDesde(desde)}</div>`;
+      })()}
+
+      <!-- Timeline Visual de Aprovação -->
+      <div class="ff-timeline-wrapper">
+        ${etapas.map((e, idx) => {
+          const isCompleted = e.ok;
+          const isActive = !e.ok && (
+            (e.ch === 'coordenacao' && f.status === 'aguardando_coordenacao') ||
+            (e.ch === 'gestao' && f.status === 'aguardando_gestao') ||
+            (e.ch === 'pagamento' && f.status === 'aguardando_financeiro') ||
+            (e.ch === 'comprovante' && f.status === 'pago')
+          );
+          return `
+            <div class="ff-timeline-step ${isCompleted ? 'completed' : isActive ? 'active' : ''}">
+              <div class="ff-timeline-node">
+                <i class="fa-solid ${isCompleted ? 'fa-check' : isActive ? 'fa-pen-to-square' : 'fa-circle'}"></i>
+              </div>
+              <div class="ff-timeline-label">${e.rot}</div>
+              ${e.quem ? `<div class="ff-timeline-sub">${escapeHTML(e.quem)}</div>` : ''}
+            </div>
+            ${idx < etapas.length - 1 ? `<div class="ff-timeline-connector ${isCompleted ? 'completed' : ''}"></div>` : ''}
+          `;
+        }).join('')}
       </div>
 
       ${f.divergencia ? `
@@ -12320,29 +12671,30 @@ function _ffRenderDetalhe() {
     b.push(`<button class="btn btn-outline" onclick="fecharDetalheFluxo()"><i class="fa-solid fa-xmark"></i> Fechar</button>`);
 
     if (f.status === 'rascunho' && _ffPodeCriar()) {
-      b.push(`<button class="btn btn-primary" onclick="ffEnviarParaAprovacao()"><i class="fa-solid fa-paper-plane"></i> Enviar para Aprovação</button>`);
+      b.push(`<button class="btn btn-primary" onclick="ffEnviarParaAprovacao()"><i class="fa-solid fa-paper-plane"></i> Finalizar e Enviar</button>`);
+      b.push(`<button class="btn btn-outline" style="border-color:#DC2626;color:#DC2626;" onclick="ffExcluirFluxo()"><i class="fa-solid fa-trash"></i> Excluir rascunho</button>`);
     }
     if (f.status === 'aguardando_coordenacao' && _ffEhCoordenacao()) {
       if (_ffEhCriador(f)) {
         b.push(`<span style="font-size:11px;color:#D97706;font-weight:700;align-self:center;"><i class="fa-solid fa-ban"></i> Você criou este fluxo — outra pessoa da Supervisão precisa aprovar.</span>`);
       } else {
-        b.push(`<button class="btn btn-success" onclick="ffAprovar('coordenacao')"><i class="fa-solid fa-check"></i> Aprovar (Supervisão DP)</button>`);
-        b.push(`<button class="btn btn-outline" style="border-color:#D97706;color:#D97706;" onclick="ffDevolver()"><i class="fa-solid fa-rotate-left"></i> Devolver p/ correção</button>`);
-        b.push(`<button class="btn btn-danger" onclick="ffReprovar()"><i class="fa-solid fa-ban"></i> Reprovar</button>`);
+        if (_ffAcaoPermitida('coordenacao', 'aprovar')) b.push(`<button class="btn btn-success" onclick="ffAprovar('coordenacao')"><i class="fa-solid fa-check"></i> Aprovar e Enviar (Supervisão DP)</button>`);
+        if (_ffAcaoPermitida('coordenacao', 'devolver')) b.push(`<button class="btn btn-outline" style="border-color:#D97706;color:#D97706;" onclick="ffDevolver()"><i class="fa-solid fa-rotate-left"></i> Devolver p/ correção</button>`);
+        if (_ffAcaoPermitida('coordenacao', 'reprovar')) b.push(`<button class="btn btn-danger" onclick="ffReprovar()"><i class="fa-solid fa-ban"></i> Reprovar</button>`);
       }
     }
     if (f.status === 'aguardando_gestao' && _ffEhGestao()) {
-      b.push(`<button class="btn btn-success" onclick="ffAprovar('gestao')"><i class="fa-solid fa-check"></i> Aprovar (Gestão)</button>`);
-      b.push(`<button class="btn btn-outline" style="border-color:#D97706;color:#D97706;" onclick="ffDevolver()"><i class="fa-solid fa-rotate-left"></i> Devolver p/ correção</button>`);
-      b.push(`<button class="btn btn-danger" onclick="ffReprovar()"><i class="fa-solid fa-ban"></i> Reprovar</button>`);
+      if (_ffAcaoPermitida('gestao', 'aprovar')) b.push(`<button class="btn btn-success" onclick="ffAprovar('gestao')"><i class="fa-solid fa-check"></i> Aprovar e Enviar (Gestão)</button>`);
+      if (_ffAcaoPermitida('gestao', 'devolver')) b.push(`<button class="btn btn-outline" style="border-color:#D97706;color:#D97706;" onclick="ffDevolver()"><i class="fa-solid fa-rotate-left"></i> Devolver p/ correção</button>`);
+      if (_ffAcaoPermitida('gestao', 'reprovar')) b.push(`<button class="btn btn-danger" onclick="ffReprovar()"><i class="fa-solid fa-ban"></i> Reprovar</button>`);
     }
     if (f.status === 'aguardando_financeiro' && _ffEhFinanceiro()) {
       if (f.divergencia) {
         b.push(`<span style="font-size:11px;color:#DC2626;font-weight:800;align-self:center;"><i class="fa-solid fa-hand"></i> Pagamento bloqueado pela divergência.</span>`);
       } else {
-        b.push(`<button class="btn btn-success" onclick="ffMarcarPago()"><i class="fa-solid fa-money-check-dollar"></i> Pagamento Realizado</button>`);
+        if (_ffAcaoPermitida('financeiro', 'pagar')) b.push(`<button class="btn btn-success" onclick="ffMarcarPago()"><i class="fa-solid fa-money-check-dollar"></i> Pagamento Realizado</button>`);
         b.push(`<button class="btn btn-outline" style="border-color:#DC2626;color:#DC2626;" onclick="ffSinalizarDivergencia()"><i class="fa-solid fa-hand"></i> Sinalizar Divergência</button>`);
-        b.push(`<button class="btn btn-outline" style="border-color:#D97706;color:#D97706;" onclick="ffDevolver()"><i class="fa-solid fa-rotate-left"></i> Devolver p/ correção</button>`);
+        if (_ffAcaoPermitida('financeiro', 'devolver')) b.push(`<button class="btn btn-outline" style="border-color:#D97706;color:#D97706;" onclick="ffDevolver()"><i class="fa-solid fa-rotate-left"></i> Devolver p/ correção</button>`);
       }
     }
     if (f.divergencia && _ffEhGestao()) {
@@ -12350,6 +12702,11 @@ function _ffRenderDetalhe() {
     }
     if (f.status === 'pago' && _ffEhFinanceiro()) {
       b.push(`<button class="btn btn-success" onclick="document.getElementById('input-comprovante-fluxo').click()"><i class="fa-solid fa-receipt"></i> Anexar Comprovante</button>`);
+    }
+    // Cancelar: disponível para fluxos JÁ enviados (nunca apaga — preserva o histórico)
+    if (!['rascunho', 'finalizado', 'cancelado'].includes(f.status) &&
+        (ehMestre(loggedUser.login) || _ffEhCriador(f) || _ffEhGestao() || _ffEhCoordenacao() || _ffVeTudo())) {
+      b.push(`<button class="btn btn-outline" style="border-color:#6B7280;color:#6B7280;" onclick="ffCancelarFluxo()"><i class="fa-solid fa-circle-minus"></i> Cancelar fluxo</button>`);
     }
     footer.innerHTML = b.join('');
   }
@@ -12557,7 +12914,9 @@ window.ffEnviarParaAprovacao = async function() {
   }
 
   f.status = 'aguardando_coordenacao';
+  f.enviadoEm = new Date().toISOString();
   _ffHist(f, `Confirmou a conferência (${f.linhas.length} registros · ${_ffMoedaBR(_ffTotal(f))}) e enviou para a Supervisão DP.`);
+  _ffNotificar(f, 'coordenacao');
   registrarLogGlobal(`Enviou o Fluxo Financeiro #${f.numero} para aprovação da Supervisão DP.`, 'dp');
   await _ffSalvarERender(f, `Fluxo #${f.numero} enviado para a Supervisão DP.`);
 };
@@ -12572,13 +12931,17 @@ window.ffAprovar = async function(etapa) {
     if (_ffEhCriador(f)) { alert('Você criou este fluxo — outra pessoa da Supervisão precisa aprovar.'); return; }
     f.aprovacoes.coordenacao = { por: quem, login: loggedUser.login, em: agora };
     f.status = 'aguardando_gestao';
+    f.enviadoEm = agora;
     _ffHist(f, 'Supervisão DP aprovou. Enviado para a Gestão.');
+    _ffNotificar(f, 'gestao');
     registrarLogGlobal(`Aprovou (Supervisão DP) o Fluxo Financeiro #${f.numero}.`, 'dp');
     await _ffSalvarERender(f, 'Aprovado! O fluxo seguiu para a Gestão.');
   } else if (etapa === 'gestao' && f.status === 'aguardando_gestao' && _ffEhGestao()) {
     f.aprovacoes.gestao = { por: quem, login: loggedUser.login, em: agora };
     f.status = 'aguardando_financeiro';
+    f.enviadoEm = agora;
     _ffHist(f, 'Gestão aprovou. Enviado para o Financeiro.');
+    _ffNotificar(f, 'financeiro');
     registrarLogGlobal(`Aprovou (Gestão) o Fluxo Financeiro #${f.numero}.`, 'dp');
     await _ffSalvarERender(f, 'Aprovado! O fluxo seguiu para o Financeiro.');
   }
@@ -12604,9 +12967,51 @@ window.ffDevolver = async function() {
   if (!String(motivo).trim()) { alert('Escreva o que corrigir.'); return; }
   f.status = 'rascunho';
   f.aprovacoes = {};   // volta do zero: as aprovações anteriores caem
+  f.enviadoEm = null;
   _ffHist(f, `Devolveu para correção. Motivo: ${String(motivo).trim()}`);
+  _ffNotificar(f, 'criar');
   registrarLogGlobal(`Devolveu o Fluxo Financeiro #${f.numero} para correção.`, 'dp');
   await _ffSalvarERender(f, 'Fluxo devolvido ao DP para correção.');
+};
+
+// CANCELAR: um fluxo que JÁ entrou no workflow nunca é apagado — é cancelado,
+// preservando todo o histórico. Só o criador, a Gestão ou o admin podem.
+window.ffCancelarFluxo = async function() {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f) return;
+  if (['finalizado', 'cancelado'].includes(f.status)) { alert('Este fluxo já está encerrado.'); return; }
+  if (f.status === 'rascunho') { alert('Rascunho não se cancela — use "Excluir rascunho".'); return; }
+  const podeCancelar = ehMestre(loggedUser.login) || _ffEhCriador(f) || _ffEhGestao() || _ffVeTudo() || _ffEhCoordenacao();
+  if (!podeCancelar) { alert('Você não tem permissão para cancelar este fluxo.'); return; }
+  const motivo = prompt('Por que este fluxo está sendo cancelado? (fica no histórico)');
+  if (motivo === null) return;
+  if (!String(motivo).trim()) { alert('Escreva o motivo do cancelamento.'); return; }
+  f.statusAntesCancelar = f.status;
+  f.status = 'cancelado';
+  f.divergencia = null;
+  _ffHist(f, `CANCELOU o fluxo. Motivo: ${String(motivo).trim()}`);
+  registrarLogGlobal(`Cancelou o Fluxo Financeiro #${f.numero}.`, 'dp');
+  await _ffSalvarERender(f, `Fluxo #${f.numero} cancelado. O histórico foi preservado.`);
+};
+
+// EXCLUIR: exclusão física permitida SOMENTE para rascunhos (nunca para um
+// processo que já entrou no workflow).
+window.ffExcluirFluxo = async function() {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f) return;
+  if (f.status !== 'rascunho') { alert('Só é possível excluir rascunhos. Um fluxo já enviado deve ser CANCELADO (o histórico é mantido).'); return; }
+  if (!(ehMestre(loggedUser.login) || _ffEhCriador(f) || _ffPodeCriar())) { alert('Você não tem permissão para excluir este rascunho.'); return; }
+  if (!confirm(`Excluir DEFINITIVAMENTE o rascunho #${f.numero} (${f.empresaNome})?\n\nEsta ação não pode ser desfeita.`)) return;
+  const idx = state.fluxosFinanceiros.indexOf(f);
+  if (idx >= 0) state.fluxosFinanceiros.splice(idx, 1);
+  registrarLogGlobal(`Excluiu o rascunho de Fluxo Financeiro #${f.numero}.`, 'dp');
+  fecharDetalheFluxo();
+  try {
+    if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') await RTCloud.salvarAgora(state);
+    else saveState();
+    try { localStorage.setItem('rt_empregos_data', _estadoParaCache()); } catch (e) {}
+  } catch (e) { alert('Não foi possível salvar: ' + (e.message || e)); }
+  renderFluxoFinanceiro();
 };
 
 window.ffMarcarPago = async function() {
