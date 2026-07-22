@@ -25,6 +25,15 @@
     <!-- SheetJS — protegido via CSP no servidor -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
             crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- pdf.js — lê o texto dos PDFs do Exata no Fluxo Financeiro (mesmo CDN do CSP) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>
+      if (window.pdfjsLib) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+    </script>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/style.css">
     <!-- R&T Design System CSS -->
@@ -172,6 +181,9 @@
                     </li>
                     <li class="nav-item nav-subitem" data-aba="equipamentos" id="nav-item-equipamentos">
                         <a href="#"><i class="fa-solid fa-boxes-packing"></i> <span>Entrega/Devolução de Equipamentos</span></a>
+                    </li>
+                    <li class="nav-item nav-subitem" data-aba="fluxo-financeiro" id="nav-item-fluxo-financeiro">
+                        <a href="#"><i class="fa-solid fa-money-bill-transfer"></i> <span>Fluxo Financeiro</span></a>
                     </li>
                     <li class="nav-item" data-aba="relatorios">
                         <a href="#"><i class="fa-solid fa-chart-line"></i> <span>Relatórios</span></a>
@@ -893,6 +905,7 @@
                                             <option value="comissao">Comissão (Estatísticas)</option>
                                             <option value="administracao">Administração / Gestão</option>
                                             <option value="clinica">Clínica (Exame Médico)</option>
+                                            <option value="financeiro">Financeiro (Pagamentos)</option>
                                         </select>
                                     </div>
                                     <div class="form-group">
@@ -1190,6 +1203,169 @@
                         <div id="cadastros-exata-conteudo"></div>
                     </div>
                 </section>
+
+                <!-- ABA: FLUXO FINANCEIRO (Departamento Pessoal) -->
+                <section id="aba-fluxo-financeiro" class="aba-content">
+                    <div class="exame-medico-wrapper">
+                        <div class="exame-header-area">
+                            <div class="exame-header-left">
+                                <div class="exame-header-icon" style="background:linear-gradient(135deg,#059669,#10b981);"><i class="fa-solid fa-money-bill-transfer"></i></div>
+                                <div>
+                                    <h1 class="exame-titulo">Fluxo Financeiro</h1>
+                                    <p class="exame-subtitulo">Do relatório do Exata até o pagamento comprovado — conferência, aprovações e histórico</p>
+                                </div>
+                            </div>
+                            <div class="exame-header-right" id="ff-header-actions"><!-- botão por JS conforme perfil --></div>
+                        </div>
+
+                        <!-- KPIs -->
+                        <div class="exame-kpi-row">
+                            <div class="exame-kpi-card exame-kpi-aguardando">
+                                <div class="exame-kpi-icon"><i class="fa-solid fa-user-clock"></i></div>
+                                <div class="exame-kpi-info">
+                                    <span class="exame-kpi-num" id="ff-kpi-minha-vez">0</span>
+                                    <span class="exame-kpi-label">Aguardando VOCÊ</span>
+                                </div>
+                            </div>
+                            <div class="exame-kpi-card exame-kpi-total">
+                                <div class="exame-kpi-icon"><i class="fa-solid fa-arrows-spin"></i></div>
+                                <div class="exame-kpi-info">
+                                    <span class="exame-kpi-num" id="ff-kpi-andamento">0</span>
+                                    <span class="exame-kpi-label">Em andamento</span>
+                                </div>
+                            </div>
+                            <div class="exame-kpi-card exame-kpi-concluido">
+                                <div class="exame-kpi-icon"><i class="fa-solid fa-sack-dollar"></i></div>
+                                <div class="exame-kpi-info">
+                                    <span class="exame-kpi-num" id="ff-kpi-hoje" style="font-size:17px;">R$ 0,00</span>
+                                    <span class="exame-kpi-label">Pagamentos hoje</span>
+                                </div>
+                            </div>
+                            <div class="exame-kpi-card exame-kpi-concluido">
+                                <div class="exame-kpi-icon"><i class="fa-solid fa-circle-check"></i></div>
+                                <div class="exame-kpi-info">
+                                    <span class="exame-kpi-num" id="ff-kpi-finalizados">0</span>
+                                    <span class="exame-kpi-label">Finalizados</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sub-abas -->
+                        <div class="exame-subtabs" id="ff-subtabs">
+                            <button type="button" class="exame-subtab active" data-subaba="minha-vez" onclick="trocarSubAbaFF('minha-vez')">
+                                <i class="fa-solid fa-user-clock"></i> Para você
+                                <span class="exame-subtab-count" id="ff-count-minha-vez">0</span>
+                            </button>
+                            <button type="button" class="exame-subtab" data-subaba="andamento" onclick="trocarSubAbaFF('andamento')">
+                                <i class="fa-solid fa-arrows-spin"></i> Em andamento
+                                <span class="exame-subtab-count" id="ff-count-andamento">0</span>
+                            </button>
+                            <button type="button" class="exame-subtab" data-subaba="finalizados" onclick="trocarSubAbaFF('finalizados')">
+                                <i class="fa-solid fa-circle-check"></i> Pagos / Finalizados
+                                <span class="exame-subtab-count" id="ff-count-finalizados">0</span>
+                            </button>
+                            <button type="button" class="exame-subtab" data-subaba="problemas" onclick="trocarSubAbaFF('problemas')">
+                                <i class="fa-solid fa-triangle-exclamation"></i> Reprovados
+                                <span class="exame-subtab-count" id="ff-count-problemas">0</span>
+                            </button>
+                            <button type="button" class="exame-subtab" data-subaba="todos" onclick="trocarSubAbaFF('todos')">
+                                <i class="fa-solid fa-list"></i> Todos
+                                <span class="exame-subtab-count" id="ff-count-todos">0</span>
+                            </button>
+                        </div>
+
+                        <div class="exame-table-wrapper">
+                            <div id="ff-lista-container"><!-- Gerado por JS --></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Modal: Novo Fluxo Financeiro -->
+                <div id="modal-novo-fluxo" class="modal-overlay" style="display:none;" onclick="if(event.target===this)fecharModalNovoFluxo()">
+                    <div class="modal-exame-box">
+                        <div class="modal-exame-header">
+                            <div style="display:flex;align-items:center;gap:12px;">
+                                <div class="modal-exame-icon" style="background:linear-gradient(135deg,#059669,#10b981);"><i class="fa-solid fa-money-bill-transfer"></i></div>
+                                <div>
+                                    <h2 style="margin:0;font-size:20px;">Novo Fluxo Financeiro</h2>
+                                    <p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary);">Importe os relatórios do Exata e envie para aprovação</p>
+                                </div>
+                            </div>
+                            <button class="modal-exame-close" onclick="fecharModalNovoFluxo()"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="modal-exame-body">
+                            <div class="exame-form-grid">
+                                <div class="form-group">
+                                    <label>Empresa *</label>
+                                    <select id="ff-form-empresa" class="form-control"><option value="">Selecione...</option></select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Tipo de pagamento *</label>
+                                    <select id="ff-form-tipo" class="form-control"><option value="">Selecione...</option></select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Data de pagamento *</label>
+                                    <input type="date" id="ff-form-data" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label>Competência *</label>
+                                    <input type="month" id="ff-form-competencia" class="form-control">
+                                </div>
+                                <div class="form-group exame-form-full">
+                                    <label>Observação</label>
+                                    <textarea id="ff-form-obs" class="form-control" rows="2" style="resize:vertical;" placeholder="Ex: Benefício referente à competência de julho."></textarea>
+                                </div>
+                                <div class="form-group exame-form-full">
+                                    <label>Relatórios do Exata (PDF) *</label>
+                                    <div class="equip-upload-box">
+                                        <button type="button" class="btn btn-success" style="width:100%;justify-content:center;"
+                                                onclick="document.getElementById('input-pdfs-fluxo').click()">
+                                            <i class="fa-solid fa-file-pdf"></i> Adicionar PDF(s)
+                                        </button>
+                                        <div id="ff-upload-hint" style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:6px;">
+                                            Um ou vários arquivos. O sistema lê os PDFs e monta a tabela sozinho.
+                                        </div>
+                                        <div id="ff-arquivos-preview" style="margin-top:10px;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="ff-processando" style="display:none;margin-top:14px;">
+                                <div class="imp-barra"><div class="imp-barra-fill" id="ff-barra"></div></div>
+                                <p class="imp-ajuda" id="ff-processando-txt" style="text-align:center;">Lendo documentos...</p>
+                            </div>
+                        </div>
+                        <div class="modal-exame-footer">
+                            <button class="btn btn-outline" onclick="fecharModalNovoFluxo()"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+                            <button class="btn btn-primary" id="ff-btn-criar" onclick="criarFluxoFinanceiro()">
+                                <i class="fa-solid fa-gears"></i> Processar e Criar Fluxo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal: Detalhe do Fluxo Financeiro -->
+                <div id="modal-detalhe-fluxo" class="modal-overlay" style="display:none;" onclick="if(event.target===this)fecharDetalheFluxo()">
+                    <div class="modal-exame-box modal-exame-box-detalhe">
+                        <div class="modal-exame-header">
+                            <div style="display:flex;align-items:center;gap:12px;">
+                                <div class="modal-exame-icon" style="background:linear-gradient(135deg,#059669,#10b981);"><i class="fa-solid fa-money-bill-transfer"></i></div>
+                                <div>
+                                    <h2 style="margin:0;font-size:20px;" id="ff-det-titulo">Fluxo Financeiro</h2>
+                                    <p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary);" id="ff-det-sub"></p>
+                                </div>
+                            </div>
+                            <button class="modal-exame-close" onclick="fecharDetalheFluxo()"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="modal-exame-body">
+                            <div id="ff-det-conteudo"><!-- Gerado por JS --></div>
+                        </div>
+                        <div class="modal-exame-footer" id="ff-det-footer" style="flex-wrap:wrap;"><!-- Botões por JS --></div>
+                    </div>
+                </div>
+
+                <!-- Inputs ocultos do Fluxo Financeiro -->
+                <input type="file" id="input-pdfs-fluxo" accept=".pdf" multiple class="input-arquivo-oculto" onchange="receberPdfsFluxo(this)">
+                <input type="file" id="input-comprovante-fluxo" accept=".pdf,.jpg,.jpeg,.png" class="input-arquivo-oculto" onchange="anexarComprovanteFluxo(this)">
 
                 <!-- ABA: ENTREGA / DEVOLUÇÃO DE EQUIPAMENTOS (Departamento Pessoal) -->
                 <section id="aba-equipamentos" class="aba-content">
@@ -2939,6 +3115,7 @@
                                 <option value="comissao">Comissão (Estatísticas)</option>
                                 <option value="administracao">Administração / Gestão</option>
                                 <option value="clinica">Clínica (Exame Médico)</option>
+                                            <option value="financeiro">Financeiro (Pagamentos)</option>
                             </select>
                         </div>
                         <div class="form-group">

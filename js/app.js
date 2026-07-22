@@ -219,7 +219,8 @@ function verificarSessao() {
           'selecao': 'Recrutamento & Seleção',
           'dp': 'Departamento Pessoal',
           'comissao': 'Comissões & Estatísticas',
-          'clinica': 'Clínica Médica'
+          'clinica': 'Clínica Médica',
+          'financeiro': 'Financeiro'
         };
         roleEl.textContent = deptoLabels[loggedUser.departamento] || 'Colaborador';
       }
@@ -253,6 +254,8 @@ function isAbaAutorizada(abaId) {
   if (abaId === 'cadastros-exata') return ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao';
   // Equipamentos: módulo do Departamento Pessoal. A Seleção não enxerga.
   if (abaId === 'equipamentos') return podeVerEquipamentos();
+  // Fluxo Financeiro: DP, Administração e Financeiro (ou permissão granular).
+  if (abaId === 'fluxo-financeiro') return _ffPodeVer();
   // Exame Médico: clínica (anexa o laudo online), seleção (envia o candidato),
   // DP (anexa a foto da ficha nos exames presenciais) e administração.
   // Também vale a permissão granular marcada no cadastro do funcionário.
@@ -344,6 +347,7 @@ function verificarPermissoesMenu() {
     if (loggedUser.departamento === 'dp') homeAba = 'depto-pessoal';
     else if (loggedUser.departamento === 'comissao') homeAba = 'comissao';
     else if (loggedUser.departamento === 'clinica') homeAba = 'exame-medico';
+    else if (loggedUser.departamento === 'financeiro') homeAba = 'fluxo-financeiro';
     else if (loggedUser.departamento === 'selecao') {
       const temVinculo = state && state.recrutadores && state.recrutadores.some(r => (r.usuarioId && r.usuarioId === loggedUser.id) || (r.loginVinculado && r.loginVinculado === loggedUser.login));
       if (temVinculo) homeAba = 'meu-painel';
@@ -914,6 +918,9 @@ function initLocalStorage() {
 
     // Módulo de Equipamentos (Entrega/Devolução do DP)
     if (!state.equipamentos) { state.equipamentos = []; alterado = true; }
+
+    // Módulo Fluxo Financeiro (DP)
+    if (!state.fluxosFinanceiros) { state.fluxosFinanceiros = []; state.proximoFluxoNum = 1; alterado = true; }
 
     // Remove os dados de exemplo que vinham de fábrica (ver removerDadosDeExemplo)
     if (removerDadosDeExemplo()) alterado = true;
@@ -1606,7 +1613,8 @@ function switchAba(abaId) {
     'controle-acesso': 'fa-solid fa-business-time',
     'cadastros-exata': 'fa-solid fa-file-invoice',
     'exame-medico': 'fa-solid fa-hospital',
-    'equipamentos': 'fa-solid fa-boxes-packing'
+    'equipamentos': 'fa-solid fa-boxes-packing',
+    'fluxo-financeiro': 'fa-solid fa-money-bill-transfer'
   };
 
   const titleMap = {
@@ -1629,7 +1637,8 @@ function switchAba(abaId) {
     'controle-acesso': 'R&T EMPREGOS — CONTROLE DE ACESSO',
     'cadastros-exata': 'R&T EMPREGOS — CADASTROS EXATA',
     'exame-medico': 'R&T EMPREGOS — EXAME MÉDICO ADMISSIONAL',
-    'equipamentos': 'R&T EMPREGOS — ENTREGA / DEVOLUÇÃO DE EQUIPAMENTOS'
+    'equipamentos': 'R&T EMPREGOS — ENTREGA / DEVOLUÇÃO DE EQUIPAMENTOS',
+    'fluxo-financeiro': 'R&T EMPREGOS — FLUXO FINANCEIRO'
   };
 
   if (headerIcon) headerIcon.className = `${iconMap[abaId] || 'fa-solid fa-building'} header-icon`;
@@ -1701,6 +1710,9 @@ function renderCurrentAba() {
       break;
     case 'equipamentos':
       renderEquipamentos();
+      break;
+    case 'fluxo-financeiro':
+      renderFluxoFinanceiro();
       break;
     case 'exame-medico':
       renderExameMedico();
@@ -5303,7 +5315,8 @@ function renderFuncionarios() {
     'selecao': 'Recrutamento & Seleção',
     'dp': 'Departamento Pessoal',
     'comissao': 'Comissões & Estatísticas',
-    'clinica': 'Clínica Médica'
+    'clinica': 'Clínica Médica',
+    'financeiro': 'Financeiro'
   };
 
   // Exibe apenas funcionários ativos/inativos na lista principal (não os pendentes),
@@ -6168,6 +6181,7 @@ const AREAS_SISTEMA = {
   funcionarios: 'Funcionários',
   exame_medico: 'Exame Médico',
   equipamentos: 'Equipamentos (DP)',
+  fluxo_financeiro: 'Fluxo Financeiro (DP)',
   sistema: 'Sistema',
   exportacoes: 'Exportações'
 };
@@ -6189,7 +6203,8 @@ const ABA_PARA_AREA = {
   'controle-acesso': 'sistema',
   'cadastros-exata': 'sistema',
   'exame-medico': 'exame_medico',
-  'equipamentos': 'equipamentos'
+  'equipamentos': 'equipamentos',
+  'fluxo-financeiro': 'fluxo_financeiro'
 };
 
 function hasPermission(area, acao) {
@@ -7113,7 +7128,7 @@ function salvarPermissoesFuncionario() {
 }
 
 function deptoLabelSimples(d) {
-  return ({ administracao: 'Administração', selecao: 'Seleção', dp: 'Departamento Pessoal', comissao: 'Comissão', clinica: 'Clínica Médica' })[d] || d || '—';
+  return ({ administracao: 'Administração', selecao: 'Seleção', dp: 'Departamento Pessoal', comissao: 'Comissão', clinica: 'Clínica Médica', financeiro: 'Financeiro' })[d] || d || '—';
 }
 
 // ==========================================================================
@@ -7518,7 +7533,8 @@ window.abrirModalMeuPerfil = function() {
     'selecao': 'Recrutamento & Seleção',
     'dp': 'Departamento Pessoal',
     'comissao': 'Comissões & Estatísticas',
-    'clinica': 'Clínica Médica'
+    'clinica': 'Clínica Médica',
+    'financeiro': 'Financeiro'
   };
   if (g('perfil-depto')) g('perfil-depto').textContent = deptoLabels[loggedUser.departamento] || loggedUser.departamento;
   if (g('perfil-cargo')) g('perfil-cargo').textContent = loggedUser.cargo || 'Colaborador';
@@ -11086,6 +11102,708 @@ function _renderEquipamentosFicha(cand) {
       </table>
     </div>`;
 }
+
+// ==========================================================================
+// FLUXO FINANCEIRO (Departamento Pessoal)
+// Exata → PDFs → tabela → conferência → Coordenação DP → Gestão → Financeiro
+// → pagamento → comprovante → finalizado. Tudo com histórico.
+// ==========================================================================
+
+const FF_STATUS = {
+  rascunho:               { rotulo: 'Em conferência (DP)',            cor: '#64748B', icone: 'fa-pen-ruler' },
+  aguardando_coordenacao: { rotulo: 'Aguardando Coordenação DP',      cor: '#D97706', icone: 'fa-user-check' },
+  aguardando_gestao:      { rotulo: 'Aguardando Gestão',              cor: '#7C3AED', icone: 'fa-user-tie' },
+  aguardando_financeiro:  { rotulo: 'Aguardando Financeiro',          cor: '#0284C7', icone: 'fa-building-columns' },
+  pago:                   { rotulo: 'Pago — falta o comprovante',     cor: '#059669', icone: 'fa-money-check-dollar' },
+  finalizado:             { rotulo: 'Finalizado',                     cor: '#059669', icone: 'fa-circle-check' },
+  reprovado:              { rotulo: 'Reprovado',                      cor: '#DC2626', icone: 'fa-circle-xmark' }
+};
+const FF_TIPOS_PADRAO = ['Salário', 'Adiantamento', 'Benefício', 'Reembolso', 'Férias', 'Rescisão', 'Vale-transporte', 'Vale-refeição', 'Outros'];
+
+function garantirFluxoFinanceiro() {
+  if (!state.fluxosFinanceiros) state.fluxosFinanceiros = [];
+  if (!state.proximoFluxoNum) state.proximoFluxoNum = 1;
+  if (!Array.isArray(state.tiposPagamentoFluxo) || !state.tiposPagamentoFluxo.length) {
+    state.tiposPagamentoFluxo = FF_TIPOS_PADRAO.slice();
+  }
+  return state.fluxosFinanceiros;
+}
+
+// ── Perfis ─────────────────────────────────────────────────────────────────
+// Assistente DP cria/confere; Coordenação DP (representante do DP) aprova a 1ª
+// etapa; Gestão (administração) a 2ª; Financeiro paga e anexa o comprovante.
+// Mestre pode tudo (o João testa tudo).
+function _ffPodeVer() {
+  if (!loggedUser) return false;
+  return ehMestre(loggedUser.login)
+    || ['dp', 'administracao', 'financeiro'].includes(loggedUser.departamento)
+    || hasPermission('fluxo_financeiro', 'visualizar');
+}
+function _ffPodeCriar() {
+  if (!loggedUser) return false;
+  return ehMestre(loggedUser.login)
+    || loggedUser.departamento === 'dp'
+    || loggedUser.departamento === 'administracao'
+    || hasPermission('fluxo_financeiro', 'criar');
+}
+function _ffEhCoordenacao() {
+  if (!loggedUser) return false;
+  return ehMestre(loggedUser.login)
+    || (loggedUser.departamento === 'dp' && loggedUser.representanteDepto)
+    || loggedUser.departamento === 'administracao';
+}
+function _ffEhGestao() {
+  if (!loggedUser) return false;
+  return ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao';
+}
+function _ffEhFinanceiro() {
+  if (!loggedUser) return false;
+  return ehMestre(loggedUser.login) || loggedUser.departamento === 'financeiro';
+}
+// A ação que cabe ao usuário logado no status atual (usada nos KPIs e na lista)
+function _ffEhMinhaVez(f) {
+  if (!loggedUser || !f) return false;
+  switch (f.status) {
+    case 'rascunho':               return _ffPodeCriar();
+    case 'aguardando_coordenacao': return _ffEhCoordenacao() && !_ffEhCriador(f);
+    case 'aguardando_gestao':      return _ffEhGestao();
+    case 'aguardando_financeiro':  return _ffEhFinanceiro();
+    case 'pago':                   return _ffEhFinanceiro();
+    default: return false;
+  }
+}
+// Ninguém aprova o PRÓPRIO fluxo (menos o mestre, que administra tudo)
+function _ffEhCriador(f) {
+  return !!(loggedUser && f && f.criadoPorLogin === loggedUser.login && !ehMestre(loggedUser.login));
+}
+
+// ── Formatação ─────────────────────────────────────────────────────────────
+function _ffMoedaBR(n) {
+  return (Number(n) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+// "1.234,56" -> 1234.56
+function _ffParseValor(s) {
+  const t = String(s == null ? '' : s).replace(/[^\d,.-]/g, '').trim();
+  if (!t) return 0;
+  const n = parseFloat(t.replace(/\./g, '').replace(',', '.'));
+  return isNaN(n) ? 0 : Math.round(n * 100) / 100;
+}
+function _ffTotal(f) {
+  return (f.linhas || []).reduce((s, l) => s + (Number(l.valor) || 0), 0);
+}
+function _ffHist(f, acao) {
+  f.historico = f.historico || [];
+  f.historico.push({ data: new Date().toISOString(), usuario: loggedUser ? nomeExibido(loggedUser) : 'Sistema', login: loggedUser ? loggedUser.login : '', acao });
+}
+function _ffCompetenciaBR(c) {
+  const m = String(c || '').match(/^(\d{4})-(\d{2})$/);
+  if (!m) return c || '—';
+  const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  return `${meses[+m[2] - 1]}/${m[1]}`;
+}
+
+// ── Leitura do PDF (pdf.js) ────────────────────────────────────────────────
+// Extrai o texto agrupando os pedaços pela posição vertical (linha visual).
+async function _ffLerPdf(file) {
+  if (!window.pdfjsLib) throw new Error('O leitor de PDF não carregou. Atualize a página (Ctrl+Shift+R).');
+  const buf = await file.arrayBuffer();
+  const doc = await pdfjsLib.getDocument({ data: buf }).promise;
+  let texto = '';
+  for (let p = 1; p <= doc.numPages; p++) {
+    const pagina = await doc.getPage(p);
+    const conteudo = await pagina.getTextContent();
+    const porLinha = new Map();  // y arredondado -> [{x, str}]
+    conteudo.items.forEach(it => {
+      const y = Math.round(it.transform[5]);
+      if (!porLinha.has(y)) porLinha.set(y, []);
+      porLinha.get(y).push({ x: it.transform[4], str: it.str });
+    });
+    [...porLinha.keys()].sort((a, b) => b - a).forEach(y => {
+      const linha = porLinha.get(y).sort((a, b) => a.x - b.x).map(i => i.str).join(' ');
+      texto += linha + '\n';
+    });
+  }
+  try { doc.destroy(); } catch (e) {}
+  return texto;
+}
+
+// Heurística: cada linha que tem um VALOR em reais vira um registro.
+// CPF e nome são capturados quando existem. O que ficar incompleto é marcado
+// "conferir" — a conferência manual do DP é parte do fluxo de qualquer jeito.
+function _ffExtrairLinhas(texto) {
+  const out = [];
+  String(texto || '').split(/\n+/).forEach(l => {
+    const linha = l.trim();
+    if (!linha) return;
+    const valores = [...linha.matchAll(/(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})\b/g)];
+    if (!valores.length) return;
+    // Cabeçalhos e totais não são colaboradores
+    if (/^(total|sub\s*total|valor\s+total|p[áa]gina|resumo|somat[óo]ri)/i.test(linha)) return;
+
+    const cpfM = linha.match(/\d{3}\.?\d{3}\.?\d{3}-?\d{2}/);
+    const valor = _ffParseValor(valores[valores.length - 1][1]);
+
+    let nome = linha;
+    if (cpfM) nome = linha.slice(0, cpfM.index);
+    const primeiroValor = nome.search(/(?:R\$\s*)?\d{1,3}(?:\.\d{3})*,\d{2}\b/);
+    if (primeiroValor >= 0) nome = nome.slice(0, primeiroValor);
+    nome = nome
+      .replace(/^[\s\d\-.:|/]+/, '')          // matrícula/índice no começo
+      .replace(/[^\p{L}\s'.-]/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (/^(nome|colaborador|funcion[áa]rio|cpf|matr[íi]cula|valor|banco|ag[êe]ncia|conta|data)$/i.test(nome)) return;
+
+    const ok = !!(nome && nome.length >= 5 && valor > 0);
+    out.push({
+      id: 'ffl-' + Date.now() + '-' + out.length + '-' + Math.random().toString(36).slice(2, 5),
+      nome, cpf: cpfM ? cpfM[0] : '', valor,
+      status: ok ? 'ok' : 'conferir'
+    });
+  });
+  return out;
+}
+
+// ── Aba: render principal ──────────────────────────────────────────────────
+let _ffSubAba = 'minha-vez';
+let _ffPdfsTemp = [];        // Files escolhidos no modal de novo fluxo
+let _ffDetalheId = null;
+
+function trocarSubAbaFF(sub) {
+  _ffSubAba = sub;
+  document.querySelectorAll('#ff-subtabs .exame-subtab').forEach(b => b.classList.toggle('active', b.dataset.subaba === sub));
+  _ffRenderLista();
+}
+window.trocarSubAbaFF = trocarSubAbaFF;
+
+function renderFluxoFinanceiro() {
+  garantirFluxoFinanceiro();
+
+  const actions = document.getElementById('ff-header-actions');
+  if (actions) {
+    actions.innerHTML = _ffPodeCriar()
+      ? `<button class="btn btn-primary" onclick="abrirModalNovoFluxo()"><i class="fa-solid fa-plus"></i> Novo Fluxo Financeiro</button>`
+      : '';
+  }
+
+  const fluxos = state.fluxosFinanceiros;
+  const hoje = new Date(); const p = n => String(n).padStart(2, '0');
+  const hojeStr = `${hoje.getFullYear()}-${p(hoje.getMonth() + 1)}-${p(hoje.getDate())}`;
+
+  const minhaVez   = fluxos.filter(f => _ffEhMinhaVez(f));
+  const andamento  = fluxos.filter(f => ['rascunho', 'aguardando_coordenacao', 'aguardando_gestao', 'aguardando_financeiro'].includes(f.status));
+  const finalizados = fluxos.filter(f => ['pago', 'finalizado'].includes(f.status));
+  const problemas  = fluxos.filter(f => f.status === 'reprovado');
+  const pagosHoje  = fluxos.filter(f => ['pago', 'finalizado'].includes(f.status) && f.dataPagamento === hojeStr)
+                           .reduce((s, f) => s + _ffTotal(f), 0);
+
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('ff-kpi-minha-vez', minhaVez.length);
+  set('ff-kpi-andamento', andamento.length);
+  set('ff-kpi-hoje', _ffMoedaBR(pagosHoje));
+  set('ff-kpi-finalizados', finalizados.length);
+  set('ff-count-minha-vez', minhaVez.length);
+  set('ff-count-andamento', andamento.length);
+  set('ff-count-finalizados', finalizados.length);
+  set('ff-count-problemas', problemas.length);
+  set('ff-count-todos', fluxos.length);
+
+  _ffRenderLista();
+}
+
+function _ffRenderLista() {
+  const cont = document.getElementById('ff-lista-container');
+  if (!cont) return;
+  garantirFluxoFinanceiro();
+
+  let lista = [...state.fluxosFinanceiros];
+  if (_ffSubAba === 'minha-vez')   lista = lista.filter(f => _ffEhMinhaVez(f));
+  if (_ffSubAba === 'andamento')   lista = lista.filter(f => ['rascunho', 'aguardando_coordenacao', 'aguardando_gestao', 'aguardando_financeiro'].includes(f.status));
+  if (_ffSubAba === 'finalizados') lista = lista.filter(f => ['pago', 'finalizado'].includes(f.status));
+  if (_ffSubAba === 'problemas')   lista = lista.filter(f => f.status === 'reprovado');
+  lista.sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')));
+
+  if (!lista.length) {
+    cont.innerHTML = `<div class="exame-empty-state"><i class="fa-solid fa-money-bill-transfer"></i>
+      <p>${_ffSubAba === 'minha-vez' ? 'Nada aguardando a sua ação. 👌' : 'Nenhum fluxo aqui ainda.'}
+      ${_ffPodeCriar() && _ffSubAba !== 'minha-vez' ? 'Clique em <strong>"Novo Fluxo Financeiro"</strong> para começar.' : ''}</p></div>`;
+    return;
+  }
+
+  cont.innerHTML = `
+    <div class="table-scroll-container">
+      <table class="excel-table">
+        <thead><tr><th>Nº</th><th>Empresa</th><th>Tipo</th><th>Pagamento</th><th>Competência</th><th>Colab.</th><th>Valor total</th><th>Status</th><th>Ação</th></tr></thead>
+        <tbody>
+          ${lista.map(f => {
+            const st = FF_STATUS[f.status] || FF_STATUS.rascunho;
+            const minha = _ffEhMinhaVez(f);
+            return `<tr ${minha ? 'style="background:rgba(217,119,6,.05);"' : ''}>
+              <td style="font-weight:800;">#${escapeHTML(f.numero)}</td>
+              <td style="font-weight:600;">${escapeHTML(f.empresaNome || '—')}</td>
+              <td>${escapeHTML(f.tipo || '—')}</td>
+              <td>${f.dataPagamento ? _formatarDataBR(f.dataPagamento) : '—'}</td>
+              <td>${escapeHTML(_ffCompetenciaBR(f.competencia))}</td>
+              <td>${(f.linhas || []).length}</td>
+              <td style="font-weight:700;">${_ffMoedaBR(_ffTotal(f))}</td>
+              <td><span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;color:${st.cor};background:${st.cor}18;border:1px solid ${st.cor}40;">
+                <i class="fa-solid ${st.icone}"></i> ${st.rotulo}</span>
+                ${minha ? '<div style="font-size:10px;font-weight:800;color:#D97706;margin-top:3px;"><i class="fa-solid fa-hand-point-right"></i> Sua vez</div>' : ''}
+              </td>
+              <td><button class="btn btn-secondary btn-sm" style="padding:2px 10px;font-size:11px;" onclick="abrirDetalheFluxo('${f.id}')"><i class="fa-solid fa-eye"></i> Abrir</button></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ── Novo fluxo ─────────────────────────────────────────────────────────────
+function abrirModalNovoFluxo() {
+  if (!_ffPodeCriar()) { alert('Você não tem permissão para criar fluxos financeiros.'); return; }
+  garantirFluxoFinanceiro();
+  _ffPdfsTemp = [];
+
+  const selEmp = document.getElementById('ff-form-empresa');
+  if (selEmp) selEmp.innerHTML = '<option value="">Selecione...</option>' +
+    (state.empresas || []).map(e => `<option value="${e.id}">${escapeHTML(e.nome)}</option>`).join('');
+  const selTipo = document.getElementById('ff-form-tipo');
+  if (selTipo) selTipo.innerHTML = '<option value="">Selecione...</option>' +
+    state.tiposPagamentoFluxo.map(t => `<option value="${escapeHTML(t)}">${escapeHTML(t)}</option>`).join('');
+
+  ['ff-form-data', 'ff-form-competencia', 'ff-form-obs'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const prev = document.getElementById('ff-arquivos-preview'); if (prev) prev.innerHTML = '';
+  const proc = document.getElementById('ff-processando'); if (proc) proc.style.display = 'none';
+  const btn = document.getElementById('ff-btn-criar'); if (btn) btn.disabled = false;
+
+  const m = document.getElementById('modal-novo-fluxo'); if (m) m.style.display = 'flex';
+}
+window.abrirModalNovoFluxo = abrirModalNovoFluxo;
+
+function fecharModalNovoFluxo() {
+  const m = document.getElementById('modal-novo-fluxo'); if (m) m.style.display = 'none';
+  _ffPdfsTemp = [];
+}
+window.fecharModalNovoFluxo = fecharModalNovoFluxo;
+
+function receberPdfsFluxo(input) {
+  const novos = Array.from(input.files || []).filter(f => /\.pdf$/i.test(f.name));
+  input.value = '';
+  novos.forEach(f => {
+    if (f.size > 20 * 1024 * 1024) { alert(`"${f.name}" passa de 20 MB.`); return; }
+    if (_ffPdfsTemp.length >= 20) { alert('Máximo de 20 arquivos por fluxo.'); return; }
+    _ffPdfsTemp.push(f);
+  });
+  const prev = document.getElementById('ff-arquivos-preview');
+  if (prev) prev.innerHTML = _ffPdfsTemp.map((f, i) => `
+    <div class="exame-pdf-card" style="margin-top:8px;">
+      <div class="exame-pdf-icon" style="color:#DC2626;"><i class="fa-solid fa-file-pdf"></i></div>
+      <div class="exame-pdf-info"><strong>${escapeHTML(f.name)}</strong><span>${(f.size / 1048576).toFixed(1)} MB</span></div>
+      <button class="btn btn-sm btn-outline" style="border-color:#DC2626;color:#DC2626;" onclick="_ffPdfsTemp.splice(${i},1); receberPdfsFluxo({files:[],value:''})">
+        <i class="fa-solid fa-trash-can"></i></button>
+    </div>`).join('');
+  const hint = document.getElementById('ff-upload-hint');
+  if (hint) hint.textContent = _ffPdfsTemp.length
+    ? `${_ffPdfsTemp.length} arquivo(s) adicionado(s).`
+    : 'Um ou vários arquivos. O sistema lê os PDFs e monta a tabela sozinho.';
+}
+window.receberPdfsFluxo = receberPdfsFluxo;
+
+async function criarFluxoFinanceiro() {
+  garantirFluxoFinanceiro();
+  const g = id => document.getElementById(id);
+  const empresaId = g('ff-form-empresa')?.value || '';
+  const tipo = g('ff-form-tipo')?.value || '';
+  const data = g('ff-form-data')?.value || '';
+  const comp = g('ff-form-competencia')?.value || '';
+  const obs  = (g('ff-form-obs')?.value || '').trim();
+
+  if (!empresaId) { alert('Escolha a empresa.'); return; }
+  if (!tipo)      { alert('Escolha o tipo de pagamento.'); return; }
+  if (!data)      { alert('Informe a data de pagamento.'); return; }
+  if (!comp)      { alert('Informe a competência.'); return; }
+  if (!_ffPdfsTemp.length) { alert('Adicione ao menos um PDF do Exata.'); return; }
+
+  const empresa = (state.empresas || []).find(e => e.id === empresaId) || {};
+  const btn = g('ff-btn-criar'); if (btn) btn.disabled = true;
+  const proc = g('ff-processando'); if (proc) proc.style.display = '';
+  const barra = g('ff-barra'); const txt = g('ff-processando-txt');
+
+  try {
+    // 1) Lê e extrai cada PDF
+    const linhas = [];
+    const arquivos = [];
+    for (let i = 0; i < _ffPdfsTemp.length; i++) {
+      const f = _ffPdfsTemp[i];
+      if (txt) txt.textContent = `Lendo ${f.name} (${i + 1} de ${_ffPdfsTemp.length})...`;
+      if (barra) barra.style.width = Math.round((i / _ffPdfsTemp.length) * 70) + '%';
+      const texto = await _ffLerPdf(f);
+      _ffExtrairLinhas(texto).forEach(l => { l.arquivo = f.name; linhas.push(l); });
+      // guarda o PDF (vira link /uploads/.. na sincronização)
+      const base64 = await fileToBase64(f);
+      arquivos.push({ nome: f.name, arquivo: base64 });
+    }
+
+    if (txt) txt.textContent = `Montando a tabela (${linhas.length} registros encontrados)...`;
+    if (barra) barra.style.width = '80%';
+
+    const numero = String(state.proximoFluxoNum).padStart(6, '0');
+    state.proximoFluxoNum++;
+
+    const fluxo = {
+      id: 'ff-' + Date.now(),
+      numero,
+      empresaId, empresaNome: empresa.nome || '',
+      tipo, dataPagamento: data, competencia: comp, observacao: obs,
+      arquivos, linhas,
+      status: 'rascunho',
+      criadoPor: loggedUser ? nomeExibido(loggedUser) : 'Sistema',
+      criadoPorLogin: loggedUser ? loggedUser.login : '',
+      criadoEm: new Date().toISOString(),
+      aprovacoes: {},
+      comprovante: null,
+      historico: []
+    };
+    _ffHist(fluxo, `Criou o Fluxo Financeiro #${numero} (${empresa.nome} · ${tipo}).`);
+    _ffHist(fluxo, `Importou ${arquivos.length} arquivo(s) PDF — ${linhas.length} registro(s) identificados.`);
+    state.fluxosFinanceiros.push(fluxo);
+
+    if (txt) txt.textContent = 'Salvando no servidor...';
+    if (barra) barra.style.width = '95%';
+    if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
+      await RTCloud.salvarAgora(state);
+    } else { saveState(); }
+    try { localStorage.setItem('rt_empregos_data', _estadoParaCache()); } catch (e) {}
+    if (barra) barra.style.width = '100%';
+
+    registrarLogGlobal(`Criou o Fluxo Financeiro #${numero} (${empresa.nome} · ${tipo}) com ${linhas.length} registro(s).`, 'dp');
+    fecharModalNovoFluxo();
+    renderFluxoFinanceiro();
+    abrirDetalheFluxo(fluxo.id);
+
+    const pendentes = linhas.filter(l => l.status === 'conferir').length;
+    alert(`Fluxo #${numero} criado!\n\n${linhas.length} registro(s) importados dos PDFs.` +
+      (pendentes ? `\n⚠ ${pendentes} registro(s) precisam de conferência.` : '') +
+      `\n\nConfira a tabela e clique em "Enviar para Aprovação".`);
+  } catch (e) {
+    alert('Não foi possível processar os PDFs.\n\nMotivo: ' + (e.message || e));
+  } finally {
+    if (btn) btn.disabled = false;
+    if (proc) proc.style.display = 'none';
+    if (barra) barra.style.width = '0%';
+  }
+}
+window.criarFluxoFinanceiro = criarFluxoFinanceiro;
+
+// ── Detalhe / conferência / aprovações ─────────────────────────────────────
+function abrirDetalheFluxo(id) {
+  garantirFluxoFinanceiro();
+  const f = state.fluxosFinanceiros.find(x => x.id === id);
+  if (!f) return;
+  _ffDetalheId = id;
+  _ffRenderDetalhe();
+  const m = document.getElementById('modal-detalhe-fluxo'); if (m) m.style.display = 'flex';
+}
+window.abrirDetalheFluxo = abrirDetalheFluxo;
+
+function fecharDetalheFluxo() {
+  const m = document.getElementById('modal-detalhe-fluxo'); if (m) m.style.display = 'none';
+  _ffDetalheId = null;
+  renderFluxoFinanceiro();
+}
+window.fecharDetalheFluxo = fecharDetalheFluxo;
+
+function _ffRenderDetalhe() {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f) return;
+  const st = FF_STATUS[f.status] || FF_STATUS.rascunho;
+  const podeEditar = f.status === 'rascunho' && (_ffPodeCriar());
+
+  const tit = document.getElementById('ff-det-titulo');
+  if (tit) tit.textContent = `Fluxo Financeiro #${f.numero}`;
+  const sub = document.getElementById('ff-det-sub');
+  if (sub) sub.textContent = `${f.empresaNome} · ${f.tipo} · pagamento ${_formatarDataBR(f.dataPagamento)}`;
+
+  const pendencias = (f.linhas || []).filter(l => l.status === 'conferir').length;
+
+  // Etapas (linha do tempo de aprovação)
+  const etapas = [
+    { ch: 'criado',      rot: 'DP criou',        ok: true,                          quem: f.criadoPor },
+    { ch: 'coordenacao', rot: 'Coordenação DP',  ok: !!f.aprovacoes.coordenacao,    quem: f.aprovacoes.coordenacao?.por },
+    { ch: 'gestao',      rot: 'Gestão',          ok: !!f.aprovacoes.gestao,         quem: f.aprovacoes.gestao?.por },
+    { ch: 'pagamento',   rot: 'Financeiro pagou',ok: ['pago', 'finalizado'].includes(f.status), quem: f.aprovacoes.pagamento?.por },
+    { ch: 'comprovante', rot: 'Comprovante',     ok: f.status === 'finalizado',     quem: null }
+  ];
+
+  const cont = document.getElementById('ff-det-conteudo');
+  if (cont) {
+    cont.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+        <span style="display:inline-flex;align-items:center;gap:7px;padding:6px 14px;border-radius:12px;font-size:13px;font-weight:800;color:${st.cor};background:${st.cor}18;border:1px solid ${st.cor}40;">
+          <i class="fa-solid ${st.icone}"></i> ${st.rotulo}</span>
+        ${pendencias && f.status === 'rascunho' ? `<span style="font-size:11px;font-weight:700;color:#D97706;"><i class="fa-solid fa-triangle-exclamation"></i> ${pendencias} registro(s) precisam de conferência</span>` : ''}
+      </div>
+
+      <div class="ff-etapas">
+        ${etapas.map(e => `
+          <div class="ff-etapa ${e.ok ? 'ff-etapa-ok' : ''}">
+            <i class="fa-solid ${e.ok ? 'fa-circle-check' : 'fa-circle'}"></i>
+            <span>${e.rot}${e.quem ? `<small>${escapeHTML(e.quem)}</small>` : ''}</span>
+          </div>`).join('<div class="ff-etapa-seta"><i class="fa-solid fa-chevron-right"></i></div>')}
+      </div>
+
+      <div class="exame-detalhe-grid" style="margin-top:16px;">
+        <div class="exame-detalhe-grupo">
+          <h4><i class="fa-solid fa-circle-info"></i> Dados do fluxo</h4>
+          <div class="exame-detalhe-campos">
+            <div class="exame-campo"><span class="exame-campo-label">Empresa</span><span class="exame-campo-valor">${escapeHTML(f.empresaNome)}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Tipo</span><span class="exame-campo-valor">${escapeHTML(f.tipo)}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Data de pagamento</span><span class="exame-campo-valor">${_formatarDataBR(f.dataPagamento)}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Competência</span><span class="exame-campo-valor">${escapeHTML(_ffCompetenciaBR(f.competencia))}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Criado por</span><span class="exame-campo-valor">${escapeHTML(f.criadoPor)} em ${_formatarDataHoraBR(f.criadoEm)}</span></div>
+            ${f.observacao ? `<div class="exame-campo"><span class="exame-campo-label">Observação</span><span class="exame-campo-valor">${escapeHTML(f.observacao)}</span></div>` : ''}
+          </div>
+        </div>
+        <div class="exame-detalhe-grupo">
+          <h4><i class="fa-solid fa-sack-dollar"></i> Totais</h4>
+          <div class="exame-detalhe-campos">
+            <div class="exame-campo"><span class="exame-campo-label">Valor total</span><span class="exame-campo-valor" style="font-size:20px;font-weight:900;color:#059669;">${_ffMoedaBR(_ffTotal(f))}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Colaboradores</span><span class="exame-campo-valor">${(f.linhas || []).length}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Arquivos</span><span class="exame-campo-valor">${(f.arquivos || []).length}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="exame-detalhe-laudo" style="margin-top:16px;">
+        <h4><i class="fa-solid fa-table-list"></i> Registros importados (${(f.linhas || []).length})
+          ${podeEditar ? `<button class="btn btn-sm btn-outline" style="margin-left:10px;" onclick="ffAdicionarLinha()"><i class="fa-solid fa-plus"></i> Adicionar linha</button>` : ''}
+        </h4>
+        <div class="table-scroll-container" style="max-height:320px;overflow-y:auto;">
+          <table class="excel-table">
+            <thead><tr><th>Colaborador</th><th>CPF</th><th>Valor</th><th>Arquivo</th><th>Situação</th>${podeEditar ? '<th></th>' : ''}</tr></thead>
+            <tbody>
+              ${(f.linhas || []).map((l, i) => `
+                <tr style="${l.status === 'conferir' ? 'background:rgba(217,119,6,.07);' : ''}">
+                  <td>${podeEditar ? `<input class="form-control" style="min-width:180px;font-size:12px;padding:4px 8px;" value="${escapeHTML(l.nome || '')}" onchange="ffEditarLinha(${i},'nome',this.value)">` : escapeHTML(l.nome || '—')}</td>
+                  <td>${podeEditar ? `<input class="form-control" style="width:140px;font-size:12px;padding:4px 8px;" value="${escapeHTML(l.cpf || '')}" onchange="ffEditarLinha(${i},'cpf',this.value)">` : escapeHTML(l.cpf || '—')}</td>
+                  <td>${podeEditar ? `<input class="form-control" style="width:110px;font-size:12px;padding:4px 8px;text-align:right;" value="${(Number(l.valor) || 0).toFixed(2).replace('.', ',')}" onchange="ffEditarLinha(${i},'valor',this.value)">` : `<strong>${_ffMoedaBR(l.valor)}</strong>`}</td>
+                  <td style="font-size:10px;color:var(--text-secondary);">${escapeHTML(l.arquivo || '—')}</td>
+                  <td>${l.status === 'conferir'
+                    ? '<span style="font-size:10px;font-weight:800;color:#D97706;">🟡 conferir</span>'
+                    : '<span style="font-size:10px;font-weight:800;color:#059669;">🟢 ok</span>'}</td>
+                  ${podeEditar ? `<td><button class="btn btn-sm btn-outline" style="border-color:#DC2626;color:#DC2626;padding:2px 8px;" onclick="ffRemoverLinha(${i})"><i class="fa-solid fa-trash-can"></i></button></td>` : ''}
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="exame-detalhe-laudo" style="margin-top:16px;">
+        <h4><i class="fa-solid fa-file-pdf"></i> Documentos (${(f.arquivos || []).length})</h4>
+        ${(f.arquivos || []).map((a, i) => `
+          <div class="exame-pdf-card" style="margin-top:8px;">
+            <div class="exame-pdf-icon" style="color:#DC2626;"><i class="fa-solid fa-file-pdf"></i></div>
+            <div class="exame-pdf-info"><strong>${escapeHTML(a.nome)}</strong></div>
+            <button class="btn btn-sm btn-primary" onclick="ffAbrirArquivo(${i})"><i class="fa-solid fa-eye"></i> Abrir</button>
+          </div>`).join('')}
+        ${f.comprovante ? `
+          <div class="exame-pdf-card" style="margin-top:8px;border-color:#059669;">
+            <div class="exame-pdf-icon" style="color:#059669;"><i class="fa-solid fa-receipt"></i></div>
+            <div class="exame-pdf-info"><strong>Comprovante: ${escapeHTML(f.comprovante.nome)}</strong></div>
+            <button class="btn btn-sm btn-primary" onclick="ffAbrirArquivo('comprovante')"><i class="fa-solid fa-eye"></i> Abrir</button>
+          </div>` : ''}
+      </div>
+
+      <div class="exame-detalhe-laudo" style="margin-top:16px;">
+        <h4><i class="fa-solid fa-clock-rotate-left"></i> Histórico</h4>
+        <div style="max-height:220px;overflow-y:auto;">
+          ${(f.historico || []).slice().reverse().map(h => `
+            <div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px dashed var(--border-color);font-size:12px;">
+              <span style="color:var(--text-secondary);white-space:nowrap;">${_formatarDataHoraBR(h.data)}</span>
+              <span><strong>${escapeHTML(h.usuario)}</strong> — ${escapeHTML(h.acao)}</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  // Botões do rodapé conforme perfil + status
+  const footer = document.getElementById('ff-det-footer');
+  if (footer) {
+    const b = [];
+    b.push(`<button class="btn btn-outline" onclick="fecharDetalheFluxo()"><i class="fa-solid fa-xmark"></i> Fechar</button>`);
+
+    if (f.status === 'rascunho' && _ffPodeCriar()) {
+      b.push(`<button class="btn btn-primary" onclick="ffEnviarParaAprovacao()"><i class="fa-solid fa-paper-plane"></i> Enviar para Aprovação</button>`);
+    }
+    if (f.status === 'aguardando_coordenacao' && _ffEhCoordenacao()) {
+      if (_ffEhCriador(f)) {
+        b.push(`<span style="font-size:11px;color:#D97706;font-weight:700;align-self:center;"><i class="fa-solid fa-ban"></i> Você criou este fluxo — outra pessoa da Coordenação precisa aprovar.</span>`);
+      } else {
+        b.push(`<button class="btn btn-success" onclick="ffAprovar('coordenacao')"><i class="fa-solid fa-check"></i> Aprovar (Coordenação)</button>`);
+        b.push(`<button class="btn btn-outline" style="border-color:#D97706;color:#D97706;" onclick="ffDevolver()"><i class="fa-solid fa-rotate-left"></i> Devolver p/ correção</button>`);
+        b.push(`<button class="btn btn-danger" onclick="ffReprovar()"><i class="fa-solid fa-ban"></i> Reprovar</button>`);
+      }
+    }
+    if (f.status === 'aguardando_gestao' && _ffEhGestao()) {
+      b.push(`<button class="btn btn-success" onclick="ffAprovar('gestao')"><i class="fa-solid fa-check"></i> Aprovar (Gestão)</button>`);
+      b.push(`<button class="btn btn-outline" style="border-color:#D97706;color:#D97706;" onclick="ffDevolver()"><i class="fa-solid fa-rotate-left"></i> Devolver p/ correção</button>`);
+      b.push(`<button class="btn btn-danger" onclick="ffReprovar()"><i class="fa-solid fa-ban"></i> Reprovar</button>`);
+    }
+    if (f.status === 'aguardando_financeiro' && _ffEhFinanceiro()) {
+      b.push(`<button class="btn btn-success" onclick="ffMarcarPago()"><i class="fa-solid fa-money-check-dollar"></i> Pagamento Realizado</button>`);
+      b.push(`<button class="btn btn-outline" style="border-color:#D97706;color:#D97706;" onclick="ffDevolver()"><i class="fa-solid fa-rotate-left"></i> Devolver p/ correção</button>`);
+    }
+    if (f.status === 'pago' && _ffEhFinanceiro()) {
+      b.push(`<button class="btn btn-success" onclick="document.getElementById('input-comprovante-fluxo').click()"><i class="fa-solid fa-receipt"></i> Anexar Comprovante</button>`);
+    }
+    footer.innerHTML = b.join('');
+  }
+}
+
+// Edição das linhas (só em rascunho)
+window.ffEditarLinha = function(i, campo, valor) {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f || f.status !== 'rascunho' || !f.linhas[i]) return;
+  if (campo === 'valor') f.linhas[i].valor = _ffParseValor(valor);
+  else f.linhas[i][campo] = String(valor || '').trim();
+  const l = f.linhas[i];
+  l.status = (l.nome && l.nome.length >= 5 && Number(l.valor) > 0) ? 'ok' : 'conferir';
+  saveState();
+  _ffRenderDetalhe();
+};
+window.ffRemoverLinha = function(i) {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f || f.status !== 'rascunho') return;
+  f.linhas.splice(i, 1);
+  saveState(); _ffRenderDetalhe();
+};
+window.ffAdicionarLinha = function() {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f || f.status !== 'rascunho') return;
+  f.linhas.push({ id: 'ffl-' + Date.now(), nome: '', cpf: '', valor: 0, arquivo: '(manual)', status: 'conferir' });
+  saveState(); _ffRenderDetalhe();
+};
+
+// Abre PDF/comprovante em nova aba (mesma técnica do exame médico)
+window.ffAbrirArquivo = function(i) {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f) return;
+  const item = i === 'comprovante' ? f.comprovante : (f.arquivos || [])[i];
+  if (!item || !item.arquivo) { alert('Arquivo não encontrado.'); return; }
+  let src = item.arquivo;
+  if (src.indexOf('data:') === 0) {
+    try {
+      const v = src.indexOf(','); const mime = (src.slice(0, v).match(/data:([^;]+)/) || [])[1] || 'application/pdf';
+      const bin = atob(src.slice(v + 1)); const bytes = new Uint8Array(bin.length);
+      for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
+      src = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    } catch (e) {}
+  } else if (src.charAt(0) === '/') src = window.location.origin + src;
+  const w = window.open(src, '_blank');
+  if (!w) alert('Habilite os pop-ups deste site para abrir o arquivo.');
+};
+
+// ── Ações do fluxo ─────────────────────────────────────────────────────────
+async function _ffSalvarERender(f, msgOk) {
+  try {
+    if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
+      await RTCloud.salvarAgora(state);
+    } else { saveState(); }
+    try { localStorage.setItem('rt_empregos_data', _estadoParaCache()); } catch (e) {}
+    _ffRenderDetalhe(); renderFluxoFinanceiro();
+    if (msgOk) alert(msgOk);
+  } catch (e) {
+    alert('Não foi possível salvar no servidor: ' + (e.message || e) + '\nTente de novo.');
+  }
+}
+
+window.ffEnviarParaAprovacao = async function() {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f || f.status !== 'rascunho') return;
+  if (!(f.linhas || []).length) { alert('O fluxo não tem nenhum registro. Adicione ou importe antes de enviar.'); return; }
+  const pend = f.linhas.filter(l => l.status === 'conferir').length;
+  if (pend && !confirm(`Ainda há ${pend} registro(s) marcados como "conferir".\n\nEnviar para aprovação mesmo assim?`)) return;
+
+  f.status = 'aguardando_coordenacao';
+  _ffHist(f, `Confirmou a conferência (${f.linhas.length} registros · ${_ffMoedaBR(_ffTotal(f))}) e enviou para a Coordenação DP.`);
+  registrarLogGlobal(`Enviou o Fluxo Financeiro #${f.numero} para aprovação da Coordenação DP.`, 'dp');
+  await _ffSalvarERender(f, `Fluxo #${f.numero} enviado para a Coordenação DP.`);
+};
+
+window.ffAprovar = async function(etapa) {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f) return;
+  const agora = new Date().toISOString();
+  const quem = nomeExibido(loggedUser);
+
+  if (etapa === 'coordenacao' && f.status === 'aguardando_coordenacao' && _ffEhCoordenacao()) {
+    if (_ffEhCriador(f)) { alert('Você criou este fluxo — outra pessoa da Coordenação precisa aprovar.'); return; }
+    f.aprovacoes.coordenacao = { por: quem, login: loggedUser.login, em: agora };
+    f.status = 'aguardando_gestao';
+    _ffHist(f, 'Coordenação DP aprovou. Enviado para a Gestão.');
+    registrarLogGlobal(`Aprovou (Coordenação DP) o Fluxo Financeiro #${f.numero}.`, 'dp');
+    await _ffSalvarERender(f, 'Aprovado! O fluxo seguiu para a Gestão.');
+  } else if (etapa === 'gestao' && f.status === 'aguardando_gestao' && _ffEhGestao()) {
+    f.aprovacoes.gestao = { por: quem, login: loggedUser.login, em: agora };
+    f.status = 'aguardando_financeiro';
+    _ffHist(f, 'Gestão aprovou. Enviado para o Financeiro.');
+    registrarLogGlobal(`Aprovou (Gestão) o Fluxo Financeiro #${f.numero}.`, 'dp');
+    await _ffSalvarERender(f, 'Aprovado! O fluxo seguiu para o Financeiro.');
+  }
+};
+
+window.ffReprovar = async function() {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f) return;
+  const motivo = prompt('Motivo da reprovação (fica no histórico):');
+  if (motivo === null) return;
+  if (!String(motivo).trim()) { alert('Escreva o motivo.'); return; }
+  f.status = 'reprovado';
+  _ffHist(f, `REPROVOU o fluxo. Motivo: ${String(motivo).trim()}`);
+  registrarLogGlobal(`Reprovou o Fluxo Financeiro #${f.numero}.`, 'dp');
+  await _ffSalvarERender(f, 'Fluxo reprovado.');
+};
+
+window.ffDevolver = async function() {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f) return;
+  const motivo = prompt('O que precisa ser corrigido? (fica no histórico)');
+  if (motivo === null) return;
+  if (!String(motivo).trim()) { alert('Escreva o que corrigir.'); return; }
+  f.status = 'rascunho';
+  f.aprovacoes = {};   // volta do zero: as aprovações anteriores caem
+  _ffHist(f, `Devolveu para correção. Motivo: ${String(motivo).trim()}`);
+  registrarLogGlobal(`Devolveu o Fluxo Financeiro #${f.numero} para correção.`, 'dp');
+  await _ffSalvarERender(f, 'Fluxo devolvido ao DP para correção.');
+};
+
+window.ffMarcarPago = async function() {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f || f.status !== 'aguardando_financeiro' || !_ffEhFinanceiro()) return;
+  if (!confirm(`Confirmar o pagamento de ${_ffMoedaBR(_ffTotal(f))} (${f.empresaNome} · ${f.tipo})?`)) return;
+  f.aprovacoes.pagamento = { por: nomeExibido(loggedUser), login: loggedUser.login, em: new Date().toISOString() };
+  f.status = 'pago';
+  _ffHist(f, `Financeiro confirmou o pagamento de ${_ffMoedaBR(_ffTotal(f))}.`);
+  registrarLogGlobal(`Confirmou o pagamento do Fluxo Financeiro #${f.numero} (${_ffMoedaBR(_ffTotal(f))}).`, 'dp');
+  await _ffSalvarERender(f, 'Pagamento registrado! Agora anexe o comprovante para finalizar.');
+};
+
+window.anexarComprovanteFluxo = async function(input) {
+  const file = input.files?.[0];
+  input.value = '';
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!file || !f || f.status !== 'pago') return;
+  try {
+    const base64 = await fileToBase64(file);
+    f.comprovante = { nome: file.name, arquivo: base64, em: new Date().toISOString() };
+    f.status = 'finalizado';
+    _ffHist(f, `Anexou o comprovante (${file.name}). Fluxo FINALIZADO.`);
+    registrarLogGlobal(`Anexou o comprovante e finalizou o Fluxo Financeiro #${f.numero}.`, 'dp');
+    await _ffSalvarERender(f, `Fluxo #${f.numero} FINALIZADO com comprovante. ✅`);
+  } catch (e) {
+    alert('Não foi possível anexar: ' + (e.message || e));
+  }
+};
 
 // Sub-aba ativa do Exame Médico: pendentes | concluidos | todos | relatorio
 let _exameSubAba = 'pendentes';

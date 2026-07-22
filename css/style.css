@@ -4474,3 +4474,32 @@ input.form-control[type="date"] {
     .imp-mapa { grid-template-columns: 1fr; }
     .imp-kpis { grid-template-columns: 1fr 1fr; }
 }
+
+/* ── Fluxo Financeiro: trilha de etapas (DP → Coordenação → Gestão → Financeiro) ── */
+.ff-etapas {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--surface-2, #F8FAFC);
+    border: 1px solid var(--color-glass-border, #E2E8F0);
+}
+.ff-etapa {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--text-secondary, #94A3B8);
+}
+.ff-etapa i { font-size: 13px; }
+.ff-etapa span small { display: block; font-weight: 500; font-size: 10px; opacity: .8; }
+.ff-etapa-ok { color: #059669; }
+.ff-etapa-seta { color: var(--text-secondary, #CBD5E1); font-size: 10px; }
+
+@media (max-width: 768px) {
+    .ff-etapas { flex-direction: column; align-items: flex-start; }
+    .ff-etapa-seta { transform: rotate(90deg); margin-left: 4px; }
+}
