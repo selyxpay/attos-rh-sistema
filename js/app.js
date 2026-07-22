@@ -11392,103 +11392,130 @@ function _ffCpfValido(s) {
 //  - "Sub-Total R$ 48.108,00" tem hífen e virava uma linha fantasma na soma;
 //  - o cabeçalho traz o CNPJ com vírgulas (36,927,751,0001,03) que parecia valor.
 // O "Total Geral" impresso no PDF é capturado para BATER com a soma das linhas.
-function _ffAnalisarTexto(texto) {
-  const out = [];
-  let totalGeral = null;
-  let subTotal = null;
-  // Metadados do cabeçalho do relatório (para os cheques técnicos)
-  let dataPagamentoPdf = null;   // "Data do pagamento: 15/07/2026"
-  let relacaoNumero = null;      // "relação N. 0012867"
-  {
-    const mDt = String(texto || '').match(/data\s+do\s+pagamento\s*:?\s*(\d{2}\/\d{2}\/\d{4})/i);
-    if (mDt) dataPagamentoPdf = mDt[1];
-    const mRel = String(texto || '').match(/rela[çc][ãa]o\s+N\.?\s*(\d{4,12})/i);
-    if (mRel) relacaoNumero = mRel[1];
-  }
+// Interpreta o "meio" de uma linha (tudo entre o CPF e o valor) por SIGNIFICADO,
+// não por posição fixa — funciona para os dois modelos e para linhas PIX (que
+// não têm agência/conta). Classifica os tokens: data de demissão, competência,
+// banco, lote, TC, agência(+dígito) e conta(+dígito).
+function _ffParseMeioExata(meio) {
+  const r = { demissao: '', competencia: '', banco: '', lote: '', tc: '', agencia: '', agenciaDg: '', conta: '', contaDg: '' };
+  let toks = String(meio || '').trim().split(/\s+/).filter(Boolean);
 
-  // Linha COMPLETA do relatório do Exata — captura TODAS as colunas:
-  //  005199 LUCAS SOUZA DE ARAUJO 434.428.718.59 07/26 237 270 CC 2826 6 000001012329 1 844,00 AA01
-  //  codigo  nome                 cpf            comp  bco lot tc agen dg conta        dg valor  orig
-  // Os dígitos de agência/conta podem NÃO existir (aí ficam vazios — nunca inventamos).
-  const rxCompleta = /^\s*(\d{3,8})\s+(.+?)\s+(\d{3}[.\s]?\d{3}[.\s]?\d{3}[.\s-]?\d{2})\s+(\d{2}\/\d{2,4})\s+(\d{2,4})\s+(\d{1,4})\s+([A-Z]{1,3})\s+(\d{1,5})(?:\s+(\d))?\s+(\d{5,13})(?:\s+(\d))?\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+(\S{1,6})\s*$/;
-  // Versão mais frouxa (colunas do meio variando): código + nome + CPF + ... + valor + origem
-  const rxSimples = /^\s*(\d{3,8})\s+(.+?)\s+(\d{3}[.\s]?\d{3}[.\s]?\d{3}[.\s-]?\d{2})\s.*?(\d{1,3}(?:\.\d{3})*,\d{2})\s+(\S{1,6})\s*$/;
+  let i = toks.findIndex(t => /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(t));   // data completa = demissão
+  if (i >= 0) { r.demissao = toks[i]; toks.splice(i, 1); }
+  i = toks.findIndex(t => /^\d{1,2}\/\d{2}$/.test(t));               // dd/aa = competência
+  if (i >= 0) { r.competencia = toks[i]; toks.splice(i, 1); }
+
+  const iTc = toks.findIndex(t => /^[A-Z]{2,3}$/.test(t));           // CC / PX / CD / TED
+  if (iTc >= 0) r.tc = toks[iTc];
+
+  const antes = (iTc >= 0 ? toks.slice(0, iTc) : toks).filter(t => /^\d+$/.test(t));
+  r.banco = antes[0] || '';
+  r.lote = antes[1] || '';
+
+  const depois = (iTc >= 0 ? toks.slice(iTc + 1) : []).filter(t => /^\d+$/.test(t));
+  if (depois.length) {
+    // a CONTA é o número mais longo; o que vem antes é agência(+dígito), o depois é dígito da conta
+    let idx = 0, max = -1;
+    depois.forEach((t, k) => { if (t.length > max) { max = t.length; idx = k; } });
+    r.conta = depois[idx];
+    const ac = depois.slice(0, idx);
+    r.agencia = ac[0] || '';
+    r.agenciaDg = ac[1] || '';
+    r.contaDg = depois[idx + 1] || '';
+  }
+  return r;
+}
+
+// Lê o texto de UM relatório do Exata. Reconhece automaticamente o MODELO:
+//   • Modelo 1 (SFP99024): CPF com pontos, totais "Sub-Total"/"Total Geral".
+//   • Modelo 2 (relação bancária RT2): CPF com vírgula (380802298,13), seções
+//     por banco (Bradesco/Itaú/PIX), linhas PIX sem agência/conta, totais por
+//     "Tot.Cliente". As colunas são lidas por significado, não por posição fixa.
+// Devolve linhas estruturadas + Sub-Total + Total Geral (recalculável) + metadados.
+function _ffAnalisarTexto(texto) {
+  const txt = String(texto || '');
+  const out = [];
+  let subTotal = null;
+  let totalGeralM1 = null;   // "Total Geral" (modelo 1)
+  let somaTotCliente = 0;    // soma dos "Tot.Cliente" (modelo 2)
+  let temTotCliente = false;
+
+  // Modelo detectado (só para o relatório/rótulo — a leitura funciona nos dois)
+  let modelo = 'Genérico';
+  if (/tot\.?\s*cliente|ordem\s+pagamento|total\s+da\s+rela[çc][ãa]o/i.test(txt)) modelo = 'Relação bancária (RT2)';
+  else if (/sfp99024|sub[\s-]*total|total\s+geral|rela[çc][ãa]o\s+N\./i.test(txt)) modelo = 'SFP99024 (RT1)';
+
+  // Metadados
+  let dataPagamentoPdf = null, relacaoNumero = null;
+  const mDt = txt.match(/data\s+d?[eo]?\s*pagamento\s*:?\s*(\d{2}\/\d{2}\/\d{4})/i);
+  if (mDt) dataPagamentoPdf = mDt[1];
+  const mRel = txt.match(/rela[çc][ãa]o\s+N\.?\s*(\d{4,12})/i) || txt.match(/ordem\s+pagamento\s+nr\.?\s*(\d{3,12})/i);
+  if (mRel) relacaoNumero = mRel[1];
+
+  // Linha de colaborador: código + nome + CPF + (meio) + valor + origem.
+  // O CPF aceita ponto, espaço, traço OU vírgula antes dos 2 últimos dígitos
+  // (RT2 imprime "380802298,13"). O valor é o último "0.000,00" antes da origem.
+  const rxLinha = /^\s*(\d{3,10})\s+(.+?)\s+(\d{3}[.\s]?\d{3}[.\s]?\d{3}[.,\s-]?\d{2})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+(\S{1,6})\s*$/;
 
   const novaLinha = extra => Object.assign({
     id: 'ffl-' + Date.now() + '-' + out.length + '-' + Math.random().toString(36).slice(2, 5),
-    codigo: '', nome: '', cpf: '', competencia: '', banco: '', lote: '', tc: '',
-    agencia: '', agenciaDg: '', conta: '', contaDg: '', origem: '', valor: 0,
-    status: 'conferir'
+    codigo: '', nome: '', cpf: '', competencia: '', demissao: '', banco: '', lote: '', tc: '',
+    agencia: '', agenciaDg: '', conta: '', contaDg: '', origem: '', valor: 0, status: 'conferir'
   }, extra);
 
-  String(texto || '').split(/\n+/).forEach(l => {
+  txt.split(/\n+/).forEach(l => {
     const linha = l.trim();
     if (!linha) return;
 
-    // Totais impressos no PDF: Sub-Total e Total Geral são guardados SEPARADOS
-    // para a validação matemática (e nunca viram registro).
-    const mTotal = linha.match(/total\s+geral\s*(?:R\$)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i);
-    if (mTotal) { totalGeral = _ffParseValor(mTotal[1]); return; }
+    // ── Totais impressos (nunca viram registro) ──
+    const mTG = linha.match(/total\s+geral\s*(?:R\$)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i);
+    if (mTG) { totalGeralM1 = _ffParseValor(mTG[1]); return; }
     const mSub = linha.match(/sub[\s-]*total\s*(?:R\$)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i);
     if (mSub) { subTotal = _ffParseValor(mSub[1]); return; }
-    if (/^(sub[\s-]*total|total|valor\s+total|resumo|somat[óo]ri)/i.test(linha)) return;
+    // Modelo 2: "Tot.Cliente - EBAZAR CAJAMAR 130,00" — soma p/ o total do documento
+    const mTC = linha.match(/tot\.?\s*cliente.*?(\d{1,3}(?:\.\d{3})*,\d{2})\s*$/i);
+    if (mTC) { somaTotCliente += _ffParseValor(mTC[1]); temTotCliente = true; return; }
 
-    // Cabeçalhos/rodapés — inclusive os REPETIDOS em cada página do relatório
-    if (/p[áa]gina|relat[óo]rio|usu[áa]rio\s*:|ordem\s+de\s+c[óo]digos|data\s+do\s+pagamento|nome\s+funcionario|ltda|\bs\/?a\b|cnpj/i.test(linha)) return;
+    // ── Cabeçalhos/rodapés dos DOIS modelos (repetidos em cada página) ──
+    if (/^\s*(empresa|banco|per[íi]odo|ordem\s+pagamento|forma\s+pagamento|data\s+(emiss[ãa]o|pagamento)|fl\.?\s*c[óo]digo|p[áa]gina|nome\s+do?\s+funcion[áa]rio|total\s+da\s+(p[áa]gina|rela[çc][ãa]o)|tot\.?\s*cliente|ordem\s+de\s+c[óo]digos|relat[óo]rio|usu[áa]rio)/i.test(linha)) return;
+    if (/\bltda\b|\bs\/?a\b|\bcnpj\b|bradesco|banco\s+ita[uú]|\bpix\b\s*$/i.test(linha)) return;
 
-    // 1º: linha completa do Exata → todas as colunas estruturadas
-    const mC = rxCompleta.exec(linha);
-    if (mC) {
-      const nome = mC[2].replace(/[^\p{L}\s'.-]/gu, ' ').replace(/\s+/g, ' ').trim();
-      const valor = _ffParseValor(mC[12]);
-      out.push(novaLinha({
-        codigo: mC[1],                    // texto: preserva os zeros à esquerda
-        nome, cpf: _ffNormalizarCpf(mC[3]),
-        competencia: mC[4], banco: mC[5], lote: mC[6], tc: mC[7],
-        agencia: mC[8], agenciaDg: mC[9] || '', conta: mC[10], contaDg: mC[11] || '',
-        valor, origem: mC[13],
+    // ── Linha de colaborador ──
+    const m = rxLinha.exec(linha);
+    if (m) {
+      const nome = m[2].replace(/[^\p{L}\s'.-]/gu, ' ').replace(/\s+/g, ' ').trim();
+      const valor = _ffParseValor(m[5]);
+      const meio = _ffParseMeioExata(m[4]);
+      out.push(novaLinha(Object.assign({
+        codigo: m[1], nome, cpf: _ffNormalizarCpf(m[3]),
+        valor, origem: m[6],
         status: (nome && nome.length >= 5 && valor > 0) ? 'ok' : 'conferir'
-      }));
+      }, meio)));
       return;
     }
 
-    // 2º: Exata com colunas do meio fora do padrão
-    const mS = rxSimples.exec(linha);
-    if (mS) {
-      const nome = mS[2].replace(/[^\p{L}\s'.-]/gu, ' ').replace(/\s+/g, ' ').trim();
-      const valor = _ffParseValor(mS[4]);
-      out.push(novaLinha({
-        codigo: mS[1], nome, cpf: _ffNormalizarCpf(mS[3]), valor, origem: mS[5],
-        status: (nome && nome.length >= 5 && valor > 0) ? 'ok' : 'conferir'
-      }));
-      return;
-    }
-
-    // 3º: heurística genérica (outros layouts) — exige CPF para confiar
+    // ── Fallback genérico (outros layouts) — exige CPF para confiar ──
     const valores = [...linha.matchAll(/(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})\b/g)];
     if (!valores.length) return;
-    const cpfM = linha.match(/\d{3}\.?\d{3}\.?\d{3}[.-]?\d{2}(?!\d)/);
+    const cpfM = linha.match(/\d{3}[.\s]?\d{3}[.\s]?\d{3}[.,\s-]?\d{2}(?!\d)/);
     const valor = _ffParseValor(valores[valores.length - 1][1]);
-
     let nome = linha;
     if (cpfM) nome = linha.slice(0, cpfM.index);
-    const primeiroValor = nome.search(/(?:R\$\s*)?\d{1,3}(?:\.\d{3})*,\d{2}\b/);
-    if (primeiroValor >= 0) nome = nome.slice(0, primeiroValor);
-    nome = nome
-      .replace(/^[\s\d\-.,:|/]+/, '')
-      .replace(/[^\p{L}\s'.-]/gu, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const pv = nome.search(/(?:R\$\s*)?\d{1,3}(?:\.\d{3})*,\d{2}\b/);
+    if (pv >= 0) nome = nome.slice(0, pv);
+    nome = nome.replace(/^[\s\d\-.,:|/]+/, '').replace(/[^\p{L}\s'.-]/gu, ' ').replace(/\s+/g, ' ').trim();
     if (/^(nome|colaborador|funcion[áa]rio|cpf|matr[íi]cula|valor|banco|ag[êe]ncia|conta|data)$/i.test(nome)) return;
-    if (!cpfM && (!nome || nome.length < 5)) return;   // sem CPF e sem nome decente = lixo
-
+    if (!cpfM) return;   // sem CPF confiável, não arrisca virar registro
     out.push(novaLinha({
-      nome, cpf: cpfM ? _ffNormalizarCpf(cpfM[0]) : '', valor,
-      status: (nome && nome.length >= 5 && valor > 0 && cpfM) ? 'ok' : 'conferir'
+      nome, cpf: _ffNormalizarCpf(cpfM[0]), valor,
+      status: (nome && nome.length >= 5 && valor > 0) ? 'ok' : 'conferir'
     }));
   });
 
-  return { linhas: out, subTotal, totalGeral, dataPagamentoPdf, relacaoNumero };
+  // Total do documento: modelo 1 usa "Total Geral"; modelo 2 usa a soma dos
+  // "Tot.Cliente". Sem nenhum dos dois, fica null (o painel avisa "sem total").
+  const totalGeral = (totalGeralM1 !== null) ? totalGeralM1 : (temTotCliente ? somaTotCliente : null);
+  return { linhas: out, subTotal, totalGeral, dataPagamentoPdf, relacaoNumero, modelo };
 }
 
 // ── Cheques técnicos do fluxo inteiro (auditoria fina) ─────────────────────
@@ -11949,7 +11976,8 @@ async function criarFluxoFinanceiro() {
       arquivos.push({
         nome: f.name, arquivo: base64, paginas,
         subTotal: analise.subTotal, totalGeral: analise.totalGeral,
-        dataPagamentoPdf: analise.dataPagamentoPdf, relacaoNumero: analise.relacaoNumero
+        dataPagamentoPdf: analise.dataPagamentoPdf, relacaoNumero: analise.relacaoNumero,
+        modelo: analise.modelo || 'Genérico'
       });
     }
 
@@ -12008,8 +12036,10 @@ async function criarFluxoFinanceiro() {
       ? `\n⚠ POSSÍVEL DUPLICIDADE: ${dups.cpf.length} CPF(s) aparecem mais de uma vez. Confira na tabela.` : '';
 
     const pendentes = linhas.filter(l => l.status === 'conferir').length;
+    const modelos = [...new Set(arquivos.map(a => a.modelo).filter(Boolean))];
     alert(`Fluxo #${numero} criado!\n\n` +
       `Arquivos processados: ${arquivos.length}\n` +
+      (modelos.length ? `Modelo reconhecido: ${modelos.join(', ')}\n` : '') +
       `Páginas processadas: ${paginasTotal}\n` +
       `Registros identificados: ${linhas.length}\n` +
       `Valor total calculado: ${_ffMoedaBR(_ffTotal(fluxo))}` +
@@ -12260,7 +12290,7 @@ function _ffRenderDetalhe() {
         ${(f.arquivos || []).map((a, i) => `
           <div class="exame-pdf-card" style="margin-top:8px;">
             <div class="exame-pdf-icon" style="color:#DC2626;"><i class="fa-solid fa-file-pdf"></i></div>
-            <div class="exame-pdf-info"><strong>${escapeHTML(a.nome)}</strong></div>
+            <div class="exame-pdf-info"><strong>${escapeHTML(a.nome)}</strong>${a.modelo ? `<br><span style="font-size:11px;color:var(--text-secondary);"><i class="fa-solid fa-layer-group"></i> Modelo: ${escapeHTML(a.modelo)}${a.paginas ? ` · ${a.paginas} pág.` : ''}</span>` : ''}</div>
             <button class="btn btn-sm btn-primary" onclick="ffAbrirArquivo(${i})"><i class="fa-solid fa-eye"></i> Abrir</button>
           </div>`).join('')}
         ${f.comprovante ? `
