@@ -4,3 +4,5 @@ server-data/
 node_modules/
 *.log
 server-data-test/
+server-data-local/
+INICIAR-SISTEMA-LOCAL.bat
