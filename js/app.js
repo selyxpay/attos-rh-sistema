@@ -11260,6 +11260,21 @@ function _ffNormalizarCpf(s) {
   return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
 }
 
+// Dígito verificador do CPF (algoritmo oficial da Receita). true = matematicamente
+// válido. Usado como ALERTA de auditoria, nunca como bloqueio: relatório com CPF
+// mascarado/truncado reprovaria em massa.
+function _ffCpfValido(s) {
+  const d = String(s || '').replace(/\D/g, '');
+  if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+  for (const t of [9, 10]) {
+    let soma = 0;
+    for (let i = 0; i < t; i++) soma += parseInt(d[i], 10) * (t + 1 - i);
+    const dv = ((soma * 10) % 11) % 10;
+    if (dv !== parseInt(d[t], 10)) return false;
+  }
+  return true;
+}
+
 // Lê o texto de UM PDF do Exata e devolve { linhas, totalDeclarado }.
 //
 // CALIBRADO NO RELATÓRIO REAL do Exata (SFP99024 — "pagamentos agendados na
@@ -11274,6 +11289,15 @@ function _ffAnalisarTexto(texto) {
   const out = [];
   let totalGeral = null;
   let subTotal = null;
+  // Metadados do cabeçalho do relatório (para os cheques técnicos)
+  let dataPagamentoPdf = null;   // "Data do pagamento: 15/07/2026"
+  let relacaoNumero = null;      // "relação N. 0012867"
+  {
+    const mDt = String(texto || '').match(/data\s+do\s+pagamento\s*:?\s*(\d{2}\/\d{2}\/\d{4})/i);
+    if (mDt) dataPagamentoPdf = mDt[1];
+    const mRel = String(texto || '').match(/rela[çc][ãa]o\s+N\.?\s*(\d{4,12})/i);
+    if (mRel) relacaoNumero = mRel[1];
+  }
 
   // Linha COMPLETA do relatório do Exata — captura TODAS as colunas:
   //  005199 LUCAS SOUZA DE ARAUJO 434.428.718.59 07/26 237 270 CC 2826 6 000001012329 1 844,00 AA01
@@ -11357,7 +11381,52 @@ function _ffAnalisarTexto(texto) {
     }));
   });
 
-  return { linhas: out, subTotal, totalGeral };
+  return { linhas: out, subTotal, totalGeral, dataPagamentoPdf, relacaoNumero };
+}
+
+// ── Cheques técnicos do fluxo inteiro (auditoria fina) ─────────────────────
+function _ffChequesTecnicos(f) {
+  const linhas = f.linhas || [];
+  const cheques = { cpfInvalidos: [], valoresZerados: [], competencias: [], datasPdf: [], stats: null };
+
+  // 1) Dígito verificador do CPF (alerta, não bloqueio)
+  cheques.cpfInvalidos = linhas.filter(l => l.cpf && !_ffCpfValido(l.cpf));
+
+  // 2) Valores zerados/negativos — nunca deveriam existir num pagamento
+  cheques.valoresZerados = linhas.filter(l => !(Number(l.valor) > 0));
+
+  // 3) Competências encontradas nas linhas (misturadas = alerta)
+  cheques.competencias = [...new Set(linhas.map(l => l.competencia).filter(Boolean))];
+
+  // 4) Data de pagamento impressa em cada PDF × data escolhida no fluxo
+  const dataFluxoBR = f.dataPagamento
+    ? f.dataPagamento.split('-').reverse().join('/')   // 2026-07-15 -> 15/07/2026
+    : null;
+  (f.arquivos || []).forEach(a => {
+    if (a.dataPagamentoPdf) {
+      cheques.datasPdf.push({ arquivo: a.nome, dataPdf: a.dataPagamentoPdf, bate: dataFluxoBR === a.dataPagamentoPdf });
+    }
+  });
+
+  // 5) Estatística dos valores (para enxergar fora-da-curva de longe)
+  const vals = linhas.map(l => Number(l.valor) || 0).filter(v => v > 0);
+  if (vals.length) {
+    const soma = vals.reduce((s, v) => s + v, 0);
+    const freq = new Map();
+    vals.forEach(v => freq.set(v, (freq.get(v) || 0) + 1));
+    const [maisComum, vezes] = [...freq.entries()].sort((a, b) => b[1] - a[1])[0];
+    cheques.stats = {
+      menor: Math.min(...vals), maior: Math.max(...vals),
+      media: Math.round((soma / vals.length) * 100) / 100,
+      maisComum, vezes
+    };
+  }
+
+  // Competência do fluxo (2026-07) no formato das linhas (07/26), para comparar
+  const mComp = String(f.competencia || '').match(/^(\d{4})-(\d{2})$/);
+  cheques.compFluxo = mComp ? `${mComp[2]}/${mComp[1].slice(2)}` : null;
+
+  return cheques;
 }
 
 // Duplicidades no fluxo inteiro (todos os arquivos juntos). O CPF é o principal
@@ -11562,7 +11631,11 @@ async function criarFluxoFinanceiro() {
       analise.linhas.forEach(l => { l.arquivo = f.name; linhas.push(l); });
       // guarda o PDF (vira link /uploads/.. na sincronização) + os totais impressos nele
       const base64 = await fileToBase64(f);
-      arquivos.push({ nome: f.name, arquivo: base64, paginas, subTotal: analise.subTotal, totalGeral: analise.totalGeral });
+      arquivos.push({
+        nome: f.name, arquivo: base64, paginas,
+        subTotal: analise.subTotal, totalGeral: analise.totalGeral,
+        dataPagamentoPdf: analise.dataPagamentoPdf, relacaoNumero: analise.relacaoNumero
+      });
     }
 
     if (txt) txt.textContent = `Montando a tabela (${linhas.length} registros encontrados)...`;
@@ -11761,6 +11834,52 @@ function _ffRenderDetalhe() {
             `Nome repetido: ${dups.nome.map(g => `${g.linhas[0].nome} (${g.linhas.length}x)`).join(' · ')}`)}
           ${linhaVal(!pend, 'Registros com problema de leitura: 0', `${pend} registro(s) precisam de conferência (marcados em amarelo na tabela)`)}
         </div>
+        ${(() => {
+          // ── CHEQUES TÉCNICOS (auditoria fina) ──
+          const t = _ffChequesTecnicos(f);
+          const aviso = txt => `<div style="font-size:12px;padding:3px 0;color:#B45309;font-weight:600;">🟡 ${txt}</div>`;
+          const okl   = txt => `<div style="font-size:12px;padding:3px 0;color:#059669;font-weight:600;">🟢 ${txt}</div>`;
+          const err   = txt => `<div style="font-size:12px;padding:3px 0;color:#DC2626;font-weight:700;">🔴 ${txt}</div>`;
+          const partes = [];
+
+          // valores zerados = erro de verdade
+          partes.push(t.valoresZerados.length
+            ? err(`${t.valoresZerados.length} registro(s) com valor ZERADO — pagamento não pode ter valor zero`)
+            : okl('Nenhum valor zerado ou negativo'));
+
+          // dígito verificador do CPF (alerta: pode ser máscara do relatório)
+          partes.push(t.cpfInvalidos.length
+            ? aviso(`${t.cpfInvalidos.length} CPF(s) reprovam no dígito verificador (ex: ${t.cpfInvalidos.slice(0, 3).map(l => (l.nome || '').split(' ')[0]).join(', ')}). Pode ser máscara do relatório — confira por amostragem.`)
+            : okl('Todos os CPFs passam no dígito verificador'));
+
+          // competência das linhas × competência do fluxo
+          if (t.competencias.length > 1) {
+            partes.push(aviso(`Competências MISTURADAS nas linhas: ${t.competencias.join(', ')} — confira se os PDFs são do mesmo período`));
+          } else if (t.competencias.length === 1 && t.compFluxo && t.competencias[0] !== t.compFluxo) {
+            partes.push(aviso(`A competência das linhas é ${t.competencias[0]}, mas o fluxo foi criado como ${t.compFluxo}`));
+          } else if (t.competencias.length === 1) {
+            partes.push(okl(`Competência única nas linhas: ${t.competencias[0]}`));
+          }
+
+          // data de pagamento impressa no PDF × data do fluxo
+          t.datasPdf.forEach(dp => {
+            partes.push(dp.bate
+              ? okl(`Data de pagamento do PDF (${dp.dataPdf}) confere com a do fluxo`)
+              : aviso(`${dp.arquivo}: o PDF diz pagamento em ${dp.dataPdf}, mas o fluxo está com ${f.dataPagamento ? f.dataPagamento.split('-').reverse().join('/') : '—'}`));
+          });
+
+          // número da relação (rastreabilidade com o Exata)
+          const relacoes = (f.arquivos || []).filter(a => a.relacaoNumero).map(a => a.relacaoNumero);
+          if (relacoes.length) partes.push(`<div style="font-size:11.5px;padding:3px 0;color:var(--text-secondary);"><i class="fa-solid fa-hashtag"></i> Relação(ões) do Exata: <strong>${[...new Set(relacoes)].join(', ')}</strong></div>`);
+
+          // estatística dos valores
+          if (t.stats) partes.push(`<div style="font-size:11.5px;padding:3px 0;color:var(--text-secondary);"><i class="fa-solid fa-chart-simple"></i>
+            Valores: menor <strong>${_ffMoedaBR(t.stats.menor)}</strong> · média <strong>${_ffMoedaBR(t.stats.media)}</strong> · maior <strong>${_ffMoedaBR(t.stats.maior)}</strong> · mais comum <strong>${_ffMoedaBR(t.stats.maisComum)}</strong> (${t.stats.vezes}×)</div>`);
+
+          return `<div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border-color);">
+            <div style="font-size:10.5px;font-weight:800;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Cheques técnicos</div>
+            ${partes.join('')}</div>`;
+        })()}
         ${tudoOk ? `<div style="margin-top:10px;padding:10px 14px;border-radius:10px;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.35);color:#059669;font-weight:800;font-size:13px;text-align:center;">
           ✅ RELATÓRIO VALIDADO COM SUCESSO</div>` : ''}
       </div>`;
