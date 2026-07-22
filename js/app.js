@@ -11191,6 +11191,19 @@ function _ffParseValor(s) {
 function _ffTotal(f) {
   return (f.linhas || []).reduce((s, l) => s + (Number(l.valor) || 0), 0);
 }
+
+// Confere, POR ARQUIVO, se a soma das linhas bate com o "Total Geral" impresso
+// no PDF. Recalculado ao vivo: se o DP editar uma linha, o cheque acompanha.
+// bate: true = fecha no centavo | false = diverge | null = PDF sem total impresso
+function _ffChequeTotais(f) {
+  return (f.arquivos || []).map(a => {
+    const soma = Math.round((f.linhas || [])
+      .filter(l => l.arquivo === a.nome)
+      .reduce((s, l) => s + (Number(l.valor) || 0), 0) * 100) / 100;
+    const decl = (a.totalDeclarado === null || a.totalDeclarado === undefined) ? null : Number(a.totalDeclarado);
+    return { arquivo: a.nome, soma, totalDeclarado: decl, bate: decl === null ? null : Math.abs(soma - decl) < 0.01 };
+  });
+}
 function _ffHist(f, acao) {
   f.historico = f.historico || [];
   f.historico.push({ data: new Date().toISOString(), usuario: loggedUser ? nomeExibido(loggedUser) : 'Sistema', login: loggedUser ? loggedUser.login : '', acao });
@@ -11227,20 +11240,64 @@ async function _ffLerPdf(file) {
   return texto;
 }
 
-// Heurística: cada linha que tem um VALOR em reais vira um registro.
-// CPF e nome são capturados quando existem. O que ficar incompleto é marcado
-// "conferir" — a conferência manual do DP é parte do fluxo de qualquer jeito.
-function _ffExtrairLinhas(texto) {
+// CPF em qualquer formato ("578.533.588.30", "578.533.588-30", "57853358830")
+// vira o padrão ###.###.###-##.
+function _ffNormalizarCpf(s) {
+  const d = String(s || '').replace(/\D/g, '');
+  if (d.length !== 11) return String(s || '').trim();
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+
+// Lê o texto de UM PDF do Exata e devolve { linhas, totalDeclarado }.
+//
+// CALIBRADO NO RELATÓRIO REAL do Exata (SFP99024 — "pagamentos agendados na
+// relação"): cada linha de colaborador é
+//   005000 SUSANA COSTA PEREIRA  578.533.588.30 07/26 237 270 CC 0354 000000182135 0   844,00 AA01
+// Detalhes que quebravam o leitor genérico:
+//  - o CPF vem com PONTO no final (578.533.588.30), não com traço;
+//  - "Sub-Total R$ 48.108,00" tem hífen e virava uma linha fantasma na soma;
+//  - o cabeçalho traz o CNPJ com vírgulas (36,927,751,0001,03) que parecia valor.
+// O "Total Geral" impresso no PDF é capturado para BATER com a soma das linhas.
+function _ffAnalisarTexto(texto) {
   const out = [];
+  let totalDeclarado = null;
+  let subTotal = null;
+
+  // Linha do relatório do Exata: código + nome + CPF + ... + valor + código de origem
+  const rxExata = /^\s*\d{3,8}\s+(.+?)\s+(\d{3}[.\s]?\d{3}[.\s]?\d{3}[.\s-]?\d{2})\s.*?(\d{1,3}(?:\.\d{3})*,\d{2})\s+\S{1,6}\s*$/;
+
   String(texto || '').split(/\n+/).forEach(l => {
     const linha = l.trim();
     if (!linha) return;
+
+    // Totais impressos no PDF: guarda para conferência (e não vira registro)
+    const mTotal = linha.match(/total\s+geral\s*(?:R\$)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i);
+    if (mTotal) { totalDeclarado = _ffParseValor(mTotal[1]); return; }
+    const mSub = linha.match(/sub[\s-]*total\s*(?:R\$)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i);
+    if (mSub) { subTotal = _ffParseValor(mSub[1]); return; }
+    if (/^(sub[\s-]*total|total|valor\s+total|resumo|somat[óo]ri)/i.test(linha)) return;
+
+    // Cabeçalhos/rodapés do relatório — nunca são colaboradores
+    if (/p[áa]gina|relat[óo]rio|usu[áa]rio\s*:|ordem\s+de\s+c[óo]digos|data\s+do\s+pagamento|nome\s+funcionario|ltda|\bs\/?a\b|cnpj/i.test(linha)) return;
+
+    // 1º: o formato exato do Exata
+    const mEx = rxExata.exec(linha);
+    if (mEx) {
+      const nome = mEx[1].replace(/[^\p{L}\s'.-]/gu, ' ').replace(/\s+/g, ' ').trim();
+      const valor = _ffParseValor(mEx[3]);
+      const ok = !!(nome && nome.length >= 5 && valor > 0);
+      out.push({
+        id: 'ffl-' + Date.now() + '-' + out.length + '-' + Math.random().toString(36).slice(2, 5),
+        nome, cpf: _ffNormalizarCpf(mEx[2]), valor,
+        status: ok ? 'ok' : 'conferir'
+      });
+      return;
+    }
+
+    // 2º: heurística genérica (outros layouts) — exige CPF para confiar
     const valores = [...linha.matchAll(/(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})\b/g)];
     if (!valores.length) return;
-    // Cabeçalhos e totais não são colaboradores
-    if (/^(total|sub\s*total|valor\s+total|p[áa]gina|resumo|somat[óo]ri)/i.test(linha)) return;
-
-    const cpfM = linha.match(/\d{3}\.?\d{3}\.?\d{3}-?\d{2}/);
+    const cpfM = linha.match(/\d{3}\.?\d{3}\.?\d{3}[.-]?\d{2}(?!\d)/);
     const valor = _ffParseValor(valores[valores.length - 1][1]);
 
     let nome = linha;
@@ -11248,20 +11305,24 @@ function _ffExtrairLinhas(texto) {
     const primeiroValor = nome.search(/(?:R\$\s*)?\d{1,3}(?:\.\d{3})*,\d{2}\b/);
     if (primeiroValor >= 0) nome = nome.slice(0, primeiroValor);
     nome = nome
-      .replace(/^[\s\d\-.:|/]+/, '')          // matrícula/índice no começo
+      .replace(/^[\s\d\-.,:|/]+/, '')
       .replace(/[^\p{L}\s'.-]/gu, ' ')
       .replace(/\s+/g, ' ')
       .trim();
     if (/^(nome|colaborador|funcion[áa]rio|cpf|matr[íi]cula|valor|banco|ag[êe]ncia|conta|data)$/i.test(nome)) return;
+    if (!cpfM && (!nome || nome.length < 5)) return;   // sem CPF e sem nome decente = lixo de cabeçalho
 
-    const ok = !!(nome && nome.length >= 5 && valor > 0);
+    const ok = !!(nome && nome.length >= 5 && valor > 0 && cpfM);
     out.push({
       id: 'ffl-' + Date.now() + '-' + out.length + '-' + Math.random().toString(36).slice(2, 5),
-      nome, cpf: cpfM ? cpfM[0] : '', valor,
+      nome, cpf: cpfM ? _ffNormalizarCpf(cpfM[0]) : '', valor,
       status: ok ? 'ok' : 'conferir'
     });
   });
-  return out;
+
+  // Sem "Total Geral"? o Sub-Total serve de referência
+  if (totalDeclarado === null && subTotal !== null) totalDeclarado = subTotal;
+  return { linhas: out, totalDeclarado };
 }
 
 // ── Aba: render principal ──────────────────────────────────────────────────
@@ -11430,7 +11491,7 @@ async function criarFluxoFinanceiro() {
   const barra = g('ff-barra'); const txt = g('ff-processando-txt');
 
   try {
-    // 1) Lê e extrai cada PDF
+    // 1) Lê e extrai cada PDF (e guarda o TOTAL impresso para bater com a soma)
     const linhas = [];
     const arquivos = [];
     for (let i = 0; i < _ffPdfsTemp.length; i++) {
@@ -11438,10 +11499,11 @@ async function criarFluxoFinanceiro() {
       if (txt) txt.textContent = `Lendo ${f.name} (${i + 1} de ${_ffPdfsTemp.length})...`;
       if (barra) barra.style.width = Math.round((i / _ffPdfsTemp.length) * 70) + '%';
       const texto = await _ffLerPdf(f);
-      _ffExtrairLinhas(texto).forEach(l => { l.arquivo = f.name; linhas.push(l); });
-      // guarda o PDF (vira link /uploads/.. na sincronização)
+      const analise = _ffAnalisarTexto(texto);
+      analise.linhas.forEach(l => { l.arquivo = f.name; linhas.push(l); });
+      // guarda o PDF (vira link /uploads/.. na sincronização) + o total impresso nele
       const base64 = await fileToBase64(f);
-      arquivos.push({ nome: f.name, arquivo: base64 });
+      arquivos.push({ nome: f.name, arquivo: base64, totalDeclarado: analise.totalDeclarado });
     }
 
     if (txt) txt.textContent = `Montando a tabela (${linhas.length} registros encontrados)...`;
@@ -11481,9 +11543,19 @@ async function criarFluxoFinanceiro() {
     renderFluxoFinanceiro();
     abrirDetalheFluxo(fluxo.id);
 
+    // A CONFERÊNCIA que importa: a soma das linhas de cada PDF tem que BATER
+    // com o "Total Geral" impresso no próprio PDF.
+    const cheque = _ffChequeTotais(fluxo);
+    const resumoCheque = cheque.map(c =>
+      c.bate === null ? `• ${c.arquivo}: PDF sem total impresso (confira manualmente)` :
+      c.bate ? `✓ ${c.arquivo}: soma ${_ffMoedaBR(c.soma)} = total do PDF ✔` :
+               `✗ ${c.arquivo}: soma ${_ffMoedaBR(c.soma)} ≠ total do PDF ${_ffMoedaBR(c.totalDeclarado)} (diferença ${_ffMoedaBR(Math.abs(c.soma - c.totalDeclarado))})`
+    ).join('\n');
+
     const pendentes = linhas.filter(l => l.status === 'conferir').length;
     alert(`Fluxo #${numero} criado!\n\n${linhas.length} registro(s) importados dos PDFs.` +
       (pendentes ? `\n⚠ ${pendentes} registro(s) precisam de conferência.` : '') +
+      `\n\nCONFERÊNCIA DOS TOTAIS:\n${resumoCheque}` +
       `\n\nConfira a tabela e clique em "Enviar para Aprovação".`);
   } catch (e) {
     alert('Não foi possível processar os PDFs.\n\nMotivo: ' + (e.message || e));
@@ -11572,6 +11644,19 @@ function _ffRenderDetalhe() {
             <div class="exame-campo"><span class="exame-campo-label">Arquivos</span><span class="exame-campo-valor">${(f.arquivos || []).length}</span></div>
           </div>
         </div>
+      </div>
+
+      <div class="exame-detalhe-laudo" style="margin-top:16px;">
+        <h4><i class="fa-solid fa-scale-balanced"></i> Soma das linhas × Total impresso no PDF</h4>
+        ${_ffChequeTotais(f).map(c => {
+          if (c.bate === true) return `<div class="imp-ok" style="margin-top:6px;"><i class="fa-solid fa-circle-check"></i>
+            <span><strong>${escapeHTML(c.arquivo)}</strong> — soma das linhas ${_ffMoedaBR(c.soma)} <strong>= total do PDF</strong>. Fechou no centavo. ✔</span></div>`;
+          if (c.bate === false) return `<div class="imp-erro" style="margin-top:6px;"><i class="fa-solid fa-triangle-exclamation"></i>
+            <span><strong>${escapeHTML(c.arquivo)}</strong> — soma das linhas ${_ffMoedaBR(c.soma)} <strong>NÃO bate</strong> com o total impresso no PDF (${_ffMoedaBR(c.totalDeclarado)}).
+            Diferença de <strong>${_ffMoedaBR(Math.abs(c.soma - c.totalDeclarado))}</strong> — falta linha ou algum valor foi lido errado. Confira antes de enviar.</span></div>`;
+          return `<div class="imp-aviso" style="margin-top:6px;"><i class="fa-solid fa-circle-info"></i>
+            <span><strong>${escapeHTML(c.arquivo)}</strong> — este PDF não tem "Total Geral" impresso; soma das linhas: ${_ffMoedaBR(c.soma)}. Confira manualmente.</span></div>`;
+        }).join('')}
       </div>
 
       <div class="exame-detalhe-laudo" style="margin-top:16px;">
@@ -11723,6 +11808,14 @@ window.ffEnviarParaAprovacao = async function() {
   if (!(f.linhas || []).length) { alert('O fluxo não tem nenhum registro. Adicione ou importe antes de enviar.'); return; }
   const pend = f.linhas.filter(l => l.status === 'conferir').length;
   if (pend && !confirm(`Ainda há ${pend} registro(s) marcados como "conferir".\n\nEnviar para aprovação mesmo assim?`)) return;
+
+  // Trava de segurança: soma das linhas × total impresso no PDF
+  const divergentes = _ffChequeTotais(f).filter(c => c.bate === false);
+  if (divergentes.length) {
+    const det = divergentes.map(c => `• ${c.arquivo}: soma ${_ffMoedaBR(c.soma)} ≠ total do PDF ${_ffMoedaBR(c.totalDeclarado)} (diferença ${_ffMoedaBR(Math.abs(c.soma - c.totalDeclarado))})`).join('\n');
+    if (!confirm(`⚠ ATENÇÃO — os valores NÃO batem com o total impresso no PDF:\n\n${det}\n\nIsso costuma indicar linha faltando ou valor lido errado.\nQuer enviar para aprovação MESMO ASSIM?`)) return;
+    _ffHist(f, `Enviou com divergência de totais reconhecida: ${det.replace(/\n/g, ' | ')}`);
+  }
 
   f.status = 'aguardando_coordenacao';
   _ffHist(f, `Confirmou a conferência (${f.linhas.length} registros · ${_ffMoedaBR(_ffTotal(f))}) e enviou para a Coordenação DP.`);
