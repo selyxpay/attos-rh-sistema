@@ -11192,16 +11192,27 @@ function _ffTotal(f) {
   return (f.linhas || []).reduce((s, l) => s + (Number(l.valor) || 0), 0);
 }
 
-// Confere, POR ARQUIVO, se a soma das linhas bate com o "Total Geral" impresso
-// no PDF. Recalculado ao vivo: se o DP editar uma linha, o cheque acompanha.
+// VALIDAÇÃO MATEMÁTICA, POR ARQUIVO: a soma linha a linha é recalculada do zero
+// a cada render (se o DP editar uma linha, o cheque acompanha) e comparada com o
+// Sub-Total E com o Total Geral impressos NAQUELE PDF. Nada de valor fixo:
+// cada arquivo novo é uma conta nova.
 // bate: true = fecha no centavo | false = diverge | null = PDF sem total impresso
 function _ffChequeTotais(f) {
   return (f.arquivos || []).map(a => {
     const soma = Math.round((f.linhas || [])
       .filter(l => l.arquivo === a.nome)
       .reduce((s, l) => s + (Number(l.valor) || 0), 0) * 100) / 100;
-    const decl = (a.totalDeclarado === null || a.totalDeclarado === undefined) ? null : Number(a.totalDeclarado);
-    return { arquivo: a.nome, soma, totalDeclarado: decl, bate: decl === null ? null : Math.abs(soma - decl) < 0.01 };
+    const sub = (a.subTotal === null || a.subTotal === undefined) ? null : Number(a.subTotal);
+    // compat: fluxos antigos guardavam só "totalDeclarado"
+    const tg  = (a.totalGeral === null || a.totalGeral === undefined)
+      ? ((a.totalDeclarado === null || a.totalDeclarado === undefined) ? null : Number(a.totalDeclarado))
+      : Number(a.totalGeral);
+    const bateSub   = sub === null ? null : Math.abs(soma - sub) < 0.01;
+    const bateTotal = tg  === null ? null : Math.abs(soma - tg)  < 0.01;
+    // resultado geral do arquivo: false se QUALQUER comparação divergir
+    const bate = (bateSub === false || bateTotal === false) ? false
+               : (bateSub === null && bateTotal === null) ? null : true;
+    return { arquivo: a.nome, soma, subTotal: sub, totalGeral: tg, bateSub, bateTotal, bate, totalDeclarado: tg };
   });
 }
 function _ffHist(f, acao) {
@@ -11221,8 +11232,9 @@ async function _ffLerPdf(file) {
   if (!window.pdfjsLib) throw new Error('O leitor de PDF não carregou. Atualize a página (Ctrl+Shift+R).');
   const buf = await file.arrayBuffer();
   const doc = await pdfjsLib.getDocument({ data: buf }).promise;
+  const paginas = doc.numPages;      // TODAS as páginas, sempre — 1, 2 ou dezenas
   let texto = '';
-  for (let p = 1; p <= doc.numPages; p++) {
+  for (let p = 1; p <= paginas; p++) {
     const pagina = await doc.getPage(p);
     const conteudo = await pagina.getTextContent();
     const porLinha = new Map();  // y arredondado -> [{x, str}]
@@ -11237,7 +11249,7 @@ async function _ffLerPdf(file) {
     });
   }
   try { doc.destroy(); } catch (e) {}
-  return texto;
+  return { texto, paginas };
 }
 
 // CPF em qualquer formato ("578.533.588.30", "578.533.588-30", "57853358830")
@@ -11260,41 +11272,68 @@ function _ffNormalizarCpf(s) {
 // O "Total Geral" impresso no PDF é capturado para BATER com a soma das linhas.
 function _ffAnalisarTexto(texto) {
   const out = [];
-  let totalDeclarado = null;
+  let totalGeral = null;
   let subTotal = null;
 
-  // Linha do relatório do Exata: código + nome + CPF + ... + valor + código de origem
-  const rxExata = /^\s*\d{3,8}\s+(.+?)\s+(\d{3}[.\s]?\d{3}[.\s]?\d{3}[.\s-]?\d{2})\s.*?(\d{1,3}(?:\.\d{3})*,\d{2})\s+\S{1,6}\s*$/;
+  // Linha COMPLETA do relatório do Exata — captura TODAS as colunas:
+  //  005199 LUCAS SOUZA DE ARAUJO 434.428.718.59 07/26 237 270 CC 2826 6 000001012329 1 844,00 AA01
+  //  codigo  nome                 cpf            comp  bco lot tc agen dg conta        dg valor  orig
+  // Os dígitos de agência/conta podem NÃO existir (aí ficam vazios — nunca inventamos).
+  const rxCompleta = /^\s*(\d{3,8})\s+(.+?)\s+(\d{3}[.\s]?\d{3}[.\s]?\d{3}[.\s-]?\d{2})\s+(\d{2}\/\d{2,4})\s+(\d{2,4})\s+(\d{1,4})\s+([A-Z]{1,3})\s+(\d{1,5})(?:\s+(\d))?\s+(\d{5,13})(?:\s+(\d))?\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+(\S{1,6})\s*$/;
+  // Versão mais frouxa (colunas do meio variando): código + nome + CPF + ... + valor + origem
+  const rxSimples = /^\s*(\d{3,8})\s+(.+?)\s+(\d{3}[.\s]?\d{3}[.\s]?\d{3}[.\s-]?\d{2})\s.*?(\d{1,3}(?:\.\d{3})*,\d{2})\s+(\S{1,6})\s*$/;
+
+  const novaLinha = extra => Object.assign({
+    id: 'ffl-' + Date.now() + '-' + out.length + '-' + Math.random().toString(36).slice(2, 5),
+    codigo: '', nome: '', cpf: '', competencia: '', banco: '', lote: '', tc: '',
+    agencia: '', agenciaDg: '', conta: '', contaDg: '', origem: '', valor: 0,
+    status: 'conferir'
+  }, extra);
 
   String(texto || '').split(/\n+/).forEach(l => {
     const linha = l.trim();
     if (!linha) return;
 
-    // Totais impressos no PDF: guarda para conferência (e não vira registro)
+    // Totais impressos no PDF: Sub-Total e Total Geral são guardados SEPARADOS
+    // para a validação matemática (e nunca viram registro).
     const mTotal = linha.match(/total\s+geral\s*(?:R\$)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i);
-    if (mTotal) { totalDeclarado = _ffParseValor(mTotal[1]); return; }
+    if (mTotal) { totalGeral = _ffParseValor(mTotal[1]); return; }
     const mSub = linha.match(/sub[\s-]*total\s*(?:R\$)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i);
     if (mSub) { subTotal = _ffParseValor(mSub[1]); return; }
     if (/^(sub[\s-]*total|total|valor\s+total|resumo|somat[óo]ri)/i.test(linha)) return;
 
-    // Cabeçalhos/rodapés do relatório — nunca são colaboradores
+    // Cabeçalhos/rodapés — inclusive os REPETIDOS em cada página do relatório
     if (/p[áa]gina|relat[óo]rio|usu[áa]rio\s*:|ordem\s+de\s+c[óo]digos|data\s+do\s+pagamento|nome\s+funcionario|ltda|\bs\/?a\b|cnpj/i.test(linha)) return;
 
-    // 1º: o formato exato do Exata
-    const mEx = rxExata.exec(linha);
-    if (mEx) {
-      const nome = mEx[1].replace(/[^\p{L}\s'.-]/gu, ' ').replace(/\s+/g, ' ').trim();
-      const valor = _ffParseValor(mEx[3]);
-      const ok = !!(nome && nome.length >= 5 && valor > 0);
-      out.push({
-        id: 'ffl-' + Date.now() + '-' + out.length + '-' + Math.random().toString(36).slice(2, 5),
-        nome, cpf: _ffNormalizarCpf(mEx[2]), valor,
-        status: ok ? 'ok' : 'conferir'
-      });
+    // 1º: linha completa do Exata → todas as colunas estruturadas
+    const mC = rxCompleta.exec(linha);
+    if (mC) {
+      const nome = mC[2].replace(/[^\p{L}\s'.-]/gu, ' ').replace(/\s+/g, ' ').trim();
+      const valor = _ffParseValor(mC[12]);
+      out.push(novaLinha({
+        codigo: mC[1],                    // texto: preserva os zeros à esquerda
+        nome, cpf: _ffNormalizarCpf(mC[3]),
+        competencia: mC[4], banco: mC[5], lote: mC[6], tc: mC[7],
+        agencia: mC[8], agenciaDg: mC[9] || '', conta: mC[10], contaDg: mC[11] || '',
+        valor, origem: mC[13],
+        status: (nome && nome.length >= 5 && valor > 0) ? 'ok' : 'conferir'
+      }));
       return;
     }
 
-    // 2º: heurística genérica (outros layouts) — exige CPF para confiar
+    // 2º: Exata com colunas do meio fora do padrão
+    const mS = rxSimples.exec(linha);
+    if (mS) {
+      const nome = mS[2].replace(/[^\p{L}\s'.-]/gu, ' ').replace(/\s+/g, ' ').trim();
+      const valor = _ffParseValor(mS[4]);
+      out.push(novaLinha({
+        codigo: mS[1], nome, cpf: _ffNormalizarCpf(mS[3]), valor, origem: mS[5],
+        status: (nome && nome.length >= 5 && valor > 0) ? 'ok' : 'conferir'
+      }));
+      return;
+    }
+
+    // 3º: heurística genérica (outros layouts) — exige CPF para confiar
     const valores = [...linha.matchAll(/(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})\b/g)];
     if (!valores.length) return;
     const cpfM = linha.match(/\d{3}\.?\d{3}\.?\d{3}[.-]?\d{2}(?!\d)/);
@@ -11310,19 +11349,36 @@ function _ffAnalisarTexto(texto) {
       .replace(/\s+/g, ' ')
       .trim();
     if (/^(nome|colaborador|funcion[áa]rio|cpf|matr[íi]cula|valor|banco|ag[êe]ncia|conta|data)$/i.test(nome)) return;
-    if (!cpfM && (!nome || nome.length < 5)) return;   // sem CPF e sem nome decente = lixo de cabeçalho
+    if (!cpfM && (!nome || nome.length < 5)) return;   // sem CPF e sem nome decente = lixo
 
-    const ok = !!(nome && nome.length >= 5 && valor > 0 && cpfM);
-    out.push({
-      id: 'ffl-' + Date.now() + '-' + out.length + '-' + Math.random().toString(36).slice(2, 5),
+    out.push(novaLinha({
       nome, cpf: cpfM ? _ffNormalizarCpf(cpfM[0]) : '', valor,
-      status: ok ? 'ok' : 'conferir'
-    });
+      status: (nome && nome.length >= 5 && valor > 0 && cpfM) ? 'ok' : 'conferir'
+    }));
   });
 
-  // Sem "Total Geral"? o Sub-Total serve de referência
-  if (totalDeclarado === null && subTotal !== null) totalDeclarado = subTotal;
-  return { linhas: out, totalDeclarado };
+  return { linhas: out, subTotal, totalGeral };
+}
+
+// Duplicidades no fluxo inteiro (todos os arquivos juntos). O CPF é o principal
+// identificador. NADA é excluído sozinho — só sinalizado para conferência humana.
+function _ffDuplicidades(f) {
+  const grupos = { cpf: [], codigo: [], nome: [] };
+  const por = (campo, normaliza) => {
+    const mapa = new Map();
+    (f.linhas || []).forEach(l => {
+      const v = normaliza(l[campo]);
+      if (!v) return;
+      if (!mapa.has(v)) mapa.set(v, []);
+      mapa.get(v).push(l);
+    });
+    return [...mapa.entries()].filter(([, ls]) => ls.length > 1)
+      .map(([chave, ls]) => ({ chave, linhas: ls }));
+  };
+  grupos.cpf    = por('cpf',    v => String(v || '').replace(/\D/g, ''));
+  grupos.codigo = por('codigo', v => String(v || '').trim());
+  grupos.nome   = por('nome',   v => String(v || '').trim().toUpperCase());
+  return grupos;
 }
 
 // ── Aba: render principal ──────────────────────────────────────────────────
@@ -11491,19 +11547,22 @@ async function criarFluxoFinanceiro() {
   const barra = g('ff-barra'); const txt = g('ff-processando-txt');
 
   try {
-    // 1) Lê e extrai cada PDF (e guarda o TOTAL impresso para bater com a soma)
+    // 1) Lê e extrai cada PDF — TODAS as páginas, e guarda Sub-Total e Total
+    //    Geral impressos em cada arquivo para a validação matemática
     const linhas = [];
     const arquivos = [];
+    let paginasTotal = 0;
     for (let i = 0; i < _ffPdfsTemp.length; i++) {
       const f = _ffPdfsTemp[i];
       if (txt) txt.textContent = `Lendo ${f.name} (${i + 1} de ${_ffPdfsTemp.length})...`;
       if (barra) barra.style.width = Math.round((i / _ffPdfsTemp.length) * 70) + '%';
-      const texto = await _ffLerPdf(f);
+      const { texto, paginas } = await _ffLerPdf(f);
+      paginasTotal += paginas;
       const analise = _ffAnalisarTexto(texto);
       analise.linhas.forEach(l => { l.arquivo = f.name; linhas.push(l); });
-      // guarda o PDF (vira link /uploads/.. na sincronização) + o total impresso nele
+      // guarda o PDF (vira link /uploads/.. na sincronização) + os totais impressos nele
       const base64 = await fileToBase64(f);
-      arquivos.push({ nome: f.name, arquivo: base64, totalDeclarado: analise.totalDeclarado });
+      arquivos.push({ nome: f.name, arquivo: base64, paginas, subTotal: analise.subTotal, totalGeral: analise.totalGeral });
     }
 
     if (txt) txt.textContent = `Montando a tabela (${linhas.length} registros encontrados)...`;
@@ -11518,6 +11577,7 @@ async function criarFluxoFinanceiro() {
       empresaId, empresaNome: empresa.nome || '',
       tipo, dataPagamento: data, competencia: comp, observacao: obs,
       arquivos, linhas,
+      paginasProcessadas: paginasTotal,
       status: 'rascunho',
       criadoPor: loggedUser ? nomeExibido(loggedUser) : 'Sistema',
       criadoPorLogin: loggedUser ? loggedUser.login : '',
@@ -11527,7 +11587,7 @@ async function criarFluxoFinanceiro() {
       historico: []
     };
     _ffHist(fluxo, `Criou o Fluxo Financeiro #${numero} (${empresa.nome} · ${tipo}).`);
-    _ffHist(fluxo, `Importou ${arquivos.length} arquivo(s) PDF — ${linhas.length} registro(s) identificados.`);
+    _ffHist(fluxo, `Importou ${arquivos.length} arquivo(s) PDF (${paginasTotal} página(s)) — ${linhas.length} registro(s) identificados.`);
     state.fluxosFinanceiros.push(fluxo);
 
     if (txt) txt.textContent = 'Salvando no servidor...';
@@ -11543,19 +11603,31 @@ async function criarFluxoFinanceiro() {
     renderFluxoFinanceiro();
     abrirDetalheFluxo(fluxo.id);
 
-    // A CONFERÊNCIA que importa: a soma das linhas de cada PDF tem que BATER
-    // com o "Total Geral" impresso no próprio PDF.
+    // VALIDAÇÃO: soma recalculada × Sub-Total × Total Geral de CADA arquivo,
+    // mais a caça de duplicidades (CPF é o principal identificador).
     const cheque = _ffChequeTotais(fluxo);
-    const resumoCheque = cheque.map(c =>
-      c.bate === null ? `• ${c.arquivo}: PDF sem total impresso (confira manualmente)` :
-      c.bate ? `✓ ${c.arquivo}: soma ${_ffMoedaBR(c.soma)} = total do PDF ✔` :
-               `✗ ${c.arquivo}: soma ${_ffMoedaBR(c.soma)} ≠ total do PDF ${_ffMoedaBR(c.totalDeclarado)} (diferença ${_ffMoedaBR(Math.abs(c.soma - c.totalDeclarado))})`
-    ).join('\n');
+    const resumoCheque = cheque.map(c => {
+      if (c.bate === null) return `• ${c.arquivo}: PDF sem totais impressos (confira manualmente). Soma: ${_ffMoedaBR(c.soma)}`;
+      if (c.bate) return `✓ ${c.arquivo}: soma ${_ffMoedaBR(c.soma)} = Sub-Total = Total Geral ✔`;
+      const partes = [];
+      if (c.bateSub === false)   partes.push(`Sub-Total ${_ffMoedaBR(c.subTotal)}`);
+      if (c.bateTotal === false) partes.push(`Total Geral ${_ffMoedaBR(c.totalGeral)}`);
+      return `✗ ${c.arquivo}: soma ${_ffMoedaBR(c.soma)} ≠ ${partes.join(' e ')}`;
+    }).join('\n');
+
+    const dups = _ffDuplicidades(fluxo);
+    const avisoDup = dups.cpf.length
+      ? `\n⚠ POSSÍVEL DUPLICIDADE: ${dups.cpf.length} CPF(s) aparecem mais de uma vez. Confira na tabela.` : '';
 
     const pendentes = linhas.filter(l => l.status === 'conferir').length;
-    alert(`Fluxo #${numero} criado!\n\n${linhas.length} registro(s) importados dos PDFs.` +
+    alert(`Fluxo #${numero} criado!\n\n` +
+      `Arquivos processados: ${arquivos.length}\n` +
+      `Páginas processadas: ${paginasTotal}\n` +
+      `Registros identificados: ${linhas.length}\n` +
+      `Valor total calculado: ${_ffMoedaBR(_ffTotal(fluxo))}` +
       (pendentes ? `\n⚠ ${pendentes} registro(s) precisam de conferência.` : '') +
-      `\n\nCONFERÊNCIA DOS TOTAIS:\n${resumoCheque}` +
+      avisoDup +
+      `\n\nVALIDAÇÃO DOS TOTAIS:\n${resumoCheque}` +
       `\n\nConfira a tabela e clique em "Enviar para Aprovação".`);
   } catch (e) {
     alert('Não foi possível processar os PDFs.\n\nMotivo: ' + (e.message || e));
@@ -11646,41 +11718,89 @@ function _ffRenderDetalhe() {
         </div>
       </div>
 
-      <div class="exame-detalhe-laudo" style="margin-top:16px;">
-        <h4><i class="fa-solid fa-scale-balanced"></i> Soma das linhas × Total impresso no PDF</h4>
-        ${_ffChequeTotais(f).map(c => {
+      ${(() => {
+        // ── PAINEL DE VALIDAÇÃO: recalculado do zero a cada render ──
+        const cheque = _ffChequeTotais(f);
+        const dups = _ffDuplicidades(f);
+        const pend = (f.linhas || []).filter(l => l.status === 'conferir').length;
+        const tudoOk = !cheque.some(c => c.bate === false) && !dups.cpf.length && !dups.codigo.length && !dups.nome.length && !pend;
+        const linhaVal = (ok, textoOk, textoErro) => ok
+          ? `<div style="font-size:12px;padding:3px 0;color:#059669;font-weight:600;">🟢 ${textoOk}</div>`
+          : `<div style="font-size:12px;padding:3px 0;color:#DC2626;font-weight:700;">🔴 ${textoErro}</div>`;
+        return `
+      <div class="exame-detalhe-laudo" style="margin-top:16px;${tudoOk ? 'border-color:#059669;' : ''}">
+        <h4><i class="fa-solid fa-scale-balanced"></i> Validação do relatório</h4>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text-secondary);margin-bottom:10px;">
+          <span><strong>${(f.arquivos || []).length}</strong> arquivo(s)</span>
+          <span><strong>${f.paginasProcessadas || '—'}</strong> página(s) processadas</span>
+          <span><strong>${(f.linhas || []).length}</strong> registro(s)</span>
+          <span>Valor total calculado: <strong style="color:#059669;">${_ffMoedaBR(_ffTotal(f))}</strong></span>
+        </div>
+        ${cheque.map(c => {
           if (c.bate === true) return `<div class="imp-ok" style="margin-top:6px;"><i class="fa-solid fa-circle-check"></i>
-            <span><strong>${escapeHTML(c.arquivo)}</strong> — soma das linhas ${_ffMoedaBR(c.soma)} <strong>= total do PDF</strong>. Fechou no centavo. ✔</span></div>`;
-          if (c.bate === false) return `<div class="imp-erro" style="margin-top:6px;"><i class="fa-solid fa-triangle-exclamation"></i>
-            <span><strong>${escapeHTML(c.arquivo)}</strong> — soma das linhas ${_ffMoedaBR(c.soma)} <strong>NÃO bate</strong> com o total impresso no PDF (${_ffMoedaBR(c.totalDeclarado)}).
-            Diferença de <strong>${_ffMoedaBR(Math.abs(c.soma - c.totalDeclarado))}</strong> — falta linha ou algum valor foi lido errado. Confira antes de enviar.</span></div>`;
+            <span><strong>${escapeHTML(c.arquivo)}</strong> (${(f.arquivos.find(a => a.nome === c.arquivo) || {}).paginas || '?'} pág.) — soma ${_ffMoedaBR(c.soma)}
+            = Sub-Total = Total Geral. <strong>Fechou no centavo.</strong> ✔</span></div>`;
+          if (c.bate === false) {
+            const ref = c.bateTotal === false ? c.totalGeral : c.subTotal;
+            return `<div class="imp-erro" style="margin-top:6px;"><i class="fa-solid fa-triangle-exclamation"></i>
+            <span><strong>${escapeHTML(c.arquivo)}</strong> — DIVERGÊNCIA:<br>
+            Total calculado pelo sistema: <strong>${_ffMoedaBR(c.soma)}</strong><br>
+            ${c.subTotal !== null ? `Sub-Total informado no PDF: <strong>${_ffMoedaBR(c.subTotal)}</strong> ${c.bateSub ? '✔' : '✗'}<br>` : ''}
+            ${c.totalGeral !== null ? `Total Geral informado no PDF: <strong>${_ffMoedaBR(c.totalGeral)}</strong> ${c.bateTotal ? '✔' : '✗'}<br>` : ''}
+            Diferença encontrada: <strong>${_ffMoedaBR(Math.abs(c.soma - ref))}</strong> — falta linha ou valor lido errado.</span></div>`;
+          }
           return `<div class="imp-aviso" style="margin-top:6px;"><i class="fa-solid fa-circle-info"></i>
-            <span><strong>${escapeHTML(c.arquivo)}</strong> — este PDF não tem "Total Geral" impresso; soma das linhas: ${_ffMoedaBR(c.soma)}. Confira manualmente.</span></div>`;
+            <span><strong>${escapeHTML(c.arquivo)}</strong> — sem Sub-Total/Total Geral impressos; soma das linhas: ${_ffMoedaBR(c.soma)}. Confira manualmente.</span></div>`;
         }).join('')}
-      </div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border-color);">
+          ${linhaVal(!dups.cpf.length, 'CPF duplicado: não encontrado',
+            `POSSÍVEL DUPLICIDADE de CPF: ${dups.cpf.map(g => `${g.linhas[0].cpf} (${g.linhas.length}x — ${g.linhas.map(l => l.nome.split(' ')[0]).join(', ')})`).join(' · ')}`)}
+          ${linhaVal(!dups.codigo.length, 'Código duplicado: não encontrado',
+            `Código repetido: ${dups.codigo.map(g => `${g.chave} (${g.linhas.length}x)`).join(' · ')}`)}
+          ${linhaVal(!dups.nome.length, 'Nome duplicado: não encontrado',
+            `Nome repetido: ${dups.nome.map(g => `${g.linhas[0].nome} (${g.linhas.length}x)`).join(' · ')}`)}
+          ${linhaVal(!pend, 'Registros com problema de leitura: 0', `${pend} registro(s) precisam de conferência (marcados em amarelo na tabela)`)}
+        </div>
+        ${tudoOk ? `<div style="margin-top:10px;padding:10px 14px;border-radius:10px;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.35);color:#059669;font-weight:800;font-size:13px;text-align:center;">
+          ✅ RELATÓRIO VALIDADO COM SUCESSO</div>` : ''}
+      </div>`;
+      })()}
 
       <div class="exame-detalhe-laudo" style="margin-top:16px;">
         <h4><i class="fa-solid fa-table-list"></i> Registros importados (${(f.linhas || []).length})
           ${podeEditar ? `<button class="btn btn-sm btn-outline" style="margin-left:10px;" onclick="ffAdicionarLinha()"><i class="fa-solid fa-plus"></i> Adicionar linha</button>` : ''}
+          <button class="btn btn-sm btn-outline" style="margin-left:6px;border-color:#059669;color:#059669;" onclick="exportarFluxoExcel()"><i class="fa-solid fa-file-excel"></i> Exportar Excel</button>
         </h4>
-        <div class="table-scroll-container" style="max-height:320px;overflow-y:auto;">
+        ${(() => {
+          const cpfsDup = new Set();
+          _ffDuplicidades(f).cpf.forEach(g => g.linhas.forEach(l => cpfsDup.add(l.id)));
+          return `
+        <div class="table-scroll-container" style="max-height:340px;overflow-y:auto;">
           <table class="excel-table">
-            <thead><tr><th>Colaborador</th><th>CPF</th><th>Valor</th><th>Arquivo</th><th>Situação</th>${podeEditar ? '<th></th>' : ''}</tr></thead>
+            <thead><tr><th>Código</th><th>Colaborador</th><th>CPF</th><th>Comp.</th><th>Bco</th><th>Ag.</th><th>Conta</th><th>Valor</th><th>Orig</th><th>Situação</th>${podeEditar ? '<th></th>' : ''}</tr></thead>
             <tbody>
               ${(f.linhas || []).map((l, i) => `
-                <tr style="${l.status === 'conferir' ? 'background:rgba(217,119,6,.07);' : ''}">
-                  <td>${podeEditar ? `<input class="form-control" style="min-width:180px;font-size:12px;padding:4px 8px;" value="${escapeHTML(l.nome || '')}" onchange="ffEditarLinha(${i},'nome',this.value)">` : escapeHTML(l.nome || '—')}</td>
-                  <td>${podeEditar ? `<input class="form-control" style="width:140px;font-size:12px;padding:4px 8px;" value="${escapeHTML(l.cpf || '')}" onchange="ffEditarLinha(${i},'cpf',this.value)">` : escapeHTML(l.cpf || '—')}</td>
-                  <td>${podeEditar ? `<input class="form-control" style="width:110px;font-size:12px;padding:4px 8px;text-align:right;" value="${(Number(l.valor) || 0).toFixed(2).replace('.', ',')}" onchange="ffEditarLinha(${i},'valor',this.value)">` : `<strong>${_ffMoedaBR(l.valor)}</strong>`}</td>
-                  <td style="font-size:10px;color:var(--text-secondary);">${escapeHTML(l.arquivo || '—')}</td>
-                  <td>${l.status === 'conferir'
-                    ? '<span style="font-size:10px;font-weight:800;color:#D97706;">🟡 conferir</span>'
-                    : '<span style="font-size:10px;font-weight:800;color:#059669;">🟢 ok</span>'}</td>
+                <tr style="${cpfsDup.has(l.id) ? 'background:rgba(220,38,38,.08);' : l.status === 'conferir' ? 'background:rgba(217,119,6,.07);' : ''}">
+                  <td style="font-family:monospace;font-size:11px;">${escapeHTML(l.codigo || '—')}</td>
+                  <td>${podeEditar ? `<input class="form-control" style="min-width:170px;font-size:12px;padding:4px 8px;" value="${escapeHTML(l.nome || '')}" onchange="ffEditarLinha(${i},'nome',this.value)">` : escapeHTML(l.nome || '—')}</td>
+                  <td>${podeEditar ? `<input class="form-control" style="width:135px;font-size:12px;padding:4px 8px;" value="${escapeHTML(l.cpf || '')}" onchange="ffEditarLinha(${i},'cpf',this.value)">` : escapeHTML(l.cpf || '—')}</td>
+                  <td style="font-size:11px;">${escapeHTML(l.competencia || '—')}</td>
+                  <td style="font-size:11px;">${escapeHTML(l.banco || '—')}</td>
+                  <td style="font-size:11px;font-family:monospace;">${escapeHTML(l.agencia || '—')}${l.agenciaDg ? '-' + escapeHTML(l.agenciaDg) : ''}</td>
+                  <td style="font-size:11px;font-family:monospace;">${escapeHTML(l.conta || '—')}${l.contaDg ? '-' + escapeHTML(l.contaDg) : ''}</td>
+                  <td>${podeEditar ? `<input class="form-control" style="width:100px;font-size:12px;padding:4px 8px;text-align:right;" value="${(Number(l.valor) || 0).toFixed(2).replace('.', ',')}" onchange="ffEditarLinha(${i},'valor',this.value)">` : `<strong>${_ffMoedaBR(l.valor)}</strong>`}</td>
+                  <td style="font-size:11px;">${escapeHTML(l.origem || '—')}</td>
+                  <td>${cpfsDup.has(l.id)
+                    ? '<span style="font-size:10px;font-weight:800;color:#DC2626;">⚠ duplicado?</span>'
+                    : l.status === 'conferir'
+                      ? '<span style="font-size:10px;font-weight:800;color:#D97706;">🟡 conferir</span>'
+                      : '<span style="font-size:10px;font-weight:800;color:#059669;">🟢 ok</span>'}</td>
                   ${podeEditar ? `<td><button class="btn btn-sm btn-outline" style="border-color:#DC2626;color:#DC2626;padding:2px 8px;" onclick="ffRemoverLinha(${i})"><i class="fa-solid fa-trash-can"></i></button></td>` : ''}
                 </tr>`).join('')}
             </tbody>
           </table>
-        </div>
+        </div>`;
+        })()}
       </div>
 
       <div class="exame-detalhe-laudo" style="margin-top:16px;">
@@ -11767,6 +11887,38 @@ window.ffAdicionarLinha = function() {
   if (!f || f.status !== 'rascunho') return;
   f.linhas.push({ id: 'ffl-' + Date.now(), nome: '', cpf: '', valor: 0, arquivo: '(manual)', status: 'conferir' });
   saveState(); _ffRenderDetalhe();
+};
+
+// Exporta a tabela do fluxo em Excel (.xlsx) — uma linha por colaborador
+window.exportarFluxoExcel = function() {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f) return;
+  if (typeof XLSX === 'undefined') { alert('O componente de Excel não carregou. Atualize a página (Ctrl+Shift+R).'); return; }
+
+  const linhas = (f.linhas || []).map(l => ({
+    'Código': l.codigo || '',
+    'Nome do Funcionário': l.nome || '',
+    'CPF': l.cpf || '',
+    'Competência': l.competencia || '',
+    'Banco': l.banco || '',
+    'Lote': l.lote || '',
+    'TC': l.tc || '',
+    'Agência': l.agencia || '',
+    'Dígito Agência': l.agenciaDg || '',
+    'Conta Bancária': l.conta || '',
+    'Dígito Conta': l.contaDg || '',
+    'Valor Líquido': Number(l.valor) || 0,
+    'Origem': l.origem || '',
+    'Arquivo': l.arquivo || '',
+    'Situação': l.status === 'ok' ? 'OK' : 'Conferir'
+  }));
+  linhas.push({ 'Código': '', 'Nome do Funcionário': 'TOTAL', 'Valor Líquido': _ffTotal(f) });
+
+  const ws = XLSX.utils.json_to_sheet(linhas);
+  ws['!cols'] = Object.keys(linhas[0]).map(k => ({ wch: Math.max(12, k.length + 2) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Fluxo ' + f.numero);
+  XLSX.writeFile(wb, `fluxo_financeiro_${f.numero}_${f.empresaNome.replace(/[^\w]+/g, '_')}.xlsx`);
 };
 
 // Abre PDF/comprovante em nova aba (mesma técnica do exame médico)
