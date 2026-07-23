@@ -166,8 +166,10 @@
             
             <nav class="sidebar-nav">
                 <ul>
+                    <!-- CATEGORIA: OPERAÇÃO -->
+                    <li class="sidebar-category-title">Operação</li>
                     <li class="nav-item active" data-aba="dashboard">
-                        <a href="#"><i class="fa-solid fa-table-cells-large"></i> <span>Dashboard</span></a>
+                        <a href="#"><i class="fa-solid fa-gauge-high"></i> <span>Dashboard</span></a>
                     </li>
                     <li class="nav-item" data-aba="vagas">
                         <a href="#"><i class="fa-solid fa-briefcase"></i> <span>Vagas</span></a>
@@ -176,28 +178,55 @@
                         <a href="#"><i class="fa-solid fa-users-viewfinder"></i> <span>Banco de Talentos</span></a>
                     </li>
                     <li class="nav-item" data-aba="selecao">
-                        <a href="#"><i class="fa-solid fa-square-check"></i> <span>Seleção</span></a>
+                        <a href="#"><i class="fa-solid fa-user-check"></i> <span>Seleção</span></a>
                     </li>
                     <li class="nav-item" data-aba="depto-pessoal">
-                        <a href="#"><i class="fa-solid fa-building-user"></i> <span>Depto. Pessoal</span></a>
+                        <a href="#"><i class="fa-solid fa-id-card"></i> <span>Depto. Pessoal</span></a>
                     </li>
                     <li class="nav-item nav-subitem" data-aba="equipamentos" id="nav-item-equipamentos">
-                        <a href="#"><i class="fa-solid fa-boxes-packing"></i> <span>Entrega/Devolução de Equipamentos</span></a>
+                        <a href="#"><i class="fa-solid fa-laptop-file"></i> <span>Entrega/Devolução de Equipamentos</span></a>
                     </li>
+                    <li class="nav-item" data-aba="exame-medico" id="nav-item-exame-medico">
+                        <a href="#"><i class="fa-solid fa-notes-medical"></i> <span>Exame Médico</span></a>
+                    </li>
+
+                    <!-- CATEGORIA: FINANCEIRO -->
+                    <li class="sidebar-category-title">Financeiro</li>
                     <li class="nav-item nav-subitem" data-aba="fluxo-financeiro" id="nav-item-fluxo-financeiro">
                         <a href="#"><i class="fa-solid fa-money-bill-transfer"></i> <span>Fluxo Financeiro</span></a>
                     </li>
-                    <li class="nav-item" data-aba="relatorios">
-                        <a href="#"><i class="fa-solid fa-chart-line"></i> <span>Relatórios</span></a>
-                    </li>
                     <li class="nav-item" data-aba="comissao">
-                        <a href="#"><i class="fa-solid fa-dollar-sign"></i> <span>Comissão</span></a>
+                        <a href="#"><i class="fa-solid fa-sack-dollar"></i> <span>Comissão</span></a>
+                    </li>
+
+                    <!-- CATEGORIA: ADMINISTRAÇÃO -->
+                    <li class="sidebar-category-title">Administração</li>
+                    <li class="nav-item" data-aba="funcionarios" id="nav-item-funcionarios" style="display: none;">
+                        <a href="#"><i class="fa-solid fa-user-gear"></i> <span>Funcionários</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="controle-acesso" id="nav-item-controle-acesso" style="display:none;">
+                        <a href="#"><i class="fa-solid fa-user-shield"></i> <span>Controle de Acesso</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="cadastros-exata" id="nav-item-cadastros-exata" style="display:none;">
+                        <a href="#"><i class="fa-solid fa-file-invoice"></i> <span>Cadastros Exata</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="documentos">
+                        <a href="#"><i class="fa-solid fa-folder-open"></i> <span>Documentos</span></a>
+                    </li>
+
+                    <!-- CATEGORIA: SISTEMA -->
+                    <li class="sidebar-category-title">Sistema</li>
+                    <li class="nav-item" data-aba="relatorios">
+                        <a href="#"><i class="fa-solid fa-chart-pie"></i> <span>Relatórios</span></a>
                     </li>
                     <li class="nav-item" data-aba="site">
                         <a href="#"><i class="fa-solid fa-globe"></i> <span>Site</span></a>
                     </li>
-                    <li class="nav-item" data-aba="funcionarios" id="nav-item-funcionarios" style="display: none;">
-                        <a href="#"><i class="fa-solid fa-user-gear"></i> <span>Funcionários</span></a>
+                    <li class="nav-item" data-aba="meu-painel">
+                        <a href="#"><i class="fa-solid fa-id-card-clip"></i> <span>Meu Painel</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="fila">
+                        <a href="#"><i class="fa-solid fa-ticket"></i> <span>Senhas</span></a>
                     </li>
                     <li class="nav-item" data-aba="auditoria" id="nav-item-auditoria" style="display: none;">
                         <a href="#"><i class="fa-solid fa-clock-rotate-left"></i> <span>Auditoria</span></a>
@@ -208,26 +237,8 @@
                     <li class="nav-item" data-aba="configuracoes" id="nav-item-configuracoes" style="display: none;">
                         <a href="#"><i class="fa-solid fa-sliders"></i> <span>Configurações</span></a>
                     </li>
-                    <li class="nav-item" data-aba="meu-painel">
-                        <a href="#"><i class="fa-solid fa-id-card-clip"></i> <span>Meu Painel</span></a>
-                    </li>
-                    <li class="nav-item" data-aba="fila">
-                        <a href="#"><i class="fa-solid fa-ticket"></i> <span>Senhas</span></a>
-                    </li>
-                    <li class="nav-item" data-aba="documentos">
-                        <a href="#"><i class="fa-solid fa-folder-open"></i> <span>Documentos</span></a>
-                    </li>
                     <li class="nav-item" data-aba="lixeira" id="nav-item-lixeira" style="display:none;">
                         <a href="#"><i class="fa-solid fa-trash-can"></i> <span>Lixeira</span></a>
-                    </li>
-                    <li class="nav-item" data-aba="controle-acesso" id="nav-item-controle-acesso" style="display:none;">
-                        <a href="#"><i class="fa-solid fa-business-time"></i> <span>Controle de Acesso</span></a>
-                    </li>
-                    <li class="nav-item" data-aba="cadastros-exata" id="nav-item-cadastros-exata" style="display:none;">
-                        <a href="#"><i class="fa-solid fa-file-invoice"></i> <span>Cadastros Exata</span></a>
-                    </li>
-                    <li class="nav-item" data-aba="exame-medico" id="nav-item-exame-medico">
-                        <a href="#"><i class="fa-solid fa-hospital"></i> <span>Exame Médico</span></a>
                     </li>
                 </ul>
             </nav>
@@ -274,9 +285,14 @@
                 
                 <!-- 1. ABA: DASHBOARD (KANBAN DE CANDIDATOS) -->
                 <section id="aba-dashboard" class="aba-content active">
-                    <div class="page-title-section">
-                        <h1>Painel R&amp;T Empregos</h1>
-                        <p class="page-subtitle">Gestão de contratações, vagas e candidatos</p>
+                    <div class="mod-header-banner">
+                        <div class="mod-header-left">
+                            <div class="mod-header-icon-badge badge-blue"><i class="fa-solid fa-gauge-high"></i></div>
+                            <div>
+                                <h1 class="mod-header-title">Painel Principal R&amp;T</h1>
+                                <p class="mod-header-subtitle">Gestão centralizada de contratações, vagas e indicadores em tempo real.</p>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- SUB-ABA: VISÃO GERAL (Métricas e Gráficos) -->
@@ -421,16 +437,19 @@
                 
                 <!-- 2. ABA: VAGAS (VITRINE & CADASTRO) -->
                 <section id="aba-vagas" class="aba-content">
-                    <div class="page-title-section title-with-btn">
-                        <div>
-                            <h1>Vagas Disponíveis</h1>
-                            <p class="page-subtitle">Gerencie e publique vagas de emprego</p>
+                    <div class="mod-header-banner">
+                        <div class="mod-header-left">
+                            <div class="mod-header-icon-badge badge-red"><i class="fa-solid fa-briefcase"></i></div>
+                            <div>
+                                <h1 class="mod-header-title">Gestão de Vagas</h1>
+                                <p class="mod-header-subtitle">Controle de aberturas, requisitos, empresas parceiras e andamento do recrutamento.</p>
+                            </div>
                         </div>
-                        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-                            <button class="btn btn-primary" id="btn-nova-vaga" style="display:none;gap:7px;align-items:center;">
-                                <i class="fa-solid fa-plus"></i> Criar Nova Vaga
+                        <div class="mod-header-actions">
+                            <button class="mod-btn-primary" id="btn-nova-vaga" style="display:none;">
+                                <i class="fa-solid fa-plus"></i> + NOVA VAGA
                             </button>
-                            <button class="btn" id="btn-novo-cliente" style="display:none;gap:7px;align-items:center;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;font-weight:600;">
+                            <button class="mod-btn-secondary" id="btn-novo-cliente" style="display:none;">
                                 <i class="fa-solid fa-building-circle-arrow-right"></i> Cadastrar Novo Cliente
                             </button>
                         </div>
@@ -444,18 +463,19 @@
                 
                 <!-- 3. ABA: BANCO DE TALENTOS -->
                 <section id="aba-banco-talentos" class="aba-content">
-
-                    <!-- Título + botões Import/Export -->
-                    <div class="page-title-section title-with-btn" style="flex-wrap:wrap;gap:12px;">
-                        <div>
-                            <h1>Banco de Talentos</h1>
-                            <p class="page-subtitle">Cadastros simplificados e importações em lote</p>
+                    <div class="mod-header-banner">
+                        <div class="mod-header-left">
+                            <div class="mod-header-icon-badge badge-purple"><i class="fa-solid fa-users-viewfinder"></i></div>
+                            <div>
+                                <h1 class="mod-header-title">Banco de Talentos</h1>
+                                <p class="mod-header-subtitle">Base completa de candidatos cadastrados, filtros por proximidade e importações em lote.</p>
+                            </div>
                         </div>
-                        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                            <button class="btn btn-secondary btn-sm" id="btn-exportar-bt" style="display:flex;align-items:center;gap:6px;">
+                        <div class="mod-header-actions">
+                            <button class="mod-btn-secondary" id="btn-exportar-bt">
                                 <i class="fa-solid fa-file-arrow-down"></i> Exportar CSV
                             </button>
-                            <label class="btn btn-primary btn-sm" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                            <label class="mod-btn-primary" style="cursor:pointer;margin:0;">
                                 <i class="fa-solid fa-file-arrow-up"></i> Importar Excel/CSV
                                 <input type="file" id="input-importar-bt" accept=".xlsx,.xls,.csv" style="display:none;">
                             </label>
@@ -559,9 +579,14 @@
                 
                 <!-- 4. ABA: SELEÇÃO (PRÉ-DP COM BORDAS COLORIDAS) -->
                 <section id="aba-selecao" class="aba-content">
-                    <div class="page-title-section">
-                        <h1>Seleção</h1>
-                        <p class="page-subtitle">Candidatos em análise — etapa pré Departamento Pessoal</p>
+                    <div class="mod-header-banner">
+                        <div class="mod-header-left">
+                            <div class="mod-header-icon-badge badge-indigo"><i class="fa-solid fa-user-check"></i></div>
+                            <div>
+                                <h1 class="mod-header-title">Seleção de Candidatos</h1>
+                                <p class="mod-header-subtitle">Acompanhe e gerencie o processo seletivo, triagens e entrevistas dos candidatos.</p>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- Grade de Seleção -->
@@ -572,9 +597,14 @@
                 
                 <!-- 5. ABA: DEPTO. PESSOAL (VALIDAÇÃO DE DOCUMENTOS) -->
                 <section id="aba-depto-pessoal" class="aba-content">
-                    <div class="page-title-section">
-                        <h1>Departamento Pessoal</h1>
-                        <p class="page-subtitle">Candidatos aprovados aguardando finalização</p>
+                    <div class="mod-header-banner">
+                        <div class="mod-header-left">
+                            <div class="mod-header-icon-badge badge-blue"><i class="fa-solid fa-id-card"></i></div>
+                            <div>
+                                <h1 class="mod-header-title">Departamento Pessoal</h1>
+                                <p class="mod-header-subtitle">Gestão da documentação, admissões e prontuários dos colaboradores aprovados.</p>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- Grid de DP -->
@@ -585,19 +615,23 @@
                 
                 <!-- 6. ABA: RELATÓRIOS (METRICAS E GRAFICOS) -->
                 <section id="aba-relatorios" class="aba-content">
-                    <div class="page-title-section" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; width: 100%;">
-                        <div>
-                            <h1>Relatórios & Gráficos</h1>
-                            <p class="page-subtitle">Indicadores de desempenho, fluxo de vagas e controle de contratações</p>
+                    <div class="mod-header-banner">
+                        <div class="mod-header-left">
+                            <div class="mod-header-icon-badge badge-amber"><i class="fa-solid fa-chart-pie"></i></div>
+                            <div>
+                                <h1 class="mod-header-title">Relatórios &amp; Analíticos</h1>
+                                <p class="mod-header-subtitle">Indicadores de desempenho, taxa de conversão, gráficos e controle de contratações.</p>
+                            </div>
                         </div>
-                        
-                        <!-- Destaque do Funcionário da Semana no topo -->
-                        <div id="bloco-destaque-semana" class="destaque-semana-box">
-                            <div class="destaque-crown-icon">👑</div>
-                            <div class="destaque-info">
-                                <span class="destaque-title">Recrutador Destaque</span>
-                                <strong class="destaque-nome" id="destaque-recrutador-nome">Nenhum</strong>
-                                <span class="destaque-meta" id="destaque-recrutador-meta">0 contratos finalizados</span>
+                        <div class="mod-header-actions">
+                            <!-- Destaque do Funcionário da Semana no topo -->
+                            <div id="bloco-destaque-semana" class="destaque-semana-box">
+                                <div class="destaque-crown-icon">👑</div>
+                                <div class="destaque-info">
+                                    <span class="destaque-title">Recrutador Destaque</span>
+                                    <strong class="destaque-nome" id="destaque-recrutador-nome">Nenhum</strong>
+                                    <span class="destaque-meta" id="destaque-recrutador-meta">0 contratos finalizados</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -794,9 +828,14 @@
                 
                 <!-- 7. ABA: COMISSÃO (EXCEL STYLE) -->
                 <section id="aba-comissao" class="aba-content">
-                    <div class="page-title-section">
-                        <h1>Planilha de Comissão</h1>
-                        <p class="page-subtitle">Controle de comissões por recrutador</p>
+                    <div class="mod-header-banner">
+                        <div class="mod-header-left">
+                            <div class="mod-header-icon-badge badge-emerald"><i class="fa-solid fa-sack-dollar"></i></div>
+                            <div>
+                                <h1 class="mod-header-title">Planilha de Comissões</h1>
+                                <p class="mod-header-subtitle">Apuração e controle financeiro de comissões por recrutador e período.</p>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- KPI Cards de comissão -->
@@ -831,14 +870,19 @@
                 
                 <!-- 9. ABA: FUNCIONÁRIOS (GERENCIAMENTO DE ACESSOS) -->
                 <section id="aba-funcionarios" class="aba-content">
-                    <div class="page-title-section" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                        <div>
-                            <h1>Funcionários Internos</h1>
-                            <p class="page-subtitle">Gerenciamento de contas e permissões de acesso ao CRM</p>
+                    <div class="mod-header-banner">
+                        <div class="mod-header-left">
+                            <div class="mod-header-icon-badge badge-purple"><i class="fa-solid fa-user-gear"></i></div>
+                            <div>
+                                <h1 class="mod-header-title">Gestão de Funcionários</h1>
+                                <p class="mod-header-subtitle">Gerenciamento de contas, departamentos e permissões de acesso ao sistema.</p>
+                            </div>
                         </div>
-                        <button class="btn btn-secondary btn-sm" id="btn-copiar-link-cadastro" style="background-color: var(--primary); border: none; font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                            <i class="fa-solid fa-copy"></i> Copiar Link de Auto-Cadastro
-                        </button>
+                        <div class="mod-header-actions">
+                            <button class="mod-btn-primary" id="btn-copiar-link-cadastro">
+                                <i class="fa-solid fa-copy"></i> Copiar Link de Auto-Cadastro
+                            </button>
+                        </div>
                     </div>
 
                     <!-- CARD DE NOVOS FUNCIONÁRIOS (AGUARDANDO APROVAÇÃO) -->
@@ -975,9 +1019,14 @@
                 
                 <!-- 10. ABA: AUDITORIA GERAL (LOGS DO SISTEMA) -->
                 <section id="aba-auditoria" class="aba-content">
-                    <div class="page-title-section">
-                        <h1>Auditoria Administrativa</h1>
-                        <p class="page-subtitle">Logs cronológicos de ações e segurança do CRM R&amp;T Empregos</p>
+                    <div class="mod-header-banner">
+                        <div class="mod-header-left">
+                            <div class="mod-header-icon-badge badge-teal"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                            <div>
+                                <h1 class="mod-header-title">Histórico &amp; Auditoria</h1>
+                                <p class="mod-header-subtitle">Logs cronológicos completos de ações, alterações de dados e eventos do sistema.</p>
+                            </div>
+                        </div>
                     </div>
                     <div class="table-box bg-glass">
                         <div class="table-header-area">
@@ -1016,9 +1065,14 @@
                 
                 <!-- 11. ABA: INAPTOS (SOMENTE ADMIN) -->
                 <section id="aba-inaptos" class="aba-content">
-                    <div class="page-title-section">
-                        <h1>Gestão de Inaptos</h1>
-                        <p class="page-subtitle">Motivos de inaptidão e registro de candidatos inaptos</p>
+                    <div class="mod-header-banner">
+                        <div class="mod-header-left">
+                            <div class="mod-header-icon-badge badge-red"><i class="fa-solid fa-ban"></i></div>
+                            <div>
+                                <h1 class="mod-header-title">Gestão de Inaptos</h1>
+                                <p class="mod-header-subtitle">Registro de candidatos não aprovados nos processos e controle de motivos de inaptidão.</p>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Bloco: Motivos de Inaptidão -->
@@ -1048,9 +1102,14 @@
                 <!-- 8. ABA: PORTAL DE CAPTAÇÃO (GESTÃO DE LINKS — SOMENTE STAFF) -->
                 <section id="aba-site" class="aba-content">
                     <div style="max-width: 900px; margin: 0 auto; padding: 0 0 40px;">
-                    <div class="page-title-section">
-                        <h1>Portal de Captação</h1>
-                        <p class="page-subtitle">Links públicos de cadastro — compartilhe com candidatos</p>
+                    <div class="mod-header-banner">
+                        <div class="mod-header-left">
+                            <div class="mod-header-icon-badge badge-blue"><i class="fa-solid fa-globe"></i></div>
+                            <div>
+                                <h1 class="mod-header-title">Portal de Captação &amp; Site</h1>
+                                <p class="mod-header-subtitle">Links públicos de cadastro e compartilhamento com candidatos.</p>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Cards de acesso rápido -->
@@ -1142,9 +1201,14 @@
                 <!-- ABA: MEU PAINEL -->
                 <section id="aba-meu-painel" class="aba-content">
                     <div style="max-width:940px;margin:0 auto;padding:0 0 40px;">
-                        <div class="page-title-section">
-                            <h1>Meu Painel</h1>
-                            <p class="page-subtitle">Central de trabalho pessoal — links, candidatos, disparo e ferramentas</p>
+                        <div class="mod-header-banner">
+                            <div class="mod-header-left">
+                                <div class="mod-header-icon-badge badge-indigo"><i class="fa-solid fa-id-card-clip"></i></div>
+                                <div>
+                                    <h1 class="mod-header-title">Meu Painel</h1>
+                                    <p class="mod-header-subtitle">Central de trabalho pessoal — links, candidatos, disparo e ferramentas.</p>
+                                </div>
+                            </div>
                         </div>
                         <div id="meu-painel-conteudo">
                             <!-- renderizado por renderMeuPainel() -->
@@ -1164,9 +1228,14 @@
                 <!-- ABA: DOCUMENTOS (validade na nuvem) -->
                 <section id="aba-documentos" class="aba-content">
                     <div style="max-width:1100px;margin:0 auto;padding:0 0 40px;">
-                        <div style="margin-bottom:18px;">
-                            <h2 style="margin:0;font-size:22px;"><i class="fa-solid fa-folder-open" style="color:var(--primary);"></i> Documentos na Nuvem</h2>
-                            <p style="color:var(--text-secondary);font-size:13px;margin:6px 0 0;max-width:680px;">Arquivos enviados pelos candidatos (RG, CPF, comprovantes), guardados permanentemente na nuvem. Clique em "Abrir" para ver ou baixar cada documento.</p>
+                        <div class="mod-header-banner">
+                            <div class="mod-header-left">
+                                <div class="mod-header-icon-badge badge-purple"><i class="fa-solid fa-folder-open"></i></div>
+                                <div>
+                                    <h1 class="mod-header-title">Central de Documentos</h1>
+                                    <p class="mod-header-subtitle">Arquivos enviados pelos candidatos, guardados permanentemente na nuvem.</p>
+                                </div>
+                            </div>
                         </div>
                         <div id="docs-resumo" style="margin-bottom:14px;font-size:13px;color:var(--text-secondary);"></div>
                         <div id="docs-lista"></div>
@@ -1176,9 +1245,14 @@
                 <!-- ABA: LIXEIRA (somente admin geral) -->
                 <section id="aba-lixeira" class="aba-content">
                     <div style="max-width:1100px;margin:0 auto;padding:0 0 40px;">
-                        <div style="margin-bottom:18px;">
-                            <h2 style="margin:0;font-size:22px;"><i class="fa-solid fa-trash-can" style="color:var(--primary);"></i> Lixeira</h2>
-                            <p style="color:var(--text-secondary);font-size:13px;margin:6px 0 0;max-width:680px;">Fichas excluídas (exclusão lógica). Você pode <strong>restaurar</strong> ou <strong>excluir definitivamente</strong>. Área restrita ao administrador geral.</p>
+                        <div class="mod-header-banner">
+                            <div class="mod-header-left">
+                                <div class="mod-header-icon-badge badge-red"><i class="fa-solid fa-trash-can"></i></div>
+                                <div>
+                                    <h1 class="mod-header-title">Lixeira do Sistema</h1>
+                                    <p class="mod-header-subtitle">Fichas e registros excluídos. Área restrita ao administrador geral.</p>
+                                </div>
+                            </div>
                         </div>
                         <div id="lixeira-lista"></div>
                     </div>
@@ -1187,9 +1261,14 @@
                 <!-- ABA: CONTROLE DE ACESSO POR HORÁRIO (só admin geral) -->
                 <section id="aba-controle-acesso" class="aba-content">
                     <div style="max-width:1100px;margin:0 auto;padding:0 0 40px;">
-                        <div style="margin-bottom:18px;">
-                            <h2 style="margin:0;font-size:22px;"><i class="fa-solid fa-business-time" style="color:var(--primary);"></i> Controle de Acesso por Horário</h2>
-                            <p style="color:var(--text-secondary);font-size:13px;margin:6px 0 0;max-width:720px;">Defina os horários de acesso dos usuários internos, bloqueie ou libere o sistema. Os candidatos (formulários públicos) <strong>nunca</strong> são afetados.</p>
+                        <div class="mod-header-banner">
+                            <div class="mod-header-left">
+                                <div class="mod-header-icon-badge badge-blue"><i class="fa-solid fa-user-shield"></i></div>
+                                <div>
+                                    <h1 class="mod-header-title">Controle de Acesso por Horário</h1>
+                                    <p class="mod-header-subtitle">Defina os horários de acesso dos usuários internos, bloqueie ou libere o sistema.</p>
+                                </div>
+                            </div>
                         </div>
                         <div id="controle-acesso-conteudo"></div>
                     </div>
@@ -1198,9 +1277,14 @@
                 <!-- ABA: CADASTROS EXATA (tipos de contratação) -->
                 <section id="aba-cadastros-exata" class="aba-content">
                     <div style="max-width:1000px;margin:0 auto;padding:0 0 40px;">
-                        <div style="margin-bottom:18px;">
-                            <h2 style="margin:0;font-size:22px;"><i class="fa-solid fa-file-invoice" style="color:var(--primary);"></i> Cadastros Exata</h2>
-                            <p style="color:var(--text-secondary);font-size:13px;margin:6px 0 0;max-width:720px;">Tipos de contratação (vínculo + filial + regras de prazo) usados na criação da vaga e na exportação do TXT.</p>
+                        <div class="mod-header-banner">
+                            <div class="mod-header-left">
+                                <div class="mod-header-icon-badge badge-teal"><i class="fa-solid fa-file-invoice"></i></div>
+                                <div>
+                                    <h1 class="mod-header-title">Cadastros Exata</h1>
+                                    <p class="mod-header-subtitle">Tipos de contratação, filiais e regras usados na criação de vagas e exportação.</p>
+                                </div>
+                            </div>
                         </div>
                         <div id="cadastros-exata-conteudo"></div>
                     </div>
@@ -1372,7 +1456,6 @@
                         </div>
                         <div class="modal-exame-body">
                             <div id="ff-det-conteudo"><!-- Gerado por JS --></div>
-                        </div>
                         <div class="modal-exame-footer" id="ff-det-footer" style="flex-wrap:wrap;"><!-- Botões por JS --></div>
                     </div>
                 </div>
@@ -1384,15 +1467,15 @@
                 <!-- ABA: ENTREGA / DEVOLUÇÃO DE EQUIPAMENTOS (Departamento Pessoal) -->
                 <section id="aba-equipamentos" class="aba-content">
                     <div class="exame-medico-wrapper">
-                        <div class="exame-header-area">
-                            <div class="exame-header-left">
-                                <div class="exame-header-icon"><i class="fa-solid fa-boxes-packing"></i></div>
+                        <div class="mod-header-banner">
+                            <div class="mod-header-left">
+                                <div class="mod-header-icon-badge badge-teal"><i class="fa-solid fa-laptop-file"></i></div>
                                 <div>
-                                    <h1 class="exame-titulo">Entrega / Devolução de Equipamentos</h1>
-                                    <p class="exame-subtitulo">Registro e histórico de equipamentos entregues e devolvidos pelos colaboradores</p>
+                                    <h1 class="mod-header-title">Entrada e Devolução de Equipamentos</h1>
+                                    <p class="mod-header-subtitle">Controle e acompanhe a movimentação de equipamentos dos colaboradores.</p>
                                 </div>
                             </div>
-                            <div class="exame-header-right" id="equip-header-actions">
+                            <div class="mod-header-actions" id="equip-header-actions">
                                 <!-- Botão "Novo Registro" injetado por JS conforme permissão -->
                             </div>
                         </div>
@@ -1698,17 +1781,15 @@
                 <section id="aba-exame-medico" class="aba-content">
                     <div class="exame-medico-wrapper">
                         <!-- Header da aba -->
-                        <div class="exame-header-area">
-                            <div class="exame-header-left">
-                                <div class="exame-header-icon">
-                                    <i class="fa-solid fa-hospital"></i>
-                                </div>
+                        <div class="mod-header-banner">
+                            <div class="mod-header-left">
+                                <div class="mod-header-icon-badge badge-rose" style="background:linear-gradient(135deg,#e11d48,#be123c);box-shadow:0 8px 16px rgba(225,29,72,0.3);"><i class="fa-solid fa-notes-medical"></i></div>
                                 <div>
-                                    <h1 class="exame-titulo">Exame Médico Admissional</h1>
-                                    <p class="exame-subtitulo" id="exame-subtitulo-desc">Gerencie os exames médicos dos candidatos</p>
+                                    <h1 class="mod-header-title">Exame Médico Admissional</h1>
+                                    <p class="mod-header-subtitle" id="exame-subtitulo-desc">Gerencie e acompanhe os exames médicos ocupacionais dos candidatos.</p>
                                 </div>
                             </div>
-                            <div class="exame-header-right" id="exame-header-actions">
+                            <div class="mod-header-actions" id="exame-header-actions">
                                 <!-- Botoes injetados por JS conforme perfil -->
                             </div>
                         </div>
@@ -1932,9 +2013,14 @@
                 <!-- ABA: CONFIGURAÇÕES (SOMENTE ADMIN) -->
                 <section id="aba-configuracoes" class="aba-content">
                     <div style="max-width: 980px; margin: 0 auto; padding: 0 0 60px;">
-                        <div class="page-title-section">
-                            <h1><i class="fa-solid fa-sliders" style="color: var(--primary);"></i> Configurações do Sistema</h1>
-                            <p class="page-subtitle">Personalize os campos do formulário de vagas e gerencie dados avançados de clientes</p>
+                        <div class="mod-header-banner">
+                            <div class="mod-header-left">
+                                <div class="mod-header-icon-badge badge-indigo"><i class="fa-solid fa-sliders"></i></div>
+                                <div>
+                                    <h1 class="mod-header-title">Configurações do Sistema</h1>
+                                    <p class="mod-header-subtitle">Personalize os campos do formulário de vagas, regras e dados avançados do CRM.</p>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- BLOCO 1: Renomear Labels dos Campos de Vaga -->

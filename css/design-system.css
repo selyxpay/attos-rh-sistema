@@ -509,3 +509,243 @@ textarea:focus {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
   color: var(--color-text-title) !important;
 }
+
+/* ==========================================================================
+   11. PADRONIZAÇÃO VISUAL DOS MÓDULOS (FAIXAS / HEADERS & BOTÕES SAAS)
+   ========================================================================== */
+
+.mod-header-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 28px;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+  border-radius: 16px !important;
+  color: #ffffff !important;
+  margin-bottom: 24px;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.15) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.mod-header-banner::after {
+  content: '' !important;
+  position: absolute !important;
+  top: -50% !important;
+  right: -10% !important;
+  width: 320px !important;
+  height: 320px !important;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, rgba(2, 132, 199, 0.05) 50%, transparent 70%) !important;
+  pointer-events: none !important;
+}
+
+.mod-header-left {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  z-index: 1;
+}
+
+.mod-header-icon-badge {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);
+  flex-shrink: 0;
+}
+
+/* Temas de cores para ícones de cabeçalho */
+.mod-header-icon-badge.badge-blue {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);
+}
+
+.mod-header-icon-badge.badge-emerald {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 8px 16px rgba(5, 150, 105, 0.3);
+}
+
+.mod-header-icon-badge.badge-red {
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  box-shadow: 0 8px 16px rgba(220, 38, 38, 0.3);
+}
+
+.mod-header-icon-badge.badge-purple {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+  box-shadow: 0 8px 16px rgba(124, 58, 237, 0.3);
+}
+
+.mod-header-icon-badge.badge-amber {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 8px 16px rgba(217, 119, 6, 0.3);
+}
+
+.mod-header-icon-badge.badge-teal {
+  background: linear-gradient(135deg, #14b8a6 0%, #0f766e 100%);
+  box-shadow: 0 8px 16px rgba(20, 184, 166, 0.3);
+}
+
+.mod-header-icon-badge.badge-indigo {
+  background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+  box-shadow: 0 8px 16px rgba(99, 102, 241, 0.3);
+}
+
+/* Correção de colisão: badge-blue/red/purple/green/yellow também são CHIPS DE
+   STATUS (regras acima com !important, fundo pastel e font-size 11px). No
+   cabeçalho o ícone precisa ficar grande, arredondado e com gradiente vivo —
+   estas regras vencem por especificidade (0,2,0) + !important, sem mexer nos
+   chips de status usados no resto do sistema. */
+.mod-header-icon-badge.badge-blue,
+.mod-header-icon-badge.badge-red,
+.mod-header-icon-badge.badge-purple,
+.mod-header-icon-badge.badge-green,
+.mod-header-icon-badge.badge-yellow {
+  padding: 0 !important;
+  border-radius: 14px !important;
+  font-size: 22px !important;
+  text-transform: none !important;
+  color: #ffffff !important;
+}
+.mod-header-icon-badge.badge-blue   { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important; box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3) !important; }
+.mod-header-icon-badge.badge-red    { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%) !important; box-shadow: 0 8px 16px rgba(220, 38, 38, 0.3) !important; }
+.mod-header-icon-badge.badge-purple { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%) !important; box-shadow: 0 8px 16px rgba(124, 58, 237, 0.3) !important; }
+.mod-header-icon-badge.badge-green  { background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important; box-shadow: 0 8px 16px rgba(5, 150, 105, 0.3) !important; }
+.mod-header-icon-badge.badge-yellow { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important; box-shadow: 0 8px 16px rgba(217, 119, 6, 0.3) !important; }
+
+.mod-header-title {
+  margin: 0 !important;
+  font-family: 'Outfit', 'Inter', sans-serif !important;
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  color: #ffffff !important;
+  letter-spacing: -0.5px !important;
+}
+
+.mod-header-subtitle {
+  margin: 4px 0 0 0 !important;
+  font-size: 13.5px !important;
+  color: #94a3b8 !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+.mod-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 1;
+  flex-wrap: wrap;
+}
+
+/* Botões Padronizados dos Módulos */
+.mod-btn-primary,
+.btn-primary-red {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 11px 20px !important;
+  border-radius: 10px !important;
+  background: linear-gradient(135deg, #d40203 0%, #9f0102 100%) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  border: none !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 14px rgba(212, 2, 3, 0.35) !important;
+  transition: all 0.2s ease !important;
+  text-decoration: none !important;
+}
+
+.mod-btn-primary:hover,
+.btn-primary-red:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 18px rgba(212, 2, 3, 0.45) !important;
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%) !important;
+  color: #ffffff !important;
+}
+
+.mod-btn-secondary {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 10px 18px !important;
+  border-radius: 10px !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  text-decoration: none !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+.mod-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  transform: translateY(-1px) !important;
+  color: #ffffff !important;
+}
+
+.mod-btn-secondary-light {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 9px 16px !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  color: #334155 !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  border: 1px solid #cbd5e1 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 1px 3px rgba(15,23,42,0.05) !important;
+}
+
+.mod-btn-secondary-light:hover {
+  background: #f8fafc !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Categorias do Menu Lateral */
+.sidebar-category-title {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  color: #64748b !important;
+  padding: 16px 16px 6px 16px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+  margin-top: 8px !important;
+}
+
+.sidebar-nav ul li:first-child .sidebar-category-title,
+.sidebar-category-title:first-of-type {
+  border-top: none !important;
+  margin-top: 0 !important;
+}
+
+.sidebar-nav ul li.nav-item a {
+  transition: all 0.2s ease !important;
+}
+
+.sidebar-nav ul li.nav-item a i {
+  width: 20px !important;
+  text-align: center !important;
+  margin-right: 8px !important;
+  font-size: 14px !important;
+}
+

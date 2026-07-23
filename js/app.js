@@ -9999,10 +9999,10 @@ function renderEquipamentos() {
   const actions = document.getElementById('equip-header-actions');
   if (actions) {
     actions.innerHTML = podeCriarEquipamento()
-      ? `<button class="btn btn-outline" onclick="abrirImportarEquip()" title="Trazer os registros do formulário antigo">
+      ? `<button class="mod-btn-secondary" onclick="abrirImportarEquip()" title="Trazer os registros do formulário antigo">
            <i class="fa-solid fa-file-import"></i> Importar do sistema antigo
          </button>
-         <button class="btn btn-primary" onclick="abrirModalEquipamento()"><i class="fa-solid fa-plus"></i> Novo Registro</button>`
+         <button class="mod-btn-primary" onclick="abrirModalEquipamento()"><i class="fa-solid fa-plus"></i> + NOVO REGISTRO</button>`
       : '';
   }
 
@@ -11663,7 +11663,7 @@ function renderFluxoFinanceiro() {
   const actions = document.getElementById('ff-header-actions');
   if (actions) {
     actions.innerHTML = _ffPodeCriar()
-      ? `<button class="btn btn-primary" onclick="abrirModalNovoFluxo()"><i class="fa-solid fa-plus"></i> Novo Fluxo Financeiro</button>`
+      ? `<button class="mod-btn-primary" onclick="abrirModalNovoFluxo()"><i class="fa-solid fa-plus"></i> + NOVO FLUXO FINANCEIRO</button>`
       : '';
   }
 
@@ -13081,8 +13081,8 @@ function renderExameMedico() {
   const actions = document.getElementById('exame-header-actions');
   if (actions) {
     if (isSelecao) {
-      actions.innerHTML = `<button class="btn btn-primary" onclick="abrirModalNovoExame()">
-        <i class="fa-solid fa-plus"></i> Novo Exame
+      actions.innerHTML = `<button class="mod-btn-primary" onclick="abrirModalNovoExame()">
+        <i class="fa-solid fa-plus"></i> + NOVO EXAME
       </button>`;
     } else {
       actions.innerHTML = '';
