@@ -3770,23 +3770,11 @@ function filtrarRelatorioPorPill(recrutadorId) {
 // ABA 7: COMISSÃO (EXCEL STYLE SHEET)
 function renderComissaoSheet() {
   const kpisContainer = document.getElementById('comissao-kpis-container');
-  if (!kpisContainer) return;
-
-  // KPI cards por recrutador
-  kpisContainer.innerHTML = state.recrutadores.map(r => {
-    const count = state.contratacoes.filter(c => c.recrutadorId === r.id).length;
-    return `
-      <div class="kpi-card bg-glass">
-        <div class="kpi-icon-wrapper" style="background-color: #f1f5f9; color: ${r.corHex};">
-          <i class="fa-solid fa-award"></i>
-        </div>
-        <div class="kpi-data">
-          <span class="kpi-number">${count}</span>
-          <span class="kpi-label">${r.nome}</span>
-        </div>
-      </div>
-    `;
-  }).join('');
+  // Os cards individuais por recrutador foram REMOVIDOS a pedido — a área fica
+  // mais limpa. Nada de dado se perde: cada contratação/recrutador continua na
+  // tabela abaixo (com filtro, busca e valores). Se um dia quiser os cards de
+  // volta, basta repopular este container.
+  if (kpisContainer) { kpisContainer.innerHTML = ''; kpisContainer.style.display = 'none'; }
 
   // Tabela Registro
   const tableBody = document.getElementById('comissao-table-body');
