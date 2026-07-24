@@ -200,7 +200,7 @@ function subsetPublico(dados) {
   const d = JSON.parse(JSON.stringify(dados || {}));
   // Remove tudo que é sensível/interno
   ['funcionarios', 'logs', 'logsGlobais', 'auditoria', 'config', 'controleAcesso',
-    'exataDominios', 'tiposContratacao', 'comissao', 'comissoes', 'relatorios', 'notificacoes']
+    'exataDominios', 'exataTransformacoes', 'tiposContratacao', 'comissao', 'comissoes', 'relatorios', 'notificacoes']
     .forEach(function (k) { delete d[k]; });
   // Candidatos e banco de talentos: some com os dados (privacidade), mas mantém
   // os arrays VAZIOS para as páginas públicas não quebrarem ao adicionar um novo.
@@ -209,7 +209,7 @@ function subsetPublico(dados) {
   if (Array.isArray(d.vagas)) {
     d.vagas = d.vagas.filter(function (v) { return !v.excluido; }).map(function (v) {
       const c = Object.assign({}, v);
-      ['exataCampos', 'exataExtras', 'funcaoCodigo', 'cbo', 'vinculo', 'codigoTipoContrato',
+      ['exataCampos', 'exataExtras', 'exataTransformacoes', 'funcaoCodigo', 'cbo', 'vinculo', 'codigoTipoContrato',
         'tipoContratacaoId', 'idEmpresaExata', 'exataJobFunctionId', 'diasVencimento', 'diasProrrogacao',
         'finalidade', 'justificativa', 'taxa', 'categoriaCodigo', 'filial', 'branchCode',
         'employmentLabel', 'exataEmploymentCode', 'employmentType', 'exataFuncaoArea', 'funcaoNome'

@@ -2909,6 +2909,7 @@ window.aoMudarEmpresaVaga = aoMudarEmpresaVaga;
 
 // ── Painel admin: Cadastros Exata (tipos de contratação) ──────────────────
 // ── Cadastro Exata = CONFIGURADOR POR VAGA (seleciona a vaga e configura os 90 campos) ──
+// ── + CONFIGURADOR DE TRANSFORMAÇÕES (global/vaga) ──
 function renderCadastrosExata() {
   const cont = document.getElementById('cadastros-exata-conteudo');
   if (!cont) return;
@@ -2932,9 +2933,27 @@ function renderCadastrosExata() {
     return `<span style="background:${x[2]};color:${x[1]};padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;white-space:nowrap;">${x[0]}</span>`;
   };
 
+  // ── Exemplos de valor para pré-visualização ──
+  const exemplos = {
+    nome: 'João Victor Esteves', email: 'joao@email.com', salario: 'R$ 2.500,00',
+    sexo: 'Masculino', raca: 'Branco', escolaridade: 'Ensino Médio Completo',
+    estado_civil: 'Solteiro', cpf: '123.456.789-00', rg: '12.345.678-9',
+    endereco: 'Rua das Flores', endereco_cidade: 'São Paulo', endereco_estado: 'SP',
+    endereco_bairro: 'Centro', endereco_cep: '01234-567', data_nascimento: '15/03/1990',
+    nome_pai: 'José Esteves', nome_mae: 'Maria Esteves', pis: '123.45678.90-1',
+    banco: 'Bradesco', agencia: '1234', conta: '56789-0', tel_celular: '(11) 91234-5678',
+    funcao: '0002', funcao_cbo: '784205', taxa: '150,00'
+  };
+
+  // ── Config de transformações: global e por vaga (merge) ──
+  const globalTransf = _getExataTransformacoes();
+  const vagaTransf = vagaSel ? _getExataTransformacoesVaga(vagaSel) : {};
+
+  // ── Tabela dos 90 campos (com config de Nome/Código da vaga + Tipo de Envio + Regras + Preview) ──
   const cfg = (vagaSel && vagaSel.exataCampos) || {};
   const mapaLinhas = EXATA_CAMPOS_INFO.map(c => {
     const configuravel = (c.origem === 'tipos' || c.origem === 'vaga');
+    // Coluna de config Nome/Código (existente — mantida)
     let conf = '';
     if (configuravel && !vagaSel) {
       conf = '<span style="font-size:11px;color:var(--text-secondary);">selecione a vaga acima</span>';
@@ -2951,11 +2970,73 @@ function renderCadastrosExata() {
     } else {
       conf = '<span style="font-size:11px;color:var(--text-secondary);">automático</span>';
     }
+
+    // ── NOVO: Tipo de Envio + Regras/Opções + Preview ──
+    const tCfg = _getTransformConfig(c.key, globalTransf, vagaTransf) || {};
+    const tipoAtual = tCfg.tipo || 'auto';
+    const regrasAtual = tCfg.regras || [];
+    const opcoesAtual = tCfg.opcoes || [];
+    const exemploVal = exemplos[c.key] || c.titulo || '';
+
+    // Dropdown tipo envio
+    const tipoHtml = `<select id="txf-tipo-${c.key}" class="form-control" style="font-size:11px;padding:3px 6px;min-width:130px;" onchange="aoMudarTipoEnvioExata('${c.key}')">
+      <option value="auto" ${tipoAtual === 'auto' ? 'selected' : ''}>Automático</option>
+      <option value="semi" ${tipoAtual === 'semi' ? 'selected' : ''}>Semiautomático</option>
+      <option value="codigo" ${tipoAtual === 'codigo' ? 'selected' : ''}>Código / Multiescolha</option>
+    </select>`;
+
+    // Regras (só se semiautomático)
+    let regrasHtml = '';
+    if (tipoAtual === 'semi') {
+      regrasHtml = '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">' +
+        EXATA_REGRAS_KEYS.map(rk => {
+          const r = EXATA_REGRAS_TRANSFORM[rk];
+          const checked = regrasAtual.includes(rk) ? 'checked' : '';
+          return `<label style="display:flex;align-items:center;gap:3px;font-size:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:2px 6px;cursor:pointer;white-space:nowrap;" title="${escapeHTML(r.desc)}">
+            <input type="checkbox" ${checked} onchange="aoToggleRegraExata('${c.key}','${rk}')" style="width:12px;height:12px;"> ${escapeHTML(r.label)}
+          </label>`;
+        }).join('') + '</div>';
+    }
+
+    // Multiescolha (só se código)
+    let multiHtml = '';
+    if (tipoAtual === 'codigo') {
+      const opLinhas = opcoesAtual.length ? opcoesAtual.map((o, idx) =>
+        `<div style="display:flex;align-items:center;gap:4px;margin-top:2px;">
+          <span style="font-size:11px;flex:1;">${escapeHTML(o.de)}</span>
+          <span style="font-size:11px;font-weight:700;">→</span>
+          <span style="font-size:11px;font-weight:700;color:#6d28d9;">${escapeHTML(o.codigo)}</span>
+          <button class="btn btn-sm" style="font-size:9px;padding:1px 4px;background:#fff1f2;border:1px solid #fca5a5;color:#dc2626;" onclick="removerOpcaoTransfExata('${c.key}',${idx})" title="Remover"><i class="fa-solid fa-xmark"></i></button>
+        </div>`
+      ).join('') : '<span style="font-size:10px;color:var(--text-secondary);">Sem opções</span>';
+      multiHtml = `<div style="margin-top:4px;">${opLinhas}
+        <div style="display:flex;gap:4px;margin-top:6px;">
+          <input class="form-control" style="flex:1;font-size:11px;padding:3px 6px;" placeholder="Opção (ex: Solteiro)" id="txf-opde-${c.key}">
+          <input class="form-control" style="flex:1;font-size:11px;padding:3px 6px;" placeholder="Código (ex: 1)" id="txf-opcod-${c.key}">
+          <button class="btn btn-primary btn-sm" style="font-size:10px;padding:3px 8px;white-space:nowrap;" onclick="addOpcaoTransfExata('${c.key}')"><i class="fa-solid fa-plus"></i></button>
+        </div>
+      </div>`;
+    }
+
+    // Preview
+    let previewHtml = '';
+    if (tipoAtual !== 'auto' && exemploVal) {
+      const resultado = _previewTransformacao(exemploVal, { tipo: tipoAtual, regras: regrasAtual, opcoes: opcoesAtual });
+      const mudou = resultado !== exemploVal;
+      previewHtml = `<div style="font-size:10px;margin-top:4px;padding:4px 8px;background:${mudou ? '#fef9c3' : '#f1f5f9'};border-radius:6px;border:1px solid ${mudou ? '#fde047' : '#e2e8f0'};">
+        <span style="color:var(--text-secondary);">${escapeHTML(exemploVal)}</span>
+        <span style="font-weight:700;color:#6d28d9;"> → </span>
+        <span style="font-weight:700;color:${mudou ? '#15803d' : 'var(--text-secondary)'};">${escapeHTML(resultado)}</span>
+      </div>`;
+    }
+
     return `<tr>
       <td style="color:var(--text-secondary);font-size:11px;">${c.pos}</td>
       <td><code style="font-size:11px;">${escapeHTML(c.key)}</code><br><span style="font-size:11px;color:var(--text-secondary);">${escapeHTML(c.titulo)}</span></td>
       <td>${badge(c.origem)}</td>
       <td style="min-width:240px;">${conf}</td>
+      <td style="min-width:140px;">${tipoHtml}</td>
+      <td style="min-width:200px;">${regrasHtml}${multiHtml}${previewHtml}</td>
     </tr>`;
   }).join('');
 
@@ -2985,6 +3066,12 @@ function renderCadastrosExata() {
     </details>`;
   }).join('');
 
+  // Contagem de campos com transformação configurada
+  const totalConfigurados = EXATA_CAMPOS_INFO.filter(c => {
+    const tc = _getTransformConfig(c.key, globalTransf, vagaTransf);
+    return tc && tc.tipo && tc.tipo !== 'auto';
+  }).length;
+
   cont.innerHTML = `
     <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
       <label for="cad-exata-vaga" style="font-weight:700;font-size:13px;color:#6d28d9;display:block;margin-bottom:6px;"><i class="fa-solid fa-briefcase"></i> Selecionar vaga</label>
@@ -2992,13 +3079,30 @@ function renderCadastrosExata() {
       ${vagaSel ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:6px;">Configurando: <b>${escapeHTML(vagaSel.empresaNome || '')} — ${escapeHTML(vagaSel.cargo || '')}</b>. Os códigos abaixo ficam salvos NESTA vaga.</div>` : '<div style="font-size:11px;color:var(--text-secondary);margin-top:6px;">Escolha uma vaga para configurar os códigos enviados ao Exata.</div>'}
     </div>
 
+    <div style="background:linear-gradient(135deg,#ede9fe,#e0e7ff);border:1px solid #c4b5fd;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <div>
+          <h4 style="margin:0;font-size:14px;color:#4c1d95;"><i class="fa-solid fa-wand-magic-sparkles"></i> Configurador de Integração</h4>
+          <p style="font-size:12px;color:#6d28d9;margin:4px 0 0;">Defina o <b>tipo de envio</b> e <b>regras de transformação</b> para cada campo antes de enviar ao Exata.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="background:#7c3aed;color:#fff;padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;">${totalConfigurados} campo${totalConfigurados !== 1 ? 's' : ''} configurado${totalConfigurados !== 1 ? 's' : ''}</span>
+          <button class="btn btn-primary" onclick="salvarTransformacoesExata()" style="font-size:12px;padding:6px 14px;background:#7c3aed;border:none;"><i class="fa-solid fa-floppy-disk"></i> Salvar Transformações</button>
+        </div>
+      </div>
+    </div>
+
     <div style="background:var(--card-bg,#fff);border:1px solid var(--border-color,#e2e8f0);border-radius:12px;padding:16px;margin-bottom:16px;">
       <h4 style="margin:0 0 4px;font-size:14px;"><i class="fa-solid fa-list-check"></i> Campos enviados ao Exata (TXT) — os 90 campos</h4>
-      <p style="font-size:12px;color:var(--text-secondary);margin:0 0 10px;">Para cada campo da VAGA, preencha <b>Nome</b> (só para você ver) e <b>Código</b> (o que vai no TXT). <b>Cinza</b> = vem da ficha do candidato; <b>laranja</b> = automático; <b>azul</b> = vem das opções da ficha (abaixo).</p>
-      <div class="table-scroll-container" style="max-height:430px;overflow:auto;"><table class="excel-table" style="width:100%;">
-        <thead><tr><th>#</th><th>Campo</th><th>Origem</th><th>Configuração (Nome / Código)</th></tr></thead>
+      <p style="font-size:12px;color:var(--text-secondary);margin:0 0 4px;">Para cada campo: <b>Configuração</b> = Nome/Código da vaga · <b>Tipo Envio</b> = como o valor é tratado · <b>Regras / Preview</b> = transformação aplicada.</p>
+      <p style="font-size:11px;color:var(--text-secondary);margin:0 0 10px;"><b>Automático</b> = envia como está · <b>Semiautomático</b> = aplica regras (MAIÚSCULAS, remover R$ etc.) · <b>Código/Multiescolha</b> = cada opção vira um código.</p>
+      <div class="table-scroll-container" style="max-height:530px;overflow:auto;"><table class="excel-table" style="width:100%;">
+        <thead><tr><th>#</th><th>Campo</th><th>Origem</th><th>Configuração (Nome / Código)</th><th>Tipo Envio</th><th>Regras / Opções / Preview</th></tr></thead>
         <tbody>${mapaLinhas}</tbody></table></div>
-      ${vagaSel ? '<div style="margin-top:12px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" onclick="salvarCamposExataVaga()"><i class="fa-solid fa-floppy-disk"></i> Salvar configuração da vaga</button></div>' : ''}
+      <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;">
+        ${vagaSel ? '<button class="btn btn-primary" onclick="salvarCamposExataVaga()"><i class="fa-solid fa-floppy-disk"></i> Salvar configuração da vaga</button>' : ''}
+        <button class="btn" onclick="salvarTransformacoesExata()" style="background:#7c3aed;color:#fff;border:none;font-weight:700;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;"><i class="fa-solid fa-wand-magic-sparkles"></i> Salvar Transformações (global)</button>
+      </div>
     </div>
 
     <div style="background:var(--card-bg,#fff);border:1px solid var(--border-color,#e2e8f0);border-radius:12px;padding:16px;">
@@ -3073,6 +3177,65 @@ window.excluirOpcaoFicha = function (key, idx) {
 window.toggleOpcaoFicha = function (key, idx) {
   const lista = getOpcoesFicha(key); if (lista[idx]) lista[idx].ativo = lista[idx].ativo === false;
   saveState(); renderCadastrosExata();
+};
+
+// ── Funções de interação do Configurador de Transformações ──
+// Ao mudar o tipo de envio de um campo
+window.aoMudarTipoEnvioExata = function (campoKey) {
+  const sel = document.getElementById('txf-tipo-' + campoKey);
+  if (!sel) return;
+  const tipo = sel.value;
+  const cfg = _getExataTransformacoes();
+  if (!cfg[campoKey]) cfg[campoKey] = {};
+  cfg[campoKey].tipo = tipo;
+  // Limpar regras/opções ao trocar o tipo
+  if (tipo === 'auto') { delete cfg[campoKey]; }
+  else if (tipo === 'semi') { cfg[campoKey].opcoes = []; }
+  else if (tipo === 'codigo') { cfg[campoKey].regras = []; }
+  renderCadastrosExata();
+};
+// Toggle de regra de transformação (checkbox)
+window.aoToggleRegraExata = function (campoKey, regraKey) {
+  const cfg = _getExataTransformacoes();
+  if (!cfg[campoKey]) cfg[campoKey] = { tipo: 'semi', regras: [] };
+  if (!cfg[campoKey].regras) cfg[campoKey].regras = [];
+  const idx = cfg[campoKey].regras.indexOf(regraKey);
+  if (idx >= 0) cfg[campoKey].regras.splice(idx, 1);
+  else cfg[campoKey].regras.push(regraKey);
+  renderCadastrosExata();
+};
+// Adicionar opção de multiescolha
+window.addOpcaoTransfExata = function (campoKey) {
+  const deEl = document.getElementById('txf-opde-' + campoKey);
+  const codEl = document.getElementById('txf-opcod-' + campoKey);
+  const de = (deEl ? deEl.value : '').trim();
+  const codigo = (codEl ? codEl.value : '').trim();
+  if (!de) { alert('Preencha a opção (ex.: Solteiro).'); return; }
+  if (!codigo) { alert('Preencha o código (ex.: 1).'); return; }
+  const cfg = _getExataTransformacoes();
+  if (!cfg[campoKey]) cfg[campoKey] = { tipo: 'codigo', opcoes: [] };
+  if (!cfg[campoKey].opcoes) cfg[campoKey].opcoes = [];
+  // Atualiza se já existir
+  const existente = cfg[campoKey].opcoes.findIndex(o => String(o.de || '').trim().toLowerCase() === de.toLowerCase());
+  if (existente >= 0) cfg[campoKey].opcoes[existente].codigo = codigo;
+  else cfg[campoKey].opcoes.push({ de, codigo });
+  renderCadastrosExata();
+};
+// Remover opção de multiescolha
+window.removerOpcaoTransfExata = function (campoKey, idx) {
+  const cfg = _getExataTransformacoes();
+  if (cfg[campoKey] && cfg[campoKey].opcoes) {
+    cfg[campoKey].opcoes.splice(idx, 1);
+  }
+  renderCadastrosExata();
+};
+// Salvar transformações no state (Firebase)
+window.salvarTransformacoesExata = function () {
+  // Já está salvo em state.exataTransformacoes (as funções acima modificam diretamente)
+  registrarLogGlobal('Salvou configurações de transformação do Exata.', 'exata');
+  saveState();
+  alert('Transformações salvas com sucesso! ✅\n\nAs regras serão aplicadas na próxima exportação de qualquer candidato.');
+  renderCadastrosExata();
 };
 
 // ── EDIÇÃO de vaga já criada (reusa o mesmo formulário de "Criar Nova Vaga") ──
@@ -5939,6 +6102,88 @@ function _aplicarCamposVaga(arr, vs) {
   return arr;
 }
 
+// ── ENGINE DE TRANSFORMAÇÃO — regras pré-definidas para o configurador Exata ──
+const EXATA_REGRAS_TRANSFORM = {
+  MAIUSCULAS:           { label: 'MAIÚSCULAS', desc: 'Converte para letras maiúsculas', fn: v => v.toUpperCase() },
+  MINUSCULAS:           { label: 'minúsculas', desc: 'Converte para letras minúsculas', fn: v => v.toLowerCase() },
+  REMOVER_ACENTOS:      { label: 'Remover acentos', desc: 'Tira acentos (São Paulo → SAO PAULO)', fn: v => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '') },
+  REMOVER_ESPACOS:      { label: 'Remover espaços', desc: 'Tira todos os espaços', fn: v => v.replace(/\s+/g, '') },
+  REMOVER_RS:           { label: 'Remover R$', desc: 'Tira "R$" e espaço', fn: v => v.replace(/R\$\s*/gi, '') },
+  REMOVER_PONTO_MILHAR: { label: 'Remover ponto de milhar', desc: 'Tira . antes de 3 dígitos', fn: v => v.replace(/\.(?=\d{3})/g, '') },
+  SO_DIGITOS:           { label: 'Só dígitos', desc: 'Mantém apenas números', fn: v => v.replace(/\D/g, '') },
+  TRIM:                 { label: 'Trim (espaços bordas)', desc: 'Remove espaços no início/fim', fn: v => v.trim() }
+};
+// Lista ordenada das chaves para UI
+const EXATA_REGRAS_KEYS = Object.keys(EXATA_REGRAS_TRANSFORM);
+
+// Retorna a config global de transformações
+function _getExataTransformacoes() {
+  if (typeof state === 'undefined' || !state) return {};
+  if (!state.exataTransformacoes) state.exataTransformacoes = {};
+  return state.exataTransformacoes;
+}
+// Retorna a config de uma vaga (override)
+function _getExataTransformacoesVaga(vs) {
+  return (vs && vs.exataTransformacoes) || {};
+}
+// Merge: vaga sobrescreve global
+function _getTransformConfig(key, globalCfg, vagaCfg) {
+  if (vagaCfg[key]) return vagaCfg[key];
+  if (globalCfg[key]) return globalCfg[key];
+  return null;
+}
+
+// Aplica regras de transformação a um valor individual
+function _aplicarRegrasValor(valor, regras) {
+  if (!regras || !regras.length) return valor;
+  let v = String(valor == null ? '' : valor);
+  if (!v) return v;
+  regras.forEach(rKey => {
+    const regra = EXATA_REGRAS_TRANSFORM[rKey];
+    if (regra && typeof regra.fn === 'function') v = regra.fn(v);
+  });
+  return v;
+}
+
+// Traduz um valor pela tabela de opções de multiescolha configurada
+function _traduzirMultiescolha(valor, opcoes) {
+  if (!opcoes || !opcoes.length) return valor;
+  const alvo = String(valor == null ? '' : valor).trim().toLowerCase();
+  if (!alvo) return valor;
+  const hit = opcoes.find(o => String(o.de || '').trim().toLowerCase() === alvo);
+  return hit ? (hit.codigo || valor) : valor;
+}
+
+// Pipeline: aplica transformações configuradas (global + override por vaga)
+function _aplicarTransformacoes(arr, vs) {
+  const globalCfg = _getExataTransformacoes();
+  const vagaCfg = _getExataTransformacoesVaga(vs);
+  EXATA_CAMPOS_INFO.forEach(c => {
+    const i = EXATA_HEADER.indexOf(c.key);
+    if (i < 0) return;
+    const cfg = _getTransformConfig(c.key, globalCfg, vagaCfg);
+    if (!cfg) return; // sem configuração = mantém valor original (retrocompatível)
+    const tipo = cfg.tipo || 'auto';
+    if (tipo === 'auto') return; // automático = sem transformação
+    if (tipo === 'semi') {
+      arr[i] = _aplicarRegrasValor(arr[i], cfg.regras || []);
+    } else if (tipo === 'codigo') {
+      arr[i] = _traduzirMultiescolha(arr[i], cfg.opcoes || []);
+    }
+  });
+  return arr;
+}
+
+// Preview: simula a transformação de um valor de exemplo
+function _previewTransformacao(valorExemplo, cfg) {
+  if (!cfg) return valorExemplo;
+  const tipo = cfg.tipo || 'auto';
+  if (tipo === 'auto') return valorExemplo;
+  if (tipo === 'semi') return _aplicarRegrasValor(valorExemplo, cfg.regras || []);
+  if (tipo === 'codigo') return _traduzirMultiescolha(valorExemplo, cfg.opcoes || []);
+  return valorExemplo;
+}
+
 // Protege o valor: nunca cria coluna extra nem emite null/undefined (itens 15-16)
 function sanitizarExata(v) {
   if (v === null || v === undefined) return '';
@@ -6076,8 +6321,8 @@ function mapearExata(cand, vs) {
     vs.previsaoDias,                              // 89 previsao_contrato_dias (vaga)
     vs.taxa                                       // 90 taxa (vaga)
   ];
-  // 1) traduz texto->código (de/para da ficha) · 2) extras legado · 3) config por campo da vaga (vence)
-  return _aplicarCamposVaga(_aplicarExtrasVaga(_aplicarDominiosExata(arr), vs), vs);
+  // 1) traduz texto→código (de/para da ficha) · 2) transformações configuradas · 3) extras legado · 4) config por campo da vaga (vence)
+  return _aplicarCamposVaga(_aplicarExtrasVaga(_aplicarTransformacoes(_aplicarDominiosExata(arr), vs), vs), vs);
 }
 
 // Validação dos campos obrigatórios antes de exportar (item 19)
@@ -12226,7 +12471,7 @@ function receberPdfsFluxo(input) {
   input.value = '';
   novos.forEach(f => {
     if (f.size > 20 * 1024 * 1024) { alert(`"${f.name}" passa de 20 MB.`); return; }
-    if (_ffPdfsTemp.length >= 20) { alert('Máximo de 20 arquivos por fluxo.'); return; }
+    // Sem limite de arquivos por fluxo
     _ffPdfsTemp.push(f);
   });
   const prev = document.getElementById('ff-arquivos-preview');
