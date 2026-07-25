@@ -12470,8 +12470,11 @@ function receberPdfsFluxo(input) {
   const novos = Array.from(input.files || []).filter(f => /\.pdf$/i.test(f.name));
   input.value = '';
   novos.forEach(f => {
-    if (f.size > 20 * 1024 * 1024) { alert(`"${f.name}" passa de 20 MB.`); return; }
-    // Sem limite de arquivos por fluxo
+    // Quantidade de arquivos: ILIMITADA (cada PDF sobe sozinho para /uploads).
+    // Tamanho por arquivo: 32 MB — teto seguro, porque o servidor monta cada
+    // upload na memória (LIMITE_CORPO 48 MB; base64 ≈ 1,34× o arquivo → 32 MB
+    // viram ~43 MB, com folga). PDF de relação bancária é bem menor que isso.
+    if (f.size > 32 * 1024 * 1024) { alert(`"${f.name}" tem ${(f.size/1048576).toFixed(1)} MB e passa do limite de 32 MB por arquivo. Você pode enviar quantos arquivos quiser, mas cada um precisa ter até 32 MB.`); return; }
     _ffPdfsTemp.push(f);
   });
   const prev = document.getElementById('ff-arquivos-preview');
