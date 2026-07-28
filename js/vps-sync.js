@@ -90,7 +90,9 @@ window.RTCloud = (function () {
       await processarDocumentos(state);   // sobe as fotos e troca o base64 por link
       const merge = !!(options && options.merge);
       const upsertIds = (options && options.upsertIds) ? options.upsertIds.slice() : [];
-      const res = await apiPost('/state', { dados: state, merge: merge, upsertIds: upsertIds });
+      // baseVersion = versão em que este cliente se baseou. O servidor usa isso
+      // para NÃO deixar um save desatualizado apagar o que outra pessoa gravou.
+      const res = await apiPost('/state', { dados: state, merge: merge, upsertIds: upsertIds, baseVersion: lastVersion });
       if (res && res.version) lastVersion = res.version;
       return res;
     } finally {
@@ -108,7 +110,7 @@ window.RTCloud = (function () {
     flushing = true;
     try {
       await processarDocumentos(state);   // sobe base64 -> /uploads e troca por link
-      const res = await apiPost('/state', { dados: state, merge: merge, upsertIds: upsert });
+      const res = await apiPost('/state', { dados: state, merge: merge, upsertIds: upsert, baseVersion: lastVersion });
       if (res && res.version) lastVersion = res.version; // evita "eco" do nosso próprio save
     } catch (e) {
       console.error('[RT VPS] Falha ao salvar (tentaremos de novo):', e);

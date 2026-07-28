@@ -15,11 +15,13 @@ const BASE = path.resolve(__dirname);
 const DATA_DIR = process.env.DATA_DIR || path.join(BASE, 'server-data');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 const LIMITE_CORPO = 48 * 1024 * 1024;  // 48 MB. O corpo inteiro e montado na MEMORIA (data += chunk);
 // 500 MB viravam ~1 GB de RAM e derrubariam a VPS. 48 MB comporta 1 arquivo de 20 MB em base64 (~27 MB) com folga.
 
 // Garante as pastas de dados
 try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (e) {}
+try { fs.mkdirSync(BACKUP_DIR, { recursive: true }); } catch (e) {}
 
 console.log('BASE:', BASE);
 console.log('DATA_DIR:', DATA_DIR);
@@ -123,9 +125,38 @@ function lerEstado() {
   }
 }
 function gravarEstado(obj) {
+  try { fazerBackupSePreciso(); } catch (e) { /* backup nunca pode derrubar o save */ }
   const tmp = STATE_FILE + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(obj));
   fs.renameSync(tmp, STATE_FILE); // troca atômica: nunca deixa arquivo pela metade
+}
+
+// ── BACKUP AUTOMÁTICO (rede de segurança contra perda de dados) ─────────────
+// Antes de sobrescrever, guarda uma cópia do state.json ATUAL. Faz no máximo 1
+// backup por hora, em 24 slots horários + 7 slots diários (nº fixo de arquivos,
+// não cresce sem parar). Assim sempre dá para restaurar até ~1 semana atrás.
+let _ultimoBackupHora = '';
+function fazerBackupSePreciso() {
+  const agora = new Date();
+  const carimboHora = agora.toISOString().slice(0, 13);   // "2026-07-25T14"
+  if (carimboHora === _ultimoBackupHora) return;          // já fez backup nesta hora
+  if (!fs.existsSync(STATE_FILE)) return;                  // nada para copiar ainda
+  const conteudo = fs.readFileSync(STATE_FILE);
+  if (!conteudo || conteudo.length < 2) return;            // não faz backup de estado vazio
+  _ultimoBackupHora = carimboHora;
+  const hh = String(agora.getHours()).padStart(2, '0');
+  fs.writeFileSync(path.join(BACKUP_DIR, 'state-hora-' + hh + '.json'), conteudo);
+  fs.writeFileSync(path.join(BACKUP_DIR, 'state-dia-' + agora.getDay() + '.json'), conteudo);
+}
+
+// Junta os IDs de todas as listas do estado (para o "upsert de tudo" do guarda anti-perda)
+function _todosIds(dados) {
+  const ids = [];
+  Object.keys(dados || {}).forEach(function (k) {
+    const v = dados[k];
+    if (Array.isArray(v)) v.forEach(function (it) { if (it && it.id != null) ids.push(it.id); });
+  });
+  return ids;
 }
 let _fila = Promise.resolve();
 function comTrava(fn) {
@@ -781,8 +812,23 @@ http.createServer(function (req, res) {
         let dados;
         if (autenticado) {
           // Staff logado: comportamento normal (merge ou substituição total)
-          if (body && body.merge) dados = mesclarEstado(atual.dados || {}, body.dados || {}, body.upsertIds || []);
-          else dados = (body && body.dados) || {};
+          if (body && body.merge) {
+            dados = mesclarEstado(atual.dados || {}, body.dados || {}, body.upsertIds || []);
+          } else {
+            // GUARDA ANTI-PERDA: se o cliente salvou baseado numa versão MAIS
+            // ANTIGA que a atual (outra pessoa gravou nesse meio-tempo), NÃO
+            // substitui cegamente — senão apagaria o que a outra acabou de
+            // cadastrar. Aplica TODAS as alterações deste cliente (upsert de
+            // tudo que ele mandou) e PRESERVA os registros que ele ainda não
+            // tinha. Assim nenhum cadastro some por concorrência.
+            const base = (body && body.baseVersion != null) ? Number(body.baseVersion) : null;
+            if (base != null && base < (atual.version || 0)) {
+              console.log('[RT] Save desatualizado (base ' + base + ' < atual ' + atual.version + ') — merge anti-perda aplicado.');
+              dados = mesclarEstado(atual.dados || {}, body.dados || {}, _todosIds(body.dados || {}));
+            } else {
+              dados = (body && body.dados) || {};
+            }
+          }
         } else {
           // SEM login: só pode ADICIONAR candidatos/talentos/fila. Nunca toca em funcionários/vagas/etc.
           const local = (body && body.dados) || {};
