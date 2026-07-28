@@ -77,13 +77,20 @@ window.RTCloud = (function () {
   // Diferente do saveState/flush (que engolem o erro e tentam de novo em silêncio),
   // este LANÇA o erro. Serve para telas onde o usuário precisa saber, na hora, se o
   // registro realmente entrou no servidor — em vez de achar que salvou e não ter salvo.
-  async function salvarAgora(state) {
+  // options: { merge, upsertIds }. Por padrão substitui o estado inteiro
+  // (merge:false) — compatível com quem já chamava salvarAgora(state).
+  // Passe { merge:true, upsertIds:[id] } quando VÁRIAS pessoas mexem na mesma
+  // lista ao mesmo tempo: aí o servidor só ADICIONA o registro novo (ou troca o
+  // que está no upsert) e NUNCA apaga o que outra pessoa acabou de cadastrar.
+  async function salvarAgora(state, options) {
     clearTimeout(saveTimer);
     pending = null; pendingMerge = false; pendingUpsert = [];
     flushing = true;
     try {
       await processarDocumentos(state);   // sobe as fotos e troca o base64 por link
-      const res = await apiPost('/state', { dados: state, merge: false, upsertIds: [] });
+      const merge = !!(options && options.merge);
+      const upsertIds = (options && options.upsertIds) ? options.upsertIds.slice() : [];
+      const res = await apiPost('/state', { dados: state, merge: merge, upsertIds: upsertIds });
       if (res && res.version) lastVersion = res.version;
       return res;
     } finally {

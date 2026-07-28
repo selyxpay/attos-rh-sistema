@@ -10687,7 +10687,10 @@ async function salvarEquipamento() {
       // salvarAgora() converte base64 -> link /uploads/ ANTES de gravar no servidor.
       // Só depois disso gravamos no localStorage — assim nunca salvamos base64
       // pesado que estoura o limite de ~5 MB do navegador.
-      await RTCloud.salvarAgora(state);
+      // MERGE + UPSERT: só adiciona/atualiza ESTE registro no servidor. Assim,
+      // quando duas pessoas cadastram equipamento ao mesmo tempo, uma não apaga
+      // o registro que a outra acabou de salvar (bug de "cadastra e some").
+      await RTCloud.salvarAgora(state, { merge: true, upsertIds: [_equipEditandoId || _idNovo] });
     } else {
       saveState();   // sem nuvem: só o cache local
     }
@@ -11166,11 +11169,13 @@ async function importarEquipamentosAgora() {
         erros.push(`${nome}: ${e.message || e}`);
       }
 
-      // Grava no servidor de tempos em tempos (se cair a internet, não perde tudo)
+      // Grava no servidor de tempos em tempos (se cair a internet, não perde tudo).
+      // MERGE: a importação só ADICIONA registros novos — nunca apaga o que
+      // outra pessoa cadastrou enquanto a importação roda.
       if ((i + 1) % BLOCO === 0 || i === fila.length - 1) {
         if (txt) txt.textContent = `Gravando no servidor... (${feitos} de ${fila.length})`;
         if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
-          await RTCloud.salvarAgora(state);
+          await RTCloud.salvarAgora(state, { merge: true });
         }
       }
     }
@@ -11178,7 +11183,7 @@ async function importarEquipamentosAgora() {
     if (barra) barra.style.width = '100%';
     registrarLogGlobal(`Importou ${feitos} registro(s) de equipamento do sistema antigo.`, 'dp');
     if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
-      await RTCloud.salvarAgora(state);
+      await RTCloud.salvarAgora(state, { merge: true });
     }
 
     _impRodando = false;
@@ -11194,7 +11199,7 @@ async function importarEquipamentosAgora() {
   } catch (e) {
     _impRodando = false;
     if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
-      try { await RTCloud.salvarAgora(state); } catch (_) {}
+      try { await RTCloud.salvarAgora(state, { merge: true }); } catch (_) {}
     }
     renderEquipamentos();
     alert(
