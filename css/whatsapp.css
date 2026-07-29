@@ -95,7 +95,80 @@
   border-radius: 999px;
 }
 
+/* ── ETAPA 2: Contatos (toolbar, tabela, modal, formulário) ───────────────── */
+.wa-toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+.wa-search { position: relative; flex: 1; min-width: 200px; }
+.wa-search i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 13px; }
+.wa-search input {
+  width: 100%; padding: 10px 12px 10px 34px;
+  border: 1px solid var(--border-color, #e2e8f0); border-radius: 10px;
+  font-size: 13.5px; background: var(--card-bg, #fff); color: var(--text-main, #0f172a);
+}
+.wa-search input:focus { outline: none; border-color: #059669; box-shadow: 0 0 0 3px rgba(5,150,105,.12); }
+
+.wa-count { font-size: 12px; color: var(--text-secondary, #64748b); margin: 2px 2px 8px; }
+.wa-table-wrap { overflow-x: auto; border: 1px solid var(--border-color, #e2e8f0); border-radius: 12px; }
+.wa-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 620px; }
+.wa-table th {
+  text-align: left; padding: 10px 14px; background: var(--surface-subtle, #f8fafc);
+  color: var(--text-secondary, #64748b); font-weight: 700; font-size: 11.5px; text-transform: uppercase;
+  border-bottom: 1px solid var(--border-color, #e2e8f0); white-space: nowrap;
+}
+.wa-table td { padding: 10px 14px; border-bottom: 1px solid var(--border-color, #f1f5f9); color: var(--text-main, #0f172a); vertical-align: middle; }
+.wa-table tr:last-child td { border-bottom: none; }
+.wa-table tr:hover td { background: rgba(5,150,105,.03); }
+.wa-avatar, .wa-det-avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 50%; margin-right: 8px;
+  background: linear-gradient(135deg, #059669, #10b981); color: #fff; font-weight: 800; font-size: 13px; vertical-align: middle;
+}
+.wa-chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #e2e8f0; color: #475569; }
+.wa-acoes { white-space: nowrap; text-align: right; }
+.wa-btn-mini {
+  border: 1px solid var(--border-color, #e2e8f0); background: var(--card-bg, #fff); color: #475569;
+  width: 30px; height: 30px; border-radius: 8px; cursor: pointer; margin-left: 4px; font-size: 12px;
+}
+.wa-btn-mini:hover { border-color: #059669; color: #059669; }
+
+/* ── Modal do módulo ──────────────────────────────────────────────────────── */
+.wa-modal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 4000;
+  background: rgba(15, 23, 42, .55); align-items: center; justify-content: center; padding: 16px;
+}
+.wa-modal {
+  background: var(--card-bg, #fff); border-radius: 16px; width: 100%; max-width: 460px;
+  max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,.3); overflow: hidden;
+}
+.wa-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--border-color, #e2e8f0); }
+.wa-modal-head h3 { margin: 0; font-size: 16px; font-weight: 800; color: var(--text-main, #0f172a); }
+.wa-modal-x { border: none; background: transparent; font-size: 18px; color: #94a3b8; cursor: pointer; }
+.wa-modal-x:hover { color: #dc2626; }
+.wa-modal-body { padding: 18px; overflow-y: auto; }
+.wa-modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--border-color, #e2e8f0); }
+
+.wa-form label { display: block; font-size: 12.5px; font-weight: 700; color: var(--text-secondary, #64748b); margin: 12px 0 4px; }
+.wa-form input, .wa-form textarea {
+  width: 100%; padding: 9px 11px; border: 1px solid var(--border-color, #e2e8f0); border-radius: 9px;
+  font-size: 13.5px; background: var(--card-bg, #fff); color: var(--text-main, #0f172a); font-family: inherit; box-sizing: border-box;
+}
+.wa-form input:focus, .wa-form textarea:focus { outline: none; border-color: #059669; box-shadow: 0 0 0 3px rgba(5,150,105,.12); }
+.wa-form input[readonly] { background: var(--surface-subtle, #f1f5f9); color: #64748b; }
+.wa-form-msg { font-size: 12.5px; margin-top: 10px; min-height: 16px; }
+.wa-form-msg.wa-err { color: #dc2626; font-weight: 600; }
+
+/* ── Detalhes do contato ──────────────────────────────────────────────────── */
+.wa-det { text-align: center; }
+.wa-det-avatar { width: 64px; height: 64px; font-size: 26px; margin: 0 auto 8px; }
+.wa-det h4 { margin: 0 0 14px; font-size: 18px; color: var(--text-main, #0f172a); }
+.wa-det-row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 2px; border-bottom: 1px dashed var(--border-color, #e2e8f0); text-align: left; }
+.wa-det-row span { color: var(--text-secondary, #64748b); font-size: 12.5px; }
+.wa-det-row b { color: var(--text-main, #0f172a); font-size: 13px; text-align: right; }
+.wa-det-notes { margin-top: 12px; text-align: left; }
+.wa-det-notes span { font-size: 11.5px; color: var(--text-secondary, #64748b); text-transform: uppercase; font-weight: 700; }
+.wa-det-notes p { margin: 4px 0 0; font-size: 13px; color: var(--text-main, #0f172a); background: var(--surface-subtle, #f8fafc); padding: 8px 10px; border-radius: 8px; }
+
 /* ── Tema escuro ──────────────────────────────────────────────────────────── */
 @media (prefers-color-scheme: dark) {
-  .wa-stat, .wa-mini-note { background: var(--card-bg, #1e293b); }
+  .wa-stat, .wa-mini-note, .wa-modal, .wa-search input, .wa-form input, .wa-form textarea { background: var(--card-bg, #1e293b); }
+  .wa-table th { background: rgba(255,255,255,.03); }
 }

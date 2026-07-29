@@ -37,8 +37,13 @@ webhook GET ecoa challenge (token certo) / 403 (errado); contato criado persiste
 - Testado no navegador: admin vê e abre (dashboard renderiza); maria (sem permissão) NÃO vê;
   Fluxo Financeiro/Equipamentos seguem funcionando; sem erro de JS.
 
+**✅ ETAPA 2 (CONTATOS) — pronta e testada:**
+- [x] Listar, buscar (debounce), criar, editar, ver detalhes. Modal reutilizável (_waModal).
+- [x] SEM duplicar por telefone (backend dedup por phone). Telefone travado na edição.
+- [x] Correção: guarda anti-corrida (troca de sub-aba durante fetch não sobrescreve a tela).
+- Testado: criar/dedup/busca/editar (persistiu no banco)/ver — tudo ok, sem erro de JS.
+
 **⏳ Próximas etapas (frontend):**
-- [ ] ETAPA 2 — Contatos (listar/buscar/criar/editar/ver, sem duplicar por telefone).
 - [ ] ETAPA 3 — Inbox (lista+chat+info, envio texto/mídia/template, atribuir/fechar/reabrir, notas, SSE tempo real).
 - [ ] ETAPA 4 — Templates (listar/sincronizar Meta/status; só enviar aprovados).
 - [ ] ETAPA 5 — Responsividade mobile do inbox + ajustes mobile gerais + docs de deploy VPS.
