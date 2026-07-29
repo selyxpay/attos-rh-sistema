@@ -256,6 +256,11 @@ function isAbaAutorizada(abaId) {
   if (abaId === 'equipamentos') return podeVerEquipamentos();
   // Fluxo Financeiro: DP, Administração e Financeiro (ou permissão granular).
   if (abaId === 'fluxo-financeiro') return _ffPodeVer();
+  // WhatsApp: só quem o administrador liberou (permissão whatsapp.visualizar).
+  // Mestre (João Balaf) e Administração sempre têm acesso total.
+  if (abaId === 'whatsapp') return ehMestre(loggedUser.login)
+    || loggedUser.departamento === 'administracao'
+    || hasPermission('whatsapp', 'visualizar');
   // Exame Médico: clínica (anexa o laudo online), seleção (envia o candidato),
   // DP (anexa a foto da ficha nos exames presenciais) e administração.
   // Também vale a permissão granular marcada no cadastro do funcionário.
@@ -1639,7 +1644,8 @@ function switchAba(abaId) {
     'cadastros-exata': 'fa-solid fa-file-invoice',
     'exame-medico': 'fa-solid fa-hospital',
     'equipamentos': 'fa-solid fa-boxes-packing',
-    'fluxo-financeiro': 'fa-solid fa-money-bill-transfer'
+    'fluxo-financeiro': 'fa-solid fa-money-bill-transfer',
+    'whatsapp': 'fa-brands fa-whatsapp'
   };
 
   const titleMap = {
@@ -1663,7 +1669,8 @@ function switchAba(abaId) {
     'cadastros-exata': 'R&T EMPREGOS — CADASTROS EXATA',
     'exame-medico': 'R&T EMPREGOS — EXAME MÉDICO ADMISSIONAL',
     'equipamentos': 'R&T EMPREGOS — ENTREGA / DEVOLUÇÃO DE EQUIPAMENTOS',
-    'fluxo-financeiro': 'R&T EMPREGOS — FLUXO FINANCEIRO'
+    'fluxo-financeiro': 'R&T EMPREGOS — FLUXO FINANCEIRO',
+    'whatsapp': 'R&T EMPREGOS — WHATSAPP'
   };
 
   if (headerIcon) headerIcon.className = `${iconMap[abaId] || 'fa-solid fa-building'} header-icon`;
@@ -1741,6 +1748,9 @@ function renderCurrentAba() {
       break;
     case 'exame-medico':
       renderExameMedico();
+      break;
+    case 'whatsapp':
+      if (typeof renderWhatsApp === 'function') renderWhatsApp();
       break;
   }
 }
@@ -6440,6 +6450,7 @@ const AREAS_SISTEMA = {
   exame_medico: 'Exame Médico',
   equipamentos: 'Equipamentos (DP)',
   fluxo_financeiro: 'Fluxo Financeiro (DP)',
+  whatsapp: 'WhatsApp',
   sistema: 'Sistema',
   exportacoes: 'Exportações'
 };
@@ -6462,7 +6473,8 @@ const ABA_PARA_AREA = {
   'cadastros-exata': 'sistema',
   'exame-medico': 'exame_medico',
   'equipamentos': 'equipamentos',
-  'fluxo-financeiro': 'fluxo_financeiro'
+  'fluxo-financeiro': 'fluxo_financeiro',
+  'whatsapp': 'whatsapp'
 };
 
 function hasPermission(area, acao) {

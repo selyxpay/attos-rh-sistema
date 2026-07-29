@@ -42,6 +42,7 @@
     <link rel="stylesheet" href="css/ux-enhancements.css?v=20260725d">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
     <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260725d">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260725d">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
     <link rel="stylesheet" href="css/mobile.css?v=20260725d">
 </head>
@@ -197,6 +198,9 @@
                     </li>
                     <li class="nav-item" data-aba="comissao">
                         <a href="#"><i class="fa-solid fa-sack-dollar"></i> <span>Comissão</span></a>
+                    </li>
+                    <li class="nav-item" data-aba="whatsapp" id="nav-item-whatsapp" style="display:none;">
+                        <a href="#"><i class="fa-brands fa-whatsapp"></i> <span>WhatsApp</span> <span class="wa-nav-badge" id="wa-nav-badge" style="display:none;"></span></a>
                     </li>
 
                     <!-- CATEGORIA: ADMINISTRAÇÃO -->
@@ -2018,6 +2022,24 @@
                 <!-- Input file oculto para upload do PDF/Imagem do exame -->
                 <input type="file" id="input-pdf-exame" accept=".pdf,.jpg,.jpeg,.png,.webp" class="input-arquivo-oculto" onchange="processarUploadPdfExame(this)">
 
+                <!-- ABA: WHATSAPP (API oficial WhatsApp Business — só quem tem permissão) -->
+                <section id="aba-whatsapp" class="aba-content">
+                    <div class="wa-container">
+                        <div class="mod-header-banner">
+                            <div class="mod-header-left">
+                                <div class="mod-header-icon-badge badge-emerald"><i class="fa-brands fa-whatsapp"></i></div>
+                                <div>
+                                    <h1 class="mod-header-title">WhatsApp</h1>
+                                    <p class="mod-header-subtitle">Atendimento e gestão de conversas pela API oficial do WhatsApp Business.</p>
+                                </div>
+                            </div>
+                            <div class="mod-header-actions" id="wa-header-actions"><!-- botões por JS conforme permissão --></div>
+                        </div>
+                        <div class="wa-subtabs" id="wa-subtabs"><!-- sub-abas geradas por JS --></div>
+                        <div id="wa-content"><!-- conteúdo gerado por js/whatsapp.js --></div>
+                    </div>
+                </section>
+
                 <!-- ABA: CONFIGURAÇÕES (SOMENTE ADMIN) -->
                 <section id="aba-configuracoes" class="aba-content">
                     <div style="max-width: 980px; margin: 0 auto; padding: 0 0 60px;">
@@ -3701,5 +3723,6 @@
     <script src="js/exata-catalogo.js?v=20260725d"></script>
     <script src="js/data.js?v=20260725d"></script>
     <script src="js/app.js?v=20260725d"></script>
+    <script src="js/whatsapp.js?v=20260725d"></script>
 </body>
 </html>

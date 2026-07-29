@@ -25,16 +25,23 @@ webhook GET ecoa challenge (token certo) / 403 (errado); contato criado persiste
       Recomendado: cifrar em repouso com chave em `.env`. **Explicar antes de mudar.**
 - [ ] `PRAGMA journal_mode=WAL` é inócuo no sql.js (em memória) — pode remover, sem urgência.
 
-### ❌ FALTA fazer (frontend + integração)
-- [ ] `js/whatsapp.js` — camada de frontend (NÃO existe ainda).
-- [ ] Item "WhatsApp" na barra lateral do `index.html`.
-- [ ] Seção `aba-whatsapp` no `index.html`: Dashboard, Contatos, Inbox (lista+chat+info), Templates.
-- [ ] Cliente SSE no frontend (mensagem nova aparece sem recarregar).
-- [ ] Checkboxes de permissão `whatsapp` no cadastro de funcionário (visualizar/criar/editar/aprovar/administrar).
-- [ ] Registrar `js/whatsapp.js` na lista de arquivos servidos com auth (como app.js).
-- [ ] Responsividade mobile do inbox (lista → conversa → detalhes).
-- [ ] Cache-busting (`?v=`) ao adicionar o novo JS.
-- [ ] Documentação de deploy na VPS (Nginx, SSL, PM2, webhook Meta, backup/restore).
+### Frontend — progresso por etapas
+**✅ ETAPA 1 (FUNDAÇÃO) — pronta e testada:**
+- [x] Permissão `whatsapp` no grid de funcionários (add em AREAS_SISTEMA → gera a linha + salva).
+- [x] Item "WhatsApp" na sidebar (id nav-item-whatsapp) — aparece SÓ para quem tem permissão.
+- [x] `isAbaAutorizada('whatsapp')`, iconMap, titleMap, roteamento em renderCurrentAba.
+- [x] Seção `aba-whatsapp` no index.html (header + sub-abas + container).
+- [x] `js/whatsapp.js` (novo) — helpers de API/permissão, sub-abas, **Dashboard (8 cartões)**.
+- [x] `css/whatsapp.css` (novo).
+- [x] `js/whatsapp.js` protegido no server.cjs (404 sem login) + carregado no index.html.
+- Testado no navegador: admin vê e abre (dashboard renderiza); maria (sem permissão) NÃO vê;
+  Fluxo Financeiro/Equipamentos seguem funcionando; sem erro de JS.
+
+**⏳ Próximas etapas (frontend):**
+- [ ] ETAPA 2 — Contatos (listar/buscar/criar/editar/ver, sem duplicar por telefone).
+- [ ] ETAPA 3 — Inbox (lista+chat+info, envio texto/mídia/template, atribuir/fechar/reabrir, notas, SSE tempo real).
+- [ ] ETAPA 4 — Templates (listar/sincronizar Meta/status; só enviar aprovados).
+- [ ] ETAPA 5 — Responsividade mobile do inbox + ajustes mobile gerais + docs de deploy VPS.
 
 ## Depende de credenciais reais da Meta (não fornecidas ainda)
 - Envio/recebimento real de mensagens, sync de templates, status de entrega/leitura.
