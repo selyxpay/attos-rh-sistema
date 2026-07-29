@@ -86,6 +86,22 @@ webhook GET ecoa challenge (token certo) / 403 (errado); contato criado persiste
 - Testado: token não vaza, dedup dos 3 formatos → 1 contato, upload .exe bloqueado (400)
   e PNG aceito (200), auditoria abre. Regressão: 12 módulos antigos + WhatsApp ok, 403 p/ sem permissão.
 
+**✅ MULTI-CONTA / MULTI-NÚMERO — vários números oficiais, isolados por funcionário (testado):**
+- [x] Banco: conexão ganha responsável (login+nome), ativo, last_error + migração p/ bancos antigos.
+      conversations.list/count aceitam account_ids (contas que o usuário pode ver).
+- [x] Backend: funcionário comum vê SÓ as conversas das contas em que é responsável; admin vê tudo.
+      Blindagem: abrir/enviar/agir em conversa de outra conta → 403 (guarda no /conversations/<id> + no send).
+      Enviar só pela conta permitida (garante o número certo). Rotas de conta (criar/editar/ativar/
+      vincular responsável) só admin. GET /accounts: comum vê só as suas; token nunca vai (has_token).
+      Editar sem preencher token NÃO apaga o token salvo.
+- [x] Frontend: aba "Conexões" (admin) — cards com nome/número/API Oficial/responsável/status/ativa/
+      última sync/erro; criar/editar/testar/ativar-desativar/vincular funcionário. Inbox com seletor de
+      conta ("Todas as contas" / cada número) e "via <número>" no cabeçalho do chat.
+- Testado: admin cria 2 conexões (A→carlos, B→pedro); carlos vê só a conta A e leva 403 ao abrir/enviar
+  na conta B; pedro só a conta B; admin vê as 2; carlos não vê a aba Conexões. Regressão ok.
+
+## 100% API OFICIAL DA META. Nada de QR Code / WhatsApp Web / bibliotecas não oficiais.
+
 ## Depende de credenciais reais da Meta (não fornecidas ainda)
 - Envio/recebimento real de mensagens, sync de templates, status de entrega/leitura.
 - Configurar no `.env`: `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` (globais) +

@@ -62,6 +62,8 @@ function renderWhatsApp() {
     { id: 'inbox',     ic: 'fa-comments',     label: 'Conversas' },
     { id: 'templates', ic: 'fa-file-lines',   label: 'Templates' }
   ];
+  // "Conexões" (múltiplos números oficiais) — só para quem administra o WhatsApp.
+  if (_waPode('aprovar')) abas.push({ id: 'conexoes', ic: 'fa-plug', label: 'Conexões' });
   subs.innerHTML = abas.map(a =>
     `<button type="button" class="wa-tab ${a.id === _waSubAba ? 'active' : ''}" onclick="waTrocarSubAba('${a.id}')">
        <i class="fa-solid ${a.ic}"></i> <span>${a.label}</span>
@@ -79,6 +81,7 @@ function renderWhatsApp() {
   else if (_waSubAba === 'contatos')  _waRenderContatos(cont);
   else if (_waSubAba === 'inbox')     _waRenderInbox(cont);
   else if (_waSubAba === 'templates') _waRenderTemplates(cont);
+  else if (_waSubAba === 'conexoes')  _waRenderConexoes(cont);
 }
 window.renderWhatsApp = renderWhatsApp;
 
@@ -295,6 +298,8 @@ let _waConvAbertaObj = null;
 let _waModoNota = false;         // composer em modo "nota interna"
 let _waSSE = null;
 let _waMsgsCache = [];           // mensagens da conversa aberta (p/ append em tempo real)
+let _waFiltroConta = '';         // '' = todas as contas | id = uma conta
+let _waContasInbox = [];         // contas que o usuário pode ver (multi-conta)
 
 const WA_STATUS_PT = { open: 'Aberta', pending: 'Pendente', waiting: 'Aguardando', closed: 'Fechada', archived: 'Arquivada' };
 const WA_STATUS_COR = { open: '#059669', pending: '#d97706', waiting: '#0891b2', closed: '#94a3b8', archived: '#64748b' };
@@ -303,6 +308,7 @@ function _waRenderInbox(cont) {
   cont.innerHTML =
     `<div class="wa-inbox" id="wa-inbox">
        <aside class="wa-col-list">
+         <div class="wa-conta-sel" id="wa-conta-sel"></div>
          <div class="wa-conv-filtros" id="wa-conv-filtros"></div>
          <div class="wa-search wa-search-conv">
            <i class="fa-solid fa-magnifying-glass"></i>
@@ -316,9 +322,29 @@ function _waRenderInbox(cont) {
        <aside class="wa-col-info" id="wa-col-info"></aside>
      </div>`;
   _waRenderFiltrosConv();
+  _waCarregarContasInbox();
   _waCarregarConversas();
   _waConectarSSE();
 }
+
+// Seletor de conta (número oficial) no Inbox — multi-conta.
+async function _waCarregarContasInbox() {
+  try { const r = await waGet('/accounts'); _waContasInbox = (r && r.ok && r.accounts) || []; } catch (e) { _waContasInbox = []; }
+  const sel = document.getElementById('wa-conta-sel');
+  if (!sel) return;
+  // Com 0 ou 1 conta não precisa de seletor (mostra só o nome quando houver 1).
+  if (_waContasInbox.length <= 1) {
+    sel.innerHTML = _waContasInbox.length === 1
+      ? `<div class="wa-conta-unica"><i class="fa-brands fa-whatsapp"></i> ${_waEsc(_waContasInbox[0].business_name || _waContasInbox[0].display_phone || 'Número oficial')}</div>` : '';
+    return;
+  }
+  sel.innerHTML =
+    `<select id="wa-conta-filtro" onchange="waFiltroConta(this.value)">
+       <option value="">Todas as contas</option>
+       ${_waContasInbox.map(a => `<option value="${a.id}" ${String(a.id) === String(_waFiltroConta) ? 'selected' : ''}>${_waEsc(a.business_name || a.display_phone || ('Conta ' + a.id))}${a.ativo === 0 ? ' (inativa)' : ''}</option>`).join('')}
+     </select>`;
+}
+window.waFiltroConta = function (id) { _waFiltroConta = id; _waCarregarConversas(); };
 
 function _waRenderFiltrosConv() {
   const box = document.getElementById('wa-conv-filtros');
@@ -336,6 +362,7 @@ async function _waCarregarConversas() {
   if (_waFiltroConv === 'open') qs += '&status=open';
   else if (_waFiltroConv === 'closed') qs += '&status=closed';
   else if (_waFiltroConv === 'unread') qs += '&unread_only=true';
+  if (_waFiltroConta) qs += '&account_id=' + encodeURIComponent(_waFiltroConta);
   if (_waBuscaConv) qs += '&search=' + encodeURIComponent(_waBuscaConv);
   let r;
   try { r = await waGet('/conversations' + qs); }
@@ -406,7 +433,7 @@ function _waRenderChat(conv, msgs) {
     `<header class="wa-chat-head">
        <button class="wa-voltar" onclick="waVoltarLista()" title="Voltar"><i class="fa-solid fa-arrow-left"></i></button>
        <span class="wa-avatar" style="background:linear-gradient(135deg,#059669,#10b981);">${_waEsc(_waInicial(nome))}</span>
-       <div class="wa-chat-head-info"><b>${_waEsc(nome)}</b><small>${_waEsc(_waFmtTelefone(conv.contact_phone))} · ${WA_STATUS_PT[conv.status] || conv.status}</small></div>
+       <div class="wa-chat-head-info"><b>${_waEsc(nome)}</b><small>${_waEsc(_waFmtTelefone(conv.contact_phone))} · ${WA_STATUS_PT[conv.status] || conv.status}${(conv.account_name || conv.account_phone) ? ' · <span class="wa-via">via ' + _waEsc(conv.account_name || conv.account_phone) + '</span>' : ''}</small></div>
        <div class="wa-chat-head-acoes">
          ${conv.contact_id ? `<button class="wa-btn-mini wa-info-btn" title="Detalhes do contato" onclick="waVerContato(${conv.contact_id})"><i class="fa-solid fa-circle-info"></i></button>` : ''}
          ${podeEditar ? `<button class="wa-btn-mini" title="Atribuir atendente" onclick="waAtribuirConversa()"><i class="fa-solid fa-user-plus"></i></button>` : ''}
@@ -601,7 +628,7 @@ async function _waRenderTemplates(cont) {
     `<div class="wa-toolbar">
        <div style="flex:1;font-size:12.5px;color:var(--text-secondary,#64748b);">Modelos de mensagem aprovados pela Meta. Só é possível <b>enviar</b> os que estão <b>Aprovados</b>.</div>
        ${podeAdmin ? `<button class="mod-btn-secondary" onclick="waAbrirAuditoria()"><i class="fa-solid fa-clipboard-list"></i> Auditoria</button>
-                      <button class="mod-btn-secondary" onclick="waConfigurarConexao()"><i class="fa-solid fa-plug"></i> Conexão com a Meta</button>
+                      <button class="mod-btn-secondary" onclick="waTrocarSubAba('conexoes')"><i class="fa-solid fa-plug"></i> Conexões</button>
                       <button class="mod-btn-primary" onclick="waSincronizarTemplates()"><i class="fa-solid fa-rotate"></i> Sincronizar templates</button>` : ''}
      </div>
      <div id="wa-tpl-lista"><div class="wa-loading"><i class="fa-solid fa-spinner fa-spin"></i></div></div>`;
@@ -738,3 +765,129 @@ window.waAbrirAuditoria = async function () {
          </tr>`).join('')}</tbody></table></div>`
     : `<div class="wa-empty" style="padding:24px;"><i class="fa-solid fa-clipboard-list"></i><p>Nenhum registro de auditoria ainda.</p></div>`;
 };
+
+// ==========================================================================
+// CONEXÕES (múltiplos números oficiais) — admin
+// ==========================================================================
+let _waConexoes = [];
+
+async function _waRenderConexoes(cont) {
+  if (!_waPode('aprovar')) { cont.innerHTML = _waErro('Só o administrador gerencia as conexões.'); return; }
+  cont.innerHTML =
+    `<div class="wa-toolbar">
+       <div style="flex:1;font-size:12.5px;color:var(--text-secondary,#64748b);">Números oficiais conectados via <b>WhatsApp Business Cloud API (Meta)</b>. Cada conexão pode ter um funcionário responsável.</div>
+       <button class="mod-btn-primary" onclick="waNovaConexao()"><i class="fa-solid fa-plus"></i> Nova conexão</button>
+     </div>
+     <div id="wa-conex-lista"><div class="wa-loading"><i class="fa-solid fa-spinner fa-spin"></i></div></div>`;
+  await _waCarregarConexoes();
+}
+
+async function _waCarregarConexoes() {
+  const box = document.getElementById('wa-conex-lista'); if (!box) return;
+  let r; try { r = await waGet('/accounts'); } catch (e) { box.innerHTML = _waErro(e.message); return; }
+  if (_waSubAba !== 'conexoes') return;
+  _waConexoes = (r && r.ok && r.accounts) || [];
+  if (!_waConexoes.length) {
+    box.innerHTML = `<div class="wa-empty"><i class="fa-solid fa-plug"></i><p>Nenhuma conexão ainda. Clique em <b>Nova conexão</b> para cadastrar o primeiro número oficial.</p></div>`;
+    return;
+  }
+  const statusCor = { connected: '#059669', active: '#059669', pendente: '#d97706', error: '#dc2626' };
+  box.innerHTML = `<div class="wa-conex-grid">${_waConexoes.map(c => {
+    const cor = statusCor[c.status] || '#64748b';
+    return `<div class="wa-conex-card ${c.ativo === 0 ? 'wa-conex-off' : ''}">
+      <div class="wa-conex-top">
+        <div><b>${_waEsc(c.business_name || 'Sem nome')}</b><div class="wa-conex-num"><i class="fa-brands fa-whatsapp"></i> ${_waEsc(_waFmtTelefone(c.display_phone) || '—')}</div></div>
+        <span class="wa-conex-status" style="color:${cor};background:${cor}1a;">${_waEsc(c.status || 'pendente')}</span>
+      </div>
+      <div class="wa-conex-linha"><span>Tipo</span><b>API Oficial</b></div>
+      <div class="wa-conex-linha"><span>Responsável</span><b>${_waEsc(c.responsavel_nome || '— (ninguém)')}</b></div>
+      <div class="wa-conex-linha"><span>Access Token</span><b>${c.has_token ? '✓ configurado' : '<span style="color:#d97706;">falta</span>'}</b></div>
+      <div class="wa-conex-linha"><span>Última sync</span><b>${c.last_sync_at ? _waFmtData(c.last_sync_at) : '—'}</b></div>
+      <div class="wa-conex-linha"><span>Ativa</span><b>${c.ativo === 0 ? '<span style="color:#dc2626;">Não</span>' : 'Sim'}</b></div>
+      ${c.last_error ? `<div class="wa-conex-erro"><i class="fa-solid fa-triangle-exclamation"></i> ${_waEsc(c.last_error)}</div>` : ''}
+      <div class="wa-conex-acoes">
+        <button class="mod-btn-secondary" onclick="waEditarConexao(${c.id})"><i class="fa-solid fa-pen"></i> Editar</button>
+        <button class="mod-btn-secondary" onclick="waTestarConexaoCard(${c.id})"><i class="fa-solid fa-plug-circle-check"></i> Testar</button>
+        <button class="mod-btn-secondary" onclick="waToggleConexao(${c.id},${c.ativo === 0 ? 1 : 0})">${c.ativo === 0 ? '<i class="fa-solid fa-toggle-on"></i> Ativar' : '<i class="fa-solid fa-toggle-off"></i> Desativar'}</button>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function _waFuncionariosAtivos() {
+  return (typeof state !== 'undefined' && state.funcionarios ? state.funcionarios : []).filter(f => f.status === 'ativo');
+}
+function _waFormConexao(c) {
+  c = c || {};
+  const editando = !!c.id;
+  const funcs = _waFuncionariosAtivos();
+  const opts = funcs.map(f => `<option value="${_waEsc(f.login)}" data-nome="${_waEsc(f.nomeExibicao || f.nome)}" ${c.responsavel_login === f.login ? 'selected' : ''}>${_waEsc(f.nomeExibicao || f.nome)} (${_waEsc(f.login)})</option>`).join('');
+  return `
+    <form onsubmit="return false;" class="wa-form">
+      <input type="hidden" id="wa-cx-id" value="${c.id || ''}">
+      <label>Nome interno da conexão</label>
+      <input type="text" id="wa-cx-nome" value="${_waEsc(c.business_name || '')}" placeholder="Ex: RT Recrutamento 01">
+      <label>Número (para exibição)</label>
+      <input type="text" id="wa-cx-num" value="${_waEsc(c.display_phone || '')}" placeholder="Ex: 5511999998888">
+      <label>Phone Number ID (Meta)</label>
+      <input type="text" id="wa-cx-pnid" value="${_waEsc(c.phone_number_id || '')}" placeholder="ID do número">
+      <label>WABA ID (WhatsApp Business Account)</label>
+      <input type="text" id="wa-cx-waba" value="${_waEsc(c.waba_id || '')}" placeholder="ID da conta comercial">
+      <label>Access Token (permanente)</label>
+      <input type="password" id="wa-cx-token" value="" placeholder="${c.has_token ? '•••••• (já configurado — vazio mantém)' : 'Cole o token aqui'}">
+      <label>Funcionário responsável</label>
+      <select id="wa-cx-resp"><option value="">— Ninguém —</option>${opts}</select>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer;">
+        <input type="checkbox" id="wa-cx-ativo" ${c.ativo === 0 ? '' : 'checked'}> Conexão ativa
+      </label>
+      <div id="wa-cx-msg" class="wa-form-msg"></div>
+    </form>`;
+}
+window.waNovaConexao = function () {
+  if (!_waPode('aprovar')) return;
+  _waModal('Nova conexão', _waFormConexao(null),
+    `<button class="mod-btn-secondary" onclick="waFecharModal()">Cancelar</button>
+     <button class="mod-btn-primary" onclick="waSalvarConexaoForm()"><i class="fa-solid fa-check"></i> Salvar</button>`);
+};
+window.waEditarConexao = function (id) {
+  const c = _waConexoes.find(x => x.id === id); if (!c) return;
+  _waModal('Editar conexão', _waFormConexao(c),
+    `<button class="mod-btn-secondary" onclick="waFecharModal()">Cancelar</button>
+     <button class="mod-btn-secondary" onclick="waTestarConexao(${id})"><i class="fa-solid fa-plug-circle-check"></i> Testar</button>
+     <button class="mod-btn-primary" onclick="waSalvarConexaoForm()"><i class="fa-solid fa-check"></i> Salvar</button>`);
+};
+window.waSalvarConexaoForm = async function () {
+  const g = id => document.getElementById(id);
+  const id = g('wa-cx-id').value.trim();
+  const resp = g('wa-cx-resp');
+  const dados = {
+    business_name: g('wa-cx-nome').value.trim(),
+    display_phone: g('wa-cx-num').value.replace(/\D/g, ''),
+    phone_number_id: g('wa-cx-pnid').value.trim(),
+    waba_id: g('wa-cx-waba').value.trim(),
+    responsavel_login: resp.value,
+    responsavel_nome: resp.selectedOptions[0] ? (resp.selectedOptions[0].getAttribute('data-nome') || '') : '',
+    ativo: g('wa-cx-ativo').checked
+  };
+  const token = g('wa-cx-token').value.trim();
+  if (token) dados.access_token = token;
+  const msg = g('wa-cx-msg');
+  if (!dados.phone_number_id) { msg.textContent = 'Informe o Phone Number ID.'; msg.className = 'wa-form-msg wa-err'; return; }
+  const r = id ? await waSend('/accounts/' + id, 'PUT', dados) : await waSend('/accounts', 'POST', dados);
+  if (r && r.ok) { waFecharModal(); _waToast('Conexão salva.'); _waCarregarConexoes(); }
+  else { msg.textContent = (r && r.error) || 'Não foi possível salvar.'; msg.className = 'wa-form-msg wa-err'; }
+};
+window.waToggleConexao = async function (id, ativo) {
+  const r = await waSend('/accounts/' + id, 'PUT', { ativo: !!ativo });
+  if (r && r.ok) { _waToast(ativo ? 'Conexão ativada.' : 'Conexão desativada.'); _waCarregarConexoes(); }
+  else _waToast('Não foi possível alterar.', true);
+};
+window.waTestarConexaoCard = async function (id) {
+  _waToast('Testando conexão com a Meta…');
+  const r = await waGet('/accounts/' + id + '/status');
+  if (r && r.ok && r.status === 'connected') _waToast('✓ Conectado à Meta.');
+  else _waToast('✗ ' + ((r && (r.message || r.error)) || 'Não conectou. Confira o token.'), true);
+  _waCarregarConexoes();
+};
+// Atalho usado pela sincronização de templates quando não há conta configurada.
+window.waConfigurarConexao = function () { waTrocarSubAba('conexoes'); setTimeout(waNovaConexao, 150); };

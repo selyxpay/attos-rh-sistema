@@ -58,7 +58,7 @@ WHATSAPP_APP_SECRET=chave_secreta_do_app_meta
 
 - **WHATSAPP_VERIFY_TOKEN**: string aleatória que você escolhe. A MESMA vai no Meta Developer.
 - **WHATSAPP_APP_SECRET**: vem do Meta Developer (Configurações do App → Básico → Chave Secreta). Valida a assinatura dos webhooks.
-- O **Access Token, Phone Number ID e WABA ID** NÃO vão no `.env` — são cadastrados dentro do sistema em **WhatsApp → Templates → Conexão com a Meta** e ficam salvos no banco.
+- O **Access Token, Phone Number ID e WABA ID** NÃO vão no `.env` — são cadastrados dentro do sistema em **WhatsApp → Conexões** e ficam salvos no banco.
 
 O `server.cjs` lê o `.env` automaticamente na inicialização. O arquivo `.env` **nunca** vai para o Git (já está no `.gitignore`).
 
@@ -79,7 +79,7 @@ O `server.cjs` lê o `.env` automaticamente na inicialização. O arquivo `.env`
 
 1. Em **WhatsApp → Configuração da API**, adicione/valide o **número de telefone** oficial (não pode ser um número já usado no WhatsApp normal/Business app).
 2. Anote o **Phone Number ID** desse número.
-3. Dentro do sistema R&T: **WhatsApp → Templates → Conexão com a Meta** → preencha *Phone Number ID*, *WABA ID* e *Access Token* → **Salvar** → **Testar** (deve dizer "Conectado").
+3. Dentro do sistema R&T: **WhatsApp → Conexões** → preencha *Phone Number ID*, *WABA ID* e *Access Token* → **Salvar** → **Testar** (deve dizer "Conectado").
 
 ## 6. Configurar o Webhook na Meta
 
@@ -238,7 +238,7 @@ Mensagens úteis do módulo: `[WhatsApp] Banco de dados inicializado`, `[WhatsAp
 | Mensagens recebidas não aparecem | Campo `messages` não assinado, ou webhook com erro | Assine `messages`; veja `pm2 logs` por `[WhatsApp Webhook]` |
 | Tempo real (SSE) não atualiza | Nginx com buffer no `/api/whatsapp/events` | Confirme o bloco com `proxy_buffering off` e `proxy_read_timeout 3600s` |
 | Assinatura inválida (403) | `WHATSAPP_APP_SECRET` errado | Copie a Chave Secreta certa do app; ou deixe vazio p/ testar (sem validar assinatura) |
-| Erro ao enviar mensagem | Access Token ausente/expirado, ou fora da janela de 24h | Reconfigure o token em *Conexão com a Meta*; fora de 24h só dá para enviar **template** |
+| Erro ao enviar mensagem | Access Token ausente/expirado, ou fora da janela de 24h | Reconfigure o token em *WhatsApp → Conexões*; fora de 24h só dá para enviar **template** |
 | Só dá para enviar template | Regra da Meta: fora da janela de 24h da última msg do cliente | Use um template aprovado (aba Templates) |
 | Módulo some/erro 503 | Banco ainda inicializando | Aguarde alguns segundos; veja se o `.db` foi criado em `DATA_DIR` |
 | "Módulo WhatsApp inicializando..." | `sql.js` não carregou | `npm install`; confira `node_modules/sql.js` |
@@ -256,4 +256,4 @@ Mensagens úteis do módulo: `[WhatsApp] Banco de dados inicializado`, `[WhatsAp
 ### O que depende de você (credenciais da Meta)
 Envio/recebimento real de mensagens, sincronização de templates e status de entrega/leitura
 só funcionam depois de configurar o número + Access Token reais no painel da Meta e em
-*WhatsApp → Templates → Conexão com a Meta*.
+*WhatsApp → Conexões*.

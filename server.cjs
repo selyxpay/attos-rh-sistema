@@ -468,6 +468,32 @@ function waUsuarioTemPermissao(req, acao) {
   if (u.permissoes && u.permissoes.whatsapp && u.permissoes.whatsapp[acao] === true) return u;
   return null;
 }
+
+// ── MULTI-CONTA: quem administra as conexões e quais contas cada um pode ver ──
+// Admin do WhatsApp = mestre (João Balaf), Administração, ou permissão 'aprovar'.
+// Só o admin cria/edita/ativa conexões e enxerga todas as contas.
+function waEhAdminWhatsapp(u) {
+  return !!(u && (ehMestreLogin(u.login) || u.departamento === 'administracao' || (u.permissoes && u.permissoes.whatsapp && u.permissoes.whatsapp.aprovar === true)));
+}
+// IDs das contas que o usuário pode acessar. Admin => null (todas). Funcionário
+// comum => só as contas em que ele é o responsável. Usado para blindar as
+// conversas: ninguém vê/atende/atua numa conta que não é sua.
+function waContasPermitidas(u) {
+  if (waEhAdminWhatsapp(u)) return null;                 // null = sem restrição (todas)
+  try { return waDb.accounts.idsDoResponsavel(u.login); } catch (e) { return []; }
+}
+function waPodeAcessarConta(u, accountId) {
+  var ids = waContasPermitidas(u);
+  if (ids === null) return true;
+  return ids.indexOf(Number(accountId)) >= 0;
+}
+// Usuário logado (objeto do funcionário) sem exigir uma ação específica.
+function waUsuarioLogado(req) {
+  var s = sessaoValida(tokenDaReq(req));
+  if (!s) return null;
+  var st = lerEstado();
+  return ((st.dados && st.dados.funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === s.login; }) || null;
+}
 function waIpDaReq(req) {
   return String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
 }
@@ -1037,6 +1063,21 @@ http.createServer(function (req, res) {
     if (!_waReady) { responderJson(res, 503, { ok: false, error: 'Módulo WhatsApp inicializando...' }); return; }
     if (!autenticado) { responderJson(res, 401, { ok: false, error: 'Não autenticado.' }); return; }
 
+    // BLINDAGEM MULTI-CONTA: qualquer rota que age sobre UMA conversa específica
+    // (/conversations/<id>...) só prossegue se o usuário puder acessar a conta
+    // daquela conversa. Ninguém abre/atende conversa de uma conta que não é sua.
+    var _mConv = urlPath.match(/^\/api\/whatsapp\/conversations\/(\d+)(?:\/|$)/);
+    if (_mConv) {
+      var _uGuard = waUsuarioLogado(req);
+      if (_uGuard && !waEhAdminWhatsapp(_uGuard)) {
+        var _convGuard = waDb.conversations.getById(parseInt(_mConv[1]));
+        if (_convGuard && !waPodeAcessarConta(_uGuard, _convGuard.account_id)) {
+          responderJson(res, 403, { ok: false, error: 'Você não tem acesso à conta desta conversa.' });
+          return;
+        }
+      }
+    }
+
     // ---- DASHBOARD ----
     if (urlPath === '/api/whatsapp/dashboard' && req.method === 'GET') {
       var u = waUsuarioTemPermissao(req, 'visualizar');
@@ -1049,7 +1090,10 @@ http.createServer(function (req, res) {
     if (urlPath === '/api/whatsapp/accounts' && req.method === 'GET') {
       var u = waUsuarioTemPermissao(req, 'visualizar');
       if (!u) { responderJson(res, 403, { ok: false }); return; }
-      responderJson(res, 200, { ok: true, accounts: waDb.accounts.list() });
+      // Admin vê todas; funcionário comum vê só as contas em que é responsável.
+      var _todasContas = waDb.accounts.list();   // já vem SEM o access_token (só has_token)
+      var _contasResp = waEhAdminWhatsapp(u) ? _todasContas : _todasContas.filter(function (a) { return a.responsavel_login === u.login; });
+      responderJson(res, 200, { ok: true, accounts: _contasResp, is_admin: waEhAdminWhatsapp(u) });
       return;
     }
     if (urlPath === '/api/whatsapp/accounts' && req.method === 'POST') {
@@ -1065,7 +1109,10 @@ http.createServer(function (req, res) {
             business_name: body.business_name || '',
             status: 'pendente',
             access_token_enc: body.access_token || '',
-            created_by: u.login
+            created_by: u.login,
+            responsavel_login: body.responsavel_login || '',
+            responsavel_nome: body.responsavel_nome || '',
+            ativo: (body.ativo === undefined ? 1 : (body.ativo ? 1 : 0))
           });
           waDb.audit.log({ user_login: u.login, user_name: u.nome, action: 'Conectou conta WhatsApp', details: 'Número: ' + (body.display_phone || body.phone_number_id), ip: waIpDaReq(req), account_id: id });
           responderJson(res, 200, { ok: true, id: id });
@@ -1087,7 +1134,10 @@ http.createServer(function (req, res) {
         if (body.display_phone !== undefined) updateData.display_phone = body.display_phone;
         if (body.business_name !== undefined) updateData.business_name = body.business_name;
         if (body.status !== undefined) updateData.status = body.status;
-        if (body.access_token !== undefined) updateData.access_token_enc = body.access_token;
+        if (body.access_token !== undefined && body.access_token !== '') updateData.access_token_enc = body.access_token;
+        if (body.responsavel_login !== undefined) updateData.responsavel_login = body.responsavel_login;
+        if (body.responsavel_nome !== undefined) updateData.responsavel_nome = body.responsavel_nome;
+        if (body.ativo !== undefined) updateData.ativo = body.ativo ? 1 : 0;
         waDb.accounts.update(accountId, updateData);
         waDb.audit.log({ user_login: u.login, user_name: u.nome, action: 'Atualizou conta WhatsApp', details: 'Account ID: ' + accountId, ip: waIpDaReq(req), account_id: accountId });
         responderJson(res, 200, { ok: true });
@@ -1133,9 +1183,14 @@ http.createServer(function (req, res) {
       if (qp.unread_only === 'true') filters.unread_only = true;
       if (qp.limit) filters.limit = parseInt(qp.limit);
       if (qp.offset) filters.offset = parseInt(qp.offset);
-      // Se o usuário não é admin/mestre, filtra só as conversas atribuídas a ele (a menos que tenha permissão total)
-      if (!ehMestreLogin(u.login) && u.departamento !== 'administracao' && !(u.permissoes && u.permissoes.whatsapp && u.permissoes.whatsapp.aprovar)) {
-        filters.assigned_to = u.login;
+      // MULTI-CONTA: o funcionário comum vê só as conversas das contas em que ele
+      // é o responsável. O admin vê tudo (ids null = sem restrição).
+      var _idsPermitidos = waContasPermitidas(u);
+      if (_idsPermitidos !== null) filters.account_ids = _idsPermitidos;
+      // Filtro do seletor de conta no Inbox (só aplica se for uma conta permitida).
+      if (qp.account_id) {
+        var _accSel = parseInt(qp.account_id);
+        if (waPodeAcessarConta(u, _accSel)) filters.account_id = _accSel;
       }
       var convs = waDb.conversations.list(filters);
       convs.forEach(function (c) { c.tags = waDb.tags.getForConversation(c.id); });
@@ -1243,11 +1298,14 @@ http.createServer(function (req, res) {
         var convId = body.conversation_id;
         var conv = waDb.conversations.getById(convId);
         if (!conv) { responderJson(res, 404, { ok: false, error: 'Conversa não encontrada.' }); return; }
+        // MULTI-CONTA: só envia por uma conta que é sua (garante o número certo).
+        if (!waPodeAcessarConta(u, conv.account_id)) { responderJson(res, 403, { ok: false, error: 'Você não pode enviar por esta conta.' }); return; }
         var account = waDb.accounts.getById(conv.account_id);
         if (!account || !account.access_token_enc) {
           responderJson(res, 400, { ok: false, error: 'Conta WhatsApp não configurada ou sem Access Token.' });
           return;
         }
+        if (account.ativo === 0) { responderJson(res, 400, { ok: false, error: 'Esta conexão está desativada.' }); return; }
         if (account.status !== 'connected' && account.status !== 'active') {
           responderJson(res, 400, { ok: false, error: 'Conta WhatsApp não está conectada. Status: ' + account.status });
           return;

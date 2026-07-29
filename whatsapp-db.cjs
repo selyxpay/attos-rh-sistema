@@ -151,9 +151,19 @@ function criarTabelas() {
       created_at          TEXT DEFAULT (datetime('now')),
       updated_at          TEXT DEFAULT (datetime('now')),
       last_sync_at        TEXT,
-      created_by          TEXT DEFAULT ''
+      created_by          TEXT DEFAULT '',
+      responsavel_login   TEXT DEFAULT '',
+      responsavel_nome    TEXT DEFAULT '',
+      ativo               INTEGER DEFAULT 1,
+      last_error          TEXT DEFAULT ''
     )
   `);
+
+  // Migração: bancos antigos (criados antes do multi-conta) ganham as colunas
+  // novas. ALTER falha silenciosamente se a coluna já existe — seguro em qualquer caso.
+  ['responsavel_login TEXT DEFAULT \'\'', 'responsavel_nome TEXT DEFAULT \'\'', 'ativo INTEGER DEFAULT 1', 'last_error TEXT DEFAULT \'\''].forEach(function (col) {
+    try { db.run('ALTER TABLE whatsapp_accounts ADD COLUMN ' + col); } catch (e) {}
+  });
 
   db.run(`
     CREATE TABLE IF NOT EXISTS whatsapp_contacts (
@@ -298,10 +308,11 @@ function criarTabelas() {
 const accounts = {
   create(data) {
     return runInsert(
-      `INSERT INTO whatsapp_accounts (phone_number_id, waba_id, display_phone, business_name, status, access_token_enc, webhook_secret, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO whatsapp_accounts (phone_number_id, waba_id, display_phone, business_name, status, access_token_enc, webhook_secret, created_by, responsavel_login, responsavel_nome, ativo)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [data.phone_number_id || '', data.waba_id || '', data.display_phone || '', data.business_name || '',
-       data.status || 'pendente', data.access_token_enc || '', data.webhook_secret || '', data.created_by || '']
+       data.status || 'pendente', data.access_token_enc || '', data.webhook_secret || '', data.created_by || '',
+       data.responsavel_login || '', data.responsavel_nome || '', (data.ativo === undefined ? 1 : (data.ativo ? 1 : 0))]
     );
   },
 
@@ -315,15 +326,21 @@ const accounts = {
 
   list() {
     // has_token: informa se o Access Token está configurado, SEM devolver o token.
-    return getAll("SELECT id, phone_number_id, waba_id, display_phone, business_name, status, created_at, updated_at, last_sync_at, created_by, CASE WHEN access_token_enc IS NOT NULL AND access_token_enc != '' THEN 1 ELSE 0 END AS has_token FROM whatsapp_accounts ORDER BY created_at DESC");
+    return getAll("SELECT id, phone_number_id, waba_id, display_phone, business_name, status, created_at, updated_at, last_sync_at, created_by, responsavel_login, responsavel_nome, ativo, last_error, CASE WHEN access_token_enc IS NOT NULL AND access_token_enc != '' THEN 1 ELSE 0 END AS has_token FROM whatsapp_accounts ORDER BY created_at DESC");
+  },
+  // IDs das contas de um funcionário (as que ele é responsável). Usado para
+  // limitar a visibilidade das conversas no backend.
+  idsDoResponsavel(login) {
+    return getAll('SELECT id FROM whatsapp_accounts WHERE responsavel_login = ?', [login]).map(function (r) { return r.id; });
   },
 
   update(id, data) {
     const fields = [];
     const values = [];
-    ['phone_number_id', 'waba_id', 'display_phone', 'business_name', 'status', 'access_token_enc', 'webhook_secret', 'last_sync_at'].forEach(f => {
+    ['phone_number_id', 'waba_id', 'display_phone', 'business_name', 'status', 'access_token_enc', 'webhook_secret', 'last_sync_at', 'responsavel_login', 'responsavel_nome', 'last_error'].forEach(f => {
       if (data[f] !== undefined) { fields.push(f + ' = ?'); values.push(data[f]); }
     });
+    if (data.ativo !== undefined) { fields.push('ativo = ?'); values.push(data.ativo ? 1 : 0); }
     if (fields.length === 0) return;
     fields.push("updated_at = datetime('now')");
     values.push(id);
@@ -463,6 +480,12 @@ const conversations = {
     const params = [];
     if (filters) {
       if (filters.account_id) { where += ' AND c.account_id = ?'; params.push(filters.account_id); }
+      // account_ids: restringe às contas que o usuário pode ver (multi-conta).
+      // [] (vazio) = não vê nenhuma; undefined = sem restrição (admin).
+      if (Array.isArray(filters.account_ids)) {
+        if (!filters.account_ids.length) { where += ' AND 0=1'; }
+        else { where += ' AND c.account_id IN (' + filters.account_ids.map(function () { return '?'; }).join(',') + ')'; filters.account_ids.forEach(function (id) { params.push(id); }); }
+      }
       if (filters.status) { where += ' AND c.status = ?'; params.push(filters.status); }
       if (filters.assigned_to) { where += ' AND c.assigned_to = ?'; params.push(filters.assigned_to); }
       if (filters.unread_only) { where += ' AND c.unread_count > 0'; }
@@ -491,6 +514,11 @@ const conversations = {
     let where = '1=1';
     const params = [];
     if (filters) {
+      if (filters.account_id) { where += ' AND account_id = ?'; params.push(filters.account_id); }
+      if (Array.isArray(filters.account_ids)) {
+        if (!filters.account_ids.length) { where += ' AND 0=1'; }
+        else { where += ' AND account_id IN (' + filters.account_ids.map(function () { return '?'; }).join(',') + ')'; filters.account_ids.forEach(function (id) { params.push(id); }); }
+      }
       if (filters.status) { where += ' AND status = ?'; params.push(filters.status); }
       if (filters.assigned_to) { where += ' AND assigned_to = ?'; params.push(filters.assigned_to); }
       if (filters.unread_only) { where += ' AND unread_count > 0'; }
