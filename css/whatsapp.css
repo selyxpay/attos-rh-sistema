@@ -261,8 +261,16 @@
   .wa-col-info { display: none !important; }
 }
 
+/* ── ETAPA 4: Templates ───────────────────────────────────────────────────── */
+.wa-tpl-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+.wa-tpl-pick { display: flex; flex-direction: column; gap: 8px; }
+.wa-tpl-opt { text-align: left; border: 1px solid var(--border-color, #e2e8f0); background: var(--card-bg, #fff); border-radius: 10px; padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; }
+.wa-tpl-opt:hover { border-color: #059669; background: rgba(5,150,105,.05); }
+.wa-tpl-opt b { font-size: 13.5px; color: var(--text-main, #0f172a); }
+.wa-tpl-opt small { font-size: 11.5px; color: var(--text-secondary, #64748b); }
+
 /* ── Tema escuro ──────────────────────────────────────────────────────────── */
 @media (prefers-color-scheme: dark) {
-  .wa-stat, .wa-mini-note, .wa-modal, .wa-search input, .wa-form input, .wa-form textarea { background: var(--card-bg, #1e293b); }
+  .wa-stat, .wa-mini-note, .wa-modal, .wa-search input, .wa-form input, .wa-form textarea, .wa-tpl-opt { background: var(--card-bg, #1e293b); }
   .wa-table th { background: rgba(255,255,255,.03); }
 }

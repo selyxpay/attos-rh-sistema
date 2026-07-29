@@ -52,8 +52,15 @@ webhook GET ecoa challenge (token certo) / 403 (errado); contato criado persiste
 - [x] SSE em tempo real: mensagem nova aparece sozinha (testado webhook→SSE, 1→2 sem reload).
 - Testado com webhook simulado (formato Meta): cria conversa/contato/mensagem, idempotente.
 
-**⏳ Próximas etapas (frontend):**
-- [ ] ETAPA 4 — Templates (listar/sincronizar Meta/status; só enviar aprovados).
+**✅ ETAPA 4 (TEMPLATES) — pronta e testada:**
+- [x] Aba Templates: lista (nome/idioma/categoria/status com selo colorido).
+- [x] Sincronizar templates com a Meta (admin) — falha graciosa sem token.
+- [x] Conexão com a Meta (admin): criar/editar conta (Phone Number ID, WABA, Access
+      Token — token só no servidor), testar conexão.
+- [x] Picker no chat oferece SÓ templates APROVADOS; envio de não-aprovado bloqueado.
+- Testado: aba/empty, criar conexão (conta no banco), sync gracioso, picker só aprovados.
+
+**⏳ Próxima etapa:**
 - [ ] ETAPA 5 — Responsividade mobile do inbox + ajustes mobile gerais + docs de deploy VPS.
 
 ## Depende de credenciais reais da Meta (não fornecidas ainda)

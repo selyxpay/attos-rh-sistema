@@ -78,7 +78,7 @@ function renderWhatsApp() {
   if (_waSubAba === 'dashboard')      _waRenderDashboard(cont);
   else if (_waSubAba === 'contatos')  _waRenderContatos(cont);
   else if (_waSubAba === 'inbox')     _waRenderInbox(cont);
-  else if (_waSubAba === 'templates') cont.innerHTML = _waEmpty('Templates');
+  else if (_waSubAba === 'templates') _waRenderTemplates(cont);
 }
 window.renderWhatsApp = renderWhatsApp;
 
@@ -422,6 +422,7 @@ function _waRenderChat(conv, msgs) {
          </div>
          <div class="wa-composer-linha">
            <button class="wa-anexo" title="Anexar mídia" onclick="document.getElementById('wa-file').click()" ${_waModoNota ? 'disabled' : ''}><i class="fa-solid fa-paperclip"></i></button>
+           <button class="wa-anexo" title="Enviar template aprovado" onclick="waAbrirTemplatePicker()" ${_waModoNota ? 'disabled' : ''}><i class="fa-regular fa-file-lines"></i></button>
            <input type="file" id="wa-file" style="display:none" accept="image/*,application/pdf,video/*,audio/*" onchange="waAnexarMidia(this)">
            <textarea id="wa-msg-input" rows="1" placeholder="${_waModoNota ? 'Escreva uma nota interna (NÃO vai para o cliente)…' : 'Digite uma mensagem…'}" onkeydown="waComposerKey(event)"></textarea>
            <button class="wa-enviar ${_waModoNota ? 'wa-enviar-nota' : ''}" onclick="waEnviarMensagem()"><i class="fa-solid fa-paper-plane"></i></button>
@@ -578,3 +579,139 @@ function _waToast(msg, erro) {
   t.textContent = msg; t.className = 'wa-toast show' + (erro ? ' wa-toast-err' : '');
   clearTimeout(t._timer); t._timer = setTimeout(() => { t.className = 'wa-toast'; }, 3200);
 }
+
+// ==========================================================================
+// ETAPA 4 — TEMPLATES + CONEXÃO COM A META
+// ==========================================================================
+let _waTemplates = [];
+let _waContas = [];
+
+function _waTplAprovado(t) { return String(t.status || '').toLowerCase() === 'approved'; }
+function _waTplBadge(status) {
+  const s = String(status || '').toLowerCase();
+  const map = { approved: ['#059669', 'Aprovado'], pending: ['#d97706', 'Pendente'], rejected: ['#dc2626', 'Rejeitado'], paused: ['#64748b', 'Pausado'] };
+  const x = map[s] || ['#64748b', status || '—'];
+  return `<span class="wa-tpl-badge" style="background:${x[0]}1a;color:${x[0]};">${_waEsc(x[1])}</span>`;
+}
+
+async function _waRenderTemplates(cont) {
+  const podeAdmin = _waPode('aprovar');
+  cont.innerHTML =
+    `<div class="wa-toolbar">
+       <div style="flex:1;font-size:12.5px;color:var(--text-secondary,#64748b);">Modelos de mensagem aprovados pela Meta. Só é possível <b>enviar</b> os que estão <b>Aprovados</b>.</div>
+       ${podeAdmin ? `<button class="mod-btn-secondary" onclick="waConfigurarConexao()"><i class="fa-solid fa-plug"></i> Conexão com a Meta</button>
+                      <button class="mod-btn-primary" onclick="waSincronizarTemplates()"><i class="fa-solid fa-rotate"></i> Sincronizar templates</button>` : ''}
+     </div>
+     <div id="wa-tpl-lista"><div class="wa-loading"><i class="fa-solid fa-spinner fa-spin"></i></div></div>`;
+  let r;
+  try { r = await waGet('/templates'); } catch (e) { document.getElementById('wa-tpl-lista').innerHTML = _waErro(e.message); return; }
+  if (_waSubAba !== 'templates') return;
+  _waTemplates = (r && r.ok && r.templates) || [];
+  _waRenderListaTemplates();
+}
+function _waRenderListaTemplates() {
+  const box = document.getElementById('wa-tpl-lista'); if (!box) return;
+  if (!_waTemplates.length) {
+    box.innerHTML = `<div class="wa-empty"><i class="fa-solid fa-file-lines"></i><p>Nenhum template ainda. Clique em <b>Sincronizar templates</b> para trazer os modelos aprovados na sua conta da Meta.</p></div>`;
+    return;
+  }
+  box.innerHTML =
+    `<div class="wa-count">${_waTemplates.length} template(s)</div>
+     <div class="wa-table-wrap"><table class="wa-table">
+       <thead><tr><th>Nome</th><th>Idioma</th><th>Categoria</th><th>Status</th></tr></thead>
+       <tbody>${_waTemplates.map(t => `<tr>
+         <td><b>${_waEsc(t.name)}</b></td>
+         <td>${_waEsc(t.language || '—')}</td>
+         <td><span class="wa-chip">${_waEsc(t.category || '—')}</span></td>
+         <td>${_waTplBadge(t.status)}</td>
+       </tr>`).join('')}</tbody>
+     </table></div>`;
+}
+
+async function _waCarregarContas() {
+  try { const r = await waGet('/accounts'); _waContas = (r && r.ok && r.accounts) || []; } catch (e) { _waContas = []; }
+  return _waContas;
+}
+
+window.waSincronizarTemplates = async function () {
+  if (!_waPode('aprovar')) return;
+  await _waCarregarContas();
+  const conta = _waContas.find(c => c.waba_id && c.access_token_enc) || _waContas.find(c => c.waba_id);
+  if (!conta) { _waToast('Configure a conexão com a Meta (WABA ID + Access Token) antes de sincronizar.', true); waConfigurarConexao(); return; }
+  _waToast('Sincronizando com a Meta…');
+  const r = await waSend('/templates/sync', 'POST', { account_id: conta.id });
+  if (r && r.ok) { _waToast(`${r.count} template(s) sincronizado(s).`); _waRenderTemplates(document.getElementById('wa-content')); }
+  else _waToast((r && r.error) || 'Falha ao sincronizar (verifique o Access Token e o WABA ID).', true);
+};
+
+// ── Conexão com a Meta (conta) — admin ───────────────────────────────────────
+window.waConfigurarConexao = async function () {
+  if (!_waPode('aprovar')) return;
+  await _waCarregarContas();
+  const c = _waContas[0] || {};
+  _waModal('Conexão com a Meta (WhatsApp Business)',
+    `<div class="wa-form">
+       <p style="font-size:12px;color:var(--text-secondary,#64748b);margin:0 0 8px;">Estes dados vêm do painel <b>Meta for Developers</b>. O Access Token fica só no servidor — nunca no navegador de quem atende.</p>
+       <input type="hidden" id="wa-ac-id" value="${c.id || ''}">
+       <label>Nome do número (referência)</label>
+       <input type="text" id="wa-ac-display" value="${_waEsc(c.display_phone || '')}" placeholder="Ex: Atendimento R&T">
+       <label>Phone Number ID</label>
+       <input type="text" id="wa-ac-pnid" value="${_waEsc(c.phone_number_id || '')}" placeholder="ID do número (Meta)">
+       <label>WhatsApp Business Account ID (WABA)</label>
+       <input type="text" id="wa-ac-waba" value="${_waEsc(c.waba_id || '')}" placeholder="ID da conta comercial">
+       <label>Access Token (permanente)</label>
+       <input type="password" id="wa-ac-token" value="" placeholder="${c.access_token_enc ? '•••••• (já configurado — deixe vazio p/ manter)' : 'Cole o token aqui'}">
+       <div id="wa-ac-msg" class="wa-form-msg"></div>
+     </div>`,
+    `<button class="mod-btn-secondary" onclick="waFecharModal()">Cancelar</button>
+     ${c.id ? `<button class="mod-btn-secondary" onclick="waTestarConexao(${c.id})"><i class="fa-solid fa-plug-circle-check"></i> Testar</button>` : ''}
+     <button class="mod-btn-primary" onclick="waSalvarConexao()"><i class="fa-solid fa-check"></i> Salvar</button>`);
+};
+window.waSalvarConexao = async function () {
+  const g = id => document.getElementById(id);
+  const dados = {
+    display_phone: g('wa-ac-display').value.trim(),
+    phone_number_id: g('wa-ac-pnid').value.trim(),
+    waba_id: g('wa-ac-waba').value.trim(),
+  };
+  const token = g('wa-ac-token').value.trim();
+  if (token) dados.access_token = token;
+  const id = g('wa-ac-id').value.trim();
+  const msg = g('wa-ac-msg');
+  if (!dados.phone_number_id) { msg.textContent = 'Informe o Phone Number ID.'; msg.className = 'wa-form-msg wa-err'; return; }
+  const r = id ? await waSend('/accounts/' + id, 'PUT', dados) : await waSend('/accounts', 'POST', dados);
+  if (r && r.ok) { waFecharModal(); _waToast('Conexão salva.'); }
+  else { msg.textContent = (r && r.error) || 'Não foi possível salvar.'; msg.className = 'wa-form-msg wa-err'; }
+};
+window.waTestarConexao = async function (id) {
+  const msg = document.getElementById('wa-ac-msg');
+  if (msg) { msg.textContent = 'Testando conexão com a Meta…'; msg.className = 'wa-form-msg'; }
+  const r = await waGet('/accounts/' + id + '/status');
+  if (!msg) return;
+  if (r && r.ok && r.status === 'connected') { msg.textContent = '✓ Conectado à Meta com sucesso.'; msg.className = 'wa-form-msg'; msg.style.color = '#059669'; }
+  else { msg.textContent = '✗ ' + ((r && (r.message || r.error)) || 'Não conectou. Confira o token.'); msg.className = 'wa-form-msg wa-err'; }
+};
+
+// ── Enviar template a partir do chat (só aprovados) ──────────────────────────
+window.waAbrirTemplatePicker = async function () {
+  if (!_waConvAberta || !_waPode('criar')) return;
+  let lista = _waTemplates;
+  if (!lista.length) { try { const r = await waGet('/templates'); lista = (r && r.ok && r.templates) || []; _waTemplates = lista; } catch (e) {} }
+  const aprovados = lista.filter(_waTplAprovado);
+  const corpo = aprovados.length
+    ? `<div class="wa-tpl-pick">${aprovados.map(t => `
+         <button class="wa-tpl-opt" onclick="waEnviarTemplate('${_waEsc(t.name)}','${_waEsc(t.language)}')">
+           <b>${_waEsc(t.name)}</b><small>${_waEsc(t.language)} · ${_waEsc(t.category || '')}</small>
+         </button>`).join('')}</div>`
+    : `<div class="wa-empty" style="padding:24px;"><i class="fa-solid fa-file-circle-xmark"></i><p>Nenhum template <b>aprovado</b> disponível. Sincronize os templates na aba <b>Templates</b>.</p></div>`;
+  _waModal('Enviar template aprovado', corpo,
+    `<button class="mod-btn-secondary" onclick="waFecharModal()">Fechar</button>`);
+};
+window.waEnviarTemplate = async function (name, language) {
+  const t = _waTemplates.find(x => x.name === name && String(x.language) === String(language));
+  if (!t || !_waTplAprovado(t)) { _waToast('Só é possível enviar templates aprovados pela Meta.', true); return; }
+  waFecharModal();
+  const r = await waSend('/messages/send', 'POST', { conversation_id: _waConvAberta, type: 'template', template_name: name, template_language: language, template_components: [] });
+  if (r && r.ok) { const nova = { direction: 'outgoing', type: 'text', content: '📋 Template: ' + name, status: 'sent', created_at: new Date().toISOString() }; _waMsgsCache.push(nova); _waAppendBolha(nova); }
+  else _waToast((r && r.error) || 'Falha ao enviar template (número conectado?).', true);
+};
