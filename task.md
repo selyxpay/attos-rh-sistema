@@ -60,8 +60,16 @@ webhook GET ecoa challenge (token certo) / 403 (errado); contato criado persiste
 - [x] Picker no chat oferece SÓ templates APROVADOS; envio de não-aprovado bloqueado.
 - Testado: aba/empty, criar conexão (conta no banco), sync gracioso, picker só aprovados.
 
-**⏳ Próxima etapa:**
-- [ ] ETAPA 5 — Responsividade mobile do inbox + ajustes mobile gerais + docs de deploy VPS.
+**✅ ETAPA 5 (MOBILE + DEPLOY) — pronta e testada:**
+- [x] Inbox mobile: 1 coluna (lista → chat → voltar), botão de info do contato,
+      campo de mensagem acessível, SEM overflow horizontal. Desktop intacto.
+- [x] Dashboard/contatos/templates responsivos (cards e tabelas com scroll interno).
+- [x] server.cjs: carrega `.env` automaticamente (loader zero-dependência).
+- [x] `docs/WHATSAPP-DEPLOY.md`: guia completo (npm, .env, Meta, número, webhook,
+      Nginx c/ SSE, SSL/Certbot, PM2, restart, update, backup, restore, logs, erros).
+- Testado no navegador (viewport 390px): lista→chat→voltar, sem overflow, msg acessível.
+
+## MÓDULO WHATSAPP COMPLETO ✅ (5 etapas). Falta só: credenciais reais da Meta + deploy.
 
 ## Depende de credenciais reais da Meta (não fornecidas ainda)
 - Envio/recebimento real de mensagens, sync de templates, status de entrega/leitura.

@@ -251,14 +251,31 @@
 .wa-toast.show { bottom: 24px; }
 .wa-toast.wa-toast-err { background: #b91c1c; }
 
-/* ── Mobile do inbox (base — refinado na Etapa 5) ─────────────────────────── */
+/* ── Mobile do inbox (Etapa 5) ────────────────────────────────────────────── */
+.wa-info-btn { display: none; }   /* só no mobile (info do contato vira modal) */
 @media (max-width: 860px) {
-  .wa-inbox { grid-template-columns: 1fr; height: calc(100vh - 200px); position: relative; }
+  .wa-subtabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+  .wa-subtabs::-webkit-scrollbar { display: none; }
+  .wa-stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .wa-stat { padding: 12px; gap: 10px; }
+  .wa-stat-val { font-size: 20px; }
+
+  /* Inbox: uma coluna por vez (lista -> chat), altura pela viewport dinâmica */
+  .wa-inbox { grid-template-columns: 1fr; height: calc(100dvh - 165px); min-height: 400px; }
   .wa-col-chat, .wa-col-info { display: none; }
   .wa-inbox.wa-chat-aberto .wa-col-list { display: none; }
   .wa-inbox.wa-chat-aberto .wa-col-chat { display: flex; }
+  .wa-col-info { display: none !important; }   /* info do contato: botão no header abre modal */
   .wa-voltar { display: inline-block; }
-  .wa-col-info { display: none !important; }
+  .wa-info-btn { display: inline-flex; }
+  .wa-bolha { max-width: 84%; font-size: 14px; }
+  .wa-msgs { padding: 12px; }
+  .wa-toolbar { gap: 8px; }
+  .wa-toolbar .mod-btn-primary, .wa-toolbar .mod-btn-secondary { font-size: 12px; padding: 8px 12px; }
+}
+@media (max-width: 420px) {
+  .wa-stats-grid { grid-template-columns: 1fr; }
+  .wa-chat-head-info small { display: none; }
 }
 
 /* ── ETAPA 4: Templates ───────────────────────────────────────────────────── */

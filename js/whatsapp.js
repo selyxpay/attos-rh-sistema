@@ -408,6 +408,7 @@ function _waRenderChat(conv, msgs) {
        <span class="wa-avatar" style="background:linear-gradient(135deg,#059669,#10b981);">${_waEsc(_waInicial(nome))}</span>
        <div class="wa-chat-head-info"><b>${_waEsc(nome)}</b><small>${_waEsc(_waFmtTelefone(conv.contact_phone))} · ${WA_STATUS_PT[conv.status] || conv.status}</small></div>
        <div class="wa-chat-head-acoes">
+         ${conv.contact_id ? `<button class="wa-btn-mini wa-info-btn" title="Detalhes do contato" onclick="waVerContato(${conv.contact_id})"><i class="fa-solid fa-circle-info"></i></button>` : ''}
          ${podeEditar ? `<button class="wa-btn-mini" title="Atribuir atendente" onclick="waAtribuirConversa()"><i class="fa-solid fa-user-plus"></i></button>` : ''}
          ${podeEditar && !fechada ? `<button class="wa-btn-mini" title="Fechar conversa" onclick="waFecharConversa()"><i class="fa-solid fa-circle-check"></i></button>` : ''}
          ${podeEditar && fechada ? `<button class="wa-btn-mini" title="Reabrir conversa" onclick="waReabrirConversa()"><i class="fa-solid fa-rotate-left"></i></button>` : ''}

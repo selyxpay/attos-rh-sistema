@@ -10,6 +10,25 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+// Carrega o arquivo .env (se existir), SEM dependência externa. Só define o que
+// ainda não veio do ambiente/PM2 — então variáveis do sistema continuam vencendo.
+// Faz o WhatsApp (WHATSAPP_VERIFY_TOKEN/APP_SECRET) funcionar só criando o .env.
+(function carregarDotEnv() {
+  try {
+    const envPath = path.join(__dirname, '.env');
+    if (!fs.existsSync(envPath)) return;
+    fs.readFileSync(envPath, 'utf8').split(/\r?\n/).forEach(function (linha) {
+      const m = linha.match(/^\s*([A-Za-z0-9_]+)\s*=\s*(.*?)\s*$/);
+      if (!m || linha.trim().charAt(0) === '#') return;
+      if (process.env[m[1]] !== undefined) return;
+      let v = m[2];
+      if (v.length >= 2 && ((v[0] === '"' && v.slice(-1) === '"') || (v[0] === "'" && v.slice(-1) === "'"))) v = v.slice(1, -1);
+      process.env[m[1]] = v;
+    });
+    console.log('[RT] .env carregado.');
+  } catch (e) { console.error('[RT] Falha ao ler .env:', e.message); }
+})();
+
 const PORT = Number(process.env.PORT) || 3000;
 const BASE = path.resolve(__dirname);
 const DATA_DIR = process.env.DATA_DIR || path.join(BASE, 'server-data');
