@@ -6,3 +6,16 @@ node_modules/
 server-data-test/
 server-data-local/
 INICIAR-SISTEMA-LOCAL.bat
+
+# Variáveis de ambiente (NUNCA devem ir para o Git)
+.env
+
+# Banco de dados SQLite do WhatsApp
+*.db
+*.db-wal
+*.db-shm
+
+# Arquivos de stderr/stdout locais
+stderr.txt
+stdout.txt
+

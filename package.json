@@ -1,12 +1,16 @@
 {
   "name": "rt-vagas-ia",
-  "version": "1.0.0",
-  "description": "R&T Vagas IA - Sistema de Recrutamento Inteligente",
+  "version": "1.1.0",
+  "description": "R&T Vagas IA - Sistema de Recrutamento Inteligente + WhatsApp Business",
   "main": "server.cjs",
   "scripts": {
     "start": "node server.cjs"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "sql.js": "^1.11.0"
   }
 }
+

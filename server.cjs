@@ -391,6 +391,81 @@ function filtrarSenhaVisivel(dados) {
 }
 
 // ==========================================================================
+// MÓDULO WHATSAPP — INICIALIZAÇÃO
+// ==========================================================================
+const waDb      = require('./whatsapp-db.cjs');
+const waApi     = require('./whatsapp-api.cjs');
+const waWebhook = require('./whatsapp-webhook.cjs');
+
+// Variáveis de ambiente do WhatsApp
+const WA_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || '';
+const WA_APP_SECRET   = process.env.WHATSAPP_APP_SECRET   || '';
+
+// SSE: clientes conectados para atualizações em tempo real
+const _sseClients = new Set();
+function notifySSEClients(data) {
+  const payload = 'data: ' + JSON.stringify(data) + '\n\n';
+  _sseClients.forEach(function (client) {
+    try { client.res.write(payload); } catch (e) { _sseClients.delete(client); }
+  });
+}
+
+// Inicializa o banco de dados WhatsApp (assíncrono)
+let _waReady = false;
+(async function initWhatsApp() {
+  try {
+    await waDb.init(DATA_DIR);
+    _waReady = true;
+    console.log('[WhatsApp] Banco de dados inicializado:', waDb.getDbPath());
+    // Inicia limpeza periódica de eventos antigos do webhook
+    waWebhook.startCleanup(waDb, 6 * 60 * 60 * 1000);
+  } catch (e) {
+    console.error('[WhatsApp] Erro ao inicializar banco:', e.message);
+  }
+})();
+
+// Salva o banco WhatsApp ANTES de encerrar (Ctrl+C, restart do PM2, deploy).
+// Sem isto, as gravações que ainda estavam no debounce de 500ms se perderiam
+// quando o processo é encerrado. salvarImediato() é síncrono (writeFileSync).
+let _waEncerrando = false;
+['SIGINT', 'SIGTERM'].forEach(function (sig) {
+  process.on(sig, function () {
+    if (_waEncerrando) return;
+    _waEncerrando = true;
+    try { if (_waReady) waDb.salvarImediato(); } catch (e) {}
+    process.exit(0);
+  });
+});
+
+// Helpers de permissão WhatsApp (reutilizam o sistema existente)
+function waUsuarioTemPermissao(req, acao) {
+  var s = sessaoValida(tokenDaReq(req));
+  if (!s) return null;
+  var st = lerEstado();
+  var u = ((st.dados && st.dados.funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === s.login; });
+  if (!u) return null;
+  if (ehMestreLogin(u.login)) return u;
+  if (u.departamento === 'administracao') return u;
+  if (u.permissoes && u.permissoes.whatsapp && u.permissoes.whatsapp[acao] === true) return u;
+  return null;
+}
+function waIpDaReq(req) {
+  return String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+}
+// Lê corpo como texto puro (para validar assinatura do webhook)
+function lerCorpoBruto(req, cb) {
+  var data = [];
+  var tamanho = 0;
+  req.on('data', function (chunk) {
+    tamanho += chunk.length;
+    if (tamanho > 5 * 1024 * 1024) { cb(new Error('corpo muito grande')); req.destroy(); return; }
+    data.push(chunk);
+  });
+  req.on('end', function () { cb(null, Buffer.concat(data)); });
+  req.on('error', function (e) { cb(e); });
+}
+
+// ==========================================================================
 // SERVIDOR
 // ==========================================================================
 http.createServer(function (req, res) {
@@ -882,6 +957,457 @@ http.createServer(function (req, res) {
       res.writeHead(200, Object.assign({ 'Content-Type': ct, 'Cache-Control': 'public, max-age=31536000' }, SECURITY_HEADERS));
       res.end(data);
     });
+    return;
+  }
+
+  // ==========================================================================
+  // ROTAS DO MÓDULO WHATSAPP
+  // ==========================================================================
+
+  // ---- WEBHOOK: Verificação (GET) — pública, sem login ----
+  if (urlPath === '/webhooks/whatsapp' && req.method === 'GET') {
+    if (!WA_VERIFY_TOKEN) { responderJson(res, 500, { error: 'WHATSAPP_VERIFY_TOKEN não configurado.' }); return; }
+    waWebhook.handleVerification(req, res, WA_VERIFY_TOKEN);
+    return;
+  }
+
+  // ---- WEBHOOK: Recepção de eventos (POST) — pública, validada por assinatura ----
+  if (urlPath === '/webhooks/whatsapp' && req.method === 'POST') {
+    lerCorpoBruto(req, function (err, rawBody) {
+      if (err) { res.writeHead(400); res.end('Bad Request'); return; }
+      // Valida assinatura
+      var signature = req.headers['x-hub-signature-256'] || '';
+      if (WA_APP_SECRET && !waWebhook.validateSignature(rawBody, signature, WA_APP_SECRET)) {
+        console.warn('[WhatsApp Webhook] Assinatura inválida.');
+        res.writeHead(403); res.end('Forbidden'); return;
+      }
+      // Responde 200 imediatamente (Meta exige resposta rápida)
+      res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('EVENT_RECEIVED');
+      // Processa em background
+      if (_waReady) {
+        try {
+          var body = JSON.parse(rawBody.toString('utf8'));
+          waWebhook.processEvent(body, waDb, waApi, notifySSEClients).catch(function (e) {
+            console.error('[WhatsApp Webhook] Erro ao processar evento:', e.message);
+          });
+        } catch (e) { console.error('[WhatsApp Webhook] JSON inválido:', e.message); }
+      }
+    });
+    return;
+  }
+
+  // ---- SSE: Atualizações em tempo real ----
+  if (urlPath === '/api/whatsapp/events' && req.method === 'GET') {
+    if (!reqAutenticada(req)) { responderJson(res, 401, { ok: false }); return; }
+    var sseUser = waUsuarioTemPermissao(req, 'visualizar');
+    if (!sseUser) { responderJson(res, 403, { ok: false }); return; }
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive', 'X-Accel-Buffering': 'no'
+    });
+    res.write('data: {"type":"connected"}\n\n');
+    var client = { res: res, login: sseUser.login };
+    _sseClients.add(client);
+    var heartbeat = setInterval(function () { try { res.write(': heartbeat\n\n'); } catch (e) { clearInterval(heartbeat); _sseClients.delete(client); } }, 30000);
+    req.on('close', function () { clearInterval(heartbeat); _sseClients.delete(client); });
+    return;
+  }
+
+  // ---- Todas as rotas /api/whatsapp/* exigem login + módulo pronto ----
+  if (urlPath.indexOf('/api/whatsapp/') === 0) {
+    if (!_waReady) { responderJson(res, 503, { ok: false, error: 'Módulo WhatsApp inicializando...' }); return; }
+    if (!autenticado) { responderJson(res, 401, { ok: false, error: 'Não autenticado.' }); return; }
+
+    // ---- DASHBOARD ----
+    if (urlPath === '/api/whatsapp/dashboard' && req.method === 'GET') {
+      var u = waUsuarioTemPermissao(req, 'visualizar');
+      if (!u) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      responderJson(res, 200, { ok: true, stats: waDb.dashboardStats() });
+      return;
+    }
+
+    // ---- CONTAS ----
+    if (urlPath === '/api/whatsapp/accounts' && req.method === 'GET') {
+      var u = waUsuarioTemPermissao(req, 'visualizar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      responderJson(res, 200, { ok: true, accounts: waDb.accounts.list() });
+      return;
+    }
+    if (urlPath === '/api/whatsapp/accounts' && req.method === 'POST') {
+      var u = waUsuarioTemPermissao(req, 'aprovar');
+      if (!u) { responderJson(res, 403, { ok: false, error: 'Apenas administradores podem gerenciar contas.' }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false }); return; }
+        try {
+          var id = waDb.accounts.create({
+            phone_number_id: body.phone_number_id || '',
+            waba_id: body.waba_id || '',
+            display_phone: body.display_phone || '',
+            business_name: body.business_name || '',
+            status: 'pendente',
+            access_token_enc: body.access_token || '',
+            created_by: u.login
+          });
+          waDb.audit.log({ user_login: u.login, user_name: u.nome, action: 'Conectou conta WhatsApp', details: 'Número: ' + (body.display_phone || body.phone_number_id), ip: waIpDaReq(req), account_id: id });
+          responderJson(res, 200, { ok: true, id: id });
+        } catch (e) { responderJson(res, 500, { ok: false, error: e.message }); }
+      });
+      return;
+    }
+    // Atualizar conta
+    var matchAccountUpdate = urlPath.match(/^\/api\/whatsapp\/accounts\/(\d+)$/);
+    if (matchAccountUpdate && req.method === 'PUT') {
+      var u = waUsuarioTemPermissao(req, 'aprovar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false }); return; }
+        var accountId = parseInt(matchAccountUpdate[1]);
+        var updateData = {};
+        if (body.phone_number_id !== undefined) updateData.phone_number_id = body.phone_number_id;
+        if (body.waba_id !== undefined) updateData.waba_id = body.waba_id;
+        if (body.display_phone !== undefined) updateData.display_phone = body.display_phone;
+        if (body.business_name !== undefined) updateData.business_name = body.business_name;
+        if (body.status !== undefined) updateData.status = body.status;
+        if (body.access_token !== undefined) updateData.access_token_enc = body.access_token;
+        waDb.accounts.update(accountId, updateData);
+        waDb.audit.log({ user_login: u.login, user_name: u.nome, action: 'Atualizou conta WhatsApp', details: 'Account ID: ' + accountId, ip: waIpDaReq(req), account_id: accountId });
+        responderJson(res, 200, { ok: true });
+      });
+      return;
+    }
+    // Status da conta (testa conexão com a Meta)
+    var matchAccountStatus = urlPath.match(/^\/api\/whatsapp\/accounts\/(\d+)\/status$/);
+    if (matchAccountStatus && req.method === 'GET') {
+      var u = waUsuarioTemPermissao(req, 'visualizar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      var accountId = parseInt(matchAccountStatus[1]);
+      var account = waDb.accounts.getById(accountId);
+      if (!account) { responderJson(res, 404, { ok: false, error: 'Conta não encontrada.' }); return; }
+      if (!account.access_token_enc) {
+        responderJson(res, 200, { ok: true, status: 'pendente', message: 'Access Token não configurado.' });
+        return;
+      }
+      waApi.getPhoneInfo(account.phone_number_id, account.access_token_enc).then(function (info) {
+        if (info.ok) {
+          waDb.accounts.update(accountId, { status: 'connected', last_sync_at: new Date().toISOString() });
+          responderJson(res, 200, { ok: true, status: 'connected', info: info.info });
+        } else {
+          waDb.accounts.update(accountId, { status: 'error' });
+          responderJson(res, 200, { ok: true, status: 'error', message: info.error });
+        }
+      }).catch(function (e) {
+        responderJson(res, 200, { ok: true, status: 'error', message: e.message });
+      });
+      return;
+    }
+
+    // ---- CONVERSAS ----
+    if (urlPath === '/api/whatsapp/conversations' && req.method === 'GET') {
+      var u = waUsuarioTemPermissao(req, 'visualizar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      var query = req.url.indexOf('?') >= 0 ? req.url.slice(req.url.indexOf('?') + 1) : '';
+      var qp = {}; query.split('&').forEach(function (p) { var kv = p.split('='); if (kv[0]) qp[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || ''); });
+      var filters = {};
+      if (qp.status) filters.status = qp.status;
+      if (qp.search) filters.search = qp.search;
+      if (qp.assigned_to) filters.assigned_to = qp.assigned_to;
+      if (qp.unread_only === 'true') filters.unread_only = true;
+      if (qp.limit) filters.limit = parseInt(qp.limit);
+      if (qp.offset) filters.offset = parseInt(qp.offset);
+      // Se o usuário não é admin/mestre, filtra só as conversas atribuídas a ele (a menos que tenha permissão total)
+      if (!ehMestreLogin(u.login) && u.departamento !== 'administracao' && !(u.permissoes && u.permissoes.whatsapp && u.permissoes.whatsapp.aprovar)) {
+        filters.assigned_to = u.login;
+      }
+      var convs = waDb.conversations.list(filters);
+      convs.forEach(function (c) { c.tags = waDb.tags.getForConversation(c.id); });
+      responderJson(res, 200, { ok: true, conversations: convs, total: waDb.conversations.count(filters) });
+      return;
+    }
+    // Conversa individual + mensagens
+    var matchConv = urlPath.match(/^\/api\/whatsapp\/conversations\/(\d+)$/);
+    if (matchConv && req.method === 'GET') {
+      var u = waUsuarioTemPermissao(req, 'visualizar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      var convId = parseInt(matchConv[1]);
+      var conv = waDb.conversations.getById(convId);
+      if (!conv) { responderJson(res, 404, { ok: false, error: 'Conversa não encontrada.' }); return; }
+      conv.tags = waDb.tags.getForConversation(convId);
+      var query = req.url.indexOf('?') >= 0 ? req.url.slice(req.url.indexOf('?') + 1) : '';
+      var qp = {}; query.split('&').forEach(function (p) { var kv = p.split('='); if (kv[0]) qp[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || ''); });
+      var msgs = waDb.messages.listByConversation(convId, parseInt(qp.limit) || 50, parseInt(qp.offset) || 0);
+      var totalMsgs = waDb.messages.countByConversation(convId);
+      // Marca como lido ao abrir
+      waDb.conversations.resetUnread(convId);
+      responderJson(res, 200, { ok: true, conversation: conv, messages: msgs, total_messages: totalMsgs });
+      return;
+    }
+    // Atribuir conversa
+    var matchAssign = urlPath.match(/^\/api\/whatsapp\/conversations\/(\d+)\/assign$/);
+    if (matchAssign && req.method === 'POST') {
+      var u = waUsuarioTemPermissao(req, 'editar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false }); return; }
+        var convId = parseInt(matchAssign[1]);
+        waDb.conversations.update(convId, { assigned_to: body.assigned_to || '', assigned_to_name: body.assigned_to_name || '' });
+        waDb.audit.log({ user_login: u.login, user_name: u.nome, action: 'Atribuiu conversa', details: 'Conversa #' + convId + ' → ' + (body.assigned_to_name || body.assigned_to), ip: waIpDaReq(req), conversation_id: convId });
+        notifySSEClients({ type: 'conversation_updated', conversation_id: convId, action: 'assigned' });
+        responderJson(res, 200, { ok: true });
+      });
+      return;
+    }
+    // Fechar conversa
+    var matchClose = urlPath.match(/^\/api\/whatsapp\/conversations\/(\d+)\/close$/);
+    if (matchClose && req.method === 'POST') {
+      var u = waUsuarioTemPermissao(req, 'editar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      var convId = parseInt(matchClose[1]);
+      waDb.conversations.update(convId, { status: 'closed', closed_at: new Date().toISOString() });
+      waDb.audit.log({ user_login: u.login, user_name: u.nome, action: 'Fechou conversa', details: 'Conversa #' + convId, ip: waIpDaReq(req), conversation_id: convId });
+      notifySSEClients({ type: 'conversation_updated', conversation_id: convId, action: 'closed' });
+      responderJson(res, 200, { ok: true });
+      return;
+    }
+    // Reabrir conversa
+    var matchReopen = urlPath.match(/^\/api\/whatsapp\/conversations\/(\d+)\/reopen$/);
+    if (matchReopen && req.method === 'POST') {
+      var u = waUsuarioTemPermissao(req, 'editar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      var convId = parseInt(matchReopen[1]);
+      waDb.conversations.update(convId, { status: 'open', closed_at: null });
+      waDb.audit.log({ user_login: u.login, user_name: u.nome, action: 'Reabriu conversa', details: 'Conversa #' + convId, ip: waIpDaReq(req), conversation_id: convId });
+      notifySSEClients({ type: 'conversation_updated', conversation_id: convId, action: 'reopened' });
+      responderJson(res, 200, { ok: true });
+      return;
+    }
+    // Nota interna
+    var matchNotes = urlPath.match(/^\/api\/whatsapp\/conversations\/(\d+)\/notes$/);
+    if (matchNotes && req.method === 'POST') {
+      var u = waUsuarioTemPermissao(req, 'criar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false }); return; }
+        var convId = parseInt(matchNotes[1]);
+        var conv = waDb.conversations.getById(convId);
+        if (!conv) { responderJson(res, 404, { ok: false }); return; }
+        waDb.messages.create({
+          conversation_id: convId, account_id: conv.account_id,
+          wamid: 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+          direction: 'outgoing', type: 'text', content: body.content || '',
+          status: 'note', sender_name: u.nome || u.login, is_internal_note: true
+        });
+        responderJson(res, 200, { ok: true });
+      });
+      return;
+    }
+    // Tags da conversa
+    var matchTags = urlPath.match(/^\/api\/whatsapp\/conversations\/(\d+)\/tags$/);
+    if (matchTags && req.method === 'POST') {
+      var u = waUsuarioTemPermissao(req, 'editar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false }); return; }
+        var convId = parseInt(matchTags[1]);
+        if (body.action === 'add' && body.tag_id) { waDb.tags.addToConversation(convId, body.tag_id); }
+        else if (body.action === 'remove' && body.tag_id) { waDb.tags.removeFromConversation(convId, body.tag_id); }
+        responderJson(res, 200, { ok: true, tags: waDb.tags.getForConversation(convId) });
+      });
+      return;
+    }
+
+    // ---- ENVIAR MENSAGEM ----
+    if (urlPath === '/api/whatsapp/messages/send' && req.method === 'POST') {
+      var u = waUsuarioTemPermissao(req, 'criar');
+      if (!u) { responderJson(res, 403, { ok: false, error: 'Sem permissão para enviar mensagens.' }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false }); return; }
+        var convId = body.conversation_id;
+        var conv = waDb.conversations.getById(convId);
+        if (!conv) { responderJson(res, 404, { ok: false, error: 'Conversa não encontrada.' }); return; }
+        var account = waDb.accounts.getById(conv.account_id);
+        if (!account || !account.access_token_enc) {
+          responderJson(res, 400, { ok: false, error: 'Conta WhatsApp não configurada ou sem Access Token.' });
+          return;
+        }
+        if (account.status !== 'connected' && account.status !== 'active') {
+          responderJson(res, 400, { ok: false, error: 'Conta WhatsApp não está conectada. Status: ' + account.status });
+          return;
+        }
+        var toPhone = conv.contact_phone;
+        if (!toPhone) { responderJson(res, 400, { ok: false, error: 'Número de telefone do contato não encontrado.' }); return; }
+
+        // Determina o tipo de mensagem
+        var sendPromise;
+        if (body.type === 'template') {
+          sendPromise = waApi.sendTemplateMessage(account.phone_number_id, toPhone, body.template_name, body.template_language, body.template_components, account.access_token_enc);
+        } else if (body.type === 'image' || body.type === 'document' || body.type === 'video' || body.type === 'audio') {
+          sendPromise = waApi.sendMediaMessage(account.phone_number_id, toPhone, body.type, { link: body.media_url, id: body.media_id, filename: body.filename }, body.caption, account.access_token_enc);
+        } else {
+          if (!body.content || !body.content.trim()) { responderJson(res, 400, { ok: false, error: 'Mensagem vazia.' }); return; }
+          sendPromise = waApi.sendTextMessage(account.phone_number_id, toPhone, body.content, account.access_token_enc);
+        }
+
+        sendPromise.then(function (result) {
+          var msgId = waDb.messages.create({
+            conversation_id: convId, account_id: account.id,
+            wamid: result.wamid || ('local_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6)),
+            direction: 'outgoing', type: body.type || 'text',
+            content: body.content || body.caption || '', template_name: body.template_name || '',
+            template_language: body.template_language || '',
+            media_url: body.media_url || '', media_mime_type: body.media_mime_type || '',
+            media_filename: body.filename || '',
+            status: result.ok ? 'sent' : 'failed',
+            sender_name: u.nome || u.login,
+            error_code: result.error_code || '', error_message: result.error || ''
+          });
+          waDb.conversations.update(convId, {
+            last_message_text: (body.content || body.caption || body.template_name || '').slice(0, 200),
+            last_message_at: new Date().toISOString()
+          });
+          waDb.audit.log({ user_login: u.login, user_name: u.nome, action: 'Enviou mensagem WhatsApp', details: 'Para: ' + toPhone + ' | Tipo: ' + (body.type || 'text'), ip: waIpDaReq(req), conversation_id: convId, message_id: msgId });
+          notifySSEClients({ type: 'new_message', conversation_id: convId, message: { id: msgId, direction: 'outgoing', type: body.type || 'text', content: body.content || body.caption || '', status: result.ok ? 'sent' : 'failed', sender_name: u.nome || u.login, created_at: new Date().toISOString() } });
+          if (result.ok) { responderJson(res, 200, { ok: true, message_id: msgId, wamid: result.wamid }); }
+          else { responderJson(res, 200, { ok: false, error: result.error, error_code: result.error_code, message_id: msgId }); }
+        }).catch(function (e) {
+          responderJson(res, 500, { ok: false, error: 'Erro ao enviar: ' + e.message });
+        });
+      });
+      return;
+    }
+
+    // ---- CONTATOS ----
+    if (urlPath === '/api/whatsapp/contacts' && req.method === 'GET') {
+      var u = waUsuarioTemPermissao(req, 'visualizar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      var query = req.url.indexOf('?') >= 0 ? req.url.slice(req.url.indexOf('?') + 1) : '';
+      var qp = {}; query.split('&').forEach(function (p) { var kv = p.split('='); if (kv[0]) qp[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || ''); });
+      var filters = {};
+      if (qp.search) filters.search = qp.search;
+      if (qp.limit) filters.limit = parseInt(qp.limit);
+      if (qp.offset) filters.offset = parseInt(qp.offset);
+      responderJson(res, 200, { ok: true, contacts: waDb.contacts.list(filters), total: waDb.contacts.count(filters) });
+      return;
+    }
+    if (urlPath === '/api/whatsapp/contacts' && req.method === 'POST') {
+      var u = waUsuarioTemPermissao(req, 'criar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false }); return; }
+        if (!body.phone) { responderJson(res, 400, { ok: false, error: 'Telefone obrigatório.' }); return; }
+        var contact = waDb.contacts.create({ phone: waApi.normalizePhone(body.phone), name: body.name, email: body.email, notes: body.notes, origin: 'manual' });
+        responderJson(res, 200, { ok: true, contact: contact });
+      });
+      return;
+    }
+    var matchContact = urlPath.match(/^\/api\/whatsapp\/contacts\/(\d+)$/);
+    if (matchContact && req.method === 'GET') {
+      var u = waUsuarioTemPermissao(req, 'visualizar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      var contact = waDb.contacts.getById(parseInt(matchContact[1]));
+      if (!contact) { responderJson(res, 404, { ok: false }); return; }
+      responderJson(res, 200, { ok: true, contact: contact });
+      return;
+    }
+    if (matchContact && req.method === 'PUT') {
+      var u = waUsuarioTemPermissao(req, 'editar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false }); return; }
+        waDb.contacts.update(parseInt(matchContact[1]), body);
+        responderJson(res, 200, { ok: true });
+      });
+      return;
+    }
+
+    // ---- TEMPLATES ----
+    if (urlPath === '/api/whatsapp/templates' && req.method === 'GET') {
+      var u = waUsuarioTemPermissao(req, 'visualizar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      var query = req.url.indexOf('?') >= 0 ? req.url.slice(req.url.indexOf('?') + 1) : '';
+      var qp = {}; query.split('&').forEach(function (p) { var kv = p.split('='); if (kv[0]) qp[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || ''); });
+      responderJson(res, 200, { ok: true, templates: waDb.templates.list(qp.account_id ? parseInt(qp.account_id) : null) });
+      return;
+    }
+    if (urlPath === '/api/whatsapp/templates/sync' && req.method === 'POST') {
+      var u = waUsuarioTemPermissao(req, 'aprovar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false }); return; }
+        var account = waDb.accounts.getById(body.account_id);
+        if (!account || !account.access_token_enc || !account.waba_id) {
+          responderJson(res, 400, { ok: false, error: 'Conta não configurada ou sem WABA ID.' }); return;
+        }
+        waApi.getTemplates(account.waba_id, account.access_token_enc).then(function (result) {
+          if (result.ok) {
+            waDb.templates.deleteByAccount(account.id);
+            (result.templates || []).forEach(function (t) {
+              waDb.templates.upsert({ account_id: account.id, meta_template_id: t.id, name: t.name, language: t.language, category: t.category, status: t.status, components: t.components });
+            });
+            waDb.audit.log({ user_login: u.login, user_name: u.nome, action: 'Sincronizou templates WhatsApp', details: result.templates.length + ' templates', ip: waIpDaReq(req), account_id: account.id });
+            responderJson(res, 200, { ok: true, count: result.templates.length });
+          } else {
+            responderJson(res, 200, { ok: false, error: result.error });
+          }
+        }).catch(function (e) { responderJson(res, 500, { ok: false, error: e.message }); });
+      });
+      return;
+    }
+
+    // ---- TAGS ----
+    if (urlPath === '/api/whatsapp/tags' && req.method === 'GET') {
+      var u = waUsuarioTemPermissao(req, 'visualizar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      responderJson(res, 200, { ok: true, tags: waDb.tags.list() });
+      return;
+    }
+    if (urlPath === '/api/whatsapp/tags' && req.method === 'POST') {
+      var u = waUsuarioTemPermissao(req, 'editar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false }); return; }
+        var tagId = waDb.tags.create(body.name || 'Nova Tag', body.color);
+        responderJson(res, 200, { ok: true, tag_id: tagId });
+      });
+      return;
+    }
+
+    // ---- AUDITORIA ----
+    if (urlPath === '/api/whatsapp/audit-logs' && req.method === 'GET') {
+      var u = waUsuarioTemPermissao(req, 'aprovar');
+      if (!u) { responderJson(res, 403, { ok: false, error: 'Apenas administradores podem ver logs de auditoria.' }); return; }
+      var query = req.url.indexOf('?') >= 0 ? req.url.slice(req.url.indexOf('?') + 1) : '';
+      var qp = {}; query.split('&').forEach(function (p) { var kv = p.split('='); if (kv[0]) qp[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || ''); });
+      var filters = {};
+      if (qp.user_login) filters.user_login = qp.user_login;
+      if (qp.action) filters.action = qp.action;
+      if (qp.limit) filters.limit = parseInt(qp.limit);
+      if (qp.offset) filters.offset = parseInt(qp.offset);
+      responderJson(res, 200, { ok: true, logs: waDb.audit.list(filters) });
+      return;
+    }
+
+    // ---- UPLOAD DE MÍDIA WHATSAPP ----
+    if (urlPath === '/api/whatsapp/media/upload' && req.method === 'POST') {
+      var u = waUsuarioTemPermissao(req, 'criar');
+      if (!u) { responderJson(res, 403, { ok: false }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false }); return; }
+        var m = /^data:([^;]+);base64,([\s\S]*)$/.exec(body.dataUrl || '');
+        if (!m) { responderJson(res, 400, { ok: false, error: 'dataUrl inválido.' }); return; }
+        var mimeType = m[1];
+        var ext = (mimeType.split('/')[1] || 'bin').split('+')[0].split(';')[0];
+        if (!ext || ext.length > 5) ext = 'bin';
+        var nome = 'wa_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+        try {
+          fs.writeFileSync(path.join(UPLOADS_DIR, nome), Buffer.from(m[2], 'base64'));
+          responderJson(res, 200, { ok: true, url: '/uploads/' + nome, mime_type: mimeType, filename: nome });
+        } catch (e) { responderJson(res, 500, { ok: false, error: 'Falha no upload.' }); }
+      });
+      return;
+    }
+
+    // Rota WhatsApp não encontrada
+    responderJson(res, 404, { ok: false, error: 'Rota WhatsApp não encontrada.' });
     return;
   }
 
