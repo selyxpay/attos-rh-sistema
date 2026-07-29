@@ -43,8 +43,16 @@ webhook GET ecoa challenge (token certo) / 403 (errado); contato criado persiste
 - [x] Correção: guarda anti-corrida (troca de sub-aba durante fetch não sobrescreve a tela).
 - Testado: criar/dedup/busca/editar (persistiu no banco)/ver — tudo ok, sem erro de JS.
 
+**✅ ETAPA 3 (INBOX) — pronta e testada:**
+- [x] 3 colunas (lista de conversas | chat | info do contato). Filtros (todas/abertas/não lidas/fechadas) + busca.
+- [x] Abrir conversa carrega mensagens; bolhas in/out estilo WhatsApp + status (✓/✓✓/lida/falhou).
+- [x] Enviar texto e mídia (upload → /media/upload → envio). Falha graciosa sem token da Meta.
+- [x] Notas internas (destaque amarelo, NUNCA vão pro WhatsApp — is_internal_note no banco).
+- [x] Atribuir atendente, fechar, reabrir conversa. Badge de não-lidas no menu.
+- [x] SSE em tempo real: mensagem nova aparece sozinha (testado webhook→SSE, 1→2 sem reload).
+- Testado com webhook simulado (formato Meta): cria conversa/contato/mensagem, idempotente.
+
 **⏳ Próximas etapas (frontend):**
-- [ ] ETAPA 3 — Inbox (lista+chat+info, envio texto/mídia/template, atribuir/fechar/reabrir, notas, SSE tempo real).
 - [ ] ETAPA 4 — Templates (listar/sincronizar Meta/status; só enviar aprovados).
 - [ ] ETAPA 5 — Responsividade mobile do inbox + ajustes mobile gerais + docs de deploy VPS.
 
