@@ -71,6 +71,21 @@ webhook GET ecoa challenge (token certo) / 403 (errado); contato criado persiste
 
 ## MÓDULO WHATSAPP COMPLETO ✅ (5 etapas). Falta só: credenciais reais da Meta + deploy.
 
+**✅ ENDURECIMENTO PARA PRODUÇÃO — revisão de segurança/robustez (testado):**
+- [x] 🔒 Access Token NUNCA vai para o navegador: `accounts.list()` devolve `has_token`
+      (0/1), não o token. Frontend usa `has_token`. Token guardado só no servidor.
+- [x] 📞 `normalizePhone` reconcilia formatos BR (`(11) 9…`, `+55 11 9…`, `5511…`) →
+      mesmo número → NÃO duplica contato. (Números do webhook já vêm completos.)
+- [x] 📵 Upload de mídia validado no SERVIDOR (não confia no front): só mimes aceitos
+      pela Meta + teto de 20 MB. Upload registrado na auditoria.
+- [x] 📋 Tela de Auditoria (admin) na aba Templates: quem fez o quê (envio, atribuição,
+      conta, upload…). Backend já registrava; agora tem visualização.
+- [x] Banco: índices completos (phone, wamid, conversas, webhook_events…), idempotência
+      por wamid, escrita atômica, flush no shutdown. Webhook valida assinatura HMAC-SHA256
+      (timing-safe). API com timeout (30s/60s) e SEM retry (evita mensagem duplicada).
+- Testado: token não vaza, dedup dos 3 formatos → 1 contato, upload .exe bloqueado (400)
+  e PNG aceito (200), auditoria abre. Regressão: 12 módulos antigos + WhatsApp ok, 403 p/ sem permissão.
+
 ## Depende de credenciais reais da Meta (não fornecidas ainda)
 - Envio/recebimento real de mensagens, sync de templates, status de entrega/leitura.
 - Configurar no `.env`: `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` (globais) +

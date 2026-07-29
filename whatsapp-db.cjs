@@ -314,7 +314,8 @@ const accounts = {
   },
 
   list() {
-    return getAll('SELECT id, phone_number_id, waba_id, display_phone, business_name, status, created_at, updated_at, last_sync_at, created_by FROM whatsapp_accounts ORDER BY created_at DESC');
+    // has_token: informa se o Access Token está configurado, SEM devolver o token.
+    return getAll("SELECT id, phone_number_id, waba_id, display_phone, business_name, status, created_at, updated_at, last_sync_at, created_by, CASE WHEN access_token_enc IS NOT NULL AND access_token_enc != '' THEN 1 ELSE 0 END AS has_token FROM whatsapp_accounts ORDER BY created_at DESC");
   },
 
   update(id, data) {

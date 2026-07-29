@@ -600,7 +600,8 @@ async function _waRenderTemplates(cont) {
   cont.innerHTML =
     `<div class="wa-toolbar">
        <div style="flex:1;font-size:12.5px;color:var(--text-secondary,#64748b);">Modelos de mensagem aprovados pela Meta. Só é possível <b>enviar</b> os que estão <b>Aprovados</b>.</div>
-       ${podeAdmin ? `<button class="mod-btn-secondary" onclick="waConfigurarConexao()"><i class="fa-solid fa-plug"></i> Conexão com a Meta</button>
+       ${podeAdmin ? `<button class="mod-btn-secondary" onclick="waAbrirAuditoria()"><i class="fa-solid fa-clipboard-list"></i> Auditoria</button>
+                      <button class="mod-btn-secondary" onclick="waConfigurarConexao()"><i class="fa-solid fa-plug"></i> Conexão com a Meta</button>
                       <button class="mod-btn-primary" onclick="waSincronizarTemplates()"><i class="fa-solid fa-rotate"></i> Sincronizar templates</button>` : ''}
      </div>
      <div id="wa-tpl-lista"><div class="wa-loading"><i class="fa-solid fa-spinner fa-spin"></i></div></div>`;
@@ -637,7 +638,7 @@ async function _waCarregarContas() {
 window.waSincronizarTemplates = async function () {
   if (!_waPode('aprovar')) return;
   await _waCarregarContas();
-  const conta = _waContas.find(c => c.waba_id && c.access_token_enc) || _waContas.find(c => c.waba_id);
+  const conta = _waContas.find(c => c.waba_id && c.has_token) || _waContas.find(c => c.waba_id);
   if (!conta) { _waToast('Configure a conexão com a Meta (WABA ID + Access Token) antes de sincronizar.', true); waConfigurarConexao(); return; }
   _waToast('Sincronizando com a Meta…');
   const r = await waSend('/templates/sync', 'POST', { account_id: conta.id });
@@ -661,7 +662,8 @@ window.waConfigurarConexao = async function () {
        <label>WhatsApp Business Account ID (WABA)</label>
        <input type="text" id="wa-ac-waba" value="${_waEsc(c.waba_id || '')}" placeholder="ID da conta comercial">
        <label>Access Token (permanente)</label>
-       <input type="password" id="wa-ac-token" value="" placeholder="${c.access_token_enc ? '•••••• (já configurado — deixe vazio p/ manter)' : 'Cole o token aqui'}">
+       <input type="password" id="wa-ac-token" value="" placeholder="${c.has_token ? '•••••• (já configurado — deixe vazio p/ manter)' : 'Cole o token aqui'}">
+       ${c.has_token ? '<small style="color:#059669;font-size:11px;"><i class="fa-solid fa-lock"></i> Token já configurado e guardado no servidor. Deixe vazio para manter o atual.</small>' : ''}
        <div id="wa-ac-msg" class="wa-form-msg"></div>
      </div>`,
     `<button class="mod-btn-secondary" onclick="waFecharModal()">Cancelar</button>
@@ -715,4 +717,24 @@ window.waEnviarTemplate = async function (name, language) {
   const r = await waSend('/messages/send', 'POST', { conversation_id: _waConvAberta, type: 'template', template_name: name, template_language: language, template_components: [] });
   if (r && r.ok) { const nova = { direction: 'outgoing', type: 'text', content: '📋 Template: ' + name, status: 'sent', created_at: new Date().toISOString() }; _waMsgsCache.push(nova); _waAppendBolha(nova); }
   else _waToast((r && r.error) || 'Falha ao enviar template (número conectado?).', true);
+};
+
+// ── Auditoria (admin) — quem fez o quê ───────────────────────────────────────
+window.waAbrirAuditoria = async function () {
+  if (!_waPode('aprovar')) return;
+  _waModal('Auditoria do WhatsApp', '<div class="wa-loading"><i class="fa-solid fa-spinner fa-spin"></i> Carregando…</div>', `<button class="mod-btn-secondary" onclick="waFecharModal()">Fechar</button>`);
+  let r; try { r = await waGet('/audit-logs?limit=100'); } catch (e) { r = null; }
+  const body = document.querySelector('#wa-modal-overlay .wa-modal-body');
+  if (!body) return;
+  const logs = (r && r.ok && r.logs) || [];
+  body.innerHTML = logs.length
+    ? `<div class="wa-table-wrap" style="max-height:60vh;overflow:auto;"><table class="wa-table">
+         <thead><tr><th>Quando</th><th>Quem</th><th>Ação</th><th>Detalhe</th></tr></thead>
+         <tbody>${logs.map(l => `<tr>
+           <td style="white-space:nowrap;font-size:11px;">${_waFmtData(l.created_at)}</td>
+           <td>${_waEsc(l.user_name || l.user_login || '—')}</td>
+           <td>${_waEsc(l.action || '')}</td>
+           <td style="font-size:11.5px;color:var(--text-secondary,#64748b);">${_waEsc(l.details || '')}</td>
+         </tr>`).join('')}</tbody></table></div>`
+    : `<div class="wa-empty" style="padding:24px;"><i class="fa-solid fa-clipboard-list"></i><p>Nenhum registro de auditoria ainda.</p></div>`;
 };

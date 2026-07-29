@@ -1414,11 +1414,18 @@ http.createServer(function (req, res) {
         var m = /^data:([^;]+);base64,([\s\S]*)$/.exec(body.dataUrl || '');
         if (!m) { responderJson(res, 400, { ok: false, error: 'dataUrl inválido.' }); return; }
         var mimeType = m[1];
-        var ext = (mimeType.split('/')[1] || 'bin').split('+')[0].split(';')[0];
+        // Validação SERVER-SIDE (não confia no frontend): só tipos que a Meta aceita.
+        var MIME_OK = /^(image\/(jpeg|png|webp)|video\/(mp4|3gpp)|audio\/(aac|mp4|mpeg|amr|ogg|opus)|application\/pdf|text\/plain|application\/(msword|vnd\.(ms-excel|ms-powerpoint|openxmlformats-officedocument\.(spreadsheetml\.sheet|wordprocessingml\.document|presentationml\.presentation))))$/;
+        if (!MIME_OK.test(mimeType)) { responderJson(res, 400, { ok: false, error: 'Tipo de arquivo não permitido.' }); return; }
+        var buf;
+        try { buf = Buffer.from(m[2], 'base64'); } catch (e) { responderJson(res, 400, { ok: false, error: 'Base64 inválido.' }); return; }
+        if (buf.length > 20 * 1024 * 1024) { responderJson(res, 400, { ok: false, error: 'Arquivo acima de 20 MB.' }); return; }
+        var ext = (mimeType.split('/')[1] || 'bin').split('+')[0].split(';')[0].replace(/[^a-z0-9]/gi, '');
         if (!ext || ext.length > 5) ext = 'bin';
         var nome = 'wa_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + ext;
         try {
-          fs.writeFileSync(path.join(UPLOADS_DIR, nome), Buffer.from(m[2], 'base64'));
+          fs.writeFileSync(path.join(UPLOADS_DIR, nome), buf);
+          waDb.audit.log({ user_login: u.login, user_name: u.nome, action: 'Upload de mídia WhatsApp', details: mimeType + ' · ' + Math.round(buf.length / 1024) + ' KB', ip: waIpDaReq(req) });
           responderJson(res, 200, { ok: true, url: '/uploads/' + nome, mime_type: mimeType, filename: nome });
         } catch (e) { responderJson(res, 500, { ok: false, error: 'Falha no upload.' }); }
       });

@@ -477,8 +477,16 @@ function isValidPhoneNumber(phone) {
 /**
  * Normaliza um número de telefone para formato somente dígitos
  */
+// Normaliza o telefone para um formato único, evitando contatos duplicados
+// pelo mesmo número escrito de jeitos diferentes:
+//   "+55 11 99999-9999", "5511999999999", "(11) 99999-9999"  ->  "5511999999999"
+// Regra: tira tudo que não é dígito. Se for um número BR sem código do país
+// (DDD + 8/9 dígitos = 10 ou 11 dígitos), adiciona o "55". Números que já vêm
+// do WhatsApp chegam completos (12-13 dígitos), então não são alterados.
 function normalizePhone(phone) {
-  return String(phone).replace(/\D/g, '');
+  let d = String(phone == null ? '' : phone).replace(/\D/g, '');
+  if ((d.length === 10 || d.length === 11) && d[0] !== '0') d = '55' + d;
+  return d;
 }
 
 // Tamanhos máximos de mídia suportados pela API (em bytes)
