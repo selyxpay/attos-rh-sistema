@@ -169,10 +169,13 @@ function fileToBase64(file) {
       }
     } else {
       // Fallback caso security.js não tenha carregado
-      const allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf', 'webp'];
-      const extension = file.name.split('.').pop().toLowerCase();
-      if (!allowedExtensions.includes(extension)) {
-        return reject(new Error(`Formato inválido para "${file.name}". Apenas JPG, JPEG, PNG, PDF ou WEBP são aceitos.`));
+      const allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf', 'webp', 'heic', 'heif'];
+      const extension = (file.name.split('.').pop() || '').toLowerCase();
+      const tipoMime = (file.type || '').toLowerCase();
+      // Câmera do celular pode mandar HEIC ou arquivo sem extensão — vale o MIME real.
+      const mimeOk = tipoMime.startsWith('image/') || tipoMime === 'application/pdf';
+      if (!allowedExtensions.includes(extension) && !mimeOk) {
+        return reject(new Error(`Formato inválido para "${file.name || 'arquivo'}". Apenas JPG, PNG, PDF, WEBP ou HEIC (foto de celular) são aceitos.`));
       }
       const maxSize = 500 * 1024 * 1024; // 500 MB — sem limite prático
       if (file.size > maxSize) {
@@ -10197,8 +10200,10 @@ function podeExcluirEquipamento() {
 
 // ── Utilidades ────────────────────────────────────────────────────────────
 function _equipNomesItens(itens, outros) {
-  const lista = (itens || []).map(k => (k === 'outros' && outros) ? `Outros: ${outros}` : (EQUIP_ITENS[k] || k));
-  return lista.join(', ') || '—';
+  // Aceita array (normal), string única ou vazio — sem nunca quebrar.
+  const arr = Array.isArray(itens) ? itens : (itens ? [itens] : []);
+  const lista = arr.map(k => (k === 'outros' && outros) ? `Outros: ${outros}` : (EQUIP_ITENS[k] || k));
+  return lista.join(', ') || (outros ? `Outros: ${outros}` : '—');
 }
 function _equipBadgeTipo(tipo) {
   return tipo === 'devolucao'
@@ -10304,73 +10309,160 @@ function _equipListaFiltrada() {
   return state.equipamentos.filter(r => {
     if (tipo && r.tipo !== tipo) return false;
     if (estado && r.estado !== estado) return false;
-    if (item && !(r.equipamentos || []).includes(item)) return false;
+    // Normaliza equipamentos: pode ser array ou string separada por vírgula (registros importados)
+    let equipArr = r.equipamentos;
+    if (typeof equipArr === 'string') equipArr = equipArr.split(',').map(s => s.trim()).filter(Boolean);
+    if (!Array.isArray(equipArr)) equipArr = [];
+    if (item && !equipArr.includes(item)) return false;
     if (ini || fim) {
-      const d = new Date(r.dataCadastro || 0);
+      const d = new Date(r.dataCadastro || r.data || 0);
       if (isNaN(d)) return false;
       if (ini && d < ini) return false;
       if (fim && d > fim) return false;
     }
     if (busca) {
-      const alvo = `${r.nome || ''} ${r.cpf || ''} ${r.responsavel || ''}`.toLowerCase();
+      const alvo = `${r.nome || ''} ${r.nomeCompleto || ''} ${r.cpf || ''} ${r.responsavel || ''}`.toLowerCase();
       if (!alvo.includes(busca)) return false;
     }
     return true;
-  }).sort((a, b) => new Date(b.dataCadastro || 0) - new Date(a.dataCadastro || 0));
+  }).sort((a, b) => new Date(b.dataCadastro || b.data || 0) - new Date(a.dataCadastro || a.data || 0));
 }
 
+// À PROVA DE ERRO: esta lista é crítica (registros/fotos de equipamentos). Nunca
+// pode ficar em branco por causa de um filtro travado ou de UM registro com
+// formato estranho. Por isso: (1) se os filtros escondem tudo mas EXISTEM
+// registros, avisa e oferece "Limpar filtros"; (2) cada linha é montada dentro
+// de um try/catch — um registro problemático é isolado, não derruba a lista;
+// (3) qualquer falha geral cai num aviso que garante que os dados estão salvos;
+// (4) campos são normalizados antes de renderizar (aceita formatos legados).
 function _renderEquipLista() {
   const cont = document.getElementById('equip-lista-container');
   if (!cont) return;
-  const lista = _equipListaFiltrada();
+  try {
+    garantirEquipamentos();
+    const totalReal = (state.equipamentos || []).length;
 
-  if (!lista.length) {
-    cont.innerHTML = `
-      <div class="exame-empty-state">
-        <i class="fa-solid fa-boxes-packing"></i>
-        <p>Nenhum registro encontrado. ${podeCriarEquipamento() ? 'Clique em <strong>"Novo Registro"</strong> para começar.' : ''}</p>
-      </div>`;
-    return;
-  }
+    let lista;
+    try { lista = _equipListaFiltrada(); }
+    catch (e) { console.error('[Equip] filtro falhou — mostrando tudo:', e); lista = (state.equipamentos || []).slice(); }
 
-  cont.innerHTML = `
-    <div class="table-scroll-container">
-      <table class="excel-table">
-        <thead>
+    if (!lista.length) {
+      if (!totalReal) {
+        cont.innerHTML = `<div class="exame-empty-state"><i class="fa-solid fa-boxes-packing"></i>
+          <p>Nenhum registro ainda. ${podeCriarEquipamento() ? 'Clique em <strong>"+ Novo Registro"</strong> para começar.' : ''}</p></div>`;
+      } else {
+        // Há registros, mas os filtros atuais escondem todos → tranquiliza e oferece limpar
+        cont.innerHTML = `<div class="exame-empty-state"><i class="fa-solid fa-filter-circle-xmark" style="color:#d97706;"></i>
+          <p><strong>${totalReal}</strong> registro(s) existem no sistema, mas os <strong>filtros atuais</strong> estão escondendo todos.</p>
+          <button class="btn btn-primary" style="margin-top:12px;" onclick="limparFiltrosEquipamento()"><i class="fa-solid fa-eraser"></i> Limpar filtros e mostrar tudo</button></div>`;
+      }
+      return;
+    }
+
+    const p = n => String(n).padStart(2, '0');
+
+    // ─── Monta as linhas da tabela (desktop) E os cards (mobile) ───
+    const linhasDesktop = [];
+    const cardsMobile = [];
+
+    lista.forEach((r, idx) => {
+      try {
+        // Normaliza campos que podem vir em formato legado
+        const nome = String(r.nome || r.nomeCompleto || '—');
+        const cpf = String(r.cpf || '—');
+        const tipo = String(r.tipo || '');
+        const estado = String(r.estado || '');
+        const responsavel = String(r.responsavel || '—');
+        const regId = String(r.id || idx);
+        const fotos = Array.isArray(r.fotos) ? r.fotos : [];
+
+        // Normaliza equipamentos (pode vir como string separada por vírgula em registros importados)
+        let equipArr = r.equipamentos;
+        if (typeof equipArr === 'string') equipArr = equipArr.split(',').map(s => s.trim()).filter(Boolean);
+        if (!Array.isArray(equipArr)) equipArr = [];
+
+        const d = new Date(r.dataCadastro || r.data || 0);
+        const data = isNaN(d) ? '—' : `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+        const hora = isNaN(d) ? '—' : `${p(d.getHours())}:${p(d.getMinutes())}`;
+        const equipNomes = _equipNomesItens(equipArr, r.equipamentoOutros);
+
+        // Linha da tabela (desktop)
+        linhasDesktop.push(`
           <tr>
-            <th>Nome</th><th>CPF</th><th>Tipo</th><th>Equipamentos</th>
-            <th>Estado</th><th>Responsável</th><th>Data</th><th>Hora</th><th>Ação</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${lista.map(r => {
-            const d = new Date(r.dataCadastro || 0);
-            const p = n => String(n).padStart(2, '0');
-            const data = isNaN(d) ? '—' : `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
-            const hora = isNaN(d) ? '—' : `${p(d.getHours())}:${p(d.getMinutes())}`;
-            return `
-              <tr>
-                <td style="font-weight:600;">${escapeHTML(r.nome || '—')}
-                  ${r.candidatoId ? '<i class="fa-solid fa-link" title="Vinculado à ficha do colaborador" style="color:#059669;font-size:10px;margin-left:4px;"></i>' : ''}
-                </td>
-                <td>${escapeHTML(r.cpf || '—')}</td>
-                <td>${_equipBadgeTipo(r.tipo)}</td>
-                <td style="max-width:260px;">${escapeHTML(_equipNomesItens(r.equipamentos, r.equipamentoOutros))}</td>
-                <td>${_equipBadgeEstado(r.estado)}</td>
-                <td>${escapeHTML(r.responsavel || '—')}</td>
-                <td>${data}</td>
-                <td>${hora}</td>
-                <td>
-                  <button class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px;"
-                          onclick="abrirVerEquipamento('${r.id}')">
-                    <i class="fa-solid fa-eye"></i> Ver
-                  </button>
-                </td>
-              </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>`;
+            <td data-label="Nome" style="font-weight:600;">${escapeHTML(nome)}
+              ${r.candidatoId ? '<i class="fa-solid fa-link" title="Vinculado à ficha do colaborador" style="color:#059669;font-size:10px;margin-left:4px;"></i>' : ''}
+            </td>
+            <td data-label="CPF">${escapeHTML(cpf)}</td>
+            <td data-label="Tipo">${_equipBadgeTipo(tipo)}</td>
+            <td data-label="Equipamentos" style="max-width:260px;">${escapeHTML(equipNomes)}</td>
+            <td data-label="Estado">${_equipBadgeEstado(estado)}</td>
+            <td data-label="Responsável">${escapeHTML(responsavel)}</td>
+            <td data-label="Data">${data}</td>
+            <td data-label="Hora">${hora}</td>
+            <td data-label="Ação">
+              <button class="btn btn-secondary btn-sm" style="padding:4px 10px;font-size:12px;"
+                      onclick="abrirVerEquipamento('${escapeHTML(regId)}')">
+                <i class="fa-solid fa-eye"></i> Ver
+              </button>
+            </td>
+          </tr>`);
+
+        // Card mobile
+        cardsMobile.push(`
+          <div class="equip-card-mobile" onclick="abrirVerEquipamento('${escapeHTML(regId)}')">
+            <div class="equip-card-header">
+              <strong>${escapeHTML(nome)}</strong>
+              ${_equipBadgeTipo(tipo)}
+            </div>
+            <div class="equip-card-body">
+              <span><i class="fa-solid fa-id-card"></i> ${escapeHTML(cpf)}</span>
+              <span><i class="fa-solid fa-boxes-packing"></i> ${escapeHTML(equipNomes)}</span>
+              <span><i class="fa-solid fa-calendar"></i> ${data} ${hora}</span>
+              <span><i class="fa-solid fa-user"></i> ${escapeHTML(responsavel)}</span>
+              ${fotos.length ? '<span><i class="fa-solid fa-camera" style="color:#059669;"></i> ' + fotos.length + ' foto(s)</span>' : ''}
+            </div>
+            <div class="equip-card-footer">
+              ${_equipBadgeEstado(estado)}
+              <span style="font-size:11px;color:var(--text-secondary);">Toque para ver detalhes</span>
+            </div>
+          </div>`);
+      } catch (e) {
+        console.error('[Equip] registro com formato antigo (isolado, não some da lista):', r && r.id, e);
+        const nome = escapeHTML(String((r && (r.nome || r.nomeCompleto)) || 'Registro'));
+        const regId = escapeHTML(String(r && r.id));
+        linhasDesktop.push(`<tr><td data-label="Nome" style="font-weight:600;">${nome}</td>
+          <td data-label="Ação" colspan="8" style="color:#b45309;">Registro em formato antigo —
+          <button class="btn btn-sm btn-secondary" onclick="abrirVerEquipamento('${regId}')"><i class="fa-solid fa-eye"></i> abrir</button></td></tr>`);
+        cardsMobile.push(`
+          <div class="equip-card-mobile" onclick="abrirVerEquipamento('${regId}')">
+            <div class="equip-card-header"><strong>${nome}</strong></div>
+            <div class="equip-card-body"><span style="color:#b45309;">Registro em formato antigo — toque para abrir</span></div>
+          </div>`);
+      }
+    });
+
+    cont.innerHTML = `
+      <div class="equip-lista-info" style="font-size:12px;color:var(--text-secondary,#64748b);margin:2px 2px 8px;">${lista.length} de ${totalReal} registro(s)</div>
+      <div class="table-scroll-container equip-desktop-view">
+        <table class="excel-table equip-lista-table">
+          <thead>
+            <tr>
+              <th>Nome</th><th>CPF</th><th>Tipo</th><th>Equipamentos</th>
+              <th>Estado</th><th>Responsável</th><th>Data</th><th>Hora</th><th>Ação</th>
+            </tr>
+          </thead>
+          <tbody>${linhasDesktop.join('')}</tbody>
+        </table>
+      </div>
+      <div class="equip-mobile-view">${cardsMobile.join('')}</div>`;
+  } catch (e) {
+    // Rede de segurança final: nunca deixa a tela em branco e garante ao usuário que os dados estão salvos.
+    console.error('[Equip] falha geral ao renderizar a lista:', e);
+    const n = (state.equipamentos || []).length;
+    cont.innerHTML = `<div class="exame-empty-state"><i class="fa-solid fa-triangle-exclamation" style="color:#dc2626;"></i>
+      <p>Tivemos um problema ao montar a lista, mas <strong>seus ${n} registro(s) estão salvos</strong> — nada foi perdido.</p>
+      <button class="btn btn-primary" style="margin-top:12px;" onclick="limparFiltrosEquipamento()"><i class="fa-solid fa-rotate"></i> Tentar de novo</button></div>`;
+  }
 }
 
 // ── Formulário: abrir / fechar ────────────────────────────────────────────
@@ -10464,26 +10556,41 @@ async function processarFotosEquipamento(input) {
   input.value = '';
   if (!arquivos.length) return;
 
-  const permitidas = ['jpg', 'jpeg', 'png', 'pdf'];
+  // Aceita por extensão OU pelo tipo real (MIME). A câmera do celular (iPhone/Android)
+  // manda foto em HEIC/HEIF ou até sem extensão no nome — nesses casos vale o MIME.
+  const permitidas = ['jpg', 'jpeg', 'png', 'pdf', 'webp', 'heic', 'heif'];
+  const mimesOk = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'];
+  const extPorMime = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif', 'application/pdf': 'pdf' };
   for (const file of arquivos) {
     if (_equipFotos.length >= EQUIP_MAX_ARQUIVOS) {
       alert(`Você já anexou o máximo de ${EQUIP_MAX_ARQUIVOS} arquivos.`);
       break;
     }
+    const tipoMime = (file.type || '').toLowerCase();
     const ext = (file.name.split('.').pop() || '').toLowerCase();
-    if (!permitidas.includes(ext)) {
-      alert(`"${file.name}": só são aceitos JPG, JPEG, PNG ou PDF.`);
+    const extOk  = permitidas.includes(ext);
+    const mimeOk = tipoMime.startsWith('image/') || mimesOk.includes(tipoMime);
+    if (!extOk && !mimeOk) {
+      alert(`"${file.name || 'arquivo'}": só são aceitos JPG, PNG, PDF, WEBP ou HEIC (foto de celular).`);
       continue;
     }
     if (file.size > EQUIP_MAX_MB * 1024 * 1024) {
-      alert(`"${file.name}" tem ${(file.size / 1048576).toFixed(1)} MB. O limite é ${EQUIP_MAX_MB} MB por arquivo.`);
+      alert(`"${file.name || 'arquivo'}" tem ${(file.size / 1048576).toFixed(1)} MB. O limite é ${EQUIP_MAX_MB} MB por arquivo.`);
       continue;
     }
+    // Nome amigável quando a câmera manda arquivo sem nome/extensão utilizável.
+    let nomeArq = file.name || '';
+    if (!extOk) {
+      const extBoa = extPorMime[tipoMime] || (tipoMime.startsWith('image/') ? (tipoMime.split('/')[1] || 'jpg') : 'jpg');
+      if (!nomeArq || nomeArq.indexOf('.') === -1) {
+        nomeArq = `foto-${Date.now()}.${extBoa}`;
+      }
+    }
     try {
-      const base64 = await fileToBase64(file);   // valida extensão, tamanho e cabeçalho real
-      _equipFotos.push({ nome: file.name, arquivo: base64 });
+      const base64 = await fileToBase64(file);   // valida tamanho e cabeçalho real (magic bytes)
+      _equipFotos.push({ nome: nomeArq, arquivo: base64 });
     } catch (e) {
-      alert(`Não foi possível anexar "${file.name}": ${e.message || e}`);
+      alert(`Não foi possível anexar "${nomeArq || 'arquivo'}": ${e.message || e}`);
     }
   }
   _renderPreviewFotosEquip();

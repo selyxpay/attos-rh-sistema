@@ -413,15 +413,23 @@ function _lerMagicBytes(file, count = 12) {
  * @returns {Promise<{ valido: boolean, mensagem: string, tipoDetectado: string|null }>}
  */
 async function validarArquivoSeguro(file) {
-  // 1. Verifica extensão
-  const extensoesPermitidas = ['jpg', 'jpeg', 'png', 'pdf', 'webp'];
-  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  // 1. Verifica extensão (aceita também HEIC/HEIF das fotos de iPhone)
+  const extensoesPermitidas = ['jpg', 'jpeg', 'png', 'pdf', 'webp', 'heic', 'heif'];
+  const mimesPermitidos = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif', 'application/pdf': 'pdf' };
+  let ext = (file.name.split('.').pop() || '').toLowerCase();
   if (!extensoesPermitidas.includes(ext)) {
-    return {
-      valido: false,
-      mensagem: `Tipo de arquivo não permitido. Aceitos: JPG, PNG, PDF, WEBP. Arquivo enviado: .${ext}`,
-      tipoDetectado: null
-    };
+    // Câmera do celular às vezes manda arquivo SEM extensão válida no nome.
+    // Nesse caso, confia no tipo real (MIME) informado pelo navegador.
+    const tipoMime = (file.type || '').toLowerCase();
+    if (mimesPermitidos[tipoMime]) {
+      ext = mimesPermitidos[tipoMime];
+    } else {
+      return {
+        valido: false,
+        mensagem: `Tipo de arquivo não permitido. Aceitos: JPG, PNG, PDF, WEBP, HEIC. Arquivo enviado: .${ext}`,
+        tipoDetectado: null
+      };
+    }
   }
 
   // 2. Verifica tamanho máximo (5MB para documentos, 2MB para selfies)
@@ -456,6 +464,14 @@ async function validarArquivoSeguro(file) {
       }
     }
 
+    // HEIC/HEIF (fotos de iPhone): caixa 'ftyp' (66747970) nos bytes 4-7 e uma
+    // marca conhecida nos bytes 8-11 (heic/heix/mif1/hevc/...).
+    if (!tipoDetectado && hex.slice(8, 16) === '66747970') {
+      const marca = hex.slice(16, 24);
+      const marcasHeic = ['68656963', '68656978', '6d696631', '6d736631', '68657663', '68657678', '6865696d', '68656973', '6865766d', '68657673'];
+      if (marcasHeic.includes(marca)) tipoDetectado = 'image/heic';
+    }
+
     // Verificação especial para WebP (tem estrutura RIFF????WEBP)
     if (!tipoDetectado && hex.startsWith('52494646') && hex.slice(16, 24) === '57454250') {
       tipoDetectado = 'image/webp';
@@ -475,6 +491,8 @@ async function validarArquivoSeguro(file) {
       'jpeg': 'image/jpeg',
       'png':  'image/png',
       'webp': 'image/webp',
+      'heic': 'image/heic',
+      'heif': 'image/heic',
       'pdf':  'application/pdf'
     };
     const tipoEsperado = extParaTipo[ext];

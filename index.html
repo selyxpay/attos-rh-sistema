@@ -35,16 +35,16 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260725d">
+    <link rel="stylesheet" href="css/style.css?v=20260801a">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260725d">
+    <link rel="stylesheet" href="css/design-system.css?v=20260801a">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260725d">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260801a">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260725d">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260725d">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260801a">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260801a">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260725d">
+    <link rel="stylesheet" href="css/mobile.css?v=20260801a">
 </head>
 <body>
 
@@ -1637,14 +1637,16 @@
                                     <label>📷 Protocolo / Equipamento *</label>
                                     <div class="equip-upload-box">
                                         <div class="equip-upload-botoes">
-                                            <button type="button" class="btn btn-success"
-                                                    onclick="document.getElementById('input-camera-equip').click()">
+                                            <!-- LABEL nativo: repassa o toque diretamente ao <input>,
+                                                 sem usar .click() por JS. Isso garante que Safari iOS,
+                                                 Chrome Android e todos os navegadores abram a câmera
+                                                 ou galeria sem bloqueio de segurança. -->
+                                            <label class="btn btn-success equip-upload-label" for="input-camera-equip">
                                                 <i class="fa-solid fa-camera"></i> Tirar foto
-                                            </button>
-                                            <button type="button" class="btn btn-outline"
-                                                    onclick="document.getElementById('input-fotos-equip').click()">
+                                            </label>
+                                            <label class="btn btn-outline equip-upload-label" for="input-fotos-equip">
                                                 <i class="fa-solid fa-folder-open"></i> Escolher arquivo
-                                            </button>
+                                            </label>
                                         </div>
                                         <div id="equip-upload-hint" style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:8px;">
                                             Obrigatório. Até 20 arquivos, 20 MB cada. JPG, JPEG, PNG ou PDF.
@@ -3718,11 +3720,11 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260725d"></script>
-    <script src="js/vps-sync.js?v=20260725d"></script>
-    <script src="js/exata-catalogo.js?v=20260725d"></script>
-    <script src="js/data.js?v=20260725d"></script>
-    <script src="js/app.js?v=20260725d"></script>
-    <script src="js/whatsapp.js?v=20260725d"></script>
+    <script src="js/security.js?v=20260801a"></script>
+    <script src="js/vps-sync.js?v=20260801a"></script>
+    <script src="js/exata-catalogo.js?v=20260801a"></script>
+    <script src="js/data.js?v=20260801a"></script>
+    <script src="js/app.js?v=20260801a"></script>
+    <script src="js/whatsapp.js?v=20260801a"></script>
 </body>
 </html>
