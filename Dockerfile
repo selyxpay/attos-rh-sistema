@@ -22,6 +22,8 @@ COPY server.cjs ./
 # Proteção dos dados críticos de Equipamentos (guarda anti-sumiço + espelho).
 # Sem estes arquivos o sistema sobe, mas SEM a rede de segurança.
 COPY equipamentos-protecao.cjs restaurar-equipamentos.cjs ./
+# Ferramentas de diagnostico e backup (somente leitura / nao destrutivas).
+COPY verificar-sistema.cjs backup-dados.cjs ./
 # Módulo WhatsApp (API Oficial da Meta). Se faltar, o servidor sobe do mesmo
 # jeito e só o WhatsApp responde 503 — o resto do sistema não é afetado.
 COPY whatsapp-db.cjs whatsapp-api.cjs whatsapp-webhook.cjs ./
