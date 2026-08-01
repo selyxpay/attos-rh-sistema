@@ -357,48 +357,12 @@
 }
 
 /* ==========================================================================
-   EQUIPAMENTOS — lista vira CARDS no celular (mais fácil de usar que tabela).
-   Desktop (>768px) não muda: continua tabela. Usa os data-label das colunas.
-   .table-scroll-container .equip-lista-table vence o .excel-table por
-   especificidade, então a conversão em cards funciona no mobile.
+   EQUIPAMENTOS no celular
+   --------------------------------------------------------------------------
+   A lista de Entrega/Devolução vira CARDS no celular, mas isso NÃO é feito
+   aqui: o próprio JS monta dois blocos (.equip-desktop-view com a tabela e
+   .equip-mobile-view com os cards) e o css/style.css troca um pelo outro em
+   até 768px. Cards de verdade ficam melhores do que forçar a tabela a virar
+   card via CSS, então esta folha não mexe mais em .equip-lista-table — para
+   não existirem dois tratamentos brigando pelo mesmo elemento.
    ========================================================================== */
-@media (max-width: 768px) {
-  .table-scroll-container:has(.equip-lista-table),
-  .equip-lista-table { overflow: visible !important; }
-  .table-scroll-container .equip-lista-table { display: block !important; min-width: 0 !important; width: 100% !important; border: none !important; }
-  .equip-lista-table thead { display: none !important; }
-  .equip-lista-table tbody { display: block !important; }
-  .equip-lista-table tr {
-    display: block !important;
-    border: 1px solid var(--border-color, #e2e8f0);
-    border-radius: 12px;
-    margin-bottom: 10px;
-    padding: 6px 12px;
-    background: var(--card-bg, #fff);
-    box-shadow: 0 1px 2px rgba(0,0,0,.05);
-  }
-  .equip-lista-table td {
-    display: flex !important;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    padding: 7px 0 !important;
-    border: none !important;
-    border-bottom: 1px solid var(--border-color, #f1f5f9) !important;
-    text-align: right;
-    max-width: none !important;
-    white-space: normal !important;
-  }
-  .equip-lista-table tr td:last-child { border-bottom: none !important; }
-  .equip-lista-table td::before {
-    content: attr(data-label);
-    font-weight: 700;
-    color: var(--text-secondary, #64748b);
-    font-size: 12px;
-    text-align: left;
-    flex-shrink: 0;
-  }
-  .equip-lista-table td[data-label="Ação"] { justify-content: center; padding-top: 10px !important; }
-  .equip-lista-table td[data-label="Ação"]::before { display: none; }
-  .equip-lista-table td[data-label="Ação"] .btn { width: 100%; min-height: 40px; }
-}

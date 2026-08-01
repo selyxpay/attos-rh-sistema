@@ -4421,6 +4421,82 @@ input.form-control[type="date"] {
 }
 .equip-upload-botoes .btn { width: 100%; justify-content: center; }
 
+/* Labels que funcionam como botão para upload (compatível com celular) */
+.equip-upload-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    text-align: center;
+}
+
+/* ── Equipamentos: Cards Mobile ────────────────────────────────────────── */
+.equip-mobile-view { display: none; }
+.equip-desktop-view { display: block; }
+
+@media (max-width: 768px) {
+    .equip-mobile-view { display: flex; flex-direction: column; gap: 10px; }
+    .equip-desktop-view { display: none !important; }
+}
+
+.equip-card-mobile {
+    background: var(--surface-card, #fff);
+    border: 1px solid var(--border-color, rgba(0,0,0,.08));
+    border-radius: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: box-shadow .15s, border-color .15s;
+}
+.equip-card-mobile:hover,
+.equip-card-mobile:active {
+    box-shadow: 0 4px 16px rgba(0,0,0,.08);
+    border-color: var(--primary, #2563EB);
+}
+.equip-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.equip-card-header strong {
+    font-size: 14px;
+    color: var(--color-text-title, #0F172A);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+.equip-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 12.5px;
+    color: var(--text-secondary, #64748B);
+}
+.equip-card-body span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.equip-card-body i {
+    width: 14px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--primary, #2563EB);
+}
+.equip-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color, rgba(0,0,0,.06));
+}
+
 /* ── Importador de registros antigos (Forms + Drive) ───────────────────── */
 .imp-passo { margin-bottom: 22px; }
 .imp-passo h4 {
