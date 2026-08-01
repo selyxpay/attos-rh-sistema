@@ -42,6 +42,18 @@ const LIMITE_CORPO = 48 * 1024 * 1024;  // 48 MB. O corpo inteiro e montado na M
 try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (e) {}
 try { fs.mkdirSync(BACKUP_DIR, { recursive: true }); } catch (e) {}
 
+// Rede de proteção dos dados críticos (Entrega/Devolução de Equipamentos).
+// Módulo isolado: se ele falhar, o sistema continua salvando normalmente.
+let equipProtecao = null;
+try {
+  equipProtecao = require('./equipamentos-protecao.cjs');
+  equipProtecao.iniciar(DATA_DIR);
+  console.log('[Equip-Proteção] ativa em:', path.join(DATA_DIR, 'equipamentos'));
+} catch (e) {
+  console.error('[Equip-Proteção] não carregou (sistema segue normal):', e.message);
+  equipProtecao = null;
+}
+
 console.log('BASE:', BASE);
 console.log('DATA_DIR:', DATA_DIR);
 
@@ -148,6 +160,13 @@ function gravarEstado(obj) {
   const tmp = STATE_FILE + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(obj));
   fs.renameSync(tmp, STATE_FILE); // troca atômica: nunca deixa arquivo pela metade
+  // Espelho independente dos equipamentos (cópia própria + snapshot). Fica
+  // DEPOIS da gravação e em try/catch: nunca pode atrapalhar o save principal.
+  if (equipProtecao) {
+    try { equipProtecao.espelhar(obj && obj.dados); } catch (e) {
+      console.error('[Equip-Proteção] espelho falhou (dados principais estão salvos):', e.message);
+    }
+  }
 }
 
 // ── BACKUP AUTOMÁTICO (rede de segurança contra perda de dados) ─────────────
@@ -965,6 +984,21 @@ http.createServer(function (req, res) {
             const a = antigos[f.id];
             if (a) { if (a.senhaVisivel !== undefined) f.senhaVisivel = a.senhaVisivel; else delete f.senhaVisivel; }
           });
+        }
+        // GUARDA ANTI-SUMIÇO: última barreira antes de gravar. Se este save
+        // faria vários registros críticos (equipamentos, candidatos...) sumirem
+        // de uma vez, eles são devolvidos; exclusão pontual segue funcionando,
+        // mas com cópia arquivada. Nunca derruba o save.
+        if (equipProtecao) {
+          try {
+            const prot = equipProtecao.protegerSave(atual.dados || {}, dados);
+            dados = prot.dados;
+            (prot.avisos || []).forEach(function (a) {
+              console.log('[Equip-Proteção] ' + a.lista + ': ' + a.acao + ' — ' + a.detalhe);
+            });
+          } catch (e) {
+            console.error('[Equip-Proteção] guarda falhou (save segue normal):', e.message);
+          }
         }
         const novo = { dados: dados, version: (atual.version || 0) + 1, atualizadoEm: Date.now() };
         try { gravarEstado(novo); responderJson(res, 200, { ok: true, version: novo.version }); }
