@@ -361,14 +361,22 @@ function garantirAdminServidor() {
       gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
     }
 
-    // Exibe lista amigável de usuários e senhas para o desenvolvedor local no console
-    console.log('\n==================================================');
-    console.log('CONTAS E SENHAS DISPONÍVEIS NO SERVIDOR:');
-    d.funcionarios.forEach(function (f) {
-      const senhaExibida = f.login === 'admin' ? 'gruport07072026' : (f.senha.length === 64 ? '(SHA-256)' : f.senha);
-      console.log(` - Login: ${f.login.padEnd(12)} | Senha: ${senhaExibida.padEnd(18)} | Departamento: ${f.departamento}`);
-    });
-    console.log('==================================================\n');
+    // Lista de contas no console — APENAS em desenvolvimento.
+    // Em produção (NODE_ENV=production, como no Coolify) as senhas NUNCA são
+    // impressas: o log do painel fica visível para quem tem acesso ao Coolify
+    // e ficaria guardado no histórico de logs.
+    if (process.env.NODE_ENV === 'production') {
+      console.log('[RT] ' + d.funcionarios.length + ' conta(s) de acesso carregada(s). ' +
+                  '(As senhas não são exibidas em produção.)');
+    } else {
+      console.log('\n==================================================');
+      console.log('CONTAS E SENHAS (somente ambiente de desenvolvimento):');
+      d.funcionarios.forEach(function (f) {
+        const senhaExibida = f.senha && f.senha.length === 64 ? '(SHA-256)' : (f.senha || '');
+        console.log(` - Login: ${f.login.padEnd(12)} | Senha: ${senhaExibida.padEnd(18)} | Departamento: ${f.departamento}`);
+      });
+      console.log('==================================================\n');
+    }
   });
 }
 
@@ -1578,6 +1586,72 @@ http.createServer(function (req, res) {
   });
 }).listen(PORT, '0.0.0.0', function () {
   console.log('Servidor R&T em: http://localhost:' + PORT);
-  console.log('Dados na VPS ativos (state.json + uploads). Sem Firebase. Login exigido no servidor.');
+  console.log('Dados na VPS ativos (state.json + uploads). Login exigido no servidor.');
   try { garantirAdminServidor(); } catch (e) { console.error('garantirAdminServidor:', e); }
+  // O resumo entra na MESMA fila do garantirAdminServidor (comTrava), então
+  // só roda depois que a carga inicial terminou — senão mostraria zero em tudo.
+  comTrava(function () {
+    try { resumoDosDados(); } catch (e) { console.error('resumoDosDados:', e); }
+  });
 });
+
+// ==========================================================================
+// RESUMO DOS DADOS NO BOOT
+// --------------------------------------------------------------------------
+// Mostra, já no log de inicialização, QUANTOS registros o servidor encontrou.
+// Serve como alarme imediato no deploy: se o volume persistente da VPS não
+// estiver montado em DATA_DIR, o container sobe vazio e isto aparece na hora
+// ("0 registro(s)" + aviso), em vez de o problema ser descoberto depois.
+// ==========================================================================
+function resumoDosDados() {
+  const st = lerEstado();
+  const d = st.dados || {};
+  const conta = function (k) { return Array.isArray(d[k]) ? d[k].length : 0; };
+  const equipamentos = conta('equipamentos');
+  let fotosEquip = 0;
+  (Array.isArray(d.equipamentos) ? d.equipamentos : []).forEach(function (r) {
+    if (Array.isArray(r && r.fotos)) fotosEquip += r.fotos.length;
+  });
+  let arquivos = 0;
+  try { arquivos = fs.readdirSync(UPLOADS_DIR).length; } catch (e) {}
+
+  console.log('');
+  console.log('=== DADOS ENCONTRADOS EM ' + DATA_DIR + ' ===');
+  console.log('  versão do estado ..... ' + (st.version || 0));
+  console.log('  Equipamentos ......... ' + equipamentos + ' registro(s), ' + fotosEquip + ' foto(s)');
+  console.log('  Candidatos ........... ' + conta('candidatos'));
+  console.log('  Funcionários ......... ' + conta('funcionarios'));
+  console.log('  Contratações ......... ' + conta('contratacoes'));
+  console.log('  Fluxos financeiros ... ' + conta('fluxosFinanceiros'));
+  console.log('  Arquivos em uploads/ . ' + arquivos);
+
+  // Senhas fracas: as contas de exemplo do js/data.js ('123', 'clinica123'...)
+  // estão no repositório do GitHub. Se alguém nunca trocou, essas senhas valem
+  // no sistema no ar. Avisa quem precisa trocar SEM imprimir a senha.
+  try {
+    const fracas = ['123', '1234', '12345', '123456', 'senha', 'admin', 'clinica123', 'gruport07072026'];
+    const hashesFracos = {};
+    fracas.forEach(function (s) { hashesFracos[hashSenhaServer(s)] = true; });
+    const emRisco = (Array.isArray(d.funcionarios) ? d.funcionarios : [])
+      .filter(function (f) {
+        const s = String(f && f.senha || '');
+        return fracas.indexOf(s) >= 0 || hashesFracos[s] === true;
+      })
+      .map(function (f) { return f.login; });
+    if (emRisco.length) {
+      console.warn('  *** SENHAS FRACAS em: ' + emRisco.join(', '));
+      console.warn('  *** Essas senhas de exemplo estão no código no GitHub. Troque em Funcionários.');
+    }
+  } catch (e) {}
+
+  // Primeiro boot legítimo tem versão 0/1 e nada gravado. Já um estado que
+  // "existe" mas veio sem os registros é o sintoma clássico de volume perdido.
+  if ((st.version || 0) > 1 && equipamentos === 0 && conta('candidatos') === 0) {
+    console.warn('');
+    console.warn('  *** ATENÇÃO: o sistema já foi usado antes (versão ' + st.version + '), mas está SEM registros.');
+    console.warn('  *** Isso costuma significar que o volume persistente NÃO está montado em ' + DATA_DIR + '.');
+    console.warn('  *** NÃO cadastre nada por cima. Confira o volume no Coolify e restaure o backup:');
+    console.warn('  ***   node restaurar-equipamentos.cjs');
+  }
+  console.log('');
+}

@@ -8,10 +8,6 @@ data
 server-data
 .data
 *.md
-nginx.conf
-firebase.json
-.firebaserc
-firebase-setup.md
 *.bat
 _*
 .DS_Store
