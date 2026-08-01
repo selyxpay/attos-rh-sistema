@@ -431,9 +431,20 @@ function filtrarSenhaVisivel(dados) {
 // ==========================================================================
 // MÓDULO WHATSAPP — INICIALIZAÇÃO
 // ==========================================================================
-const waDb      = require('./whatsapp-db.cjs');
-const waApi     = require('./whatsapp-api.cjs');
-const waWebhook = require('./whatsapp-webhook.cjs');
+// ISOLAMENTO: o WhatsApp é um módulo à parte e NUNCA pode derrubar o resto do
+// sistema. Se o sql.js não estiver instalado ou um arquivo do módulo falhar, o
+// servidor sobe do mesmo jeito — Vagas, Seleção, DP, Equipamentos e Financeiro
+// continuam funcionando e só o WhatsApp fica indisponível (responde 503).
+let waDb = null, waApi = null, waWebhook = null, _waCarregado = false;
+try {
+  waDb      = require('./whatsapp-db.cjs');
+  waApi     = require('./whatsapp-api.cjs');
+  waWebhook = require('./whatsapp-webhook.cjs');
+  _waCarregado = true;
+} catch (e) {
+  console.error('[WhatsApp] Módulo NÃO carregou (o resto do sistema segue normal):', e.message);
+  console.error('[WhatsApp] Se quiser usar o WhatsApp, rode: npm install');
+}
 
 // Variáveis de ambiente do WhatsApp
 const WA_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || '';
@@ -451,6 +462,7 @@ function notifySSEClients(data) {
 // Inicializa o banco de dados WhatsApp (assíncrono)
 let _waReady = false;
 (async function initWhatsApp() {
+  if (!_waCarregado) return;              // módulo não carregou: fica desligado, sistema segue
   try {
     await waDb.init(DATA_DIR);
     _waReady = true;
@@ -1045,6 +1057,7 @@ http.createServer(function (req, res) {
 
   // ---- WEBHOOK: Verificação (GET) — pública, sem login ----
   if (urlPath === '/webhooks/whatsapp' && req.method === 'GET') {
+    if (!_waCarregado) { responderJson(res, 503, { error: 'Módulo WhatsApp indisponível.' }); return; }
     if (!WA_VERIFY_TOKEN) { responderJson(res, 500, { error: 'WHATSAPP_VERIFY_TOKEN não configurado.' }); return; }
     waWebhook.handleVerification(req, res, WA_VERIFY_TOKEN);
     return;
@@ -1052,6 +1065,7 @@ http.createServer(function (req, res) {
 
   // ---- WEBHOOK: Recepção de eventos (POST) — pública, validada por assinatura ----
   if (urlPath === '/webhooks/whatsapp' && req.method === 'POST') {
+    if (!_waCarregado) { res.writeHead(503); res.end('WhatsApp indisponivel'); return; }
     lerCorpoBruto(req, function (err, rawBody) {
       if (err) { res.writeHead(400); res.end('Bad Request'); return; }
       // Valida assinatura
