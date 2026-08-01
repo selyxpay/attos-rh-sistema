@@ -8,8 +8,72 @@
 // ==========================================================================
 'use strict';
 
-const path = require('path');
-const fs   = require('fs');
+const path   = require('path');
+const fs     = require('fs');
+const crypto = require('crypto');
+
+// ==========================================================================
+// ACCESS TOKEN CIFRADO EM REPOUSO
+// --------------------------------------------------------------------------
+// O Access Token da Meta é a credencial mais sensível do módulo: com ele,
+// alguém consegue mandar mensagem em nome da empresa. Ele nunca sai para o
+// navegador, mas ficava em texto puro dentro do whatsapp.db — quem copiasse
+// um backup do arquivo leria o token.
+//
+// Agora, se WHATSAPP_CRYPTO_KEY estiver definida no .env, o token é gravado
+// cifrado (AES-256-GCM, com IV novo a cada gravação e selo de integridade).
+//
+// COMPATIBILIDADE: token gravado antes, em texto puro, continua funcionando
+// (a leitura reconhece os dois formatos). Sem a chave no .env, o
+// comportamento é exatamente o de antes — nada quebra.
+//
+// Gerar a chave:  node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+// ==========================================================================
+const _MARCA_CIFRADO = 'enc:v1:';
+
+function _chaveCripto() {
+  const bruta = process.env.WHATSAPP_CRYPTO_KEY || '';
+  if (!bruta) return null;
+  // Aceita hex de 64 caracteres (32 bytes) ou qualquer texto (vira hash de 32 bytes)
+  if (/^[0-9a-fA-F]{64}$/.test(bruta)) return Buffer.from(bruta, 'hex');
+  return crypto.createHash('sha256').update(bruta, 'utf8').digest();
+}
+
+function cifrarToken(texto) {
+  if (!texto) return '';
+  const chave = _chaveCripto();
+  if (!chave) return texto;                       // sem chave: comportamento antigo
+  try {
+    const iv = crypto.randomBytes(12);
+    const c = crypto.createCipheriv('aes-256-gcm', chave, iv);
+    const dados = Buffer.concat([c.update(String(texto), 'utf8'), c.final()]);
+    const selo = c.getAuthTag();
+    return _MARCA_CIFRADO + iv.toString('base64') + ':' + selo.toString('base64') + ':' + dados.toString('base64');
+  } catch (e) {
+    console.error('[WhatsApp] Falha ao cifrar o token (gravando como estava):', e.message);
+    return texto;
+  }
+}
+
+function decifrarToken(valor) {
+  if (!valor || typeof valor !== 'string') return valor || '';
+  if (valor.indexOf(_MARCA_CIFRADO) !== 0) return valor;   // token antigo, texto puro
+  const chave = _chaveCripto();
+  if (!chave) {
+    console.error('[WhatsApp] Token está cifrado, mas WHATSAPP_CRYPTO_KEY não está no .env. ' +
+                  'Reponha a chave para o envio de mensagens voltar a funcionar.');
+    return '';
+  }
+  try {
+    const p = valor.slice(_MARCA_CIFRADO.length).split(':');
+    const d = crypto.createDecipheriv('aes-256-gcm', chave, Buffer.from(p[0], 'base64'));
+    d.setAuthTag(Buffer.from(p[1], 'base64'));
+    return Buffer.concat([d.update(Buffer.from(p[2], 'base64')), d.final()]).toString('utf8');
+  } catch (e) {
+    console.error('[WhatsApp] Não consegui decifrar o token (chave trocada?):', e.message);
+    return '';
+  }
+}
 
 let _db = null;
 let _dbPath = '';
@@ -311,17 +375,17 @@ const accounts = {
       `INSERT INTO whatsapp_accounts (phone_number_id, waba_id, display_phone, business_name, status, access_token_enc, webhook_secret, created_by, responsavel_login, responsavel_nome, ativo)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [data.phone_number_id || '', data.waba_id || '', data.display_phone || '', data.business_name || '',
-       data.status || 'pendente', data.access_token_enc || '', data.webhook_secret || '', data.created_by || '',
+       data.status || 'pendente', cifrarToken(data.access_token_enc || ''), data.webhook_secret || '', data.created_by || '',
        data.responsavel_login || '', data.responsavel_nome || '', (data.ativo === undefined ? 1 : (data.ativo ? 1 : 0))]
     );
   },
 
   getById(id) {
-    return getOne('SELECT * FROM whatsapp_accounts WHERE id = ?', [id]);
+    return _comTokenAberto(getOne('SELECT * FROM whatsapp_accounts WHERE id = ?', [id]));
   },
 
   getByPhoneNumberId(phoneNumberId) {
-    return getOne('SELECT * FROM whatsapp_accounts WHERE phone_number_id = ?', [phoneNumberId]);
+    return _comTokenAberto(getOne('SELECT * FROM whatsapp_accounts WHERE phone_number_id = ?', [phoneNumberId]));
   },
 
   list() {
@@ -338,7 +402,11 @@ const accounts = {
     const fields = [];
     const values = [];
     ['phone_number_id', 'waba_id', 'display_phone', 'business_name', 'status', 'access_token_enc', 'webhook_secret', 'last_sync_at', 'responsavel_login', 'responsavel_nome', 'last_error'].forEach(f => {
-      if (data[f] !== undefined) { fields.push(f + ' = ?'); values.push(data[f]); }
+      if (data[f] !== undefined) {
+        fields.push(f + ' = ?');
+        // O token vai cifrado para o banco; os demais campos, como estão.
+        values.push(f === 'access_token_enc' ? cifrarToken(data[f]) : data[f]);
+      }
     });
     if (data.ativo !== undefined) { fields.push('ativo = ?'); values.push(data.ativo ? 1 : 0); }
     if (fields.length === 0) return;
@@ -349,13 +417,23 @@ const accounts = {
 
   getAccessToken(id) {
     const row = getOne('SELECT access_token_enc FROM whatsapp_accounts WHERE id = ?', [id]);
-    return row ? row.access_token_enc : null;
+    return row ? decifrarToken(row.access_token_enc) : null;
   },
 
   getFirstActive() {
-    return getOne("SELECT * FROM whatsapp_accounts WHERE status IN ('connected', 'active') ORDER BY id LIMIT 1");
+    return _comTokenAberto(getOne("SELECT * FROM whatsapp_accounts WHERE status IN ('connected', 'active') ORDER BY id LIMIT 1"));
   }
 };
+
+// Devolve a conta com o token já decifrado em access_token_enc, do jeito que o
+// resto do servidor espera. Uso INTERNO (envio de mensagem, teste de conexão) —
+// esta linha nunca é enviada ao navegador; para o navegador existe o list(),
+// que só informa has_token.
+function _comTokenAberto(conta) {
+  if (!conta) return conta;
+  if (conta.access_token_enc) conta.access_token_enc = decifrarToken(conta.access_token_enc);
+  return conta;
+}
 
 // ==========================================================================
 // OPERAÇÕES: CONTATOS
