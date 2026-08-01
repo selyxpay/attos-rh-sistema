@@ -35,16 +35,16 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260801a">
+    <link rel="stylesheet" href="css/style.css?v=20260801b">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260801a">
+    <link rel="stylesheet" href="css/design-system.css?v=20260801b">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260801a">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260801b">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260801a">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260801a">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260801b">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260801b">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260801a">
+    <link rel="stylesheet" href="css/mobile.css?v=20260801b">
 </head>
 <body>
 
@@ -1649,7 +1649,7 @@
                                             </label>
                                         </div>
                                         <div id="equip-upload-hint" style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:8px;">
-                                            Obrigatório. Até 20 arquivos, 20 MB cada. JPG, JPEG, PNG ou PDF.
+                                            Obrigatório. Até 20 arquivos, 20 MB cada. Fotos do celular (JPG, PNG, HEIC) ou PDF.
                                         </div>
                                         <div id="equip-fotos-preview" class="equip-fotos-preview"><!-- previews por JS --></div>
                                     </div>
@@ -1788,7 +1788,10 @@
                      "Salvar" recusava o registro. A classe abaixo esconde sem tirar do fluxo. -->
                 <input type="file" id="input-camera-equip" accept="image/*" capture="environment"
                        class="input-arquivo-oculto" onchange="processarFotosEquipamento(this)">
-                <input type="file" id="input-fotos-equip" accept=".jpg,.jpeg,.png,.pdf" multiple
+                <!-- accept por TIPO (image/*), não por extensão: a galeria do iPhone guarda
+                     as fotos em HEIC e uma lista de extensões deixaria essas fotos
+                     bloqueadas (cinzas) na hora de escolher. -->
+                <input type="file" id="input-fotos-equip" accept="image/*,application/pdf" multiple
                        class="input-arquivo-oculto" onchange="processarFotosEquipamento(this)">
 
                 <!-- ABA: EXAME MÉDICO -->
@@ -3720,11 +3723,11 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260801a"></script>
-    <script src="js/vps-sync.js?v=20260801a"></script>
-    <script src="js/exata-catalogo.js?v=20260801a"></script>
-    <script src="js/data.js?v=20260801a"></script>
-    <script src="js/app.js?v=20260801a"></script>
-    <script src="js/whatsapp.js?v=20260801a"></script>
+    <script src="js/security.js?v=20260801b"></script>
+    <script src="js/vps-sync.js?v=20260801b"></script>
+    <script src="js/exata-catalogo.js?v=20260801b"></script>
+    <script src="js/data.js?v=20260801b"></script>
+    <script src="js/app.js?v=20260801b"></script>
+    <script src="js/whatsapp.js?v=20260801b"></script>
 </body>
 </html>
