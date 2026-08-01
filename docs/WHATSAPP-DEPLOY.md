@@ -58,6 +58,7 @@ WHATSAPP_APP_SECRET=chave_secreta_do_app_meta
 
 - **WHATSAPP_VERIFY_TOKEN**: string aleatória que você escolhe. A MESMA vai no Meta Developer.
 - **WHATSAPP_APP_SECRET**: vem do Meta Developer (Configurações do App → Básico → Chave Secreta). Valida a assinatura dos webhooks.
+- **WHATSAPP_CRYPTO_KEY** (recomendado): cifra o Access Token dentro do banco. Gere com o mesmo comando do verify token. Com ela, quem copiar o `whatsapp.db` **não consegue ler** os tokens. Guarde a chave: se ela for perdida, é só recadastrar os tokens em *WhatsApp → Conexões* (nenhum outro dado é afetado).
 - O **Access Token, Phone Number ID e WABA ID** NÃO vão no `.env` — são cadastrados dentro do sistema em **WhatsApp → Conexões** e ficam salvos no banco.
 
 O `server.cjs` lê o `.env` automaticamente na inicialização. O arquivo `.env` **nunca** vai para o Git (já está no `.gitignore`).
