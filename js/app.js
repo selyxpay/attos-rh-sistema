@@ -12478,18 +12478,31 @@ function _ffRenderLista() {
   // Filtro dinâmico por busca rápida e empresa
   if (_ffFiltroBusca) {
     const q = _ffFiltroBusca.toLowerCase();
+    // Busca também por tomador e cliente dos vínculos (fluxos antigos, que só
+    // têm empresaNome, continuam sendo encontrados pelo mesmo caminho de antes).
     lista = lista.filter(f => (f.numero && f.numero.includes(q)) ||
       (f.empresaNome && f.empresaNome.toLowerCase().includes(q)) ||
       (f.tipo && f.tipo.toLowerCase().includes(q)) ||
-      (f.criadoPor && f.criadoPor.toLowerCase().includes(q)));
+      (f.criadoPor && f.criadoPor.toLowerCase().includes(q)) ||
+      (Array.isArray(f.vinculos) && f.vinculos.some(v =>
+        (v.empresaNome   || '').toLowerCase().includes(q) ||
+        (v.clienteNome   || '').toLowerCase().includes(q) ||
+        String(v.tomadorCodigo || '').toLowerCase().includes(q) ||
+        (v.tomadorNome   || '').toLowerCase().includes(q))));
   }
   if (_ffFiltroEmpresa) {
-    lista = lista.filter(f => f.empresaNome === _ffFiltroEmpresa);
+    // Um fluxo com vários vínculos aparece no filtro de QUALQUER empresa dele.
+    lista = lista.filter(f => f.empresaNome === _ffFiltroEmpresa ||
+      (Array.isArray(f.vinculos) && f.vinculos.some(v => v.empresaNome === _ffFiltroEmpresa)));
   }
 
   lista.sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')));
 
-  const empresasUnicas = [...new Set(_ffVisiveis().map(f => f.empresaNome).filter(Boolean))];
+  // Empresas do filtro: as do campo antigo MAIS as que aparecem nos vínculos.
+  const empresasUnicas = [...new Set(_ffVisiveis().flatMap(f => [
+    f.empresaNome,
+    ...(Array.isArray(f.vinculos) ? f.vinculos.map(v => v.empresaNome) : [])
+  ]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
   // Barra de ferramentas (busca + filtro de empresa)
   const toolbarHtml = `
@@ -12562,15 +12575,149 @@ function _ffRenderLista() {
     </div>`;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// VÍNCULOS DO FLUXO: EMPRESA → TOMADOR → CLIENTE
+// --------------------------------------------------------------------------
+// Um fluxo pode ter VÁRIOS vínculos. A chave lógica de um vínculo é
+// EMPRESA + TOMADOR + CLIENTE — o código do tomador se repete entre empresas
+// (o 76 existe na RT1 e na RT2), então tomador sozinho não identifica nada.
+//
+// Compatibilidade: fluxos antigos têm só empresaId/empresaNome e nenhum
+// vínculo. Eles continuam sendo exibidos normalmente (_ffIdentificacao trata
+// os dois formatos) e NÃO são migrados.
+// ══════════════════════════════════════════════════════════════════════════
+let _ffVinculos = [];
+
+// Só cadastros ATIVOS aparecem para novos lançamentos. Os inativos continuam
+// visíveis no histórico, mas não podem ser escolhidos de novo.
+function _ffEmpresasAtivas() {
+  return (state.empresas || []).filter(e => e && e.ativo !== false)
+    .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+}
+function _ffTomadoresDaEmpresa(empresaId) {
+  if (!empresaId) return [];
+  return (state.tomadores || []).filter(t => t && t.ativo !== false && t.empresaId === empresaId)
+    .sort((a, b) => (Number(a.codigo) || 0) - (Number(b.codigo) || 0));
+}
+function _ffClientesDoTomador(empresaId, tomadorId) {
+  if (!empresaId || !tomadorId) return [];
+  return (state.clientes || []).filter(c => c && c.ativo !== false &&
+      c.empresaId === empresaId && c.tomadorId === tomadorId)
+    .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+}
+function _ffNomeTomador(t) {
+  if (!t) return '';
+  return t.nome ? `${t.codigo} — ${t.nome}` : String(t.codigo);
+}
+
+function _ffRenderVinculos() {
+  const cont = document.getElementById('ff-vinculos-lista');
+  if (!cont) return;
+  if (!_ffVinculos.length) _ffVinculos = [{ empresaId: '', tomadorId: '', clienteId: '' }];
+
+  cont.innerHTML = _ffVinculos.map((v, i) => {
+    const tomadores = _ffTomadoresDaEmpresa(v.empresaId);
+    const clientes  = _ffClientesDoTomador(v.empresaId, v.tomadorId);
+    const opt = (val, txt, sel) => `<option value="${escapeHTML(String(val))}"${sel ? ' selected' : ''}>${escapeHTML(txt)}</option>`;
+    return `
+      <div class="ff-vinculo-linha" data-indice="${i}">
+        <div class="ff-vinculo-topo">
+          <span class="ff-vinculo-num">Vínculo ${i + 1}</span>
+          ${_ffVinculos.length > 1
+            ? `<button type="button" class="ff-vinculo-remover" onclick="ffRemoverVinculo(${i})" title="Remover este vínculo"><i class="fa-solid fa-trash-can"></i> Remover</button>`
+            : ''}
+        </div>
+        <div class="ff-vinculo-campos">
+          <div class="form-group">
+            <label>Empresa *</label>
+            <select class="form-control" onchange="ffVinculoMudou(${i},'empresa',this.value)">
+              ${opt('', 'Selecionar empresa...', !v.empresaId)}
+              ${_ffEmpresasAtivas().map(e => opt(e.id, e.nome, e.id === v.empresaId)).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Tomador *</label>
+            <select class="form-control" onchange="ffVinculoMudou(${i},'tomador',this.value)" ${v.empresaId ? '' : 'disabled'}>
+              ${opt('', v.empresaId ? (tomadores.length ? 'Selecionar tomador...' : 'Nenhum tomador nesta empresa') : 'Escolha a empresa primeiro', !v.tomadorId)}
+              ${tomadores.map(t => opt(t.id, _ffNomeTomador(t), t.id === v.tomadorId)).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Cliente *</label>
+            <select class="form-control" onchange="ffVinculoMudou(${i},'cliente',this.value)" ${v.tomadorId ? '' : 'disabled'}>
+              ${opt('', v.tomadorId ? (clientes.length ? 'Selecionar cliente...' : 'Nenhum cliente neste tomador') : 'Escolha o tomador primeiro', !v.clienteId)}
+              ${clientes.map(c => opt(c.id, c.nome, c.id === v.clienteId)).join('')}
+            </select>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// Trocar a empresa zera tomador e cliente (senão sobraria uma combinação inválida).
+window.ffVinculoMudou = function (i, campo, valor) {
+  const v = _ffVinculos[i];
+  if (!v) return;
+  if (campo === 'empresa') { v.empresaId = valor; v.tomadorId = ''; v.clienteId = ''; }
+  else if (campo === 'tomador') { v.tomadorId = valor; v.clienteId = ''; }
+  else { v.clienteId = valor; }
+  _ffRenderVinculos();
+};
+window.ffAdicionarVinculo = function () {
+  _ffVinculos.push({ empresaId: '', tomadorId: '', clienteId: '' });
+  _ffRenderVinculos();
+  const linhas = document.querySelectorAll('#ff-vinculos-lista .ff-vinculo-linha');
+  const ultima = linhas[linhas.length - 1];
+  if (ultima && ultima.scrollIntoView) ultima.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+};
+window.ffRemoverVinculo = function (i) {
+  if (_ffVinculos.length <= 1) return;   // sempre fica pelo menos um
+  _ffVinculos.splice(i, 1);
+  _ffRenderVinculos();
+};
+
+// Valida e converte os vínculos da tela em dados para gravar no fluxo.
+function _ffVinculosParaSalvar() {
+  const out = [];
+  for (let i = 0; i < _ffVinculos.length; i++) {
+    const v = _ffVinculos[i];
+    const emp = (state.empresas  || []).find(e => e.id === v.empresaId);
+    const tom = (state.tomadores || []).find(t => t.id === v.tomadorId);
+    const cli = (state.clientes  || []).find(c => c.id === v.clienteId);
+    if (!emp || !tom || !cli) {
+      return { erro: `Vínculo ${i + 1}: escolha empresa, tomador e cliente.` };
+    }
+    // Duplicidade dentro do MESMO fluxo (chave EMPRESA+TOMADOR+CLIENTE)
+    if (out.some(o => o.empresaId === emp.id && o.tomadorId === tom.id && o.clienteId === cli.id)) {
+      return { erro: `Vínculo ${i + 1} está repetido (${emp.nome} · ${tom.codigo} · ${cli.nome}).` };
+    }
+    out.push({
+      empresaId: emp.id, empresaNome: emp.nome,
+      tomadorId: tom.id, tomadorCodigo: String(tom.codigo), tomadorNome: tom.nome || '',
+      clienteId: cli.id, clienteNome: cli.nome
+    });
+  }
+  return { vinculos: out };
+}
+
+// Texto de identificação de um fluxo — entende o formato NOVO (vínculos) e o
+// ANTIGO (só empresaNome). Usado na lista, na busca e no detalhe.
+function _ffIdentificacao(f) {
+  if (f && Array.isArray(f.vinculos) && f.vinculos.length) {
+    return f.vinculos.map(v => `${v.empresaNome} · ${v.tomadorCodigo} · ${v.clienteNome}`).join('  |  ');
+  }
+  return (f && f.empresaNome) || '—';   // fluxo antigo: continua aparecendo normal
+}
+window._ffIdentificacao = _ffIdentificacao;
+
 // ── Novo fluxo ─────────────────────────────────────────────────────────────
 function abrirModalNovoFluxo() {
   if (!_ffPodeCriar()) { alert('Você não tem permissão para criar fluxos financeiros.'); return; }
   garantirFluxoFinanceiro();
   _ffPdfsTemp = [];
 
-  const selEmp = document.getElementById('ff-form-empresa');
-  if (selEmp) selEmp.innerHTML = '<option value="">Selecione...</option>' +
-    (state.empresas || []).map(e => `<option value="${e.id}">${escapeHTML(e.nome)}</option>`).join('');
+  _ffVinculos = [{ empresaId: '', tomadorId: '', clienteId: '' }];   // sempre começa com 1 linha
+  _ffRenderVinculos();
   const selTipo = document.getElementById('ff-form-tipo');
   if (selTipo) selTipo.innerHTML = '<option value="">Selecione...</option>' +
     state.tiposPagamentoFluxo.map(t => `<option value="${escapeHTML(t)}">${escapeHTML(t)}</option>`).join('');
@@ -12619,13 +12766,19 @@ window.receberPdfsFluxo = receberPdfsFluxo;
 async function criarFluxoFinanceiro() {
   garantirFluxoFinanceiro();
   const g = id => document.getElementById(id);
-  const empresaId = g('ff-form-empresa')?.value || '';
   const tipo = g('ff-form-tipo')?.value || '';
   const data = g('ff-form-data')?.value || '';
   const comp = g('ff-form-competencia')?.value || '';
   const obs  = (g('ff-form-obs')?.value || '').trim();
 
-  if (!empresaId) { alert('Escolha a empresa.'); return; }
+  // Vínculos EMPRESA -> TOMADOR -> CLIENTE (um ou vários)
+  const res = _ffVinculosParaSalvar();
+  if (res.erro) { alert(res.erro); return; }
+  const vinculos = res.vinculos;
+  // O 1º vínculo alimenta empresaId/empresaNome: assim tudo que já lia esses
+  // campos (filtros, busca, exportação, títulos) continua funcionando igual.
+  const empresaId = vinculos[0].empresaId;
+
   if (!tipo)      { alert('Escolha o tipo de pagamento.'); return; }
   if (!data)      { alert('Informe a data de pagamento.'); return; }
   if (!comp)      { alert('Informe a competência.'); return; }
@@ -12670,6 +12823,7 @@ async function criarFluxoFinanceiro() {
       id: 'ff-' + Date.now(),
       numero,
       empresaId, empresaNome: empresa.nome || '',
+      vinculos,                       // formato novo: EMPRESA + TOMADOR + CLIENTE (1 ou vários)
       tipo, dataPagamento: data, competencia: comp, observacao: obs,
       arquivos, linhas,
       paginasProcessadas: paginasTotal,
@@ -12763,7 +12917,7 @@ function _ffRenderDetalhe() {
   const tit = document.getElementById('ff-det-titulo');
   if (tit) tit.textContent = `Fluxo Financeiro #${f.numero}`;
   const sub = document.getElementById('ff-det-sub');
-  if (sub) sub.textContent = `${f.empresaNome} · ${f.tipo} · pagamento ${_formatarDataBR(f.dataPagamento)}`;
+  if (sub) sub.textContent = `${_ffIdentificacao(f)} · ${f.tipo} · pagamento ${_formatarDataBR(f.dataPagamento)}`;
 
   const pendencias = (f.linhas || []).filter(l => l.status === 'conferir').length;
 
@@ -12847,7 +13001,7 @@ function _ffRenderDetalhe() {
         <div class="exame-detalhe-grupo">
           <h4><i class="fa-solid fa-circle-info"></i> Dados do fluxo</h4>
           <div class="exame-detalhe-campos">
-            <div class="exame-campo"><span class="exame-campo-label">Empresa</span><span class="exame-campo-valor">${escapeHTML(f.empresaNome)}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">${(f.vinculos||[]).length > 1 ? "Identifica&ccedil;&atilde;o (" + f.vinculos.length + " v&iacute;nculos)" : "Identifica&ccedil;&atilde;o"}</span><span class="exame-campo-valor">${escapeHTML(_ffIdentificacao(f))}</span></div>
             <div class="exame-campo"><span class="exame-campo-label">Tipo</span><span class="exame-campo-valor">${escapeHTML(f.tipo)}</span></div>
             <div class="exame-campo"><span class="exame-campo-label">Data de pagamento</span><span class="exame-campo-valor">${_formatarDataBR(f.dataPagamento)}</span></div>
             <div class="exame-campo"><span class="exame-campo-label">Competência</span><span class="exame-campo-valor">${escapeHTML(_ffCompetenciaBR(f.competencia))}</span></div>

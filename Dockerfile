@@ -19,6 +19,8 @@ RUN npm ci --omit=dev
 
 # --- Backend ---------------------------------------------------------------
 COPY server.cjs ./
+# Base inicial de EMPRESAS/TOMADORES/CLIENTES do Fluxo Financeiro (import idempotente).
+COPY ff-cadastros-base.json ./
 # Proteção dos dados críticos de Equipamentos (guarda anti-sumiço + espelho).
 # Sem estes arquivos o sistema sobe, mas SEM a rede de segurança.
 COPY equipamentos-protecao.cjs restaurar-equipamentos.cjs ./

@@ -35,16 +35,16 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260801b">
+    <link rel="stylesheet" href="css/style.css?v=20260803a">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260801b">
+    <link rel="stylesheet" href="css/design-system.css?v=20260803a">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260801b">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260803a">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260801b">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260801b">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260803a">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260803a">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260801b">
+    <link rel="stylesheet" href="css/mobile.css?v=20260803a">
 </head>
 <body>
 
@@ -1403,11 +1403,21 @@
                             <button class="modal-exame-close" onclick="fecharModalNovoFluxo()"><i class="fa-solid fa-xmark"></i></button>
                         </div>
                         <div class="modal-exame-body">
-                            <div class="exame-form-grid">
-                                <div class="form-group">
-                                    <label>Empresa *</label>
-                                    <select id="ff-form-empresa" class="form-control"><option value="">Selecione...</option></select>
+                            <!-- Identificação: um ou mais vínculos EMPRESA -> TOMADOR -> CLIENTE.
+                                 O select de Tomador só lista os tomadores da empresa escolhida, e o
+                                 de Cliente só os clientes daquele tomador. As linhas são montadas
+                                 por JS em #ff-vinculos-lista. -->
+                            <div class="ff-vinculos-bloco">
+                                <div class="ff-vinculos-cabecalho">
+                                    <label style="margin:0;">Identificação *</label>
+                                    <span class="ff-vinculos-dica">Empresa &rarr; Tomador &rarr; Cliente</span>
                                 </div>
+                                <div id="ff-vinculos-lista"></div>
+                                <button type="button" class="btn btn-outline ff-btn-add-vinculo" onclick="ffAdicionarVinculo()">
+                                    <i class="fa-solid fa-plus"></i> Adicionar outro
+                                </button>
+                            </div>
+                            <div class="exame-form-grid">
                                 <div class="form-group">
                                     <label>Tipo de pagamento *</label>
                                     <select id="ff-form-tipo" class="form-control"><option value="">Selecione...</option></select>
@@ -3723,11 +3733,11 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260801b"></script>
-    <script src="js/vps-sync.js?v=20260801b"></script>
-    <script src="js/exata-catalogo.js?v=20260801b"></script>
-    <script src="js/data.js?v=20260801b"></script>
-    <script src="js/app.js?v=20260801b"></script>
-    <script src="js/whatsapp.js?v=20260801b"></script>
+    <script src="js/security.js?v=20260803a"></script>
+    <script src="js/vps-sync.js?v=20260803a"></script>
+    <script src="js/exata-catalogo.js?v=20260803a"></script>
+    <script src="js/data.js?v=20260803a"></script>
+    <script src="js/app.js?v=20260803a"></script>
+    <script src="js/whatsapp.js?v=20260803a"></script>
 </body>
 </html>

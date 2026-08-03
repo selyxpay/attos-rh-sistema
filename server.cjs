@@ -294,6 +294,91 @@ function subsetPublico(dados) {
 // Sem login, só pode ADICIONAR nestes campos (candidatos/talentos/fila). Nada de funcionários/vagas.
 const CHAVES_ESCRITA_PUBLICA = ['candidatos', 'bancoTalentos', 'fila', '_docsMeta', 'proximaFilaNum'];
 
+// ==========================================================================
+// CADASTROS DO FLUXO FINANCEIRO — EMPRESAS / TOMADORES / CLIENTES
+// --------------------------------------------------------------------------
+// Carrega a base inicial de ff-cadastros-base.json.
+//
+// IDEMPOTENTE: a chave lógica é EMPRESA + TOMADOR + CLIENTE. Rodar de novo
+// (novo deploy, restart) NÃO duplica nada. Só ACRESCENTA o que ainda não
+// existe — nunca altera, renomeia, inativa ou apaga cadastro já gravado, e
+// nunca encosta nos fluxos financeiros existentes.
+// ==========================================================================
+function garantirCadastrosFinanceiro() {
+  comTrava(function () {
+    let base;
+    try {
+      base = JSON.parse(fs.readFileSync(path.join(BASE, 'ff-cadastros-base.json'), 'utf8'));
+    } catch (e) {
+      return;   // sem arquivo base: nada a fazer (não é erro)
+    }
+
+    const st = lerEstado();
+    const d = st.dados || {};
+    let novos = { empresas: 0, tomadores: 0, clientes: 0 };
+
+    if (!Array.isArray(d.empresas))   d.empresas = [];
+    if (!Array.isArray(d.tomadores))  d.tomadores = [];
+    if (!Array.isArray(d.clientes))   d.clientes = [];
+
+    // EMPRESAS — chave: nome (comparado sem diferenciar maiúsculas/acentos)
+    const norm = function (s) {
+      return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toUpperCase();
+    };
+    const idPorEmpresa = {};
+    d.empresas.forEach(function (e) { if (e) idPorEmpresa[norm(e.nome)] = e.id; });
+    (base.empresas || []).forEach(function (e) {
+      const k = norm(e.nome);
+      if (idPorEmpresa[k]) return;                       // já existe: preserva o que está lá
+      d.empresas.push({ id: e.id, nome: e.nome, ativo: true });
+      idPorEmpresa[k] = e.id;
+      novos.empresas++;
+    });
+
+    // TOMADORES — chave: empresa + código
+    const idPorTomador = {};
+    d.tomadores.forEach(function (t) {
+      if (t) idPorTomador[t.empresaId + '||' + String(t.codigo).trim()] = t.id;
+    });
+    (base.tomadores || []).forEach(function (t) {
+      const empresaBase = (base.empresas || []).find(function (e) { return e.id === t.empresaId; });
+      const empresaId = empresaBase ? idPorEmpresa[norm(empresaBase.nome)] : t.empresaId;
+      const k = empresaId + '||' + String(t.codigo).trim();
+      if (idPorTomador[k]) return;
+      d.tomadores.push({ id: t.id, empresaId: empresaId, codigo: String(t.codigo), nome: t.nome || '', ativo: true });
+      idPorTomador[k] = t.id;
+      novos.tomadores++;
+    });
+
+    // CLIENTES — chave: empresa + tomador + nome do cliente
+    const jaTem = {};
+    d.clientes.forEach(function (c) {
+      if (c) jaTem[c.empresaId + '||' + c.tomadorId + '||' + norm(c.nome)] = true;
+    });
+    (base.clientes || []).forEach(function (c) {
+      const empresaBase = (base.empresas || []).find(function (e) { return e.id === c.empresaId; });
+      const empresaId = empresaBase ? idPorEmpresa[norm(empresaBase.nome)] : c.empresaId;
+      const tomadorBase = (base.tomadores || []).find(function (t) { return t.id === c.tomadorId; });
+      const tomadorId = tomadorBase
+        ? (idPorTomador[empresaId + '||' + String(tomadorBase.codigo).trim()] || c.tomadorId)
+        : c.tomadorId;
+      const k = empresaId + '||' + tomadorId + '||' + norm(c.nome);
+      if (jaTem[k]) return;
+      d.clientes.push({ id: c.id, empresaId: empresaId, tomadorId: tomadorId, nome: c.nome, ativo: true });
+      jaTem[k] = true;
+      novos.clientes++;
+    });
+
+    if (novos.empresas || novos.tomadores || novos.clientes) {
+      gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+      console.log('[RT] Cadastros do Fluxo Financeiro importados: ' +
+        novos.empresas + ' empresa(s), ' + novos.tomadores + ' tomador(es), ' + novos.clientes + ' cliente(s).');
+    } else {
+      console.log('[RT] Cadastros do Fluxo Financeiro já estavam completos (nada duplicado).');
+    }
+  });
+}
+
 // Garante que a conta MESTRE "admin" exista (senão, ninguém consegue logar num 1º uso).
 // Nunca sobrescreve um admin já existente (preserva a senha atual).
 function garantirAdminServidor() {
@@ -1588,6 +1673,7 @@ http.createServer(function (req, res) {
   console.log('Servidor R&T em: http://localhost:' + PORT);
   console.log('Dados na VPS ativos (state.json + uploads). Login exigido no servidor.');
   try { garantirAdminServidor(); } catch (e) { console.error('garantirAdminServidor:', e); }
+  try { garantirCadastrosFinanceiro(); } catch (e) { console.error('garantirCadastrosFinanceiro:', e); }
   // O resumo entra na MESMA fila do garantirAdminServidor (comTrava), então
   // só roda depois que a carga inicial terminou — senão mostraria zero em tudo.
   comTrava(function () {
