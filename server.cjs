@@ -269,12 +269,22 @@ function limparFalhasLogin(login) { delete tentativasLogin[login]; }
 
 // Subconjunto PÚBLICO do estado (sem login): só o que as páginas públicas usam.
 // NUNCA expõe candidatos, banco de talentos, funcionários (senhas!), logs, etc.
+// ATENÇÃO — esta função responde a QUEM NÃO ESTÁ LOGADO.
+// Antes ela funcionava por lista de EXCLUSÃO: apagava alguns campos e devolvia
+// TODO O RESTO. Com isso, equipamentos/EPI (com CPF), contratações, exames
+// médicos e fluxos financeiros estavam sendo servidos publicamente — e a
+// resposta chegou a 87 MB, o que também derrubava o carregamento da tela.
+// Agora é lista de INCLUSÃO: só sai o que as páginas públicas realmente usam
+// (candidato.html, talento.html, fila-display.html). Qualquer área nova do
+// sistema fica privada por padrão.
+const CHAVES_PUBLICAS = ['vagas', 'recrutadores', 'fila', 'proximaFilaNum', 'portalSettings', 'empresas'];
+
 function subsetPublico(dados) {
-  const d = JSON.parse(JSON.stringify(dados || {}));
-  // Remove tudo que é sensível/interno
-  ['funcionarios', 'logs', 'logsGlobais', 'auditoria', 'config', 'controleAcesso',
-    'exataDominios', 'exataTransformacoes', 'tiposContratacao', 'comissao', 'comissoes', 'relatorios', 'notificacoes']
-    .forEach(function (k) { delete d[k]; });
+  const origem = dados || {};
+  const d = {};
+  CHAVES_PUBLICAS.forEach(function (k) {
+    if (origem[k] !== undefined) d[k] = JSON.parse(JSON.stringify(origem[k]));
+  });
   // Candidatos e banco de talentos: some com os dados (privacidade), mas mantém
   // os arrays VAZIOS para as páginas públicas não quebrarem ao adicionar um novo.
   d.candidatos = [];
