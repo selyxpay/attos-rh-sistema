@@ -115,11 +115,24 @@ function mesclarEstado(servidor, local, upsertIds) {
       if (!Array.isArray(out[k])) { out[k] = lv.slice(); return; }
       const idx = {};
       out[k].forEach(function (it, i) { if (it && it.id != null) idx[it.id] = i; });
+      // Itens SEM id (ex.: tiposPagamentoFluxo, que é uma lista de textos) não
+      // podem ser anexados às cegas: o cliente manda a lista inteira de volta e
+      // ela DOBRA a cada gravação. Foi assim que tiposPagamentoFluxo chegou a
+      // 6,5 milhões de itens (78 MB) e travou todos os saves do sistema.
+      // Agora esses itens só entram se ainda não existirem (comparação por valor).
+      let jaExiste = null;
       lv.forEach(function (it) {
         if (it && it.id != null) {
           if (idx[it.id] === undefined) out[k].push(it);      // novo -> adiciona
           else if (ups[it.id]) out[k][idx[it.id]] = it;       // upsert -> substitui
-        } else out[k].push(it);
+        } else {
+          if (jaExiste === null) {
+            jaExiste = {};
+            out[k].forEach(function (x) { if (!x || x.id == null) jaExiste[JSON.stringify(x)] = true; });
+          }
+          const chave = JSON.stringify(it);
+          if (!jaExiste[chave]) { out[k].push(it); jaExiste[chave] = true; }
+        }
       });
     } else if (k === 'fila' && lv && typeof lv === 'object') {
       out[k] = mesclarFila(out[k] || {}, lv);
