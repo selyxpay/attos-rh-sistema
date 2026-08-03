@@ -35,7 +35,11 @@ const DATA_DIR = process.env.DATA_DIR || path.join(BASE, 'server-data');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
-const LIMITE_CORPO = 48 * 1024 * 1024;  // 48 MB. O corpo inteiro e montado na MEMORIA (data += chunk);
+const LIMITE_CORPO = 160 * 1024 * 1024; // 160 MB. O corpo inteiro e montado na MEMORIA (data += chunk);
+// ATENCAO: ja aconteceu de o state.json passar de 48 MB (fotos gravadas DENTRO
+// do JSON) e TODO save comecar a ser recusado silenciosamente. O limite subiu
+// para dar folga, mas a solucao certa e manter o arquivo pequeno:
+//   node limpar-fotos-embutidas.cjs --aplicar
 // 500 MB viravam ~1 GB de RAM e derrubariam a VPS. 48 MB comporta 1 arquivo de 20 MB em base64 (~27 MB) com folga.
 
 // Garante as pastas de dados
@@ -1710,6 +1714,20 @@ function resumoDosDados() {
   console.log('  Contratações ......... ' + conta('contratacoes'));
   console.log('  Fluxos financeiros ... ' + conta('fluxosFinanceiros'));
   console.log('  Arquivos em uploads/ . ' + arquivos);
+
+  // O state.json inteiro trafega em cada gravacao. Se ele crescer demais, os
+  // saves passam a ser RECUSADOS pelo limite de corpo e o sistema para de
+  // salvar sem avisar. Este alerta existe para isso nunca mais passar batido.
+  let tamState = 0;
+  try { tamState = fs.statSync(STATE_FILE).size; } catch (e) {}
+  console.log('  Tamanho do state.json  ' + (tamState / 1048576).toFixed(1) + ' MB');
+  if (tamState > 0.6 * LIMITE_CORPO) {
+    console.warn('');
+    console.warn('  *** ATENCAO: state.json com ' + (tamState / 1048576).toFixed(1) + ' MB — perto do limite de envio (' +
+                 (LIMITE_CORPO / 1048576).toFixed(0) + ' MB).');
+    console.warn('  *** Quando passar do limite, NENHUM cadastro consegue ser salvo.');
+    console.warn('  *** Rode:  node limpar-fotos-embutidas.cjs --aplicar');
+  }
 
   // Senhas fracas: as contas de exemplo do js/data.js ('123', 'clinica123'...)
   // estão no repositório do GitHub. Se alguém nunca trocou, essas senhas valem
