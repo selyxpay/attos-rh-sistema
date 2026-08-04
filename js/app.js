@@ -10618,7 +10618,7 @@ function _renderPreviewFotosEquip() {
   box.innerHTML = _equipFotos.map((f, i) => {
     const img = _equipEhImagem(f);
     const thumb = img
-      ? `<img src="${f.arquivo}" alt="${escapeHTML(f.nome)}">`
+      ? `<img src="${f.arquivo}" alt="${escapeHTML(f.nome)}" loading="lazy" decoding="async">`
       : `<div class="equip-foto-pdf"><i class="fa-solid fa-file-pdf"></i></div>`;
     return `
       <div class="equip-foto-item">
@@ -11362,7 +11362,7 @@ function abrirVerEquipamento(id) {
          ${(reg.fotos || []).map((f, i) => {
            const img = _equipEhImagem(f);
            const thumb = img
-             ? `<img src="${f.arquivo}" alt="${escapeHTML(f.nome)}">`
+             ? `<img src="${f.arquivo}" alt="${escapeHTML(f.nome)}" loading="lazy" decoding="async">`
              : `<div class="equip-foto-pdf"><i class="fa-solid fa-file-pdf"></i></div>`;
            return `
              <button type="button" class="equip-galeria-item" title="Ampliar ${escapeHTML(f.nome)}"
