@@ -49,6 +49,13 @@ window.RTCloud = (function () {
   async function verificarRemoto() {
     if (flushing || pending) return; // não checa enquanto está salvando o nosso
     try {
+      // Pergunta SÓ a versão (resposta de algumas dezenas de bytes). Antes esta
+      // checagem baixava o estado inteiro a cada 4 segundos — com o sistema
+      // cheio isso virava dezenas de MB por minuto EM CADA aba aberta, e era o
+      // principal motivo da lentidão. Agora o estado só é baixado quando
+      // alguém realmente alterou alguma coisa.
+      const v = await apiGet('/state/version');
+      if ((v.version || 0) === lastVersion) return;      // nada mudou: acabou aqui
       const s = await apiGet('/state');
       if ((s.version || 0) !== lastVersion) {
         lastVersion = s.version || 0;

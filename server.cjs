@@ -172,8 +172,20 @@ function lerEstado() {
     return { dados: null, version: 0, atualizadoEm: 0 };
   }
 }
+// Versão atual guardada na memória, para responder /api/state/version sem
+// precisar ler e interpretar o state.json inteiro a cada consulta.
+let _versaoMemoria = null;
+function versaoAtual() {
+  if (_versaoMemoria === null) {
+    const s = lerEstado();
+    _versaoMemoria = { version: s.version || 0, atualizadoEm: s.atualizadoEm || 0 };
+  }
+  return _versaoMemoria;
+}
+
 function gravarEstado(obj) {
   try { fazerBackupSePreciso(); } catch (e) { /* backup nunca pode derrubar o save */ }
+  _versaoMemoria = { version: obj.version || 0, atualizadoEm: obj.atualizadoEm || 0 };
   const tmp = STATE_FILE + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(obj));
   fs.renameSync(tmp, STATE_FILE); // troca atômica: nunca deixa arquivo pela metade
@@ -1058,6 +1070,18 @@ http.createServer(function (req, res) {
   // ---- API: hora do servidor ----
   if (urlPath === '/api/time' && req.method === 'GET') {
     responderJson(res, 200, { epoch: Date.now() });
+    return;
+  }
+
+  // ---- API: só a VERSÃO do estado (resposta minúscula) ----
+  // O navegador consulta isto a cada poucos segundos para saber se alguém
+  // alterou algo. Antes ele baixava o ESTADO INTEIRO só para comparar um
+  // número — com 3,5 MB por consulta a cada 4 s, era o que mais deixava o
+  // sistema lento. Aqui a resposta tem algumas dezenas de bytes e sai da
+  // memória, sem tocar no disco.
+  if (urlPath === '/api/state/version' && req.method === 'GET') {
+    const v = versaoAtual();
+    responderJson(res, 200, { version: v.version, atualizadoEm: v.atualizadoEm });
     return;
   }
 
