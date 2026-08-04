@@ -3435,7 +3435,7 @@ function renderVagasGrid() {
   container.innerHTML = state.vagas.map(v => {
     const emp = state.empresas.find(e => e.id === v.empresaId);
     const cor = emp?.cor || '#6366f1';
-    const siglaDisplay = emp?.sigla || v.empresaNome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 4);
+    const siglaDisplay = (emp && emp.sigla) || String(v.empresaNome || '—').split(' ').map(n => n[0] || '').join('').toUpperCase().slice(0, 4);
 
     const isQuente = !!v.vagaQuente;
     const benefitsHtml = (v.beneficios || []).map(b => `<span class="benefit-tag">${b}</span>`).join('');
@@ -3563,7 +3563,7 @@ function renderBancoTalentos(filtroNome = '') {
       <div class="banco-grupo-secao">
         <div class="banco-grupo-header">
           <div class="banco-grupo-title">
-            <div class="banco-logo-badge" style="background-color: ${emp.cor};">${emp.sigla}</div>
+            <div class="banco-logo-badge" style="background-color: ${emp.cor || '#64748B'};">${escapeHTML(emp.sigla || (emp.nome || '').slice(0,3).toUpperCase())}</div>
             <h2>Banco de dados — ${emp.nome}</h2>
           </div>
           <span class="banco-count-badge">${candEmpresa.length}</span>
@@ -8625,9 +8625,18 @@ function renderDashboardOverview() {
   // --- Gráfico 2: Contratações por Empresa (Rosca/Doughnut) ---
   const ctxEmp = document.getElementById('chartDashContratacoesEmpresa');
   if (ctxEmp) {
-    const labels = state.empresas.map(e => e.nome);
-    const data = state.empresas.map(e => {
-      return state.contratacoes.filter(c => c.empresaNome.toLowerCase().includes(e.nome.toLowerCase()) || c.empresaNome.toLowerCase().includes(e.sigla.toLowerCase())).length;
+    // Nem toda empresa tem "sigla" e nem toda contratação tem "empresaNome"
+    // preenchido — sem estas proteções, UMA empresa sem sigla derrubava o
+    // dashboard inteiro (a tela ficava em branco para todo mundo).
+    const labels = (state.empresas || []).map(e => (e && e.nome) || '—');
+    const data = (state.empresas || []).map(e => {
+      const nome  = String((e && e.nome)  || '').toLowerCase();
+      const sigla = String((e && e.sigla) || '').toLowerCase();
+      return (state.contratacoes || []).filter(c => {
+        const emp = String((c && c.empresaNome) || '').toLowerCase();
+        if (!emp) return false;
+        return (nome && emp.includes(nome)) || (sigla && emp.includes(sigla));
+      }).length;
     });
 
     dashboardCharts.empresa = new Chart(ctxEmp, {
@@ -8713,7 +8722,7 @@ function renderDashboardOverview() {
   // --- Gráfico 5: Vagas Disponíveis por Empresa (Barras Verticais Duplas) ---
   const ctxVagas = document.getElementById('chartDashVagasEmpresa');
   if (ctxVagas) {
-    const labels = state.empresas.map(e => e.sigla);
+    const labels = (state.empresas || []).map(e => (e && (e.sigla || e.nome)) || '—');
     const disponiveis = state.empresas.map(e => {
       return state.vagas.filter(v => v.empresaId === e.id).reduce((acc, v) => acc + (v.vagasDisponiveis || 0), 0);
     });
@@ -13407,7 +13416,7 @@ window.exportarFluxoExcel = function() {
   ws['!cols'] = Object.keys(linhas[0]).map(k => ({ wch: Math.max(12, k.length + 2) }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Fluxo ' + f.numero);
-  XLSX.writeFile(wb, `fluxo_financeiro_${f.numero}_${f.empresaNome.replace(/[^\w]+/g, '_')}.xlsx`);
+  XLSX.writeFile(wb, `fluxo_financeiro_${f.numero}_${String(f.empresaNome || 'sem_empresa').replace(/[^\w]+/g, '_')}.xlsx`);
 };
 
 // Abre PDF/comprovante em nova aba (mesma técnica do exame médico)

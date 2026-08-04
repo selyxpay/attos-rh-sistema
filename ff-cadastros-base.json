@@ -5,17 +5,20 @@
   {
    "id": "emp-rt2",
    "nome": "RT2",
-   "ativo": true
+   "ativo": true,
+   "sigla": "RT2"
   },
   {
    "id": "emp-rt1",
    "nome": "RT1",
-   "ativo": true
+   "ativo": true,
+   "sigla": "RT1"
   },
   {
    "id": "emp-green-service",
    "nome": "GREEN SERVICE",
-   "ativo": true
+   "ativo": true,
+   "sigla": "GS"
   }
  ],
  "tomadores": [
