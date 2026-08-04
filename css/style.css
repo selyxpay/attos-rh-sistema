@@ -4705,3 +4705,80 @@ input.form-control[type="date"] {
     .ff-btn-add-vinculo { min-height: 44px; font-size: 16px; }
     .ff-vinculo-remover { min-height: 40px; }
 }
+
+/* ── Financeiro: telas "A Pagar" e busca de colaborador ──────────────────── */
+.ff-filtros-envio {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+    background: var(--surface-subtle, #f8fafc);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 12px; padding: 14px; margin-bottom: 14px;
+}
+.ff-filtro-campo { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.ff-filtro-campo label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--text-secondary, #64748b);
+}
+.ff-filtro-cresce { flex: 1 1 240px; }
+.ff-filtros-envio .form-control { min-height: 40px; }
+
+.ff-resumo-pagar { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+.ff-resumo-pagar > div {
+    flex: 1 1 160px; background: var(--surface-card, #fff);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-left: 4px solid #0284C7; border-radius: 10px; padding: 12px 14px;
+}
+.ff-resumo-pagar span {
+    display: block; font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--text-secondary, #64748b);
+}
+.ff-resumo-pagar strong {
+    display: block; margin-top: 4px; font-size: 20px;
+    color: var(--color-text-title, #0f172a); font-variant-numeric: tabular-nums;
+}
+
+.ff-acoes-lote {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 10px;
+    padding: 10px 14px; margin-bottom: 12px;
+}
+.ff-selecionar-todas { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.ff-selecao-info { font-size: 13px; color: var(--text-secondary, #64748b); margin-right: auto; }
+.ff-tabela-pagar input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+.ff-status-badge {
+    display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px;
+    border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap;
+}
+
+/* Resultado da busca por colaborador */
+.ff-busca-pessoa {
+    background: var(--surface-card, #fff); border: 1px solid var(--border-color, #e2e8f0);
+    border-left: 4px solid #059669; border-radius: 12px; padding: 14px; margin-bottom: 14px;
+}
+.ff-busca-titulo { font-size: 13px; font-weight: 800; color: #059669; margin-bottom: 10px; }
+.ff-busca-vazia { border-left-color: #D97706; color: var(--text-secondary, #64748b); font-size: 13.5px; }
+.ff-achado {
+    border: 1px solid var(--border-color, #e2e8f0); border-radius: 10px;
+    padding: 12px; margin-bottom: 10px;
+}
+.ff-achado:last-child { margin-bottom: 0; }
+.ff-achado-nome {
+    font-size: 15px; font-weight: 800; color: var(--color-text-title, #0f172a);
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px;
+}
+.ff-achado-cpf { font-size: 12px; font-weight: 600; color: var(--text-secondary, #64748b); }
+.ff-achado-linhas {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 4px 16px; margin: 8px 0 10px; font-size: 13px; line-height: 1.5;
+}
+.ff-achado-linhas b { color: var(--text-secondary, #64748b); font-weight: 700; }
+
+@media (max-width: 768px) {
+    .ff-filtros-envio { flex-direction: column; align-items: stretch; padding: 12px; }
+    .ff-filtro-campo, .ff-filtro-cresce { flex: 1 1 auto; width: 100%; }
+    .ff-filtros-envio .form-control, .ff-filtros-envio .btn { min-height: 44px; font-size: 16px; width: 100%; }
+    .ff-resumo-pagar > div { flex: 1 1 100%; }
+    .ff-acoes-lote { flex-direction: column; align-items: stretch; }
+    .ff-acoes-lote .btn { width: 100%; min-height: 44px; }
+    .ff-selecao-info { margin-right: 0; }
+    .ff-achado-linhas { grid-template-columns: 1fr; }
+}

@@ -12127,6 +12127,8 @@ function renderFluxoFinanceiro() {
   set('ff-kpi-finalizados', finalizados.length);
   set('ff-count-minha-vez', minhaVez.length);
   set('ff-count-andamento', andamento.length);
+  // "A Pagar": tudo que já passou pelas aprovações e espera o Financeiro
+  set('ff-count-a-pagar', fluxos.filter(f => f.status === 'aguardando_financeiro').length);
   set('ff-count-finalizados', finalizados.length);
   set('ff-count-problemas', problemas.length);
   set('ff-count-todos', fluxos.length);
@@ -12486,6 +12488,266 @@ function _ffRenderMonitor(cont) {
     </table></div>` : `<div class="ff-empty-box"><div class="ff-empty-icon"><i class="fa-solid fa-mug-hot"></i></div><div class="ff-empty-title">Nada parado 👌</div><div class="ff-empty-text">Não há processos aguardando ação no momento.</div></div>`}`;
 }
 
+
+// ══════════════════════════════════════════════════════════════════════════
+// TELA "A PAGAR" — uso do Financeiro
+// --------------------------------------------------------------------------
+// Junta, de TODAS as empresas, as fichas que já passaram por todas as
+// aprovações e estão prontas para pagar. O filtro é pela DATA DE ENVIO AO
+// FINANCEIRO (f.enviadoEm), não pela data do documento — é assim que o
+// financeiro trabalha: "o que entrou para eu pagar nesse período".
+// ══════════════════════════════════════════════════════════════════════════
+let _ffPagarDe = '', _ffPagarAte = '', _ffPagarBusca = '';
+let _ffFinBuscaPessoa = '';
+let _ffPagarSelecao = {};
+
+// Data em que a ficha chegou ao Financeiro. Fichas antigas (de antes deste
+// campo existir) caem para a aprovação da gestão e, por último, para a criação.
+
+// Selo colorido do status — mesmo visual usado na lista principal.
+function _ffSelo(f) {
+  const st = FF_STATUS[f && f.status] || FF_STATUS.rascunho;
+  return '<span class="ff-status-badge" style="background:' + st.cor + '1A;color:' + st.cor + ';">' +
+         '<i class="fa-solid ' + st.icone + '"></i> ' + escapeHTML(st.rotulo) + '</span>';
+}
+
+function _ffDataEnvioFinanceiro(f) {
+  return (f && (f.enviadoEm
+    || (f.aprovacoes && f.aprovacoes.gestao && f.aprovacoes.gestao.em)
+    || f.criadoEm)) || '';
+}
+function _ffSoData(iso) { return String(iso || '').slice(0, 10); }
+
+function _ffQtdColaboradores(f) {
+  return Array.isArray(f && f.linhas) ? f.linhas.length : 0;
+}
+
+function _ffFiltraPorEnvio(lista) {
+  return lista.filter(f => {
+    const d = _ffSoData(_ffDataEnvioFinanceiro(f));
+    if (_ffPagarDe && (!d || d < _ffPagarDe)) return false;
+    if (_ffPagarAte && (!d || d > _ffPagarAte)) return false;
+    if (_ffPagarBusca) {
+      const q = _ffPagarBusca.toLowerCase();
+      const alvo = [f.numero, f.empresaNome, f.tipo, _ffIdentificacao(f)].join(' ').toLowerCase();
+      if (!alvo.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function _ffBarraFiltroEnvio(tela) {
+  const ehFin = tela === 'fin';
+  return '<div class="ff-filtros-envio">' +
+    '<div class="ff-filtro-campo"><label>Enviado ao financeiro — de</label>' +
+      '<input type="date" class="form-control" value="' + escapeHTML(_ffPagarDe) + '" onchange="ffFiltroEnvio(\'de\', this.value)"></div>' +
+    '<div class="ff-filtro-campo"><label>até</label>' +
+      '<input type="date" class="form-control" value="' + escapeHTML(_ffPagarAte) + '" onchange="ffFiltroEnvio(\'ate\', this.value)"></div>' +
+    '<div class="ff-filtro-campo ff-filtro-cresce">' +
+      '<label>' + (ehFin ? 'Buscar colaborador (nome ou CPF)' : 'Buscar ficha (nº, empresa, tipo)') + '</label>' +
+      '<input type="text" class="form-control" placeholder="' + (ehFin ? 'Ex.: João Silva' : 'Ex.: 000123 ou RT1') + '"' +
+      ' value="' + escapeHTML(ehFin ? _ffFinBuscaPessoa : _ffPagarBusca) + '"' +
+      ' oninput="ffFiltroEnvio(\'' + (ehFin ? 'pessoa' : 'busca') + '\', this.value)"></div>' +
+    '<button class="btn btn-secondary" onclick="ffFiltroEnvio(\'limpar\')"><i class="fa-solid fa-eraser"></i> Limpar</button>' +
+  '</div>';
+}
+
+window.ffFiltroEnvio = function (campo, valor) {
+  if (campo === 'de') _ffPagarDe = valor;
+  else if (campo === 'ate') _ffPagarAte = valor;
+  else if (campo === 'busca') _ffPagarBusca = valor;
+  else if (campo === 'pessoa') _ffFinBuscaPessoa = valor;
+  else if (campo === 'limpar') { _ffPagarDe = ''; _ffPagarAte = ''; _ffPagarBusca = ''; _ffFinBuscaPessoa = ''; }
+  _ffRenderLista();
+};
+
+function _ffRenderAPagar(cont) {
+  if (!_ffEhFinanceiro() && !_ffPodeAdministrarWorkflow()) {
+    cont.innerHTML = '<div class="ff-empty-box"><div class="ff-empty-title">Tela do Financeiro</div>' +
+      '<div class="ff-empty-text">Esta tela é usada pelo setor Financeiro para efetuar os pagamentos.</div></div>';
+    return;
+  }
+  const todas = _ffVisiveis().filter(f => f.status === 'aguardando_financeiro');
+  const lista = _ffFiltraPorEnvio(todas)
+    .sort((a, b) => String(_ffDataEnvioFinanceiro(a)).localeCompare(String(_ffDataEnvioFinanceiro(b))));
+
+  const totalValor = lista.reduce((s, f) => s + _ffTotal(f), 0);
+  const totalPessoas = lista.reduce((s, f) => s + _ffQtdColaboradores(f), 0);
+  const selecionadas = lista.filter(f => _ffPagarSelecao[f.id]);
+  const valorSel = selecionadas.reduce((s, f) => s + _ffTotal(f), 0);
+
+  const linhas = lista.map(function (f) {
+    const trava = f.divergencia
+      ? '<i class="fa-solid fa-triangle-exclamation" title="Divergência sinalizada — pagamento bloqueado" style="color:#B45309;margin-left:6px;"></i>' : '';
+    return '<tr>' +
+      '<td data-label="" style="width:38px;"><input type="checkbox" ' + (f.divergencia ? 'disabled' : '') + ' ' +
+        (_ffPagarSelecao[f.id] ? 'checked' : '') + ' onchange="ffSelecionarPagar(\'' + f.id + '\', this.checked)"></td>' +
+      '<td data-label="Empresa" style="font-weight:600;">' + escapeHTML(_ffIdentificacao(f)) + '</td>' +
+      '<td data-label="Documento">#' + escapeHTML(f.numero) + trava +
+        '<div style="font-size:11px;color:var(--text-secondary);">' + escapeHTML(f.tipo || '') + '</div></td>' +
+      '<td data-label="Enviado ao financeiro">' + (_formatarDataBR(_ffSoData(_ffDataEnvioFinanceiro(f))) || '—') + '</td>' +
+      '<td data-label="Colaboradores" style="text-align:center;font-variant-numeric:tabular-nums;">' + _ffQtdColaboradores(f) + '</td>' +
+      '<td data-label="Valor" style="font-weight:700;font-variant-numeric:tabular-nums;">' + _ffMoedaBR(_ffTotal(f)) + '</td>' +
+      '<td data-label="Status">' + _ffSelo(f) + '</td>' +
+      '<td data-label="Ação"><button class="btn btn-secondary btn-sm" onclick="abrirDetalheFluxo(\'' + f.id + '\')">' +
+        '<i class="fa-solid fa-eye"></i> Abrir</button></td>' +
+    '</tr>';
+  }).join('');
+
+  const corpo = lista.length
+    ? '<div class="ff-acoes-lote">' +
+        '<label class="ff-selecionar-todas"><input type="checkbox" ' +
+          (selecionadas.length === lista.length ? 'checked' : '') + ' onchange="ffSelecionarTodasPagar(this.checked)"> Selecionar todas</label>' +
+        '<span class="ff-selecao-info">' + selecionadas.length + ' selecionada(s) &middot; <strong>' + _ffMoedaBR(valorSel) + '</strong></span>' +
+        '<button class="btn btn-primary" ' + (selecionadas.length ? '' : 'disabled') + ' onclick="ffFinalizarPagamentos()">' +
+          '<i class="fa-solid fa-circle-check"></i> Finalizar Pagamentos</button>' +
+      '</div>' +
+      '<div class="table-scroll-container"><table class="excel-table ff-tabela-pagar"><thead><tr>' +
+        '<th></th><th>Empresa / Identificação</th><th>Documento</th><th>Enviado ao financeiro</th>' +
+        '<th style="text-align:center;">Colab.</th><th>Valor</th><th>Status</th><th>Ação</th>' +
+      '</tr></thead><tbody>' + linhas + '</tbody></table></div>'
+    : '<div class="ff-empty-box"><div class="ff-empty-title">Nada para pagar ' +
+        ((_ffPagarDe || _ffPagarAte) ? 'neste período' : 'no momento') + '</div><div class="ff-empty-text">' +
+        (todas.length ? 'Existem ' + todas.length + ' ficha(s) aguardando pagamento — ajuste o filtro de data.'
+                      : 'Assim que a Gestão aprovar, as fichas aparecem aqui.') + '</div></div>';
+
+  cont.innerHTML = _ffBarraFiltroEnvio('pagar') +
+    '<div class="ff-resumo-pagar">' +
+      '<div><span>Fichas a pagar</span><strong>' + lista.length + '</strong></div>' +
+      '<div><span>Colaboradores</span><strong>' + totalPessoas + '</strong></div>' +
+      '<div><span>Total do período</span><strong>' + _ffMoedaBR(totalValor) + '</strong></div>' +
+    '</div>' + corpo;
+}
+
+window.ffSelecionarPagar = function (id, marcado) {
+  if (marcado) _ffPagarSelecao[id] = true; else delete _ffPagarSelecao[id];
+  _ffRenderLista();
+};
+window.ffSelecionarTodasPagar = function (marcado) {
+  _ffPagarSelecao = {};
+  if (marcado) {
+    _ffFiltraPorEnvio(_ffVisiveis().filter(f => f.status === 'aguardando_financeiro'))
+      .filter(f => !f.divergencia)
+      .forEach(f => { _ffPagarSelecao[f.id] = true; });
+  }
+  _ffRenderLista();
+};
+
+// Marca as fichas selecionadas como PAGAS de uma vez. Elas saem desta tela e
+// passam para "Pagos / Finalizados", onde ainda se anexa o comprovante.
+window.ffFinalizarPagamentos = async function () {
+  if (!_ffEhFinanceiro() && !_ffPodeAdministrarWorkflow()) return;
+  const ids = Object.keys(_ffPagarSelecao);
+  const fichas = (state.fluxosFinanceiros || []).filter(f =>
+    ids.indexOf(f.id) >= 0 && f.status === 'aguardando_financeiro' && !f.divergencia);
+  if (!fichas.length) { alert('Selecione ao menos uma ficha para finalizar.'); return; }
+  const total = fichas.reduce((s, f) => s + _ffTotal(f), 0);
+  const pessoas = fichas.reduce((s, f) => s + _ffQtdColaboradores(f), 0);
+  if (!confirm('Finalizar o pagamento de ' + fichas.length + ' ficha(s)?\n\n' +
+               pessoas + ' colaborador(es)\nTotal: ' + _ffMoedaBR(total) +
+               '\n\nElas vão para "Pagos / Finalizados".')) return;
+
+  const agora = new Date().toISOString();
+  fichas.forEach(function (f) {
+    f.aprovacoes = f.aprovacoes || {};
+    f.aprovacoes.pagamento = { por: nomeExibido(loggedUser), login: loggedUser.login, em: agora };
+    f.status = 'pago';
+    f.pagoEm = agora;
+    _ffHist(f, 'Financeiro finalizou o pagamento de ' + _ffMoedaBR(_ffTotal(f)) + ' (em lote).');
+  });
+  registrarLogGlobal('Finalizou o pagamento de ' + fichas.length + ' ficha(s) do Fluxo Financeiro (' + _ffMoedaBR(total) + ').', 'dp');
+  _ffPagarSelecao = {};
+  try {
+    await RTCloud.salvarAgora(state, { merge: true, upsertIds: fichas.map(f => f.id) });
+    alert(fichas.length + ' ficha(s) finalizada(s)! Total: ' + _ffMoedaBR(total));
+  } catch (e) {
+    alert('Não consegui salvar no servidor: ' + (e.message || e));
+  }
+  renderFluxoFinanceiro();
+};
+
+// ══════════════════════════════════════════════════════════════════════════
+// TELA "PAGOS / FINALIZADOS" — com busca por COLABORADOR
+// --------------------------------------------------------------------------
+// Quando o banco devolve um pagamento, ele informa só o nome da pessoa. Aqui
+// o financeiro digita esse nome e o sistema diz em qual empresa, ficha e
+// posição ele está — sem procurar ficha por ficha.
+// ══════════════════════════════════════════════════════════════════════════
+function _ffRenderFinalizados(cont) {
+  const todas = _ffVisiveis().filter(f => ['pago', 'finalizado'].includes(f.status));
+  const lista = _ffFiltraPorEnvio(todas)
+    .sort((a, b) => String(_ffDataEnvioFinanceiro(b)).localeCompare(String(_ffDataEnvioFinanceiro(a))));
+
+  let blocoBusca = '';
+  const q = (_ffFinBuscaPessoa || '').trim().toLowerCase();
+  if (q) {
+    const soDigitos = q.replace(/\D/g, '');
+    const achados = [];
+    lista.forEach(function (f) {
+      (Array.isArray(f.linhas) ? f.linhas : []).forEach(function (l, i) {
+        const nome = String((l && l.nome) || '');
+        const cpf = String((l && l.cpf) || '').replace(/\D/g, '');
+        const bateNome = nome.toLowerCase().includes(q);
+        const bateCpf = soDigitos.length >= 3 && cpf.includes(soDigitos);
+        if (bateNome || bateCpf) achados.push({ f: f, l: l, posicao: i + 1 });
+      });
+    });
+    if (achados.length) {
+      blocoBusca = '<div class="ff-busca-pessoa">' +
+        '<div class="ff-busca-titulo"><i class="fa-solid fa-magnifying-glass"></i> ' +
+          achados.length + ' resultado(s) para &ldquo;' + escapeHTML(_ffFinBuscaPessoa) + '&rdquo;</div>' +
+        achados.map(function (a) {
+          return '<div class="ff-achado">' +
+            '<div class="ff-achado-nome">' + escapeHTML(a.l.nome || '(sem nome)') +
+              (a.l.cpf ? '<span class="ff-achado-cpf">CPF ' + escapeHTML(a.l.cpf) + '</span>' : '') + '</div>' +
+            '<div class="ff-achado-linhas">' +
+              '<span><b>Empresa:</b> ' + escapeHTML(_ffIdentificacao(a.f)) + '</span>' +
+              '<span><b>Documento:</b> #' + escapeHTML(a.f.numero) + '</span>' +
+              '<span><b>Ficha:</b> ' + escapeHTML(a.f.tipo || '—') +
+                (a.f.competencia ? ' · ' + escapeHTML(a.f.competencia) : '') + '</span>' +
+              '<span><b>Posição na ficha:</b> linha ' + a.posicao + ' de ' + _ffQtdColaboradores(a.f) + '</span>' +
+              '<span><b>Enviado ao financeiro:</b> ' + (_formatarDataBR(_ffSoData(_ffDataEnvioFinanceiro(a.f))) || '—') + '</span>' +
+              '<span><b>Valor:</b> ' + _ffMoedaBR(Number(a.l.valor) || 0) + '</span>' +
+              '<span><b>Status da ficha:</b> ' + (FF_STATUS[a.f.status] ? FF_STATUS[a.f.status].rotulo : a.f.status) + '</span>' +
+            '</div>' +
+            '<button class="btn btn-secondary btn-sm" onclick="abrirDetalheFluxo(\'' + a.f.id + '\')">' +
+              '<i class="fa-solid fa-eye"></i> Abrir a ficha</button>' +
+          '</div>';
+        }).join('') + '</div>';
+    } else {
+      blocoBusca = '<div class="ff-busca-pessoa ff-busca-vazia">Nenhum colaborador chamado &ldquo;' +
+        escapeHTML(_ffFinBuscaPessoa) + '&rdquo; nas fichas ' +
+        ((_ffPagarDe || _ffPagarAte) ? 'deste período' : 'pagas') + '.' +
+        ((_ffPagarDe || _ffPagarAte) ? '<br>Tente ampliar o período ou limpar o filtro de datas.' : '') + '</div>';
+    }
+  }
+
+  const linhas = lista.map(function (f) {
+    return '<tr>' +
+      '<td data-label="Empresa" style="font-weight:600;">' + escapeHTML(_ffIdentificacao(f)) + '</td>' +
+      '<td data-label="Documento">#' + escapeHTML(f.numero) +
+        '<div style="font-size:11px;color:var(--text-secondary);">' + escapeHTML(f.tipo || '') + '</div></td>' +
+      '<td data-label="Enviado ao financeiro">' + (_formatarDataBR(_ffSoData(_ffDataEnvioFinanceiro(f))) || '—') + '</td>' +
+      '<td data-label="Colaboradores" style="text-align:center;font-variant-numeric:tabular-nums;">' + _ffQtdColaboradores(f) + '</td>' +
+      '<td data-label="Valor" style="font-weight:700;font-variant-numeric:tabular-nums;">' + _ffMoedaBR(_ffTotal(f)) + '</td>' +
+      '<td data-label="Status">' + _ffSelo(f) + '</td>' +
+      '<td data-label="Ação"><button class="btn btn-secondary btn-sm" onclick="abrirDetalheFluxo(\'' + f.id + '\')">' +
+        '<i class="fa-solid fa-eye"></i> Abrir</button></td>' +
+    '</tr>';
+  }).join('');
+
+  const tabela = lista.length
+    ? '<div class="table-scroll-container"><table class="excel-table ff-tabela-pagar"><thead><tr>' +
+        '<th>Empresa / Identificação</th><th>Documento</th><th>Enviado ao financeiro</th>' +
+        '<th style="text-align:center;">Colab.</th><th>Valor</th><th>Status</th><th>Ação</th>' +
+      '</tr></thead><tbody>' + linhas + '</tbody></table></div>'
+    : '<div class="ff-empty-box"><div class="ff-empty-title">Nenhuma ficha paga ' +
+        ((_ffPagarDe || _ffPagarAte) ? 'neste período' : 'ainda') + '</div><div class="ff-empty-text">' +
+        (todas.length ? 'Existem ' + todas.length + ' ficha(s) paga(s) — ajuste o filtro de data.' : '') + '</div></div>';
+
+  cont.innerHTML = _ffBarraFiltroEnvio('fin') + blocoBusca + tabela;
+}
+
 function _ffRenderLista() {
   const cont = document.getElementById('ff-lista-container');
   if (!cont) return;
@@ -12493,6 +12755,10 @@ function _ffRenderLista() {
 
   // Painel do próprio módulo (não é a dashboard geral do sistema)
   if (_ffSubAba === 'painel') { _ffRenderPainel(cont); return; }
+
+  // Telas do Financeiro
+  if (_ffSubAba === 'a-pagar')     { _ffRenderAPagar(cont); return; }
+  if (_ffSubAba === 'finalizados') { _ffRenderFinalizados(cont); return; }
 
   // Configuração do fluxo de aprovação (admin define os responsáveis de cada etapa)
   if (_ffSubAba === 'config') {

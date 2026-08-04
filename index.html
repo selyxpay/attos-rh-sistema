@@ -35,16 +35,16 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260804c">
+    <link rel="stylesheet" href="css/style.css?v=20260804d">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260804c">
+    <link rel="stylesheet" href="css/design-system.css?v=20260804d">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260804c">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260804d">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260804c">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260804c">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260804d">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260804d">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260804c">
+    <link rel="stylesheet" href="css/mobile.css?v=20260804d">
 </head>
 <body>
 
@@ -1360,6 +1360,12 @@
                             <button type="button" class="ff-tab-btn exame-subtab" data-subaba="andamento" onclick="trocarSubAbaFF('andamento')">
                                 <i class="fa-solid fa-arrows-spin"></i> Em andamento
                                 <span class="ff-tab-badge exame-subtab-count" id="ff-count-andamento">0</span>
+                            </button>
+                            <!-- Tela do Financeiro: tudo que já passou por todas as aprovações
+                                 e está pronto para pagar, de todas as empresas juntas. -->
+                            <button type="button" class="ff-tab-btn exame-subtab" data-subaba="a-pagar" onclick="trocarSubAbaFF('a-pagar')">
+                                <i class="fa-solid fa-money-check-dollar"></i> A Pagar
+                                <span class="ff-tab-badge exame-subtab-count" id="ff-count-a-pagar">0</span>
                             </button>
                             <button type="button" class="ff-tab-btn exame-subtab" data-subaba="finalizados" onclick="trocarSubAbaFF('finalizados')">
                                 <i class="fa-solid fa-circle-check"></i> Pagos / Finalizados
@@ -3733,11 +3739,11 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260804c"></script>
-    <script src="js/vps-sync.js?v=20260804c"></script>
-    <script src="js/exata-catalogo.js?v=20260804c"></script>
-    <script src="js/data.js?v=20260804c"></script>
-    <script src="js/app.js?v=20260804c"></script>
-    <script src="js/whatsapp.js?v=20260804c"></script>
+    <script src="js/security.js?v=20260804d"></script>
+    <script src="js/vps-sync.js?v=20260804d"></script>
+    <script src="js/exata-catalogo.js?v=20260804d"></script>
+    <script src="js/data.js?v=20260804d"></script>
+    <script src="js/app.js?v=20260804d"></script>
+    <script src="js/whatsapp.js?v=20260804d"></script>
 </body>
 </html>
