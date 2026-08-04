@@ -1693,6 +1693,43 @@ function switchAba(abaId) {
   renderCurrentAba();
 }
 
+// Resume um erro em uma linha legível (mensagem + onde aconteceu). Serve para
+// a pessoa mandar um print e o problema ser identificado na hora.
+function _rtDetalheErro(e) {
+  const msg = String((e && e.message) || e || 'erro desconhecido');
+  const linha = String((e && e.stack) || '').split('\n')[1] || '';
+  return (msg + '  ' + linha.trim()).slice(0, 300);
+}
+
+// REDE DE SEGURANÇA GLOBAL: qualquer erro solto (fora da montagem das abas,
+// dentro de um clique, de uma promessa etc.) mostrava tela branca sem nenhuma
+// explicação. Agora aparece uma faixa no topo com o erro — a pessoa manda o
+// print e dá para corrigir sem adivinhação.
+(function instalarRedeDeSeguranca() {
+  let jaMostrou = false;
+  function mostrar(detalhe) {
+    if (jaMostrou) return;
+    jaMostrou = true;
+    try {
+      const b = document.createElement('div');
+      b.setAttribute('role', 'alert');
+      b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#FEF2F2;border-bottom:2px solid #DC2626;' +
+        'padding:12px 16px;font:13px/1.5 system-ui,sans-serif;color:#7F1D1D;box-shadow:0 2px 10px rgba(0,0,0,.12)';
+      b.innerHTML = '<strong>Algo falhou nesta tela.</strong> Seus dados estão salvos. ' +
+        '<button style="margin-left:8px;padding:4px 12px;border:0;border-radius:6px;background:#DC2626;color:#fff;cursor:pointer;font-weight:600;">Recarregar</button>' +
+        '<div style="margin-top:6px;font-size:11px;color:#B91C1C;word-break:break-all;">' + escapeHTML(detalhe) + '</div>';
+      b.querySelector('button').onclick = function () { location.reload(); };
+      document.body.appendChild(b);
+    } catch (_) {}
+  }
+  window.addEventListener('error', function (ev) {
+    mostrar(_rtDetalheErro(ev.error || ev.message));
+  });
+  window.addEventListener('unhandledrejection', function (ev) {
+    mostrar(_rtDetalheErro(ev.reason));
+  });
+})();
+
 // BLINDAGEM: se a montagem de uma aba falhar, a tela NÃO pode ficar branca.
 // O invólucro abaixo mostra um aviso com botão de recarregar em vez de deixar
 // a pessoa presa numa página vazia, sem entender o que aconteceu.
@@ -1707,7 +1744,8 @@ function renderCurrentAba() {
         alvo.innerHTML = '<div style="max-width:520px;margin:60px auto;text-align:center;padding:28px;border:1px solid #E2E8F0;border-radius:14px;background:#fff;">' +
           '<div style="font-size:34px;">&#9888;&#65039;</div>' +
           '<h3 style="margin:12px 0 6px;color:#0F172A;">Não consegui montar esta tela</h3>' +
-          '<p style="color:#64748B;font-size:14px;line-height:1.6;margin:0 0 18px;">Seus dados estão salvos — foi só a exibição que falhou. Recarregue para tentar de novo.</p>' +
+          '<p style="color:#64748B;font-size:14px;line-height:1.6;margin:0 0 14px;">Seus dados estão salvos — foi só a exibição que falhou. Recarregue para tentar de novo.</p>' +
+          '<pre style="text-align:left;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px;font-size:11px;color:#B91C1C;overflow:auto;max-height:120px;margin:0 0 16px;white-space:pre-wrap;">' + escapeHTML(_rtDetalheErro(e)) + '</pre>' +
           '<button class="btn btn-primary" onclick="location.reload()">Recarregar o sistema</button></div>';
       }
     } catch (_) {}
