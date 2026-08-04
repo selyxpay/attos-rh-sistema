@@ -8191,6 +8191,10 @@ function renderBancoTalentosSimples() {
   const fCidade  = (document.getElementById('bt-filter-cidade')  || {}).value || '';
   const fEmpresa = (document.getElementById('bt-filter-empresa') || {}).value || '';
 
+  // Filtro mudou -> volta para a primeira página
+  const _assinaturaFiltro = fSexo + '|' + fCidade + '|' + fEmpresa;
+  if (window.__btUltimoFiltro !== _assinaturaFiltro) { window.__btUltimoFiltro = _assinaturaFiltro; rtResetarPagina('talentos'); }
+
   let lista = state.bancoTalentos || [];
   if (fSexo)   lista = lista.filter(t => (t.sexo || detectarSexoPeloNome(t.nome)) === fSexo);
   if (fCidade) lista = lista.filter(t => (t.cidade || '').toLowerCase() === fCidade.toLowerCase());
@@ -8207,9 +8211,11 @@ function renderBancoTalentosSimples() {
   const headerHtml = `<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;font-weight:600;">
     ${lista.length} talento${lista.length > 1 ? 's' : ''} encontrado${lista.length > 1 ? 's' : ''}
     <span style="font-weight:400;"> — clique em um nome para ver detalhes e puxar para processo</span>
-  </div>`;
+  </div>` + rtControlesPagina(pagT, 'talentos');
 
-  const cardsHtml = lista.map(t => {
+  // Pagina os cards: 7.584 talentos de uma vez geravam 524.000 pixels de rolagem.
+  const pagT = rtPaginar(lista, 'talentos');
+  const cardsHtml = pagT.itens.map(t => {
     const initials = (t.nome || '?').split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase();
     const sexo     = t.sexo || detectarSexoPeloNome(t.nome);
     const proximas = empresasMaisProximas(t);
@@ -8255,7 +8261,7 @@ function renderBancoTalentosSimples() {
     </div>`;
   }).join('');
 
-  container.innerHTML = headerHtml + cardsHtml;
+  container.innerHTML = headerHtml + cardsHtml + rtControlesPagina(pagT, 'talentos');
 }
 
 window.abrirDetalheBT = function(btId) {
@@ -10411,6 +10417,81 @@ function _equipListaFiltrada() {
   }).sort((a, b) => new Date(b.dataCadastro || b.data || 0) - new Date(a.dataCadastro || a.data || 0));
 }
 
+
+// ══════════════════════════════════════════════════════════════════════════
+// PAGINAÇÃO DAS LISTAS GRANDES
+// --------------------------------------------------------------------------
+// As listas mostravam TODOS os registros de uma vez. Com os dados reais, a
+// rolagem virava um poço sem fundo: Equipamentos gerava 59.000 pixels de
+// rolagem (77 telas) e o Banco de Talentos 524.000 (688 telas) — a pessoa
+// descia sem parar e o navegador não dava conta de desenhar, deixando a tela
+// em branco no meio do caminho.
+//
+// Agora cada lista mostra um pedaço por vez, com navegação de páginas.
+// ══════════════════════════════════════════════════════════════════════════
+const _RT_POR_PAGINA = 50;
+// No celular cada registro vira um CARD alto: 50 cards davam 12.500 pixels de
+// rolagem. Menos itens por página deixa a navegação confortável no telefone.
+const _RT_POR_PAGINA_CELULAR = 15;
+function _rtPorPagina() {
+  try { return window.matchMedia('(max-width: 768px)').matches ? _RT_POR_PAGINA_CELULAR : _RT_POR_PAGINA; }
+  catch (e) { return _RT_POR_PAGINA; }
+}
+const _rtPaginas = {};   // { chave: numeroDaPagina }
+
+function rtPaginaAtual(chave) { return _rtPaginas[chave] || 1; }
+
+// Recorta a lista na página atual. Se a lista encolheu (filtro), volta para a
+// primeira página em vez de mostrar uma página vazia.
+function rtPaginar(lista, chave, porPagina) {
+  const tamanho = porPagina || _rtPorPagina();
+  const total = lista.length;
+  const totalPaginas = Math.max(1, Math.ceil(total / tamanho));
+  let pagina = rtPaginaAtual(chave);
+  if (pagina > totalPaginas) { pagina = 1; _rtPaginas[chave] = 1; }
+  const inicio = (pagina - 1) * tamanho;
+  return {
+    itens: lista.slice(inicio, inicio + tamanho),
+    pagina: pagina, totalPaginas: totalPaginas, total: total,
+    primeiro: total ? inicio + 1 : 0,
+    ultimo: Math.min(inicio + tamanho, total)
+  };
+}
+
+// Barra de navegação. Some sozinha quando cabe tudo em uma página.
+function rtControlesPagina(p, chave) {
+  if (p.totalPaginas <= 1) {
+    return '<div class="rt-paginacao-info">' + p.total + ' registro(s)</div>';
+  }
+  const btn = (destino, rotulo, titulo, desabilitado) =>
+    '<button type="button" class="rt-pag-btn" ' + (desabilitado ? 'disabled' : '') +
+    ' title="' + titulo + '" onclick="rtIrParaPagina(\'' + chave + '\',' + destino + ')">' + rotulo + '</button>';
+  return '<div class="rt-paginacao">' +
+    '<div class="rt-paginacao-info">Mostrando <b>' + p.primeiro + '–' + p.ultimo + '</b> de <b>' + p.total + '</b></div>' +
+    '<div class="rt-paginacao-botoes">' +
+      btn(1, '&laquo;', 'Primeira página', p.pagina === 1) +
+      btn(p.pagina - 1, '&lsaquo; Anterior', 'Página anterior', p.pagina === 1) +
+      '<span class="rt-pag-atual">' + p.pagina + ' / ' + p.totalPaginas + '</span>' +
+      btn(p.pagina + 1, 'Próxima &rsaquo;', 'Próxima página', p.pagina === p.totalPaginas) +
+      btn(p.totalPaginas, '&raquo;', 'Última página', p.pagina === p.totalPaginas) +
+    '</div>' +
+  '</div>';
+}
+
+window.rtIrParaPagina = function (chave, pagina) {
+  _rtPaginas[chave] = Math.max(1, pagina);
+  // Redesenha a lista da vez e sobe o scroll para o topo do conteúdo — senão a
+  // pessoa troca de página e continua vendo o fim da anterior.
+  if (chave === 'equipamentos' && typeof _renderEquipLista === 'function') _renderEquipLista();
+  else if (chave === 'talentos' && typeof renderBancoTalentosSimples === 'function') renderBancoTalentosSimples();
+  else if (typeof renderCurrentAba === 'function') renderCurrentAba();
+  const v = document.querySelector('.content-viewport');
+  if (v && v.scrollTo) v.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+// Quando um filtro muda, a paginação precisa voltar para a página 1.
+function rtResetarPagina(chave) { _rtPaginas[chave] = 1; }
+
 // À PROVA DE ERRO: esta lista é crítica (registros/fotos de equipamentos). Nunca
 // pode ficar em branco por causa de um filtro travado ou de UM registro com
 // formato estranho. Por isso: (1) se os filtros escondem tudo mas EXISTEM
@@ -10424,6 +10505,15 @@ function _renderEquipLista() {
   try {
     garantirEquipamentos();
     const totalReal = (state.equipamentos || []).length;
+
+    // Filtro mudou -> volta para a primeira página
+    const _assEquip = [ (document.getElementById('equip-f-busca')||{}).value,
+                        (document.getElementById('equip-f-item')||{}).value,
+                        (document.getElementById('equip-f-estado')||{}).value,
+                        (document.getElementById('equip-f-de')||{}).value,
+                        (document.getElementById('equip-f-ate')||{}).value,
+                        _equipFiltroTipo ].join('|');
+    if (window.__equipUltimoFiltro !== _assEquip) { window.__equipUltimoFiltro = _assEquip; rtResetarPagina('equipamentos'); }
 
     let lista;
     try { lista = _equipListaFiltrada(); }
@@ -10445,10 +10535,13 @@ function _renderEquipLista() {
     const p = n => String(n).padStart(2, '0');
 
     // ─── Monta as linhas da tabela (desktop) E os cards (mobile) ───
+    // Só a PÁGINA ATUAL é desenhada. Com 943 registros de uma vez, a rolagem
+    // passava de 59.000 pixels e o navegador não dava conta de desenhar.
+    const pag = rtPaginar(lista, 'equipamentos');
     const linhasDesktop = [];
     const cardsMobile = [];
 
-    lista.forEach((r, idx) => {
+    pag.itens.forEach((r, idx) => {
       try {
         // Normaliza campos que podem vir em formato legado
         const nome = String(r.nome || r.nomeCompleto || '—');
@@ -10526,6 +10619,7 @@ function _renderEquipLista() {
 
     cont.innerHTML = `
       <div class="equip-lista-info" style="font-size:12px;color:var(--text-secondary,#64748b);margin:2px 2px 8px;">${lista.length} de ${totalReal} registro(s)</div>
+      ${rtControlesPagina(pag, 'equipamentos')}
       <div class="table-scroll-container equip-desktop-view">
         <table class="excel-table equip-lista-table">
           <thead>
@@ -10537,7 +10631,8 @@ function _renderEquipLista() {
           <tbody>${linhasDesktop.join('')}</tbody>
         </table>
       </div>
-      <div class="equip-mobile-view">${cardsMobile.join('')}</div>`;
+      <div class="equip-mobile-view">${cardsMobile.join('')}</div>
+      ${rtControlesPagina(pag, 'equipamentos')}`;
   } catch (e) {
     // Rede de segurança final: nunca deixa a tela em branco e garante ao usuário que os dados estão salvos.
     console.error('[Equip] falha geral ao renderizar a lista:', e);
@@ -10580,10 +10675,12 @@ function abrirModalEquipamento(id) {
   const marcados = reg ? (reg.equipamentos || []) : [];
   g('equip-form-itens').innerHTML = Object.entries(EQUIP_ITENS).map(([k, nome]) => `
     <label class="equip-check">
-      <input type="checkbox" class="equip-item-chk" value="${k}" ${marcados.includes(k) ? 'checked' : ''} onchange="_equipToggleOutros()">
+      <input type="checkbox" class="equip-item-chk" value="${k}" ${marcados.includes(k) ? 'checked' : ''} onchange="_equipMarcarItem(this); _equipToggleOutros();">
       <span>${nome}</span>
     </label>`).join('');
 
+  // Deixa a marcação visual correta já na abertura (edição de registro)
+  document.querySelectorAll('#equip-form-itens .equip-item-chk').forEach(_equipMarcarItem);
   _equipToggleOutros();
   _renderPreviewFotosEquip();
   if (reg && reg.cpf) buscarColaboradorPorCPFEquip();
@@ -10602,6 +10699,16 @@ function fecharModalEquipamento() {
 window.fecharModalEquipamento = fecharModalEquipamento;
 
 // Mostra o campo "Descreva o equipamento" só quando "Outros" está marcado
+// Mantém a classe .marcado no rótulo do item. Serve de alternativa ao seletor
+// CSS :has(), que o Safari só entende a partir da versão 15.4 — sem isto, no
+// Safari antigo o item selecionado não ficava destacado.
+function _equipMarcarItem(chk) {
+  if (!chk) return;
+  const rot = chk.closest ? chk.closest('.equip-check') : null;
+  if (rot) rot.classList.toggle('marcado', !!chk.checked);
+}
+window._equipMarcarItem = _equipMarcarItem;
+
 function _equipToggleOutros() {
   const marcado = !!document.querySelector('.equip-item-chk[value="outros"]:checked');
   const wrap = document.getElementById('equip-outros-wrap');

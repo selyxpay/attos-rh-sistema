@@ -168,8 +168,8 @@ body::before {
 .modal-body {
   background: var(--color-white) !important;
   color: var(--color-text-main) !important;
-  backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
   box-shadow: var(--shadow-floating) !important;
   border: 1px solid #CBD5E1 !important;
 }
@@ -199,6 +199,7 @@ label,
 .app-container {
   display: flex !important;
   height: 100vh !important;
+  height: 100dvh !important;   /* iOS Safari: 100vh inclui a barra de endereço */
   overflow: hidden !important;
 }
 
@@ -222,6 +223,7 @@ label,
   position: sticky !important;
   top: 16px !important;
   height: calc(100vh - 32px) !important;
+  height: calc(100dvh - 32px) !important;
   width: 230px !important;
   flex-shrink: 0 !important;
   
@@ -320,6 +322,7 @@ label,
 .main-layout {
   flex-grow: 1 !important;
   height: 100vh !important;
+  height: 100dvh !important;   /* idem: sem isto o rodapé some atrás da barra do Safari */
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
@@ -345,6 +348,7 @@ label,
   overflow-y: auto !important;
   padding: 0 16px 32px 0 !important;
   height: calc(100vh - 100px) !important;
+  height: calc(100dvh - 100px) !important;
 }
 
 /* 6. BOTÕES MODERNOS E LEGÍVEIS */
@@ -687,6 +691,7 @@ textarea:focus {
   cursor: pointer !important;
   transition: all 0.2s ease !important;
   text-decoration: none !important;
+  -webkit-backdrop-filter: blur(4px) !important;
   backdrop-filter: blur(4px) !important;
 }
 
