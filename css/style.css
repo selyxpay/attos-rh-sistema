@@ -4782,3 +4782,17 @@ input.form-control[type="date"] {
     .ff-selecao-info { margin-right: 0; }
     .ff-achado-linhas { grid-template-columns: 1fr; }
 }
+
+/* Resultado da busca: destaque da posição e ações */
+.ff-achado-posicao {
+    margin: 6px 0 2px; font-size: 13.5px; color: #0F172A;
+    background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px;
+    padding: 7px 11px; display: inline-block;
+}
+.ff-achado-posicao b { color: #1D4ED8; }
+.ff-achado-acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 768px) {
+    .ff-achado-acoes { flex-direction: column; }
+    .ff-achado-acoes .btn { width: 100%; min-height: 44px; justify-content: center; }
+    .ff-achado-posicao { display: block; }
+}

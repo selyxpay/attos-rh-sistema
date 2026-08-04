@@ -1739,7 +1739,12 @@ function renderCurrentAba() {
   } catch (e) {
     console.error('[RT] Falha ao montar a aba "' + activeAba + '":', e);
     try {
-      const alvo = document.querySelector('#aba-' + activeAba) || document.querySelector('.aba-content:not([style*="display: none"])');
+      // A seção visível é marcada com a classe .active pelo switchAba(). O id
+      // NEM SEMPRE é "aba-" + activeAba (ex.: financeiro -> aba-fluxo-financeiro),
+      // então procurar pelo id daria erro justamente nessas abas.
+      const alvo = document.querySelector('.aba-content.active')
+                || document.getElementById('aba-' + activeAba)
+                || document.querySelector('.aba-content');
       if (alvo) {
         alvo.innerHTML = '<div style="max-width:520px;margin:60px auto;text-align:center;padding:28px;border:1px solid #E2E8F0;border-radius:14px;background:#fff;">' +
           '<div style="font-size:34px;">&#9888;&#65039;</div>' +
@@ -12697,21 +12702,37 @@ function _ffRenderFinalizados(cont) {
         '<div class="ff-busca-titulo"><i class="fa-solid fa-magnifying-glass"></i> ' +
           achados.length + ' resultado(s) para &ldquo;' + escapeHTML(_ffFinBuscaPessoa) + '&rdquo;</div>' +
         achados.map(function (a) {
+          const v0 = (Array.isArray(a.f.vinculos) && a.f.vinculos[0]) || null;
+          const empresa = v0 ? v0.empresaNome : (a.f.empresaNome || '—');
+          const cliente = v0 ? v0.clienteNome : '';
+          const tomador = v0 ? v0.tomadorCodigo : '';
+          // Nome do arquivo que vai ser baixado — o mesmo que a exportação gera,
+          // para a pessoa reconhecer a planilha na pasta de downloads.
+          const arquivo = 'fluxo_financeiro_' + a.f.numero + '_' +
+            String(a.f.empresaNome || 'sem_empresa').replace(/[^\w]+/g, '_') + '.xlsx';
           return '<div class="ff-achado">' +
             '<div class="ff-achado-nome">' + escapeHTML(a.l.nome || '(sem nome)') +
               (a.l.cpf ? '<span class="ff-achado-cpf">CPF ' + escapeHTML(a.l.cpf) + '</span>' : '') + '</div>' +
+            '<div class="ff-achado-posicao">Está na <b>posição ' + a.posicao + '</b> de ' +
+              _ffQtdColaboradores(a.f) + ' pessoa(s) desta ficha</div>' +
             '<div class="ff-achado-linhas">' +
-              '<span><b>Empresa:</b> ' + escapeHTML(_ffIdentificacao(a.f)) + '</span>' +
+              '<span><b>Empresa:</b> ' + escapeHTML(empresa) + '</span>' +
+              (cliente ? '<span><b>Cliente:</b> ' + escapeHTML(cliente) + '</span>' : '') +
+              (tomador ? '<span><b>Tomador:</b> ' + escapeHTML(tomador) + '</span>' : '') +
               '<span><b>Documento:</b> #' + escapeHTML(a.f.numero) + '</span>' +
               '<span><b>Ficha:</b> ' + escapeHTML(a.f.tipo || '—') +
                 (a.f.competencia ? ' · ' + escapeHTML(a.f.competencia) : '') + '</span>' +
-              '<span><b>Posição na ficha:</b> linha ' + a.posicao + ' de ' + _ffQtdColaboradores(a.f) + '</span>' +
               '<span><b>Enviado ao financeiro:</b> ' + (_formatarDataBR(_ffSoData(_ffDataEnvioFinanceiro(a.f))) || '—') + '</span>' +
-              '<span><b>Valor:</b> ' + _ffMoedaBR(Number(a.l.valor) || 0) + '</span>' +
+              '<span><b>Valor da pessoa:</b> ' + _ffMoedaBR(Number(a.l.valor) || 0) + '</span>' +
               '<span><b>Status da ficha:</b> ' + (FF_STATUS[a.f.status] ? FF_STATUS[a.f.status].rotulo : a.f.status) + '</span>' +
+              '<span><b>Planilha:</b> ' + escapeHTML(arquivo) + '</span>' +
             '</div>' +
-            '<button class="btn btn-secondary btn-sm" onclick="abrirDetalheFluxo(\'' + a.f.id + '\')">' +
-              '<i class="fa-solid fa-eye"></i> Abrir a ficha</button>' +
+            '<div class="ff-achado-acoes">' +
+              '<button class="btn btn-primary btn-sm" onclick="exportarFluxoExcel(\'' + a.f.id + '\')">' +
+                '<i class="fa-solid fa-file-excel"></i> Abrir o Excel desta ficha</button>' +
+              '<button class="btn btn-secondary btn-sm" onclick="abrirDetalheFluxo(\'' + a.f.id + '\')">' +
+                '<i class="fa-solid fa-eye"></i> Ver a ficha no sistema</button>' +
+            '</div>' +
           '</div>';
         }).join('') + '</div>';
     } else {
@@ -13692,8 +13713,12 @@ window.exportarGerencialExcel = function() {
 };
 
 // Exporta a tabela do fluxo em Excel (.xlsx) — uma linha por colaborador
-window.exportarFluxoExcel = function() {
-  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+// Aceita um id opcional: assim o Excel pode ser baixado direto do resultado da
+// busca por colaborador, sem precisar abrir a ficha antes. Sem id, continua
+// exportando a ficha aberta (comportamento de sempre).
+window.exportarFluxoExcel = function(idFluxo) {
+  const alvo = idFluxo || _ffDetalheId;
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === alvo);
   if (!f) return;
   if (typeof XLSX === 'undefined') { alert('O componente de Excel não carregou. Atualize a página (Ctrl+Shift+R).'); return; }
 
