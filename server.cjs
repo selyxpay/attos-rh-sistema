@@ -1081,7 +1081,10 @@ http.createServer(function (req, res) {
   // memória, sem tocar no disco.
   if (urlPath === '/api/state/version' && req.method === 'GET') {
     const v = versaoAtual();
-    responderJson(res, 200, { version: v.version, atualizadoEm: v.atualizadoEm });
+    // "autenticado" vai junto para o navegador perceber NA HORA quando a sessão
+    // cai (expirou, servidor reiniciou). Antes isso só era notado quando alguém
+    // gravava algo — e a tela ficava travada até a pessoa sair e entrar de novo.
+    responderJson(res, 200, { version: v.version, atualizadoEm: v.atualizadoEm, autenticado: !!autenticado });
     return;
   }
 

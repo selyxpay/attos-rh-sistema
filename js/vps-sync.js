@@ -16,6 +16,7 @@ window.RTCloud = (function () {
   const POLL_MS = 4000;
 
   let onRemote = null;
+  let onSessaoPerdida = null;
   let pending = null, pendingMerge = false, pendingUpsert = [];
   let saveTimer = null, pollTimer = null;
   let lastVersion = 0;
@@ -40,6 +41,7 @@ window.RTCloud = (function () {
   // -- Inicializa: guarda callback e começa o polling (substitui o tempo real) --
   async function init(opts) {
     onRemote = (opts && opts.onRemoteUpdate) || null;
+    onSessaoPerdida = (opts && opts.onSessaoPerdida) || null;
     try { const s = await apiGet('/state'); lastVersion = s.version || 0; } catch (e) {}
     if (pollTimer) clearInterval(pollTimer);
     pollTimer = setInterval(verificarRemoto, POLL_MS);
@@ -55,6 +57,9 @@ window.RTCloud = (function () {
       // principal motivo da lentidão. Agora o estado só é baixado quando
       // alguém realmente alterou alguma coisa.
       const v = await apiGet('/state/version');
+      // Sessão caiu (expirou / servidor reiniciou): avisa quem estiver ouvindo
+      // para a tela reagir na hora, em vez de ficar parada sem salvar nada.
+      if (v && v.autenticado === false && onSessaoPerdida) { onSessaoPerdida(); return; }
       if ((v.version || 0) === lastVersion) return;      // nada mudou: acabou aqui
       const s = await apiGet('/state');
       if ((s.version || 0) !== lastVersion) {

@@ -757,6 +757,16 @@ async function ativarNuvem() {
   let _remoteUpdateTimer = null;
   try {
     await RTCloud.init({
+      // Sessão caiu (expirou, servidor reiniciou). Antes a tela simplesmente
+      // parava de funcionar e a pessoa tinha que sair e entrar de novo sem
+      // saber por quê. Agora avisa e leva para o login.
+      onSessaoPerdida: () => {
+        if (window.__rtAvisandoSessao) return;
+        window.__rtAvisandoSessao = true;
+        try { localStorage.removeItem('rt_logged_user'); } catch (e) {}
+        alert('Sua sessão expirou por segurança. Entre novamente para continuar.');
+        location.replace('/login.html');
+      },
       onRemoteUpdate: (dados) => {
         if (!dados) return;
         // Sessão perdida/expirada no servidor (veio só o subconjunto público) → volta pro login
@@ -1683,7 +1693,28 @@ function switchAba(abaId) {
   renderCurrentAba();
 }
 
+// BLINDAGEM: se a montagem de uma aba falhar, a tela NÃO pode ficar branca.
+// O invólucro abaixo mostra um aviso com botão de recarregar em vez de deixar
+// a pessoa presa numa página vazia, sem entender o que aconteceu.
 function renderCurrentAba() {
+  try {
+    _renderCurrentAbaInterno();
+  } catch (e) {
+    console.error('[RT] Falha ao montar a aba "' + activeAba + '":', e);
+    try {
+      const alvo = document.querySelector('#aba-' + activeAba) || document.querySelector('.aba-content:not([style*="display: none"])');
+      if (alvo) {
+        alvo.innerHTML = '<div style="max-width:520px;margin:60px auto;text-align:center;padding:28px;border:1px solid #E2E8F0;border-radius:14px;background:#fff;">' +
+          '<div style="font-size:34px;">&#9888;&#65039;</div>' +
+          '<h3 style="margin:12px 0 6px;color:#0F172A;">Não consegui montar esta tela</h3>' +
+          '<p style="color:#64748B;font-size:14px;line-height:1.6;margin:0 0 18px;">Seus dados estão salvos — foi só a exibição que falhou. Recarregue para tentar de novo.</p>' +
+          '<button class="btn btn-primary" onclick="location.reload()">Recarregar o sistema</button></div>';
+      }
+    } catch (_) {}
+  }
+}
+
+function _renderCurrentAbaInterno() {
   // O monitor de pedidos de senha só roda na aba Funcionários
   if (activeAba !== 'funcionarios') pararMonitorPedidosSenha();
 
