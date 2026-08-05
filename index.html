@@ -35,16 +35,16 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260805d">
+    <link rel="stylesheet" href="css/style.css?v=20260805e">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260805d">
+    <link rel="stylesheet" href="css/design-system.css?v=20260805e">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260805d">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260805e">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260805d">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260805d">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260805e">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260805e">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260805d">
+    <link rel="stylesheet" href="css/mobile.css?v=20260805e">
 </head>
 <body>
 
@@ -1574,6 +1574,48 @@
                         </div>
                     </div>
                 </section>
+
+                <!-- Modal: Gerar relatório de equipamentos para a empresa cliente -->
+                <div id="modal-relatorio-equip" class="modal-overlay" style="display:none;" onclick="if(event.target===this)fecharModalRelatorioEquip()">
+                    <div class="modal-exame-box">
+                        <div class="modal-exame-header">
+                            <div style="display:flex;align-items:center;gap:12px;">
+                                <div class="modal-exame-icon" style="background:linear-gradient(135deg,#1E40AF,#3B82F6);"><i class="fa-solid fa-share-nodes"></i></div>
+                                <div>
+                                    <h2 style="margin:0;font-size:20px;">Enviar relatório para a empresa</h2>
+                                    <p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary);">
+                                        <strong id="rel-equip-qtd">0</strong> colaborador(es) selecionado(s)</p>
+                                </div>
+                            </div>
+                            <button class="modal-exame-close" onclick="fecharModalRelatorioEquip()"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="modal-exame-body">
+                            <div class="form-group">
+                                <label>Título do relatório</label>
+                                <input type="text" id="rel-equip-titulo" class="form-control" placeholder="Ex.: Devolução de equipamentos — Agosto/2026">
+                            </div>
+                            <div class="form-group">
+                                <label>Empresa que vai receber</label>
+                                <input type="text" id="rel-equip-empresa" class="form-control" placeholder="Ex.: Mercado Livre">
+                            </div>
+                            <div class="form-group">
+                                <label>Mensagem para a empresa (opcional)</label>
+                                <textarea id="rel-equip-obs" class="form-control" rows="3"
+                                    placeholder="Ex.: Segue a relação dos colaboradores que devolveram os equipamentos. Todos conferidos e em ordem."></textarea>
+                            </div>
+                            <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin:0;">
+                                <i class="fa-solid fa-circle-info"></i> O link abre sem senha — qualquer pessoa com o endereço vê o relatório.
+                                Por segurança, o CPF aparece parcialmente oculto e você pode desativar o link quando quiser.
+                            </p>
+                            <div id="rel-equip-resultado"></div>
+                        </div>
+                        <div class="modal-exame-footer">
+                            <button class="btn btn-secondary" onclick="fecharModalRelatorioEquip()">Fechar</button>
+                            <button class="btn btn-primary" id="rel-equip-btn" onclick="gerarRelatorioEquip()">
+                                <i class="fa-solid fa-link"></i> Gerar link</button>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Modal: Novo / Editar Registro de Equipamento -->
                 <div id="modal-equipamento" class="modal-overlay" style="display:none;" onclick="if(event.target===this)fecharModalEquipamento()">
@@ -3740,11 +3782,11 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260805d"></script>
-    <script src="js/vps-sync.js?v=20260805d"></script>
-    <script src="js/exata-catalogo.js?v=20260805d"></script>
-    <script src="js/data.js?v=20260805d"></script>
-    <script src="js/app.js?v=20260805d"></script>
-    <script src="js/whatsapp.js?v=20260805d"></script>
+    <script src="js/security.js?v=20260805e"></script>
+    <script src="js/vps-sync.js?v=20260805e"></script>
+    <script src="js/exata-catalogo.js?v=20260805e"></script>
+    <script src="js/data.js?v=20260805e"></script>
+    <script src="js/app.js?v=20260805e"></script>
+    <script src="js/whatsapp.js?v=20260805e"></script>
 </body>
 </html>

@@ -10494,6 +10494,229 @@ window.rtIrParaPagina = function (chave, pagina) {
 // Quando um filtro muda, a paginação precisa voltar para a página 1.
 function rtResetarPagina(chave) { _rtPaginas[chave] = 1; }
 
+
+// ══════════════════════════════════════════════════════════════════════════
+// RELATÓRIO DE EQUIPAMENTOS PARA A EMPRESA CLIENTE
+// --------------------------------------------------------------------------
+// O DP marca os colaboradores na lista e gera um LINK. A empresa cliente abre
+// esse link sem login e vê a relação com as fotos. Também dá para baixar em
+// Excel.
+//
+// IMPORTANTE: nada aqui altera os registros de Equipamentos. A seleção vive só
+// na tela, e o relatório é gravado numa lista SEPARADA (state.relatoriosEquip),
+// guardando apenas os IDs dos registros escolhidos.
+// ══════════════════════════════════════════════════════════════════════════
+let _equipSelecao = {};   // { idDoRegistro: true } — só enquanto a tela está aberta
+
+function garantirRelatoriosEquip() {
+  if (!Array.isArray(state.relatoriosEquip)) state.relatoriosEquip = [];
+  return state.relatoriosEquip;
+}
+function _equipSelecionados() { return Object.keys(_equipSelecao); }
+
+window.equipMarcar = function (id, marcado) {
+  if (marcado) _equipSelecao[id] = true; else delete _equipSelecao[id];
+  _equipAtualizarBarraSelecao();
+};
+
+// Marca/desmarca tudo que está aparecendo com os filtros atuais (todas as páginas).
+window.equipMarcarTodos = function (marcado) {
+  let lista = [];
+  try { lista = _equipListaFiltrada(); } catch (e) { lista = state.equipamentos || []; }
+  if (marcado) lista.forEach(r => { if (r && r.id) _equipSelecao[r.id] = true; });
+  else lista.forEach(r => { if (r && r.id) delete _equipSelecao[r.id]; });
+  _renderEquipLista();
+};
+window.equipLimparSelecao = function () { _equipSelecao = {}; _renderEquipLista(); };
+
+// Barra que aparece quando há alguém marcado.
+function _equipBarraSelecao() {
+  const n = _equipSelecionados().length;
+  if (!n) return '';
+  return '<div class="equip-barra-selecao">' +
+    '<span class="equip-sel-info"><b>' + n + '</b> colaborador(es) selecionado(s)</span>' +
+    '<button class="btn btn-secondary btn-sm" onclick="equipLimparSelecao()">Limpar</button>' +
+    '<button class="btn btn-primary" onclick="abrirModalRelatorioEquip()">' +
+      '<i class="fa-solid fa-share-nodes"></i> Gerar relatório para a empresa</button>' +
+  '</div>';
+}
+function _equipAtualizarBarraSelecao() {
+  const alvo = document.getElementById('equip-barra-selecao');
+  if (alvo) alvo.innerHTML = _equipBarraSelecao();
+}
+
+// ── Modal: dados do relatório ─────────────────────────────────────────────
+window.abrirModalRelatorioEquip = function () {
+  const ids = _equipSelecionados();
+  if (!ids.length) { alert('Marque ao menos um colaborador na lista.'); return; }
+  const m = document.getElementById('modal-relatorio-equip');
+  if (!m) return;
+  const g = k => document.getElementById(k);
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  if (g('rel-equip-titulo')) g('rel-equip-titulo').value = 'Relatório de Equipamentos — ' + hoje;
+  if (g('rel-equip-empresa')) g('rel-equip-empresa').value = '';
+  if (g('rel-equip-obs')) g('rel-equip-obs').value = '';
+  if (g('rel-equip-qtd')) g('rel-equip-qtd').textContent = ids.length;
+  if (g('rel-equip-resultado')) g('rel-equip-resultado').innerHTML = '';
+  m.style.display = 'flex';
+};
+window.fecharModalRelatorioEquip = function () {
+  const m = document.getElementById('modal-relatorio-equip');
+  if (m) m.style.display = 'none';
+};
+
+// Token longo e aleatório — o link não pode ser adivinhado.
+function _equipNovoToken() {
+  try {
+    const a = new Uint8Array(24);
+    crypto.getRandomValues(a);
+    return [...a].map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch (e) {
+    return String(Date.now()) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  }
+}
+
+window.gerarRelatorioEquip = async function () {
+  const ids = _equipSelecionados();
+  if (!ids.length) { alert('Nenhum colaborador selecionado.'); return; }
+  const g = k => document.getElementById(k);
+  const titulo = (g('rel-equip-titulo')?.value || '').trim() || 'Relatório de Equipamentos';
+  const empresa = (g('rel-equip-empresa')?.value || '').trim();
+  const obs = (g('rel-equip-obs')?.value || '').trim();
+
+  garantirRelatoriosEquip();
+  const rel = {
+    id: 'relequip-' + Date.now(),
+    token: _equipNovoToken(),
+    titulo, empresaDestino: empresa, observacao: obs,
+    registrosIds: ids.slice(),
+    criadoPor: loggedUser ? nomeExibido(loggedUser) : 'Sistema',
+    criadoPorLogin: loggedUser ? loggedUser.login : '',
+    criadoEm: new Date().toISOString(),
+    ativo: true
+  };
+  state.relatoriosEquip.push(rel);
+
+  const btn = g('rel-equip-btn'); if (btn) btn.disabled = true;
+  try {
+    // merge + upsert: grava SÓ este relatório, sem tocar em mais nada
+    await RTCloud.salvarAgora(state, { merge: true, upsertIds: [rel.id] });
+  } catch (e) {
+    state.relatoriosEquip = state.relatoriosEquip.filter(r => r.id !== rel.id);
+    if (btn) btn.disabled = false;
+    alert('Não consegui salvar o relatório: ' + (e.message || e));
+    return;
+  }
+  if (btn) btn.disabled = false;
+
+  const link = location.origin + '/relatorio-equip.html?r=' + rel.token;
+  registrarLogGlobal('Gerou relatório de equipamentos com ' + ids.length + ' colaborador(es)' +
+    (empresa ? ' para ' + empresa : '') + '.', 'dp');
+
+  const res = g('rel-equip-resultado');
+  if (res) {
+    res.innerHTML =
+      '<div class="rel-equip-ok">' +
+        '<div class="rel-equip-ok-titulo"><i class="fa-solid fa-circle-check"></i> Link criado!</div>' +
+        '<p class="rel-equip-ok-txt">Mande este endereço para a empresa. Ela abre direto, sem senha.</p>' +
+        '<div class="rel-equip-link"><input type="text" id="rel-equip-url" readonly value="' + escapeHTML(link) + '"></div>' +
+        '<div class="rel-equip-acoes">' +
+          '<button class="btn btn-primary" onclick="copiarLinkRelatorioEquip()"><i class="fa-solid fa-copy"></i> Copiar link</button>' +
+          '<a class="btn btn-secondary" href="' + escapeHTML(link) + '" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> Abrir</a>' +
+          '<button class="btn btn-secondary" onclick="exportarRelatorioEquipExcel(\'' + rel.id + '\')"><i class="fa-solid fa-file-excel"></i> Baixar Excel</button>' +
+        '</div>' +
+      '</div>';
+  }
+  _equipSelecao = {};
+  renderEquipamentos();
+};
+
+window.copiarLinkRelatorioEquip = function () {
+  const el = document.getElementById('rel-equip-url');
+  if (!el) return;
+  el.select(); el.setSelectionRange(0, 99999);
+  const feito = () => alert('Link copiado! É só colar no e-mail ou no WhatsApp.');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(el.value).then(feito).catch(() => { document.execCommand('copy'); feito(); });
+  } else { document.execCommand('copy'); feito(); }
+};
+
+// ── Excel do relatório ────────────────────────────────────────────────────
+window.exportarRelatorioEquipExcel = function (idRel) {
+  if (typeof XLSX === 'undefined') { alert('O componente de Excel não carregou. Atualize a página (Ctrl+Shift+R).'); return; }
+  garantirRelatoriosEquip();
+  const rel = state.relatoriosEquip.find(r => r.id === idRel);
+  const ids = rel ? rel.registrosIds : _equipSelecionados();
+  const registros = (state.equipamentos || []).filter(r => r && ids.indexOf(r.id) >= 0);
+  if (!registros.length) { alert('Nenhum registro para exportar.'); return; }
+
+  const linhas = registros.map(r => ({
+    'Colaborador': r.nome || '',
+    'CPF': r.cpf || '',
+    'Tipo': EQUIP_TIPOS[r.tipo] || r.tipo || '',
+    'Equipamentos': _equipNomesItens(r.equipamentos, r.equipamentoOutros),
+    'Estado': EQUIP_ESTADOS[r.estado] || r.estado || '',
+    'Responsável R&T': r.responsavel || '',
+    'Data do registro': _formatarDataHoraBR ? _formatarDataHoraBR(r.dataCadastro) : (r.dataCadastro || ''),
+    'Fotos anexadas': (r.fotos || []).length,
+    'Observações': r.observacoes || ''
+  }));
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(linhas);
+  ws['!cols'] = [{ wch: 32 }, { wch: 16 }, { wch: 12 }, { wch: 34 }, { wch: 12 },
+                 { wch: 22 }, { wch: 18 }, { wch: 8 }, { wch: 40 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Equipamentos');
+  const nome = 'relatorio_equipamentos_' +
+    String((rel && rel.empresaDestino) || 'geral').replace(/[^\w]+/g, '_') + '_' +
+    new Date().toISOString().slice(0, 10) + '.xlsx';
+  XLSX.writeFile(wb, nome);
+};
+
+// ── Relatórios já gerados (para reenviar ou desativar) ────────────────────
+function _equipListaRelatorios() {
+  garantirRelatoriosEquip();
+  const rels = state.relatoriosEquip.slice().reverse();
+  if (!rels.length) return '';
+  return '<details class="equip-rels">' +
+    '<summary>Relatórios já enviados (' + rels.length + ')</summary>' +
+    rels.map(r => {
+      const link = location.origin + '/relatorio-equip.html?r=' + r.token;
+      return '<div class="equip-rel-item' + (r.ativo === false ? ' inativo' : '') + '">' +
+        '<div class="equip-rel-nome">' + escapeHTML(r.titulo || 'Relatório') +
+          (r.empresaDestino ? ' <span class="equip-rel-emp">→ ' + escapeHTML(r.empresaDestino) + '</span>' : '') +
+          (r.ativo === false ? ' <span class="equip-rel-off">desativado</span>' : '') + '</div>' +
+        '<div class="equip-rel-meta">' + (r.registrosIds || []).length + ' colaborador(es) &middot; ' +
+          escapeHTML(r.criadoPor || '') + ' &middot; ' + _ffDataHora(r.criadoEm) + '</div>' +
+        '<div class="equip-rel-acoes">' +
+          (r.ativo === false ? '' :
+            '<a class="btn btn-sm btn-secondary" href="' + escapeHTML(link) + '" target="_blank" rel="noopener">Abrir</a>' +
+            '<button class="btn btn-sm btn-secondary" onclick="copiarLinkDireto(\'' + escapeHTML(link) + '\')">Copiar link</button>') +
+          '<button class="btn btn-sm btn-secondary" onclick="exportarRelatorioEquipExcel(\'' + r.id + '\')">Excel</button>' +
+          (podeExcluirEquipamento() ? '<button class="btn btn-sm btn-outline" style="border-color:#DC2626;color:#DC2626;" onclick="alternarRelatorioEquip(\'' + r.id + '\')">' +
+            (r.ativo === false ? 'Reativar' : 'Desativar link') + '</button>' : '') +
+        '</div>' +
+      '</div>';
+    }).join('') +
+  '</details>';
+}
+window.copiarLinkDireto = function (link) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(function () { alert('Link copiado!'); });
+  } else { prompt('Copie o link:', link); }
+};
+window.alternarRelatorioEquip = async function (id) {
+  garantirRelatoriosEquip();
+  const r = state.relatoriosEquip.find(x => x.id === id);
+  if (!r) return;
+  const desativando = r.ativo !== false;
+  if (desativando && !confirm('Desativar este link? Quem tiver o endereço deixa de conseguir abrir.\n\nOs registros de equipamentos NÃO são afetados.')) return;
+  r.ativo = !desativando;
+  try { await RTCloud.salvarAgora(state, { merge: true, upsertIds: [r.id] }); }
+  catch (e) { alert('Não consegui salvar: ' + (e.message || e)); return; }
+  renderEquipamentos();
+};
+
 // À PROVA DE ERRO: esta lista é crítica (registros/fotos de equipamentos). Nunca
 // pode ficar em branco por causa de um filtro travado ou de UM registro com
 // formato estranho. Por isso: (1) se os filtros escondem tudo mas EXISTEM
@@ -10567,6 +10790,7 @@ function _renderEquipLista() {
         // Linha da tabela (desktop)
         linhasDesktop.push(`
           <tr>
+            <td data-label="" class="equip-col-check"><input type="checkbox" ${_equipSelecao[regId] ? 'checked' : ''} onclick="event.stopPropagation()" onchange="equipMarcar('${regId}', this.checked)" aria-label="Selecionar ${escapeHTML(nome)}"></td>
             <td data-label="Nome" style="font-weight:600;">${escapeHTML(nome)}
               ${r.candidatoId ? '<i class="fa-solid fa-link" title="Vinculado à ficha do colaborador" style="color:#059669;font-size:10px;margin-left:4px;"></i>' : ''}
             </td>
@@ -10608,7 +10832,7 @@ function _renderEquipLista() {
         console.error('[Equip] registro com formato antigo (isolado, não some da lista):', r && r.id, e);
         const nome = escapeHTML(String((r && (r.nome || r.nomeCompleto)) || 'Registro'));
         const regId = escapeHTML(String(r && r.id));
-        linhasDesktop.push(`<tr><td data-label="Nome" style="font-weight:600;">${nome}</td>
+        linhasDesktop.push(`<tr><td class="equip-col-check"></td><td data-label="Nome" style="font-weight:600;">${nome}</td>
           <td data-label="Ação" colspan="8" style="color:#b45309;">Registro em formato antigo —
           <button class="btn btn-sm btn-secondary" onclick="abrirVerEquipamento('${regId}')"><i class="fa-solid fa-eye"></i> abrir</button></td></tr>`);
         cardsMobile.push(`
@@ -10621,11 +10845,14 @@ function _renderEquipLista() {
 
     cont.innerHTML = `
       <div class="equip-lista-info" style="font-size:12px;color:var(--text-secondary,#64748b);margin:2px 2px 8px;">${lista.length} de ${totalReal} registro(s)</div>
+      <div id="equip-barra-selecao">${_equipBarraSelecao()}</div>
+      ${_equipListaRelatorios()}
       ${rtControlesPagina(pag, 'equipamentos')}
       <div class="table-scroll-container equip-desktop-view">
         <table class="excel-table equip-lista-table">
           <thead>
             <tr>
+              <th class="equip-col-check"><input type="checkbox" onchange="equipMarcarTodos(this.checked)" title="Selecionar todos os filtrados"></th>
               <th>Nome</th><th>CPF</th><th>Tipo</th><th>Equipamentos</th>
               <th>Estado</th><th>Responsável</th><th>Data</th><th>Hora</th><th>Ação</th>
             </tr>

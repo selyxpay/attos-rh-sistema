@@ -1088,6 +1088,68 @@ http.createServer(function (req, res) {
     return;
   }
 
+  // ==========================================================================
+  // RELATÓRIO DE EQUIPAMENTOS PARA A EMPRESA CLIENTE (link público)
+  // --------------------------------------------------------------------------
+  // O DP monta um relatório com os colaboradores escolhidos e manda o link
+  // para a empresa. Quem abre o link NÃO precisa de login — mas só enxerga
+  // AQUELE relatório, e nada mais do sistema.
+  //
+  // Cuidados: o token é longo e aleatório (não dá para adivinhar); a resposta
+  // traz somente os registros daquele relatório; o CPF sai parcialmente
+  // mascarado (o nome já identifica a pessoa para o cliente); e um relatório
+  // desativado deixa de responder.
+  // ==========================================================================
+  if (urlPath.indexOf('/api/relatorio-equip/') === 0 && req.method === 'GET') {
+    const token = decodeURIComponent(urlPath.slice('/api/relatorio-equip/'.length)).trim();
+    if (!token || token.length < 20) { responderJson(res, 404, { error: 'Relatório não encontrado.' }); return; }
+
+    const st = lerEstado();
+    const d = st.dados || {};
+    const rel = (Array.isArray(d.relatoriosEquip) ? d.relatoriosEquip : [])
+      .find(function (r) { return r && r.token === token; });
+    if (!rel) { responderJson(res, 404, { error: 'Relatório não encontrado.' }); return; }
+    if (rel.ativo === false) { responderJson(res, 410, { error: 'Este relatório foi desativado por quem o gerou.' }); return; }
+
+    const ids = {};
+    (rel.registrosIds || []).forEach(function (id) { ids[id] = true; });
+    const mascararCpf = function (cpf) {
+      const so = String(cpf || '').replace(/\D/g, '');
+      if (so.length !== 11) return '';
+      return '***.' + so.slice(3, 6) + '.' + so.slice(6, 9) + '-**';
+    };
+    const registros = (Array.isArray(d.equipamentos) ? d.equipamentos : [])
+      .filter(function (r) { return r && ids[r.id]; })
+      .map(function (r) {
+        return {
+          id: r.id,
+          nome: r.nome || '',
+          cpf: mascararCpf(r.cpf),
+          tipo: r.tipo || '',
+          equipamentos: Array.isArray(r.equipamentos) ? r.equipamentos : (r.equipamentos ? [r.equipamentos] : []),
+          equipamentoOutros: r.equipamentoOutros || '',
+          estado: r.estado || '',
+          observacoes: r.observacoes || '',
+          responsavel: r.responsavel || '',
+          dataCadastro: r.dataCadastro || '',
+          fotos: (Array.isArray(r.fotos) ? r.fotos : []).map(function (f) {
+            return { nome: (f && f.nome) || '', arquivo: (f && f.arquivo) || '' };
+          })
+        };
+      });
+
+    responderJson(res, 200, {
+      titulo: rel.titulo || 'Relatório de Equipamentos',
+      empresaDestino: rel.empresaDestino || '',
+      observacao: rel.observacao || '',
+      criadoPor: rel.criadoPor || '',
+      criadoEm: rel.criadoEm || '',
+      total: registros.length,
+      registros: registros
+    });
+    return;
+  }
+
   // ---- API: ler estado (com login = tudo; sem login = só o público) ----
   if (urlPath === '/api/state' && req.method === 'GET') {
     const s = lerEstado();

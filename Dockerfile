@@ -31,7 +31,7 @@ COPY verificar-sistema.cjs backup-dados.cjs limpar-fotos-embutidas.cjs reparar-l
 COPY whatsapp-db.cjs whatsapp-api.cjs whatsapp-webhook.cjs ./
 
 # --- Frontend --------------------------------------------------------------
-COPY index.html login.html candidato.html talento.html fila-display.html ./
+COPY index.html login.html candidato.html talento.html fila-display.html relatorio-equip.html ./
 COPY robots.txt sitemap.xml ./
 COPY css ./css
 COPY js  ./js
