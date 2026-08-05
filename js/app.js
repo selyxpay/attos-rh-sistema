@@ -3475,7 +3475,9 @@ function renderVagasGrid() {
     return;
   }
 
-  container.innerHTML = state.vagas.map(v => {
+  // Pagina: com muitas vagas a rolagem passava de 6.700 pixels (9 telas).
+  const _pgV = rtPaginar(state.vagas, 'vagas');
+  container.innerHTML = rtControlesPagina(_pgV, 'vagas') + _pgV.itens.map(v => {
     const emp = state.empresas.find(e => e.id === v.empresaId);
     const cor = emp?.cor || '#6366f1';
     const siglaDisplay = (emp && emp.sigla) || String(v.empresaNome || '—').split(' ').map(n => n[0] || '').join('').toUpperCase().slice(0, 4);
@@ -3640,7 +3642,9 @@ function renderSelecaoGrid() {
     return;
   }
 
-  container.innerHTML = candidatosSelecao.map(c => {
+  // Pagina: 340 candidatos davam 8.900 pixels de rolagem (12 telas).
+  const _pgS = rtPaginar(candidatosSelecao, 'selecao');
+  container.innerHTML = rtControlesPagina(_pgS, 'selecao') + _pgS.itens.map(c => {
     // Sanitizar campos de dados do candidato para prevenir XSS
     const esc = typeof escapeHTML === 'function' ? escapeHTML : (v => String(v || ''));
     const nomeSeguro = esc(c.nome);
@@ -3774,7 +3778,9 @@ function renderDeptoPessoal() {
     return;
   }
 
-  container.innerHTML = candidatosAprovados.map(c => {
+  // Pagina: a lista inteira chegava a 12.800 pixels de rolagem (17 telas).
+  const _pgDP = rtPaginar(candidatosAprovados, 'depto-pessoal');
+  container.innerHTML = rtControlesPagina(_pgDP, 'depto-pessoal') + _pgDP.itens.map(c => {
     // Sanitizar campos de dados do candidato para prevenir XSS
     const esc = typeof escapeHTML === 'function' ? escapeHTML : (v => String(v || ''));
     const nomeSeguro = esc(c.nome);
@@ -4038,7 +4044,11 @@ function renderComissaoSheet() {
     return;
   }
 
-  tableBody.innerHTML = listSorted.map(c => {
+  // Pagina: a tabela inteira chegava a 10.200 pixels de rolagem (13 telas).
+  const _pgC = rtPaginar(listSorted, 'comissao');
+  const _pagCEl = document.getElementById('comissao-paginacao');
+  if (_pagCEl) _pagCEl.innerHTML = rtControlesPagina(_pgC, 'comissao');
+  tableBody.innerHTML = _pgC.itens.map(c => {
     const rec = state.recrutadores.find(r => r.id === c.recrutadorId);
     const recNome = rec ? rec.nome : 'Sem rec.';
     const recColor = rec ? rec.corHex : '#94a3b8';
@@ -10434,6 +10444,16 @@ const _RT_POR_PAGINA = 50;
 // No celular cada registro vira um CARD alto: 50 cards davam 12.500 pixels de
 // rolagem. Menos itens por página deixa a navegação confortável no telefone.
 const _RT_POR_PAGINA_CELULAR = 15;
+// Cada lista tem um "peso" diferente na tela: card de vaga ocupa muito mais
+// espaço que uma linha de tabela. Por isso o tamanho da página varia.
+const _RT_TAMANHO_POR_LISTA = {
+  vagas: 12,           // cards grandes, com benefícios e descrição
+  selecao: 18,         // cards de candidato
+  'depto-pessoal': 18, // cards de candidato aprovado
+  talentos: 24,        // cards menores
+  comissao: 40,        // linhas de tabela
+  equipamentos: 50     // linhas de tabela
+};
 function _rtPorPagina() {
   try { return window.matchMedia('(max-width: 768px)').matches ? _RT_POR_PAGINA_CELULAR : _RT_POR_PAGINA; }
   catch (e) { return _RT_POR_PAGINA; }
@@ -10445,7 +10465,12 @@ function rtPaginaAtual(chave) { return _rtPaginas[chave] || 1; }
 // Recorta a lista na página atual. Se a lista encolheu (filtro), volta para a
 // primeira página em vez de mostrar uma página vazia.
 function rtPaginar(lista, chave, porPagina) {
-  const tamanho = porPagina || _rtPorPagina();
+  const tamanho = porPagina || (function () {
+    const base = _RT_TAMANHO_POR_LISTA[chave] || _RT_POR_PAGINA;
+    // No celular tudo vira card empilhado: menos itens por página.
+    try { return window.matchMedia('(max-width: 768px)').matches ? Math.min(base, _RT_POR_PAGINA_CELULAR) : base; }
+    catch (e) { return base; }
+  })();
   const total = lista.length;
   const totalPaginas = Math.max(1, Math.ceil(total / tamanho));
   let pagina = rtPaginaAtual(chave);
@@ -10483,8 +10508,15 @@ window.rtIrParaPagina = function (chave, pagina) {
   _rtPaginas[chave] = Math.max(1, pagina);
   // Redesenha a lista da vez e sobe o scroll para o topo do conteúdo — senão a
   // pessoa troca de página e continua vendo o fim da anterior.
-  if (chave === 'equipamentos' && typeof _renderEquipLista === 'function') _renderEquipLista();
-  else if (chave === 'talentos' && typeof renderBancoTalentosSimples === 'function') renderBancoTalentosSimples();
+  const redesenhar = {
+    equipamentos:  function () { if (typeof _renderEquipLista === 'function') _renderEquipLista(); },
+    talentos:      function () { if (typeof renderBancoTalentosSimples === 'function') renderBancoTalentosSimples(); },
+    vagas:         function () { if (typeof renderVagasGrid === 'function') renderVagasGrid(); },
+    selecao:       function () { if (typeof renderSelecaoGrid === 'function') renderSelecaoGrid(); },
+    comissao:      function () { if (typeof renderComissaoSheet === 'function') renderComissaoSheet(); },
+    'depto-pessoal': function () { if (typeof renderDeptoPessoal === 'function') renderDeptoPessoal(); }
+  };
+  if (redesenhar[chave]) redesenhar[chave]();
   else if (typeof renderCurrentAba === 'function') renderCurrentAba();
   const v = document.querySelector('.content-viewport');
   if (v && v.scrollTo) v.scrollTo({ top: 0, behavior: 'smooth' });
@@ -14257,6 +14289,11 @@ function _ffRenderDetalhe() {
       b.push(`<button class="btn btn-primary" onclick="ffEnviarParaAprovacao()"><i class="fa-solid fa-paper-plane"></i> Finalizar e Enviar</button>`);
       b.push(`<button class="btn btn-outline" style="border-color:#DC2626;color:#DC2626;" onclick="ffExcluirFluxo()"><i class="fa-solid fa-trash"></i> Excluir rascunho</button>`);
     }
+    // Ficha JÁ ENVIADA: só o administrador vê o botão de excluir — é assim que
+    // se limpa uma nota subida por engano.
+    if (f.status !== 'rascunho' && (ehMestre(loggedUser.login) || _ffVeTudo())) {
+      b.push(`<button class="btn btn-outline" style="border-color:#DC2626;color:#DC2626;" title="Só o administrador vê esta opção" onclick="ffExcluirFluxo()"><i class="fa-solid fa-trash"></i> Excluir ficha (admin)</button>`);
+    }
     if (f.status === 'aguardando_coordenacao' && _ffEhCoordenacao()) {
       if (_ffEhCriador(f)) {
         b.push(`<span style="font-size:11px;color:#D97706;font-weight:700;align-self:center;"><i class="fa-solid fa-ban"></i> Você criou este fluxo — outra pessoa da Supervisão precisa aprovar.</span>`);
@@ -14588,9 +14625,28 @@ window.ffCancelarFluxo = async function() {
 window.ffExcluirFluxo = async function() {
   const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
   if (!f) return;
-  if (f.status !== 'rascunho') { alert('Só é possível excluir rascunhos. Um fluxo já enviado deve ser CANCELADO (o histórico é mantido).'); return; }
-  if (!(ehMestre(loggedUser.login) || _ffEhCriador(f) || _ffPodeCriar())) { alert('Você não tem permissão para excluir este rascunho.'); return; }
-  if (!confirm(`Excluir DEFINITIVAMENTE o rascunho #${f.numero} (${f.empresaNome})?\n\nEsta ação não pode ser desfeita.`)) return;
+  // Rascunho: quem criou (ou a Supervisão) apaga. Ficha JÁ ENVIADA: só o
+  // administrador — é ele quem limpa uma nota subida por engano.
+  const ehAdminFF = ehMestre(loggedUser.login) || _ffVeTudo();
+  if (f.status !== 'rascunho' && !ehAdminFF) {
+    alert('Esta ficha já foi enviada. Só o administrador pode excluí-la — para os demais, o caminho é CANCELAR (assim o histórico fica preservado).');
+    return;
+  }
+  if (f.status === 'rascunho' && !(ehAdminFF || _ffEhCriador(f) || _ffPodeCriar())) {
+    alert('Você não tem permissão para excluir este rascunho.');
+    return;
+  }
+  const relFF = _ffRelacaoTexto(f);
+  const avisoFF = 'EXCLUIR DEFINITIVAMENTE a ficha #' + f.numero + '\n\n' +
+    'Empresa: ' + (f.empresaNome || '—') + '\n' +
+    'Tipo: ' + (f.tipo || '—') + '\n' +
+    (relFF ? 'Relação bancária: N. ' + relFF + '\n' : '') +
+    'Colaboradores: ' + ((f.linhas || []).length) + '\n' +
+    'Situação: ' + ((FF_STATUS[f.status] || {}).rotulo || f.status) + '\n\n' +
+    'Os arquivos e o histórico desta ficha somem junto.\nEsta ação NÃO pode ser desfeita.';
+  if (!confirm(avisoFF)) return;
+  // Ficha que já saiu do rascunho pede uma segunda confirmação
+  if (f.status !== 'rascunho' && !confirm('Confirma mesmo? A ficha #' + f.numero + ' será apagada para todos.')) return;
   const idx = state.fluxosFinanceiros.indexOf(f);
   if (idx >= 0) state.fluxosFinanceiros.splice(idx, 1);
   registrarLogGlobal(`Excluiu o rascunho de Fluxo Financeiro #${f.numero}.`, 'dp');
