@@ -8566,6 +8566,8 @@ window.copiarLinkAgencia = function(btn) {
 /* Visão Geral (Overview) do Dashboard */
 function renderDashboardOverview() {
   const hoje = new Date().toLocaleDateString('pt-BR');
+  // Avisos de divergência: aparecem sozinhos quando existem
+  try { _rtRenderAvisos(); _rtAtualizarSinoMenu(); } catch (e) { console.error('[RT] avisos:', e); }
   
   // 1. Saudação do Usuário
   const greetingEl = document.getElementById('dash-welcome-title');
@@ -12713,6 +12715,136 @@ window.ffFiltroEnvio = function (campo, valor) {
 //   corrigido  → quem montou já ajustou (tem l.correcao) e espera conferência
 // ══════════════════════════════════════════════════════════════════════════
 
+
+// ══════════════════════════════════════════════════════════════════════════
+// PAINEL DE AVISOS (divergências que esperam alguém)
+// --------------------------------------------------------------------------
+// Não é uma aba fixa: ele só EXISTE quando há algo pendente. Sem pendência,
+// o painel some por completo e o Dashboard fica como sempre foi.
+//
+// Aparece para quem precisa agir:
+//  - Pagamento REPROVADO  → para quem montou a ficha (e para a Supervisão)
+//  - Correção FEITA       → para o Financeiro conferir
+// ══════════════════════════════════════════════════════════════════════════
+
+// Junta tudo que está pendente PARA MIM, em uma lista pronta de exibir.
+function _rtAvisosPendentes() {
+  const avisos = [];
+  if (!loggedUser) return avisos;
+  const fluxos = Array.isArray(state.fluxosFinanceiros) ? state.fluxosFinanceiros : [];
+
+  fluxos.forEach(f => {
+    if (!f || !Array.isArray(f.linhas)) return;
+    const souDono = _ffEhDonoDaFicha(f);
+    const souSupervisao = (typeof _ffEhCoordenacao === 'function') && _ffEhCoordenacao();
+    const souFinanceiro = (typeof _ffEhFinanceiro === 'function') && _ffEhFinanceiro();
+    const vejoTudo = (typeof _ffVeTudo === 'function') && _ffVeTudo();
+
+    f.linhas.forEach((l, i) => {
+      if (!l) return;
+      if (l.status === 'reprovado' && (souDono || souSupervisao || vejoTudo)) {
+        avisos.push({
+          tipo: 'reprovado', fluxo: f, linha: l, indice: i,
+          quando: (l.reprovacao && l.reprovacao.em) || f.criadoEm || ''
+        });
+      } else if (l.status === 'corrigido' && (souFinanceiro || vejoTudo)) {
+        avisos.push({
+          tipo: 'corrigido', fluxo: f, linha: l, indice: i,
+          quando: (l.correcao && l.correcao.em) || ''
+        });
+      }
+    });
+  });
+  // mais recentes primeiro
+  return avisos.sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
+}
+
+function _rtRenderAvisos() {
+  const cont = document.getElementById('dash-avisos');
+  if (!cont) return;
+  let avisos = [];
+  try { avisos = _rtAvisosPendentes(); } catch (e) { console.error('[RT] avisos:', e); }
+
+  if (!avisos.length) { cont.innerHTML = ''; return; }   // sem pendência: nem existe
+
+  const reprovados = avisos.filter(a => a.tipo === 'reprovado');
+  const corrigidos = avisos.filter(a => a.tipo === 'corrigido');
+
+  const cartao = a => {
+    const f = a.fluxo, l = a.linha;
+    const rel = (typeof _ffRelacaoTexto === 'function') ? _ffRelacaoTexto(f) : '';
+    const emp = (typeof _ffIdentificacao === 'function') ? _ffIdentificacao(f) : (f.empresaNome || '—');
+    const reprovado = a.tipo === 'reprovado';
+    const detalhe = reprovado
+      ? '<div class="rt-aviso-motivo"><b>Motivo:</b> ' + escapeHTML((l.reprovacao && l.reprovacao.motivo) || '—') + '</div>'
+      : '<div class="rt-aviso-motivo"><b>Estava:</b> ' + escapeHTML((l.correcao && l.correcao.oQueEstavaErrado) || '—') +
+        '<br><b>Corrigido para:</b> ' + escapeHTML((l.correcao && l.correcao.oCorreto) || '—') +
+        ((l.correcao && l.correcao.observacao) ? '<br><b>Obs.:</b> ' + escapeHTML(l.correcao.observacao) : '') + '</div>';
+    const autor = reprovado ? (l.reprovacao && l.reprovacao.por) : (l.correcao && l.correcao.por);
+    const quando = (typeof _ffDataHora === 'function') ? _ffDataHora(a.quando) : '';
+
+    return '<article class="rt-aviso-card ' + (reprovado ? 'rt-aviso-vermelho' : 'rt-aviso-azul') + '">' +
+      '<header class="rt-aviso-topo">' +
+        '<span class="rt-aviso-tag">' + (reprovado ? 'Pagamento reprovado' : 'Correção para conferir') + '</span>' +
+        (rel ? '<span class="rt-aviso-relacao" title="Número da relação bancária">N. ' + escapeHTML(rel) + '</span>' : '') +
+      '</header>' +
+      '<h4 class="rt-aviso-pessoa">' + escapeHTML(l.nome || '(sem nome)') +
+        (l.cpf ? ' <span class="rt-aviso-cpf">CPF ' + escapeHTML(l.cpf) + '</span>' : '') + '</h4>' +
+      '<div class="rt-aviso-onde">' + escapeHTML(emp) + ' &middot; Ficha #' + escapeHTML(f.numero || '—') +
+        ' &middot; ' + escapeHTML(f.tipo || '') + '</div>' +
+      detalhe +
+      '<footer class="rt-aviso-rodape">' +
+        '<span class="rt-aviso-quem">' + escapeHTML(autor || '') + (quando ? ' &middot; ' + quando : '') + '</span>' +
+        '<button class="btn btn-sm btn-primary" onclick="rtAbrirAviso(\'' + f.id + '\')">' +
+          (reprovado ? 'Corrigir agora' : 'Conferir') + '</button>' +
+      '</footer>' +
+    '</article>';
+  };
+
+  cont.innerHTML =
+    '<section class="rt-avisos-painel">' +
+      '<header class="rt-avisos-cabecalho">' +
+        '<span class="rt-sino" aria-hidden="true"><i class="fa-solid fa-bell"></i></span>' +
+        '<div>' +
+          '<h3 class="rt-avisos-titulo">' + avisos.length + ' aviso(s) esperando você</h3>' +
+          '<p class="rt-avisos-sub">' +
+            (reprovados.length ? reprovados.length + ' pagamento(s) reprovado(s) para corrigir' : '') +
+            (reprovados.length && corrigidos.length ? ' &middot; ' : '') +
+            (corrigidos.length ? corrigidos.length + ' correção(ões) para o Financeiro conferir' : '') +
+          '</p>' +
+        '</div>' +
+        '<span class="rt-avisos-contador">' + avisos.length + '</span>' +
+      '</header>' +
+      '<div class="rt-avisos-lista">' + avisos.map(cartao).join('') + '</div>' +
+    '</section>';
+}
+window._rtRenderAvisos = _rtRenderAvisos;
+
+// Abre a ficha do aviso (leva direto para o Fluxo Financeiro).
+window.rtAbrirAviso = function (idFluxo) {
+  switchAba('fluxo-financeiro');
+  setTimeout(function () { try { abrirDetalheFluxo(idFluxo); } catch (e) {} }, 350);
+};
+
+// Marcador no menu lateral: bolinha vermelha no Fluxo Financeiro quando há aviso.
+function _rtAtualizarSinoMenu() {
+  try {
+    const n = _rtAvisosPendentes().length;
+    const item = document.getElementById('nav-item-fluxo-financeiro');
+    if (!item) return;
+    let selo = item.querySelector('.rt-nav-alerta');
+    if (!n) { if (selo) selo.remove(); return; }
+    if (!selo) {
+      selo = document.createElement('span');
+      selo.className = 'rt-nav-alerta';
+      item.appendChild(selo);
+    }
+    selo.textContent = n;
+    selo.title = n + ' aviso(s) de divergência';
+  } catch (e) {}
+}
+window._rtAtualizarSinoMenu = _rtAtualizarSinoMenu;
+
 function _ffLinhasReprovadas(f) {
   return (f && Array.isArray(f.linhas) ? f.linhas : []).filter(l => l && l.status === 'reprovado');
 }
@@ -14089,6 +14221,8 @@ window.ffAbrirArquivo = function(i) {
 
 // ── Ações do fluxo ─────────────────────────────────────────────────────────
 async function _ffSalvarERender(f, msgOk) {
+  // Mantem o painel de avisos e o marcador do menu sempre em dia
+  setTimeout(function(){ try { _rtRenderAvisos(); _rtAtualizarSinoMenu(); } catch (e) {} }, 100);
   try {
     if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
       await RTCloud.salvarAgora(state);

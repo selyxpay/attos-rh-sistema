@@ -35,16 +35,16 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260805c">
+    <link rel="stylesheet" href="css/style.css?v=20260805d">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260805c">
+    <link rel="stylesheet" href="css/design-system.css?v=20260805d">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260805c">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260805d">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260805c">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260805c">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260805d">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260805d">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260805c">
+    <link rel="stylesheet" href="css/mobile.css?v=20260805d">
 </head>
 <body>
 
@@ -301,6 +301,11 @@
 
                     <!-- SUB-ABA: VISÃO GERAL (Métricas e Gráficos) -->
                     <div id="dash-sub-visao-geral" style="display:block">
+                        <!-- AVISOS: só existe quando há divergência esperando alguém.
+                             Montado por _rtRenderAvisos() — fica vazio (e invisível)
+                             quando não há nada pendente. -->
+                        <div id="dash-avisos"></div>
+
                         <!-- Greeting Banner -->
                         <div class="dashboard-greeting-banner">
                             <div>
@@ -3735,11 +3740,11 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260805c"></script>
-    <script src="js/vps-sync.js?v=20260805c"></script>
-    <script src="js/exata-catalogo.js?v=20260805c"></script>
-    <script src="js/data.js?v=20260805c"></script>
-    <script src="js/app.js?v=20260805c"></script>
-    <script src="js/whatsapp.js?v=20260805c"></script>
+    <script src="js/security.js?v=20260805d"></script>
+    <script src="js/vps-sync.js?v=20260805d"></script>
+    <script src="js/exata-catalogo.js?v=20260805d"></script>
+    <script src="js/data.js?v=20260805d"></script>
+    <script src="js/app.js?v=20260805d"></script>
+    <script src="js/whatsapp.js?v=20260805d"></script>
 </body>
 </html>

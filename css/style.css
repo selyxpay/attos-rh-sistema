@@ -4901,3 +4901,99 @@ input.form-control[type="date"] {
     .ff-faixa-relacao { flex-direction: column; align-items: flex-start; gap: 6px; }
     .ff-faixa-dica { margin-left: 0; }
 }
+
+/* ══ PAINEL DE AVISOS (divergências) ═══════════════════════════════════════
+   Só aparece quando há algo pendente — sem pendência o container fica vazio. */
+.rt-avisos-painel {
+    background: var(--surface-card, #fff);
+    border: 2px solid #FCA5A5;
+    border-radius: 16px;
+    box-shadow: 0 6px 22px rgba(220, 38, 38, .10);
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+.rt-avisos-cabecalho {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 18px;
+    background: linear-gradient(135deg, #FEF2F2, #FEE2E2);
+    border-bottom: 1px solid #FECACA;
+}
+.rt-avisos-titulo { margin: 0; font-size: 16px; font-weight: 800; color: #7F1D1D; }
+.rt-avisos-sub { margin: 3px 0 0; font-size: 12.5px; color: #B91C1C; }
+.rt-avisos-contador {
+    margin-left: auto; min-width: 34px; height: 34px; padding: 0 10px;
+    display: flex; align-items: center; justify-content: center;
+    background: #DC2626; color: #fff; border-radius: 999px;
+    font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums;
+}
+
+/* Sino que pisca — chama atenção sem ser irritante */
+.rt-sino {
+    width: 42px; height: 42px; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center;
+    background: #DC2626; color: #fff; border-radius: 50%; font-size: 18px;
+    animation: rtSinoPulsa 1.6s ease-in-out infinite;
+}
+.rt-sino i { animation: rtSinoBalanca 1.6s ease-in-out infinite; }
+@keyframes rtSinoPulsa {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, .55); }
+    70%      { box-shadow: 0 0 0 14px rgba(220, 38, 38, 0); }
+}
+@keyframes rtSinoBalanca {
+    0%, 60%, 100% { transform: rotate(0); }
+    10%, 30%, 50% { transform: rotate(-13deg); }
+    20%, 40%      { transform: rotate(13deg); }
+}
+/* Respeita quem prefere menos animação no sistema */
+@media (prefers-reduced-motion: reduce) {
+    .rt-sino, .rt-sino i { animation: none; }
+}
+
+.rt-avisos-lista {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 12px; padding: 16px;
+}
+.rt-aviso-card {
+    border: 1px solid var(--border-color, #e2e8f0); border-left-width: 5px;
+    border-radius: 12px; padding: 13px 15px; background: var(--surface-card, #fff);
+    display: flex; flex-direction: column; gap: 6px;
+}
+.rt-aviso-vermelho { border-left-color: #DC2626; }
+.rt-aviso-azul     { border-left-color: #2563EB; }
+.rt-aviso-topo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rt-aviso-tag {
+    font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
+    padding: 3px 9px; border-radius: 6px; background: #FEE2E2; color: #B91C1C;
+}
+.rt-aviso-azul .rt-aviso-tag { background: #DBEAFE; color: #1D4ED8; }
+.rt-aviso-relacao {
+    margin-left: auto; font-size: 12px; font-weight: 800;
+    background: #FACC15; color: #422006; padding: 2px 9px; border-radius: 6px;
+    font-variant-numeric: tabular-nums;
+}
+.rt-aviso-pessoa { margin: 2px 0 0; font-size: 16px; font-weight: 800; color: var(--color-text-title, #0f172a); }
+.rt-aviso-cpf { font-size: 11.5px; font-weight: 600; color: var(--text-secondary, #64748b); }
+.rt-aviso-onde { font-size: 12.5px; color: var(--text-secondary, #64748b); }
+.rt-aviso-motivo {
+    font-size: 13px; line-height: 1.55; color: #0F172A;
+    background: var(--surface-subtle, #f8fafc); border-radius: 8px; padding: 9px 11px;
+}
+.rt-aviso-rodape { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+.rt-aviso-quem { font-size: 11.5px; color: var(--text-secondary, #64748b); margin-right: auto; }
+
+/* Bolinha vermelha no menu lateral */
+.rt-nav-alerta {
+    margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #DC2626; color: #fff; border-radius: 999px;
+    font-size: 11px; font-weight: 800;
+    animation: rtSinoPulsa 1.6s ease-in-out infinite;
+}
+
+@media (max-width: 768px) {
+    .rt-avisos-lista { grid-template-columns: 1fr; padding: 12px; }
+    .rt-avisos-cabecalho { padding: 12px 14px; }
+    .rt-avisos-titulo { font-size: 14.5px; }
+    .rt-aviso-rodape .btn { width: 100%; min-height: 42px; justify-content: center; }
+    .rt-aviso-quem { margin-right: 0; }
+}
