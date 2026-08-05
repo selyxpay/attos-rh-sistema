@@ -190,12 +190,71 @@
     .pessoa-acao { margin-left:0; width:100%; justify-content:space-between; }
     .fotos { grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); }
   }
-  @media print {
-    body { background:#fff; padding:0; }
-    .barra, .ver-mais { display:none !important; }
-    .detalhe { display:block !important; }
-    .pessoa { break-inside:avoid; }
+  /* Aviso de que quem está vendo é da R&T, e não a empresa cliente */
+  .interno {
+    background:#FFFBEB; border:1px solid #FDE68A; border-left:4px solid var(--ambar);
+    border-radius:12px; padding:13px 18px; margin-bottom:16px; font-size:13.5px; line-height:1.55;
   }
+  .interno b { color:var(--ambar); }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     FOLHA DE IMPRESSÃO — TERMO DE ENTREGA
+     ----------------------------------------------------------------------
+     O motoboy leva esta folha junto com o material. A empresa confere item
+     por item, aponta ressalvas se houver e assina. Sai enxuta de propósito:
+     sem fotos, muita gente por página. O relatório completo com as fotos
+     continua disponível pelo botão "Imprimir com fotos".
+     ══════════════════════════════════════════════════════════════════════ */
+  #termo { display:none; }
+  @media print {
+    @page { size:A4 portrait; margin:11mm 10mm 12mm; }
+    body { background:#fff; padding:0; margin:0; }
+    .folha { max-width:none; }
+    /* Padrão (inclusive Ctrl+P): sai o termo */
+    #conteudo { display:none !important; }
+    #termo { display:block !important; }
+    /* Com fotos, só quando pedido pelo botão */
+    body.imprimir-tudo #conteudo { display:block !important; }
+    body.imprimir-tudo #termo { display:none !important; }
+    body.imprimir-tudo .barra,
+    body.imprimir-tudo .ver-mais,
+    body.imprimir-tudo .acao-conf,
+    body.imprimir-tudo .confere { display:none !important; }
+    body.imprimir-tudo .detalhe { display:block !important; }
+    body.imprimir-tudo .pessoa { break-inside:avoid; }
+  }
+  #termo { color:#000; font-size:9.5pt; line-height:1.35; }
+  .t-cab { display:flex; align-items:center; gap:12px; border-bottom:1.5pt solid #000;
+           padding-bottom:7pt; margin-bottom:9pt; }
+  .t-cab img { height:36px; width:auto; flex:0 0 auto; }
+  .t-cab > div:first-of-type { flex:1 1 auto; min-width:0; }
+  .t-cab h1 { margin:0; font-size:10.5pt; text-transform:uppercase; letter-spacing:.01em; line-height:1.25; }
+  .t-cab p { margin:2pt 0 0; font-size:8.5pt; }
+  .t-meta { margin-left:auto; text-align:right; font-size:8.5pt; line-height:1.5;
+            flex:0 0 auto; white-space:nowrap; }
+  .t-info { display:flex; flex-wrap:wrap; gap:3pt 22pt; font-size:9pt; margin-bottom:8pt; }
+  table.t-tab { width:100%; border-collapse:collapse; font-size:8.5pt; }
+  table.t-tab thead { display:table-header-group; }
+  table.t-tab th, table.t-tab td { border:.6pt solid #555; padding:2.1pt 4pt;
+                                   text-align:left; vertical-align:top; }
+  table.t-tab th { background:#E9E9E9; font-size:8pt; text-transform:uppercase; letter-spacing:.03em; }
+  table.t-tab tr { break-inside:avoid; }
+  .t-num { width:20pt; text-align:center; }
+  .t-ok { width:32pt; text-align:center; }
+  .t-cpf, .t-tipo, .t-estado { white-space:nowrap; }
+  .t-quadro { display:inline-block; width:10pt; height:10pt; border:.8pt solid #000; }
+  .t-termo { margin-top:8pt; font-size:8.2pt; line-height:1.36; text-align:justify; break-inside:avoid; }
+  .t-termo h2 { font-size:9pt; margin:0 0 4pt; text-transform:uppercase; }
+  .t-termo p { margin:0 0 4pt; }
+  .t-termo ol { margin:0 0 4pt; padding-left:13pt; }
+  .t-termo li { margin-bottom:2pt; }
+  .t-ressalva { margin-top:7pt; break-inside:avoid; font-size:8.2pt; }
+  .t-linha { border-bottom:.6pt solid #000; height:12pt; margin-top:2pt; }
+  .t-assina { display:flex; gap:26pt; margin-top:11pt; break-inside:avoid; }
+  .t-assina > div { flex:1; }
+  .t-risco { border-top:.8pt solid #000; margin-top:26pt; padding-top:3pt; font-size:8pt; line-height:1.55; }
+  .t-rod { margin-top:8pt; padding-top:3pt; border-top:.5pt solid #999;
+           font-size:7.5pt; text-align:center; color:#333; }
 </style>
 </head>
 <body>
@@ -203,6 +262,8 @@
   <div id="conteudo">
     <div class="vazio">Carregando o relatório…</div>
   </div>
+  <!-- Folha do termo de entrega: invisível na tela, é o que sai na impressão -->
+  <div id="termo"></div>
 </div>
 
 <script>
@@ -238,8 +299,157 @@
 
   var dados = null;
   var visitante = '';          // nome de quem abriu (portaria)
+  var interno = false;         // true = quem abriu é da R&T (já logado no sistema)
   var conferencia = {};        // { idDoRegistro: {ok:bool, motivo:string} }
   var abertos = {};            // fichas expandidas, para não fecharem ao remarcar
+
+  // ══════════════════════════════════════════════════════════════════════
+  // TERMO DE ENTREGA (folha que o motoboy leva para a empresa assinar)
+  // ══════════════════════════════════════════════════════════════════════
+  // Número de protocolo legível, derivado da emissão: RT-EQ-20260805-1432
+  function protocolo(iso) {
+    var d = new Date(iso); if (isNaN(d)) d = new Date();
+    var p = function (n) { return String(n).padStart(2, '0'); };
+    return 'RT-EQ-' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) +
+           '-' + p(d.getHours()) + p(d.getMinutes());
+  }
+
+  function montarTermo() {
+    var el = document.getElementById('termo');
+    if (!el || !dados) return;
+    var regs = dados.registros || [];
+    var entregas = regs.filter(function (r) { return r.tipo === 'entrega'; }).length;
+    var devolucoes = regs.filter(function (r) { return r.tipo === 'devolucao'; }).length;
+
+    // A declaração muda conforme o que está na lista: só entrega, só devolução
+    // ou as duas coisas. Assim o texto nunca diz "recebeu" para item que volta.
+    var declara;
+    if (devolucoes === 0) {
+      declara = 'recebeu do <b>GRUPO R&amp;T</b> os equipamentos e Equipamentos de Proteção Individual (EPI) ' +
+        'discriminados na relação que integra este termo, referentes aos colaboradores nela identificados';
+    } else if (entregas === 0) {
+      declara = 'restituiu ao <b>GRUPO R&amp;T</b> os equipamentos e Equipamentos de Proteção Individual (EPI) ' +
+        'discriminados na relação que integra este termo, referentes aos colaboradores nela identificados';
+    } else {
+      declara = 'conferiu a movimentação de equipamentos e Equipamentos de Proteção Individual (EPI) ' +
+        'discriminada na relação que integra este termo, <b>recebendo</b> do <b>GRUPO R&amp;T</b> os itens ' +
+        'assinalados como &ldquo;Entrega&rdquo; e <b>restituindo</b> os assinalados como &ldquo;Devolução&rdquo;, ' +
+        'referentes aos colaboradores nela identificados';
+    }
+
+    var linhas = regs.map(function (r, i) {
+      return '<tr>' +
+        '<td class="t-num">' + (i + 1) + '</td>' +
+        '<td>' + esc(r.nome || '—') + '</td>' +
+        '<td class="t-cpf">' + esc(r.cpf || '—') + '</td>' +
+        '<td class="t-tipo">' + esc(TIPOS[r.tipo] || r.tipo || '—') + '</td>' +
+        '<td>' + esc(nomesItens(r)) + '</td>' +
+        '<td class="t-estado">' + esc(ESTADOS[r.estado] || r.estado || '—') + '</td>' +
+        '<td class="t-ok"><span class="t-quadro"></span></td>' +
+      '</tr>';
+    }).join('');
+
+    el.innerHTML =
+      '<div class="t-cab">' +
+        '<img src="img/logo-rt.png" alt="Grupo R&amp;T">' +
+        '<div>' +
+          '<h1>Termo de entrega e conferência de equipamentos e EPI</h1>' +
+          '<p>Grupo R&amp;T &middot; Terceirização de mão de obra</p>' +
+        '</div>' +
+        '<div class="t-meta">' +
+          'Protocolo <b>' + esc(protocolo(dados.criadoEm)) + '</b><br>' +
+          'Emitido em ' + dataBR(dados.criadoEm) +
+          (dados.criadoPor ? '<br>por ' + esc(dados.criadoPor) : '') +
+        '</div>' +
+      '</div>' +
+
+      '<div class="t-info">' +
+        '<div><b>Destinatário:</b> ' + esc(dados.empresaDestino || '—') + '</div>' +
+        '<div><b>Referência:</b> ' + esc(dados.titulo || '—') + '</div>' +
+        '<div><b>Colaboradores:</b> ' + regs.length + '</div>' +
+        (entregas ? '<div><b>Entregas:</b> ' + entregas + '</div>' : '') +
+        (devolucoes ? '<div><b>Devoluções:</b> ' + devolucoes + '</div>' : '') +
+      '</div>' +
+      (dados.observacao ? '<div class="t-info"><div><b>Observação:</b> ' + esc(dados.observacao) + '</div></div>' : '') +
+
+      '<table class="t-tab">' +
+        '<thead><tr>' +
+          '<th class="t-num">#</th><th>Colaborador</th><th class="t-cpf">CPF</th>' +
+          '<th class="t-tipo">Operação</th><th>Equipamentos / EPI</th>' +
+          '<th class="t-estado">Estado</th><th class="t-ok">Confere</th>' +
+        '</tr></thead>' +
+        '<tbody>' + (linhas || '<tr><td colspan="7">Sem itens relacionados.</td></tr>') + '</tbody>' +
+      '</table>' +
+
+      '<div class="t-termo">' +
+        '<h2>Declaração de recebimento e conferência</h2>' +
+        '<p>Pelo presente instrumento, o signatário abaixo identificado, na qualidade de responsável ' +
+        'pelo recebimento em nome da empresa destinatária acima indicada, <b>DECLARA</b> que:</p>' +
+        '<ol>' +
+          '<li>' + declara + ';</li>' +
+          '<li>conferiu, no ato do recebimento e na presença do portador, a quantidade, a descrição e o estado ' +
+          'de conservação de cada item relacionado, encontrando-os em conformidade com o aqui descrito;</li>' +
+          '<li>está ciente de que qualquer divergência, falta ou avaria deve ser registrada no campo ' +
+          '<b>&ldquo;Ressalvas&rdquo;</b> deste documento <b>antes</b> da assinatura, valendo a assinatura sem ' +
+          'ressalvas como reconhecimento da regularidade e da integralidade da entrega;</li>' +
+          '<li>está ciente de que o fornecimento de EPI e o respectivo registro observam a Norma Regulamentadora ' +
+          'nº 6 (NR-6) do Ministério do Trabalho e Emprego, que determina o registro do fornecimento ao ' +
+          'trabalhador, e o art. 158, inciso II, da Consolidação das Leis do Trabalho, que obriga o empregado ' +
+          'a utilizar o equipamento fornecido;</li>' +
+          '<li>as declarações aqui prestadas presumem-se verdadeiras em relação ao signatário, nos termos do ' +
+          'art. 219 do Código Civil, servindo o presente documento como recibo de entrega para os efeitos do ' +
+          'art. 320 do mesmo diploma legal.</li>' +
+        '</ol>' +
+        '<p>E, por estar de acordo, firma o presente termo, do qual fica uma via com o Grupo R&amp;T. ' +
+        'A relação completa, com as fotografias de cada item, permanece disponível para consulta no link ' +
+        'de conferência enviado à empresa destinatária.</p>' +
+      '</div>' +
+
+      '<div class="t-ressalva">' +
+        '<b>RESSALVAS</b> (preencher somente se houver divergência, falta ou avaria):' +
+        '<div class="t-linha"></div><div class="t-linha"></div>' +
+      '</div>' +
+
+      '<div class="t-assina">' +
+        '<div>' +
+          '<div class="t-risco">' +
+            '<b>ENTREGUE POR</b> — Grupo R&amp;T<br>' +
+            'Nome: ______________________________<br>' +
+            'CPF/RG: ____________________________<br>' +
+            'Data: ____/____/________  Hora: ______' +
+          '</div>' +
+        '</div>' +
+        '<div>' +
+          '<div class="t-risco">' +
+            '<b>RECEBIDO E CONFERIDO POR</b> — ' + esc(dados.empresaDestino || 'empresa destinatária') + '<br>' +
+            'Nome: ______________________________<br>' +
+            'CPF/RG: ____________________________<br>' +
+            'Função: ____________________________<br>' +
+            'Data: ____/____/________  Carimbo:' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="t-rod">' +
+        'Documento gerado eletronicamente pelo sistema do Grupo R&amp;T &middot; Protocolo ' +
+        esc(protocolo(dados.criadoEm)) + ' &middot; ' + regs.length + ' colaborador(es) relacionado(s).' +
+      '</div>';
+  }
+
+  // Padrão da impressão é o termo. "Imprimir com fotos" liga o modo completo
+  // só durante a impressão e desliga logo depois.
+  window.imprimirTermo = function () {
+    montarTermo();
+    document.body.classList.remove('imprimir-tudo');
+    window.print();
+  };
+  window.imprimirCompleto = function () {
+    document.body.classList.add('imprimir-tudo');
+    window.print();
+  };
+  window.addEventListener('afterprint', function () {
+    document.body.classList.remove('imprimir-tudo');
+  });
 
   function montar(filtro) {
     var q = String(filtro || '').trim().toLowerCase();
@@ -272,7 +482,8 @@
       '</div>' +
       '<div class="barra">' +
         '<input id="busca" type="search" placeholder="Buscar colaborador pelo nome…" value="' + esc(filtro || '') + '">' +
-        '<button class="btn sec" onclick="window.print()">Imprimir / PDF</button>' +
+        '<button class="btn" onclick="imprimirTermo()">Imprimir termo de entrega</button>' +
+        '<button class="btn sec" onclick="imprimirCompleto()">Imprimir com fotos</button>' +
         '<button class="btn sec" onclick="abrirTodos()">Abrir todos</button>' +
       '</div>';
 
@@ -318,7 +529,7 @@
       }).join('');
     }
 
-    if (!dados.jaConferido && lista.length) {
+    if (!dados.jaConferido && lista.length && !interno) {
       var marcados = Object.keys(conferencia).length;
       html += '<div class="acao-conf">' +
         '<div class="acao-conf-topo">' +
@@ -343,11 +554,24 @@
 
   // ── Conferência de cada pessoa ────────────────────────────────────────
   function statusConferencia() {
+    // Quem é da R&T (já logado) vê em modo consulta: não assina pela empresa
+    // e o acesso não entra no histórico como se a empresa tivesse aberto.
+    var avisoInterno = interno
+      ? '<div class="interno"><b>Visualização interna do Grupo R&amp;T.</b> ' +
+        'Você está vendo o relatório exatamente como a empresa vai ver. Este acesso ' +
+        'não é registrado no histórico e o aceite continua sendo só de quem receber. ' +
+        'Use <b>&ldquo;Imprimir termo de entrega&rdquo;</b> para a folha que vai junto com o material.</div>'
+      : '';
     if (!dados.jaConferido || !dados.ultimaConferencia) {
-      return '<div class="aviso-conf">' +
-        '<b>Olá, ' + esc(visitante) + '!</b> Confira cada colaborador abaixo e, no fim, confirme a conferência.' +
-      '</div>';
+      return avisoInterno + (interno ? '' :
+        '<div class="aviso-conf">' +
+          '<b>Olá, ' + esc(visitante) + '!</b> Confira cada colaborador abaixo e, no fim, confirme a conferência.' +
+        '</div>');
     }
+    return avisoInterno + conferenciaFeita();
+  }
+
+  function conferenciaFeita() {
     var c = dados.ultimaConferencia;
     var tudo = c.naoConferidos === 0;
     return '<div class="feito-conf' + (tudo ? '' : ' com-pendencia') + '">' +
@@ -366,6 +590,7 @@
   }
 
   function confereBloco(r) {
+    if (interno) return '';           // a R&T não confere no lugar da empresa
     var c = conferencia[r.id] || {};
     var jaEnviado = !!dados.jaConferido;
     var marcado = c.ok === true, recusado = c.ok === false;
@@ -476,7 +701,25 @@
       if (!r.ok) throw new Error('Não consegui carregar o relatório agora. Tente novamente em instantes.');
       return r.json();
     })
-    .then(function (j) { dados = j; portaria(); })
+    .then(function (j) {
+      dados = j;
+      montarTermo();
+      // Se quem abriu JÁ está logado no sistema, é gente da R&T conferindo o
+      // próprio envio: entra direto, sem portaria e sem sujar o histórico.
+      return fetch('/api/state/version', { cache: 'no-store', credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .catch(function () { return {}; })
+        .then(function (v) {
+          if (v && v.autenticado) {
+            interno = true;
+            montar('');
+            // Atalho "Imprimir termo" vindo do sistema: já abre a impressão
+            if (location.hash === '#imprimir') setTimeout(imprimirTermo, 400);
+          } else {
+            portaria();
+          }
+        });
+    })
     .catch(function (e) {
       document.getElementById('conteudo').innerHTML =
         '<div class="erro"><h2>Não foi possível abrir</h2><p>' + esc(e.message) + '</p></div>';

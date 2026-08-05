@@ -10649,10 +10649,12 @@ window.gerarRelatorioEquip = async function () {
     res.innerHTML =
       '<div class="rel-equip-ok">' +
         '<div class="rel-equip-ok-titulo"><i class="fa-solid fa-circle-check"></i> Link criado!</div>' +
-        '<p class="rel-equip-ok-txt">Mande este endereço para a empresa. Ela abre direto, sem senha.</p>' +
+        '<p class="rel-equip-ok-txt">Mande este endereço para a empresa. Ela abre direto, sem senha.<br>' +
+          'Para o material que vai com o motoboy, imprima o <b>termo de entrega</b> — a empresa confere e assina no ato.</p>' +
         '<div class="rel-equip-link"><input type="text" id="rel-equip-url" readonly value="' + escapeHTML(link) + '"></div>' +
         '<div class="rel-equip-acoes">' +
           '<button class="btn btn-primary" onclick="copiarLinkRelatorioEquip()"><i class="fa-solid fa-copy"></i> Copiar link</button>' +
+          '<a class="btn btn-primary" href="' + escapeHTML(link) + '#imprimir" target="_blank" rel="noopener"><i class="fa-solid fa-print"></i> Imprimir termo de entrega</a>' +
           '<a class="btn btn-secondary" href="' + escapeHTML(link) + '" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> Abrir</a>' +
           '<button class="btn btn-secondary" onclick="exportarRelatorioEquipExcel(\'' + rel.id + '\')"><i class="fa-solid fa-file-excel"></i> Baixar Excel</button>' +
         '</div>' +
@@ -10870,6 +10872,9 @@ function _renderHistoricoRelatorios() {
       '<div class="rel-timeline">' + linha + '</div>' +
       '<div class="rel-card-acoes">' +
         (r.ativo === false ? '' :
+          '<a class="btn btn-sm btn-primary" href="' + escapeHTML(link) + '#imprimir" target="_blank" rel="noopener" ' +
+            'title="Abre a folha que o motoboy leva para a empresa assinar">' +
+            '<i class="fa-solid fa-print"></i> Termo de entrega</a>' +
           '<a class="btn btn-sm btn-secondary" href="' + escapeHTML(link) + '" target="_blank" rel="noopener">Abrir</a>' +
           '<button class="btn btn-sm btn-secondary" onclick="copiarLinkDireto(\'' + escapeHTML(link) + '\')">Copiar link</button>') +
         '<button class="btn btn-sm btn-secondary" onclick="exportarRelatorioEquipExcel(\'' + r.id + '\')">Excel</button>' +
