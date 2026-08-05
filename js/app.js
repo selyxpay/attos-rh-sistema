@@ -12635,6 +12635,24 @@ function _ffDataEnvioFinanceiro(f) {
 }
 function _ffSoData(iso) { return String(iso || '').slice(0, 10); }
 
+// Número(s) da RELAÇÃO impressos no PDF do banco ("relação N. 0004847"). É o
+// código que identifica cada remessa bancária — o Financeiro usa ele para
+// achar a bancária no extrato, então precisa ficar visível e ser pesquisável.
+function _ffRelacoes(f) {
+  const arr = (f && Array.isArray(f.arquivos) ? f.arquivos : [])
+    .map(a => a && a.relacaoNumero).filter(Boolean).map(String);
+  return [...new Set(arr)];
+}
+function _ffRelacaoTexto(f) {
+  const r = _ffRelacoes(f);
+  return r.length ? r.join(' · ') : '';
+}
+function _ffSeloRelacao(f) {
+  const r = _ffRelacoes(f);
+  if (!r.length) return '<span class="ff-relacao ff-relacao-vazia" title="O PDF não trouxe o número da relação">sem nº</span>';
+  return r.map(n => '<span class="ff-relacao" title="Número da relação bancária (código da remessa)">N. ' + escapeHTML(n) + '</span>').join(' ');
+}
+
 function _ffQtdColaboradores(f) {
   return Array.isArray(f && f.linhas) ? f.linhas.length : 0;
 }
@@ -12646,7 +12664,7 @@ function _ffFiltraPorEnvio(lista) {
     if (_ffPagarAte && (!d || d > _ffPagarAte)) return false;
     if (_ffPagarBusca) {
       const q = _ffPagarBusca.toLowerCase();
-      const alvo = [f.numero, f.empresaNome, f.tipo, _ffIdentificacao(f)].join(' ').toLowerCase();
+      const alvo = [f.numero, f.empresaNome, f.tipo, _ffIdentificacao(f), _ffRelacaoTexto(f)].join(' ').toLowerCase();
       if (!alvo.includes(q)) return false;
     }
     return true;
@@ -12880,6 +12898,7 @@ function _ffRenderAPagar(cont) {
       '<td data-label="Empresa" style="font-weight:600;">' + escapeHTML(_ffIdentificacao(f)) + '</td>' +
       '<td data-label="Documento">#' + escapeHTML(f.numero) + trava +
         '<div style="font-size:11px;color:var(--text-secondary);">' + escapeHTML(f.tipo || '') + '</div></td>' +
+      '<td data-label="Relação" class="ff-col-relacao">' + _ffSeloRelacao(f) + '</td>' +
       '<td data-label="Enviado ao financeiro">' + (_formatarDataBR(_ffSoData(_ffDataEnvioFinanceiro(f))) || '—') + '</td>' +
       '<td data-label="Colaboradores" style="text-align:center;font-variant-numeric:tabular-nums;">' + _ffQtdColaboradores(f) + '</td>' +
       '<td data-label="Valor" style="font-weight:700;font-variant-numeric:tabular-nums;">' + _ffMoedaBR(_ffTotal(f)) + '</td>' +
@@ -12898,7 +12917,7 @@ function _ffRenderAPagar(cont) {
           '<i class="fa-solid fa-circle-check"></i> Finalizar Pagamentos</button>' +
       '</div>' +
       '<div class="table-scroll-container"><table class="excel-table ff-tabela-pagar"><thead><tr>' +
-        '<th></th><th>Empresa / Identificação</th><th>Documento</th><th>Enviado ao financeiro</th>' +
+        '<th></th><th>Empresa / Identificação</th><th>Documento</th><th>Relação</th><th>Enviado ao financeiro</th>' +
         '<th style="text-align:center;">Colab.</th><th>Valor</th><th>Status</th><th>Ação</th>' +
       '</tr></thead><tbody>' + linhas + '</tbody></table></div>'
     : '<div class="ff-empty-box"><div class="ff-empty-title">Nada para pagar ' +
@@ -12975,6 +12994,8 @@ function _ffRenderFinalizados(cont) {
 
   let blocoBusca = '';
   const q = (_ffFinBuscaPessoa || '').trim().toLowerCase();
+  // Digitar o número da relação também funciona: mostra a bancária inteira.
+  const porRelacao = q && lista.filter(f => _ffRelacaoTexto(f).toLowerCase().includes(q));
   if (q) {
     const soDigitos = q.replace(/\D/g, '');
     const achados = [];
@@ -13010,6 +13031,7 @@ function _ffRenderFinalizados(cont) {
               (cliente ? '<span><b>Cliente:</b> ' + escapeHTML(cliente) + '</span>' : '') +
               (tomador ? '<span><b>Tomador:</b> ' + escapeHTML(tomador) + '</span>' : '') +
               '<span><b>Documento:</b> #' + escapeHTML(a.f.numero) + '</span>' +
+              (_ffRelacaoTexto(a.f) ? '<span><b>Relação bancária:</b> N. ' + escapeHTML(_ffRelacaoTexto(a.f)) + '</span>' : '') +
               '<span><b>Ficha:</b> ' + escapeHTML(a.f.tipo || '—') +
                 (a.f.competencia ? ' · ' + escapeHTML(a.f.competencia) : '') + '</span>' +
               '<span><b>Enviado ao financeiro:</b> ' + (_formatarDataBR(_ffSoData(_ffDataEnvioFinanceiro(a.f))) || '—') + '</span>' +
@@ -13038,6 +13060,7 @@ function _ffRenderFinalizados(cont) {
       '<td data-label="Empresa" style="font-weight:600;">' + escapeHTML(_ffIdentificacao(f)) + '</td>' +
       '<td data-label="Documento">#' + escapeHTML(f.numero) +
         '<div style="font-size:11px;color:var(--text-secondary);">' + escapeHTML(f.tipo || '') + '</div></td>' +
+      '<td data-label="Relação" class="ff-col-relacao">' + _ffSeloRelacao(f) + '</td>' +
       '<td data-label="Enviado ao financeiro">' + (_formatarDataBR(_ffSoData(_ffDataEnvioFinanceiro(f))) || '—') + '</td>' +
       '<td data-label="Colaboradores" style="text-align:center;font-variant-numeric:tabular-nums;">' + _ffQtdColaboradores(f) + '</td>' +
       '<td data-label="Valor" style="font-weight:700;font-variant-numeric:tabular-nums;">' + _ffMoedaBR(_ffTotal(f)) + '</td>' +
@@ -13049,7 +13072,7 @@ function _ffRenderFinalizados(cont) {
 
   const tabela = lista.length
     ? '<div class="table-scroll-container"><table class="excel-table ff-tabela-pagar"><thead><tr>' +
-        '<th>Empresa / Identificação</th><th>Documento</th><th>Enviado ao financeiro</th>' +
+        '<th>Empresa / Identificação</th><th>Documento</th><th>Relação</th><th>Enviado ao financeiro</th>' +
         '<th style="text-align:center;">Colab.</th><th>Valor</th><th>Status</th><th>Ação</th>' +
       '</tr></thead><tbody>' + linhas + '</tbody></table></div>'
     : '<div class="ff-empty-box"><div class="ff-empty-title">Nenhuma ficha paga ' +
@@ -13139,6 +13162,7 @@ function _ffRenderLista() {
       (f.empresaNome && f.empresaNome.toLowerCase().includes(q)) ||
       (f.tipo && f.tipo.toLowerCase().includes(q)) ||
       (f.criadoPor && f.criadoPor.toLowerCase().includes(q)) ||
+      _ffRelacaoTexto(f).toLowerCase().includes(q) ||
       (Array.isArray(f.vinculos) && f.vinculos.some(v =>
         (v.empresaNome   || '').toLowerCase().includes(q) ||
         (v.clienteNome   || '').toLowerCase().includes(q) ||
@@ -13572,7 +13596,7 @@ function _ffRenderDetalhe() {
   const tit = document.getElementById('ff-det-titulo');
   if (tit) tit.textContent = `Fluxo Financeiro #${f.numero}`;
   const sub = document.getElementById('ff-det-sub');
-  if (sub) sub.textContent = `${_ffIdentificacao(f)} · ${f.tipo} · pagamento ${_formatarDataBR(f.dataPagamento)}`;
+  if (sub) sub.textContent = `${_ffIdentificacao(f)} · ${f.tipo} · pagamento ${_formatarDataBR(f.dataPagamento)}` + (_ffRelacaoTexto(f) ? `  ·  Relação N. ${_ffRelacaoTexto(f)}` : '');
 
   const pendencias = (f.linhas || []).filter(l => l.status === 'conferir').length;
 
@@ -13592,6 +13616,12 @@ function _ffRenderDetalhe() {
         <span style="display:inline-flex;align-items:center;gap:7px;padding:6px 14px;border-radius:12px;font-size:13px;font-weight:800;color:${st.cor};background:${st.cor}18;border:1px solid ${st.cor}40;">
           <i class="fa-solid ${st.icone}"></i> ${st.rotulo}</span>
         ${pendencias && f.status === 'rascunho' ? `<span style="font-size:11px;font-weight:700;color:#D97706;"><i class="fa-solid fa-triangle-exclamation"></i> ${pendencias} registro(s) precisam de conferência</span>` : ''}
+      </div>
+
+      <div class="ff-faixa-relacao">
+        <span class="ff-faixa-rot"><i class="fa-solid fa-barcode"></i> Relação bancária</span>
+        <span class="ff-faixa-num">${_ffSeloRelacao(f)}</span>
+        <span class="ff-faixa-dica">é este número que identifica a remessa no banco</span>
       </div>
 
       ${_ffAvisoReprovacoes(f)}
