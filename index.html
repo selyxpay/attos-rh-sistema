@@ -35,16 +35,16 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260805e">
+    <link rel="stylesheet" href="css/style.css?v=20260805f">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260805e">
+    <link rel="stylesheet" href="css/design-system.css?v=20260805f">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260805e">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260805f">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260805e">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260805e">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260805f">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260805f">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260805e">
+    <link rel="stylesheet" href="css/mobile.css?v=20260805f">
 </head>
 <body>
 
@@ -301,11 +301,6 @@
 
                     <!-- SUB-ABA: VISÃO GERAL (Métricas e Gráficos) -->
                     <div id="dash-sub-visao-geral" style="display:block">
-                        <!-- AVISOS: só existe quando há divergência esperando alguém.
-                             Montado por _rtRenderAvisos() — fica vazio (e invisível)
-                             quando não há nada pendente. -->
-                        <div id="dash-avisos"></div>
-
                         <!-- Greeting Banner -->
                         <div class="dashboard-greeting-banner">
                             <div>
@@ -1302,6 +1297,11 @@
                 <!-- ABA: FLUXO FINANCEIRO (Departamento Pessoal) -->
                 <section id="aba-fluxo-financeiro" class="aba-content">
                     <div class="ff-container">
+                        <!-- AVISOS de divergência: só existem quando há algo pendente.
+                             Montado por _rtRenderAvisos() — fica vazio e invisível
+                             quando não há nada esperando ninguém. -->
+                        <div id="ff-avisos"></div>
+
                         <!-- Header Banner -->
                         <div class="ff-header-banner">
                             <div class="ff-header-left">
@@ -3782,11 +3782,11 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260805e"></script>
-    <script src="js/vps-sync.js?v=20260805e"></script>
-    <script src="js/exata-catalogo.js?v=20260805e"></script>
-    <script src="js/data.js?v=20260805e"></script>
-    <script src="js/app.js?v=20260805e"></script>
-    <script src="js/whatsapp.js?v=20260805e"></script>
+    <script src="js/security.js?v=20260805f"></script>
+    <script src="js/vps-sync.js?v=20260805f"></script>
+    <script src="js/exata-catalogo.js?v=20260805f"></script>
+    <script src="js/data.js?v=20260805f"></script>
+    <script src="js/app.js?v=20260805f"></script>
+    <script src="js/whatsapp.js?v=20260805f"></script>
 </body>
 </html>

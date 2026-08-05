@@ -5048,3 +5048,6 @@ input.form-control[type="date"] {
     .rel-equip-acoes .btn { width: 100%; min-height: 44px; justify-content: center; }
     .equip-rel-acoes .btn { flex: 1 1 auto; min-height: 40px; justify-content: center; }
 }
+
+/* Nota/relação em destaque dentro do resultado da busca */
+.ff-achado-linhas .ff-relacao { font-size: 14px; padding: 2px 9px; }

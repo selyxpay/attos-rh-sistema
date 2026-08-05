@@ -8566,8 +8566,7 @@ window.copiarLinkAgencia = function(btn) {
 /* Visão Geral (Overview) do Dashboard */
 function renderDashboardOverview() {
   const hoje = new Date().toLocaleDateString('pt-BR');
-  // Avisos de divergência: aparecem sozinhos quando existem
-  try { _rtRenderAvisos(); _rtAtualizarSinoMenu(); } catch (e) { console.error('[RT] avisos:', e); }
+
   
   // 1. Saudação do Usuário
   const greetingEl = document.getElementById('dash-welcome-title');
@@ -12512,6 +12511,9 @@ function atualizarBadgeFluxoFinanceiro() {
 // atrasados, gargalos e os últimos movimentos. Respeita a visibilidade da
 // pessoa (analista vê só o dele; supervisão/gerencial veem tudo).
 function _ffRenderPainel(cont) {
+  // Avisos de divergência: ficam AQUI, no painel do Fluxo Financeiro, que é
+  // onde o assunto pertence. Só aparecem quando há algo pendente.
+  setTimeout(function () { try { _rtRenderAvisos(); } catch (e) { console.error('[RT] avisos:', e); } }, 0);
   const fluxos = _ffVisiveis();
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   const p = n => String(n).padStart(2, '0');
@@ -12872,6 +12874,18 @@ function _ffRelacoes(f) {
     .map(a => a && a.relacaoNumero).filter(Boolean).map(String);
   return [...new Set(arr)];
 }
+// Cada linha guarda de qual PDF ela veio (l.arquivo). Aqui achamos esse
+// arquivo dentro da ficha para responder "essa pessoa está em qual nota, e
+// qual é o número DELA" — em vez de listar os números de todos os arquivos.
+function _ffArquivoDaLinha(f, l) {
+  const nome = String((l && l.arquivo) || '');
+  const arqs = (f && Array.isArray(f.arquivos)) ? f.arquivos : [];
+  if (!arqs.length) return null;
+  const achado = nome ? arqs.find(a => a && String(a.nome || '') === nome) : null;
+  // Se a ficha só tem UM arquivo, a pessoa só pode ter vindo dele.
+  return achado || (arqs.length === 1 ? arqs[0] : null);
+}
+
 function _ffRelacaoTexto(f) {
   const r = _ffRelacoes(f);
   return r.length ? r.join(' · ') : '';
@@ -12987,7 +13001,7 @@ function _rtAvisosPendentes() {
 }
 
 function _rtRenderAvisos() {
-  const cont = document.getElementById('dash-avisos');
+  const cont = document.getElementById('ff-avisos');
   if (!cont) return;
   let avisos = [];
   try { avisos = _rtAvisosPendentes(); } catch (e) { console.error('[RT] avisos:', e); }
@@ -13054,20 +13068,13 @@ window.rtAbrirAviso = function (idFluxo) {
 };
 
 // Marcador no menu lateral: bolinha vermelha no Fluxo Financeiro quando há aviso.
+// A bolinha no menu foi removida: o aviso mora dentro do proprio Fluxo
+// Financeiro, e o item do menu volta a ficar limpo (verde com o icone branco).
 function _rtAtualizarSinoMenu() {
   try {
-    const n = _rtAvisosPendentes().length;
     const item = document.getElementById('nav-item-fluxo-financeiro');
-    if (!item) return;
-    let selo = item.querySelector('.rt-nav-alerta');
-    if (!n) { if (selo) selo.remove(); return; }
-    if (!selo) {
-      selo = document.createElement('span');
-      selo.className = 'rt-nav-alerta';
-      item.appendChild(selo);
-    }
-    selo.textContent = n;
-    selo.title = n + ' aviso(s) de divergência';
+    const selo = item && item.querySelector('.rt-nav-alerta');
+    if (selo) selo.remove();
   } catch (e) {}
 }
 window._rtAtualizarSinoMenu = _rtAtualizarSinoMenu;
@@ -13390,7 +13397,16 @@ function _ffRenderFinalizados(cont) {
               (cliente ? '<span><b>Cliente:</b> ' + escapeHTML(cliente) + '</span>' : '') +
               (tomador ? '<span><b>Tomador:</b> ' + escapeHTML(tomador) + '</span>' : '') +
               '<span><b>Documento:</b> #' + escapeHTML(a.f.numero) + '</span>' +
-              (_ffRelacaoTexto(a.f) ? '<span><b>Relação bancária:</b> N. ' + escapeHTML(_ffRelacaoTexto(a.f)) + '</span>' : '') +
+              // O arquivo DESTA pessoa, com o número DELE — não a lista de
+              // todos os arquivos da ficha.
+              (function () {
+                const arq = _ffArquivoDaLinha(a.f, a.l);
+                if (!arq) return '';
+                let h = '';
+                if (arq.relacaoNumero) h += '<span><b>Nota / Relação:</b> <span class="ff-relacao">N. ' + escapeHTML(String(arq.relacaoNumero)) + '</span></span>';
+                if (arq.nome) h += '<span><b>Arquivo:</b> ' + escapeHTML(arq.nome) + '</span>';
+                return h;
+              })() +
               '<span><b>Ficha:</b> ' + escapeHTML(a.f.tipo || '—') +
                 (a.f.competencia ? ' · ' + escapeHTML(a.f.competencia) : '') + '</span>' +
               '<span><b>Enviado ao financeiro:</b> ' + (_formatarDataBR(_ffSoData(_ffDataEnvioFinanceiro(a.f))) || '—') + '</span>' +
@@ -13399,6 +13415,15 @@ function _ffRenderFinalizados(cont) {
               '<span><b>Planilha:</b> ' + escapeHTML(arquivo) + '</span>' +
             '</div>' +
             '<div class="ff-achado-acoes">' +
+              // Abre o PDF de onde ESTA pessoa veio, identificado pelo número dele
+              (function () {
+                const arq = _ffArquivoDaLinha(a.f, a.l);
+                const url = (arq && typeof arq.arquivo === 'string' && arq.arquivo.indexOf('/uploads/') === 0) ? arq.arquivo : '';
+                if (!url) return '';
+                return '<a class="btn btn-sm" style="background:#B45309;color:#fff;" href="' + escapeHTML(url) +
+                  '" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> Abrir a nota N. ' +
+                  escapeHTML(String(arq.relacaoNumero || '—')) + '</a>';
+              })() +
               '<button class="btn btn-primary btn-sm" onclick="exportarFluxoExcel(\'' + a.f.id + '\')">' +
                 '<i class="fa-solid fa-file-excel"></i> Abrir o Excel desta ficha</button>' +
               '<button class="btn btn-secondary btn-sm" onclick="abrirDetalheFluxo(\'' + a.f.id + '\')">' +
