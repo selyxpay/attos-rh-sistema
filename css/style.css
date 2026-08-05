@@ -5051,3 +5051,23 @@ input.form-control[type="date"] {
 
 /* Nota/relação em destaque dentro do resultado da busca */
 .ff-achado-linhas .ff-relacao { font-size: 14px; padding: 2px 9px; }
+
+/* ══ ROLAGEM DA PÁGINA ═════════════════════════════════════════════════════
+   O sistema tem rolagem PRÓPRIA dentro de .content-viewport. Sem travar a
+   página, ela rolava JUNTO: dava para descer muito além do conteúdo e chegar
+   numa área vazia, com a barra lateral subindo junto. Agora só o conteúdo
+   rola, e nunca se desce "para onde não existe".
+
+   A classe .app-shell existe apenas no index.html — as páginas públicas
+   (login, candidato, talento, relatório) continuam rolando normalmente.
+   ========================================================================== */
+html:has(> body.app-shell) { height: 100%; overflow: hidden; }
+body.app-shell {
+    height: 100%;
+    min-height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;   /* sem "efeito elástico" puxando a página */
+}
+/* Alternativa para navegadores sem :has() (Safari anterior ao 15.4):
+   a regra abaixo não depende dele. */
+body.app-shell > .app-container { max-height: 100%; }
