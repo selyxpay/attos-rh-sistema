@@ -236,17 +236,26 @@ label,
   display: none !important;
 }
 
-/* Logo da empresa com fundo branco absoluto e centralizado */
+/* Logo da empresa com container glassmorphism integrado */
 .sidebar-header {
-  background: #FFFFFF !important;
-  border-radius: var(--radius-md) !important;
-  padding: 6px !important;
-  margin-bottom: 16px !important;
-  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-radius: 12px !important;
+  padding: 8px 14px !important;
+  margin-bottom: 18px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  height: 60px !important;
+  height: 64px !important;
+  -webkit-backdrop-filter: blur(8px) !important;   /* Safari */
+  backdrop-filter: blur(8px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  transition: all 0.2s ease !important;
+}
+
+.sidebar-header:hover {
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
 }
 
 .sidebar-header .logo-area {
@@ -257,9 +266,10 @@ label,
 }
 
 .sidebar-header .logo-area img {
-  height: 48px !important;
+  height: 44px !important;
   max-width: 100% !important;
   object-fit: contain !important;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)) !important;
   padding: 0 !important;
 }
 
@@ -535,14 +545,7 @@ textarea:focus {
 }
 
 .mod-header-banner::after {
-  content: '' !important;
-  position: absolute !important;
-  top: -50% !important;
-  right: -10% !important;
-  width: 320px !important;
-  height: 320px !important;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, rgba(2, 132, 199, 0.05) 50%, transparent 70%) !important;
-  pointer-events: none !important;
+  display: none !important;
 }
 
 .mod-header-left {

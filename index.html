@@ -35,16 +35,16 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260806b">
+    <link rel="stylesheet" href="css/style.css?v=20260806c">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260806b">
+    <link rel="stylesheet" href="css/design-system.css?v=20260806c">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260806b">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260806c">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260806b">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260806b">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260806c">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260806c">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260806b">
+    <link rel="stylesheet" href="css/mobile.css?v=20260806c">
 </head>
 <body class="app-shell">
 
@@ -487,59 +487,7 @@
                     </div>
 
                     <!-- Botão para abrir o guia -->
-                    <button id="btn-bt-guia" onclick="document.getElementById('bt-guia').style.display='block';this.style.display='none';" style="margin-bottom:16px;padding:8px 16px;border-radius:8px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;">
-                        <i class="fa-solid fa-circle-info"></i> Como usar o Banco de Talentos?
-                    </button>
 
-                    <!-- Caixa Guia (oculta por padrão) -->
-                    <div id="bt-guia" style="display:none;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:10px;padding:14px 18px;margin-bottom:16px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                            <span style="font-size:13px;font-weight:700;color:#1d4ed8;display:flex;align-items:center;gap:7px;">
-                                <i class="fa-solid fa-circle-info"></i> Como usar o Banco de Talentos
-                            </span>
-                            <button onclick="document.getElementById('bt-guia').style.display='none';document.getElementById('btn-bt-guia').style.display='flex';" style="background:none;border:none;color:#1d4ed8;cursor:pointer;font-size:12px;padding:0;">
-                                <i class="fa-solid fa-xmark"></i> Fechar
-                            </button>
-                        </div>
-                        <div id="bt-guia-body" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                            <div style="background:#fff;border-radius:8px;padding:10px 12px;border:1px solid #dbeafe;">
-                                <div style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:5px;display:flex;align-items:center;gap:6px;">
-                                    <i class="fa-solid fa-file-arrow-up" style="color:#2563eb;"></i> Importar pessoas
-                                </div>
-                                <p style="font-size:11.5px;color:#475569;margin:0;line-height:1.6;">
-                                    Clique em <b>Importar Excel/CSV</b> e selecione uma planilha com as colunas:<br>
-                                    <code style="background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:11px;">Nome · Telefone · Email · CPF · Cidade · Estado · Sexo</code><br>
-                                    O sistema detecta automaticamente o sexo pelo nome se a coluna estiver vazia.
-                                </p>
-                            </div>
-                            <div style="background:#fff;border-radius:8px;padding:10px 12px;border:1px solid #dbeafe;">
-                                <div style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:5px;display:flex;align-items:center;gap:6px;">
-                                    <i class="fa-solid fa-filter" style="color:#2563eb;"></i> Filtrar e encontrar
-                                </div>
-                                <p style="font-size:11.5px;color:#475569;margin:0;line-height:1.6;">
-                                    Use os <b>filtros abaixo</b> para buscar por sexo, cidade ou proximidade de empresa.<br>
-                                    O ícone <span style="background:#dcfce7;color:#16a34a;padding:1px 5px;border-radius:4px;font-size:10px;">📍 ≤15km</span> indica candidatos perto de uma empresa parceira.
-                                </p>
-                            </div>
-                            <div style="background:#fff;border-radius:8px;padding:10px 12px;border:1px solid #dbeafe;">
-                                <div style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:5px;display:flex;align-items:center;gap:6px;">
-                                    <i class="fa-solid fa-arrow-right-arrow-left" style="color:#2563eb;"></i> Mover para processo
-                                </div>
-                                <p style="font-size:11.5px;color:#475569;margin:0;line-height:1.6;">
-                                    Clique em <b>Puxar para Processo</b> no card do talento para movê-lo para a aba <b>Seleção</b> e iniciar o processo de contratação.
-                                </p>
-                            </div>
-                            <div style="background:#fff;border-radius:8px;padding:10px 12px;border:1px solid #dbeafe;">
-                                <div style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:5px;display:flex;align-items:center;gap:6px;">
-                                    <i class="fa-solid fa-file-arrow-down" style="color:#2563eb;"></i> Exportar dados
-                                </div>
-                                <p style="font-size:11.5px;color:#475569;margin:0;line-height:1.6;">
-                                    Clique em <b>Exportar CSV</b> para baixar todos os talentos em planilha.<br>
-                                    Você também pode enviar o <b>link de ficha</b> para candidatos preencherem online via celular.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
 
                     <!-- Filtros BT — no topo -->
                     <div id="bt-filtros" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding:14px 16px;background:var(--card-bg);border-radius:10px;border:1px solid var(--border-color);box-shadow:var(--shadow-sm);align-items:center;">
@@ -1402,7 +1350,7 @@
                     <div class="modal-exame-box">
                         <div class="modal-exame-header">
                             <div style="display:flex;align-items:center;gap:12px;">
-                                <div class="modal-exame-icon" style="background:linear-gradient(135deg,#059669,#10b981);"><i class="fa-solid fa-money-bill-transfer"></i></div>
+                                <div class="modal-exame-icon" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);box-shadow:0 8px 16px rgba(37,99,235,0.3);"><i class="fa-solid fa-money-bill-transfer"></i></div>
                                 <div>
                                     <h2 style="margin:0;font-size:20px;">Novo Fluxo Financeiro</h2>
                                     <p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary);">Importe os relatórios do Exata e envie para aprovação</p>
@@ -1475,7 +1423,7 @@
                     <div class="modal-exame-box modal-exame-box-detalhe">
                         <div class="modal-exame-header">
                             <div style="display:flex;align-items:center;gap:12px;">
-                                <div class="modal-exame-icon" style="background:linear-gradient(135deg,#059669,#10b981);"><i class="fa-solid fa-money-bill-transfer"></i></div>
+                                <div class="modal-exame-icon" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);box-shadow:0 8px 16px rgba(37,99,235,0.3);"><i class="fa-solid fa-money-bill-transfer"></i></div>
                                 <div>
                                     <h2 style="margin:0;font-size:20px;" id="ff-det-titulo">Fluxo Financeiro</h2>
                                     <p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary);" id="ff-det-sub"></p>
@@ -3176,13 +3124,13 @@
     <!-- MODAL: CADASTRAR NOVO CLIENTE (EMPRESA PARCEIRA) -->
     <div id="modal-novo-cliente" class="modal-overlay">
         <div class="modal-box" style="max-width: 720px; width: 95%;">
-            <div class="modal-header" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;">
+            <div class="modal-header" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;">
                 <h3 style="color:#fff;"><i class="fa-solid fa-building-circle-arrow-right" style="margin-right:8px;"></i>Cadastrar Novo Cliente</h3>
                 <button class="btn-close-modal" onclick="fecharModalNovoCliente()" style="color:#fff;"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <form id="form-novo-cliente">
                 <div class="modal-body">
-                    <div style="font-size:11px; font-weight:700; color:#059669; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+                    <div style="font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
                         <i class="fa-solid fa-building"></i> Empresa Parceira
                     </div>
                     <div class="form-group">
@@ -3207,7 +3155,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="fecharModalNovoCliente()">Cancelar</button>
-                    <button type="submit" class="btn btn-primary" style="background:linear-gradient(135deg,#059669,#10b981);border:none;">
+                    <button type="submit" class="btn btn-primary" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none;">
                         <i class="fa-solid fa-check"></i> Cadastrar Cliente
                     </button>
                 </div>
@@ -3783,11 +3731,11 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260806b"></script>
-    <script src="js/vps-sync.js?v=20260806b"></script>
-    <script src="js/exata-catalogo.js?v=20260806b"></script>
-    <script src="js/data.js?v=20260806b"></script>
-    <script src="js/app.js?v=20260806b"></script>
-    <script src="js/whatsapp.js?v=20260806b"></script>
+    <script src="js/security.js?v=20260806c"></script>
+    <script src="js/vps-sync.js?v=20260806c"></script>
+    <script src="js/exata-catalogo.js?v=20260806c"></script>
+    <script src="js/data.js?v=20260806c"></script>
+    <script src="js/app.js?v=20260806c"></script>
+    <script src="js/whatsapp.js?v=20260806c"></script>
 </body>
 </html>
