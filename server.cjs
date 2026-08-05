@@ -1100,6 +1100,77 @@ http.createServer(function (req, res) {
   // mascarado (o nome já identifica a pessoa para o cliente); e um relatório
   // desativado deixa de responder.
   // ==========================================================================
+  // ---- Registrar QUEM abriu o link e o ACEITE da conferência (públicos) ----
+  // Servem de comprovante: ficam gravados o nome informado, a data/hora e o
+  // que a pessoa conferiu (ou não conferiu, com o motivo).
+  if (urlPath.indexOf('/api/relatorio-equip/') === 0 && req.method === 'POST') {
+    const resto = decodeURIComponent(urlPath.slice('/api/relatorio-equip/'.length));
+    const barra = resto.lastIndexOf('/');
+    const token = barra > 0 ? resto.slice(0, barra).trim() : '';
+    const acao = barra > 0 ? resto.slice(barra + 1).trim() : '';
+    if (!token || token.length < 20 || ['acesso', 'conferencia'].indexOf(acao) < 0) {
+      responderJson(res, 404, { error: 'Não encontrado.' }); return;
+    }
+    lerCorpo(req, function (err, body) {
+      if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
+      const nome = String((body && body.nome) || '').trim().slice(0, 120);
+      if (nome.length < 2) { responderJson(res, 400, { error: 'Informe seu nome.' }); return; }
+
+      comTrava(function () {
+        const st = lerEstado();
+        const d = st.dados || {};
+        const lista = Array.isArray(d.relatoriosEquip) ? d.relatoriosEquip : [];
+        const rel = lista.find(function (r) { return r && r.token === token; });
+        if (!rel) { responderJson(res, 404, { error: 'Relatório não encontrado.' }); return; }
+        if (rel.ativo === false) { responderJson(res, 410, { error: 'Este relatório foi desativado.' }); return; }
+
+        const agora = new Date().toISOString();
+        if (acao === 'acesso') {
+          if (!Array.isArray(rel.acessos)) rel.acessos = [];
+          // Guarda no máximo 200 acessos por relatório (não cresce sem fim)
+          rel.acessos.push({ nome: nome, em: agora });
+          if (rel.acessos.length > 200) rel.acessos = rel.acessos.slice(-200);
+        } else {
+          const itens = (body && body.itens && typeof body.itens === 'object') ? body.itens : {};
+          const idsValidos = {};
+          (rel.registrosIds || []).forEach(function (id) { idsValidos[id] = true; });
+          const limpos = {};
+          Object.keys(itens).forEach(function (id) {
+            if (!idsValidos[id]) return;                       // só itens deste relatório
+            const it = itens[id] || {};
+            limpos[id] = {
+              ok: it.ok === true,
+              motivo: String(it.motivo || '').trim().slice(0, 400)
+            };
+          });
+          const total = (rel.registrosIds || []).length;
+          const conferidos = Object.keys(limpos).filter(function (k) { return limpos[k].ok; }).length;
+          if (!Array.isArray(rel.conferencias)) rel.conferencias = [];
+          rel.conferencias.push({
+            id: 'conf-' + Date.now(),
+            nome: nome, em: agora,
+            itens: limpos,
+            totalItens: total,
+            conferidos: conferidos,
+            naoConferidos: Object.keys(limpos).filter(function (k) { return !limpos[k].ok; }).length,
+            tudoOk: total > 0 && conferidos === total,
+            observacao: String((body && body.observacao) || '').trim().slice(0, 1000)
+          });
+          if (rel.conferencias.length > 50) rel.conferencias = rel.conferencias.slice(-50);
+        }
+
+        try {
+          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+          responderJson(res, 200, { ok: true, em: agora });
+        } catch (e) {
+          console.error('[RT] relatorio-equip ' + acao + ':', e);
+          responderJson(res, 500, { error: 'falha ao gravar' });
+        }
+      });
+    });
+    return;
+  }
+
   if (urlPath.indexOf('/api/relatorio-equip/') === 0 && req.method === 'GET') {
     const token = decodeURIComponent(urlPath.slice('/api/relatorio-equip/'.length)).trim();
     if (!token || token.length < 20) { responderJson(res, 404, { error: 'Relatório não encontrado.' }); return; }
@@ -1145,6 +1216,15 @@ http.createServer(function (req, res) {
       criadoPor: rel.criadoPor || '',
       criadoEm: rel.criadoEm || '',
       total: registros.length,
+      // Resumo do que ja foi conferido, para a pagina mostrar o estado atual
+      jaConferido: !!(rel.conferencias && rel.conferencias.length),
+      ultimaConferencia: (rel.conferencias && rel.conferencias.length)
+        ? (function () {
+            const c = rel.conferencias[rel.conferencias.length - 1];
+            return { nome: c.nome, em: c.em, tudoOk: c.tudoOk, conferidos: c.conferidos,
+                     naoConferidos: c.naoConferidos, itens: c.itens, observacao: c.observacao };
+          })()
+        : null,
       registros: registros
     });
     return;

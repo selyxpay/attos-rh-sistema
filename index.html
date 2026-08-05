@@ -35,16 +35,16 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260806c">
+    <link rel="stylesheet" href="css/style.css?v=20260806d">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260806c">
+    <link rel="stylesheet" href="css/design-system.css?v=20260806d">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260806c">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260806d">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260806c">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260806c">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260806d">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260806d">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260806c">
+    <link rel="stylesheet" href="css/mobile.css?v=20260806d">
 </head>
 <body class="app-shell">
 
@@ -1518,8 +1518,25 @@
                             </button>
                         </div>
 
-                        <div class="exame-table-wrapper">
+                        <!-- Duas visões: a lista de registros e o histórico dos links
+                             enviados para as empresas (com o rastreio da conferência). -->
+                        <div class="equip-visoes">
+                            <button type="button" class="equip-visao-btn ativa" id="equip-visao-lista"
+                                    onclick="equipTrocarVisao('lista')">
+                                <i class="fa-solid fa-list"></i> Registros
+                            </button>
+                            <button type="button" class="equip-visao-btn" id="equip-visao-historico"
+                                    onclick="equipTrocarVisao('historico')">
+                                <i class="fa-solid fa-share-nodes"></i> Links enviados
+                                <span class="equip-visao-conta" id="equip-conta-links">0</span>
+                            </button>
+                        </div>
+
+                        <div class="exame-table-wrapper" id="equip-bloco-lista">
                             <div id="equip-lista-container"><!-- Gerado por JS --></div>
+                        </div>
+                        <div id="equip-bloco-historico" style="display:none;">
+                            <div id="equip-historico-lista"><!-- Gerado por JS --></div>
                         </div>
                     </div>
                 </section>
@@ -3731,11 +3748,11 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260806c"></script>
-    <script src="js/vps-sync.js?v=20260806c"></script>
-    <script src="js/exata-catalogo.js?v=20260806c"></script>
-    <script src="js/data.js?v=20260806c"></script>
-    <script src="js/app.js?v=20260806c"></script>
-    <script src="js/whatsapp.js?v=20260806c"></script>
+    <script src="js/security.js?v=20260806d"></script>
+    <script src="js/vps-sync.js?v=20260806d"></script>
+    <script src="js/exata-catalogo.js?v=20260806d"></script>
+    <script src="js/data.js?v=20260806d"></script>
+    <script src="js/app.js?v=20260806d"></script>
+    <script src="js/whatsapp.js?v=20260806d"></script>
 </body>
 </html>

@@ -10704,33 +10704,6 @@ window.exportarRelatorioEquipExcel = function (idRel) {
   XLSX.writeFile(wb, nome);
 };
 
-// ── Relatórios já gerados (para reenviar ou desativar) ────────────────────
-function _equipListaRelatorios() {
-  garantirRelatoriosEquip();
-  const rels = state.relatoriosEquip.slice().reverse();
-  if (!rels.length) return '';
-  return '<details class="equip-rels">' +
-    '<summary>Relatórios já enviados (' + rels.length + ')</summary>' +
-    rels.map(r => {
-      const link = location.origin + '/relatorio-equip.html?r=' + r.token;
-      return '<div class="equip-rel-item' + (r.ativo === false ? ' inativo' : '') + '">' +
-        '<div class="equip-rel-nome">' + escapeHTML(r.titulo || 'Relatório') +
-          (r.empresaDestino ? ' <span class="equip-rel-emp">→ ' + escapeHTML(r.empresaDestino) + '</span>' : '') +
-          (r.ativo === false ? ' <span class="equip-rel-off">desativado</span>' : '') + '</div>' +
-        '<div class="equip-rel-meta">' + (r.registrosIds || []).length + ' colaborador(es) &middot; ' +
-          escapeHTML(r.criadoPor || '') + ' &middot; ' + _ffDataHora(r.criadoEm) + '</div>' +
-        '<div class="equip-rel-acoes">' +
-          (r.ativo === false ? '' :
-            '<a class="btn btn-sm btn-secondary" href="' + escapeHTML(link) + '" target="_blank" rel="noopener">Abrir</a>' +
-            '<button class="btn btn-sm btn-secondary" onclick="copiarLinkDireto(\'' + escapeHTML(link) + '\')">Copiar link</button>') +
-          '<button class="btn btn-sm btn-secondary" onclick="exportarRelatorioEquipExcel(\'' + r.id + '\')">Excel</button>' +
-          (podeExcluirEquipamento() ? '<button class="btn btn-sm btn-outline" style="border-color:#DC2626;color:#DC2626;" onclick="alternarRelatorioEquip(\'' + r.id + '\')">' +
-            (r.ativo === false ? 'Reativar' : 'Desativar link') + '</button>' : '') +
-        '</div>' +
-      '</div>';
-    }).join('') +
-  '</details>';
-}
 window.copiarLinkDireto = function (link) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(link).then(function () { alert('Link copiado!'); });
@@ -10746,7 +10719,177 @@ window.alternarRelatorioEquip = async function (id) {
   try { await RTCloud.salvarAgora(state, { merge: true, upsertIds: [r.id] }); }
   catch (e) { alert('Não consegui salvar: ' + (e.message || e)); return; }
   renderEquipamentos();
+  // Quando a ação partiu do histórico, o cartão de lá também precisa se atualizar
+  if (_equipVisao === 'historico') _renderHistoricoRelatorios();
 };
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// HISTÓRICO DOS LINKS ENVIADOS (rastreio da conferência)
+// --------------------------------------------------------------------------
+// Para cada link gerado, mostra a linha do tempo: quando foi criado, quem
+// abriu e a que horas, e quando a empresa deu o aceite (com o que conferiu ou
+// não conferiu). Também dá para procurar pelo nome do colaborador e descobrir
+// em quais relatórios ele foi enviado.
+// ══════════════════════════════════════════════════════════════════════════
+let _relBusca = '';
+let _equipVisao = 'lista';
+
+// Alterna entre a lista de registros e o histórico dos links enviados.
+window.equipTrocarVisao = function (visao) {
+  _equipVisao = visao;
+  const g = k => document.getElementById(k);
+  const lista = g('equip-bloco-lista'), hist = g('equip-bloco-historico');
+  if (lista) lista.style.display = visao === 'lista' ? '' : 'none';
+  if (hist)  hist.style.display  = visao === 'historico' ? '' : 'none';
+  const bl = g('equip-visao-lista'), bh = g('equip-visao-historico');
+  if (bl) bl.classList.toggle('ativa', visao === 'lista');
+  if (bh) bh.classList.toggle('ativa', visao === 'historico');
+  // Os filtros de data/tipo são da lista de registros; somem no histórico.
+  const filtros = document.querySelector('#aba-equipamentos .exame-filtros-bar');
+  if (filtros) filtros.style.display = visao === 'lista' ? '' : 'none';
+  if (visao === 'historico') _renderHistoricoRelatorios();
+};
+
+window.relFiltrarHistorico = function (txt) {
+  _relBusca = txt;
+  _renderHistoricoRelatorios();
+};
+
+function _relSituacao(r) {
+  const acessos = Array.isArray(r.acessos) ? r.acessos : [];
+  const confs = Array.isArray(r.conferencias) ? r.conferencias : [];
+  if (confs.length) {
+    const c = confs[confs.length - 1];
+    return c.naoConferidos > 0
+      ? { txt: 'Conferido com ressalva', cor: '#B45309', fundo: '#FFFBEB' }
+      : { txt: 'Conferido', cor: '#059669', fundo: '#ECFDF5' };
+  }
+  if (acessos.length) return { txt: 'Aberto, sem aceite', cor: '#1D4ED8', fundo: '#EFF6FF' };
+  return { txt: 'Ainda não abriram', cor: '#64748B', fundo: '#F1F5F9' };
+}
+
+function _renderHistoricoRelatorios() {
+  const cont = document.getElementById('equip-historico-lista');
+  if (!cont) return;
+  garantirRelatoriosEquip();
+  garantirEquipamentos();
+
+  const q = String(_relBusca || '').trim().toLowerCase();
+  let rels = state.relatoriosEquip.slice().reverse();
+
+  // Busca pelo nome do colaborador: mostra em quais relatórios ele está
+  let achadosPessoa = [];
+  if (q) {
+    const porId = {};
+    (state.equipamentos || []).forEach(e => { if (e && e.id) porId[e.id] = e; });
+    rels.forEach(r => {
+      (r.registrosIds || []).forEach(id => {
+        const reg = porId[id];
+        if (reg && String(reg.nome || '').toLowerCase().includes(q)) {
+          achadosPessoa.push({ rel: r, reg: reg });
+        }
+      });
+    });
+    // a lista principal também filtra por título/empresa
+    rels = rels.filter(r =>
+      String(r.titulo || '').toLowerCase().includes(q) ||
+      String(r.empresaDestino || '').toLowerCase().includes(q) ||
+      achadosPessoa.some(a => a.rel.id === r.id));
+  }
+
+  if (!state.relatoriosEquip.length) {
+    cont.innerHTML = '<div class="exame-empty-state"><i class="fa-solid fa-share-nodes"></i>' +
+      '<p>Nenhum link enviado ainda. Selecione colaboradores na lista e clique em ' +
+      '<strong>"Gerar relatório para a empresa"</strong>.</p></div>';
+    return;
+  }
+
+  const blocoPessoa = (q && achadosPessoa.length)
+    ? '<div class="rel-achou-pessoa">' +
+        '<div class="rel-achou-titulo"><i class="fa-solid fa-user-check"></i> ' +
+          achadosPessoa.length + ' envio(s) com &ldquo;' + escapeHTML(_relBusca) + '&rdquo;</div>' +
+        achadosPessoa.map(a => {
+          const s = _relSituacao(a.rel);
+          return '<div class="rel-achou-item">' +
+            '<b>' + escapeHTML(a.reg.nome || '—') + '</b> — ' + escapeHTML(a.rel.titulo || 'Relatório') +
+            (a.rel.empresaDestino ? ' <span class="rel-emp">→ ' + escapeHTML(a.rel.empresaDestino) + '</span>' : '') +
+            '<div class="rel-achou-meta">Enviado em ' + _ffDataHora(a.rel.criadoEm) +
+              ' &middot; <span style="color:' + s.cor + ';font-weight:700;">' + s.txt + '</span></div>' +
+          '</div>';
+        }).join('') +
+      '</div>'
+    : (q && !achadosPessoa.length
+        ? '<div class="rel-achou-pessoa rel-vazio">Nenhum colaborador com &ldquo;' +
+          escapeHTML(_relBusca) + '&rdquo; nos relatórios enviados.</div>'
+        : '');
+
+  const cartoes = rels.map(r => {
+    const s = _relSituacao(r);
+    const acessos = Array.isArray(r.acessos) ? r.acessos : [];
+    const confs = Array.isArray(r.conferencias) ? r.conferencias : [];
+    const link = location.origin + '/relatorio-equip.html?r=' + r.token;
+    const porId = {};
+    (state.equipamentos || []).forEach(e => { if (e && e.id) porId[e.id] = e; });
+
+    // Linha do tempo
+    let linha = '<div class="rel-tl-item"><span class="rel-tl-bola" style="background:#64748B;"></span>' +
+      '<div><b>Link gerado</b> por ' + escapeHTML(r.criadoPor || '—') +
+      '<div class="rel-tl-quando">' + _ffDataHora(r.criadoEm) + '</div></div></div>';
+    acessos.slice(-5).forEach(a => {
+      linha += '<div class="rel-tl-item"><span class="rel-tl-bola" style="background:#2563EB;"></span>' +
+        '<div><b>' + escapeHTML(a.nome || '—') + '</b> abriu o link' +
+        '<div class="rel-tl-quando">' + _ffDataHora(a.em) + '</div></div></div>';
+    });
+    confs.forEach(c => {
+      const cor = c.naoConferidos > 0 ? '#B45309' : '#059669';
+      const naoOk = Object.keys(c.itens || {}).filter(k => c.itens[k] && !c.itens[k].ok);
+      linha += '<div class="rel-tl-item"><span class="rel-tl-bola" style="background:' + cor + ';"></span>' +
+        '<div><b>' + escapeHTML(c.nome || '—') + '</b> deu o aceite — ' +
+        c.conferidos + ' de ' + c.totalItens + ' conferido(s)' +
+        (c.naoConferidos ? ', ' + c.naoConferidos + ' com ressalva' : '') +
+        '<div class="rel-tl-quando">' + _ffDataHora(c.em) + '</div>' +
+        (c.observacao ? '<div class="rel-tl-obs">Obs.: ' + escapeHTML(c.observacao) + '</div>' : '') +
+        (naoOk.length
+          ? '<div class="rel-tl-ressalvas">' + naoOk.map(id =>
+              '<div>⚠ <b>' + escapeHTML((porId[id] || {}).nome || id) + '</b>: ' +
+              escapeHTML((c.itens[id] || {}).motivo || 'sem motivo informado') + '</div>').join('') + '</div>'
+          : '') +
+        '</div></div>';
+    });
+
+    return '<article class="rel-card' + (r.ativo === false ? ' inativo' : '') + '">' +
+      '<header class="rel-card-topo">' +
+        '<div><div class="rel-card-titulo">' + escapeHTML(r.titulo || 'Relatório') +
+          (r.ativo === false ? ' <span class="rel-off">link desativado</span>' : '') + '</div>' +
+          '<div class="rel-card-sub">' +
+            (r.empresaDestino ? 'Para <b>' + escapeHTML(r.empresaDestino) + '</b> &middot; ' : '') +
+            (r.registrosIds || []).length + ' colaborador(es)</div></div>' +
+        '<span class="rel-selo" style="color:' + s.cor + ';background:' + s.fundo + ';">' + s.txt + '</span>' +
+      '</header>' +
+      '<div class="rel-timeline">' + linha + '</div>' +
+      '<div class="rel-card-acoes">' +
+        (r.ativo === false ? '' :
+          '<a class="btn btn-sm btn-secondary" href="' + escapeHTML(link) + '" target="_blank" rel="noopener">Abrir</a>' +
+          '<button class="btn btn-sm btn-secondary" onclick="copiarLinkDireto(\'' + escapeHTML(link) + '\')">Copiar link</button>') +
+        '<button class="btn btn-sm btn-secondary" onclick="exportarRelatorioEquipExcel(\'' + r.id + '\')">Excel</button>' +
+        (podeExcluirEquipamento()
+          ? '<button class="btn btn-sm btn-outline" style="border-color:#DC2626;color:#DC2626;" onclick="alternarRelatorioEquip(\'' + r.id + '\')">' +
+            (r.ativo === false ? 'Reativar' : 'Desativar') + '</button>'
+          : '') +
+      '</div>' +
+    '</article>';
+  }).join('');
+
+  cont.innerHTML =
+    '<div class="rel-busca">' +
+      '<input type="search" class="form-control" placeholder="Procurar por colaborador, empresa ou título…" ' +
+      'value="' + escapeHTML(_relBusca) + '" oninput="relFiltrarHistorico(this.value)">' +
+    '</div>' +
+    blocoPessoa +
+    (rels.length ? cartoes : '<div class="exame-empty-state"><p>Nenhum relatório com esse termo.</p></div>');
+}
+window._renderHistoricoRelatorios = _renderHistoricoRelatorios;
 
 // À PROVA DE ERRO: esta lista é crítica (registros/fotos de equipamentos). Nunca
 // pode ficar em branco por causa de um filtro travado ou de UM registro com
@@ -10756,6 +10899,12 @@ window.alternarRelatorioEquip = async function (id) {
 // (3) qualquer falha geral cai num aviso que garante que os dados estão salvos;
 // (4) campos são normalizados antes de renderizar (aceita formatos legados).
 function _renderEquipLista() {
+  // Contador de links enviados no botão da visão
+  try {
+    garantirRelatoriosEquip();
+    const c = document.getElementById('equip-conta-links');
+    if (c) c.textContent = state.relatoriosEquip.length;
+  } catch (e) {}
   const cont = document.getElementById('equip-lista-container');
   if (!cont) return;
   try {
@@ -10877,7 +11026,7 @@ function _renderEquipLista() {
     cont.innerHTML = `
       <div class="equip-lista-info" style="font-size:12px;color:var(--text-secondary,#64748b);margin:2px 2px 8px;">${lista.length} de ${totalReal} registro(s)</div>
       <div id="equip-barra-selecao">${_equipBarraSelecao()}</div>
-      ${_equipListaRelatorios()}
+
       ${rtControlesPagina(pag, 'equipamentos')}
       <div class="table-scroll-container equip-desktop-view">
         <table class="excel-table equip-lista-table">
