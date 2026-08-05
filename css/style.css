@@ -3662,7 +3662,16 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .modal-exame-box-detalhe {
-    max-width: 780px;
+    /* A ficha tem muitas colunas (nome, CPF, banco, agência, conta, valor...).
+       Com 780px a tabela ficava espremida e obrigava a rolar de lado. */
+    max-width: 1500px;
+    width: 96%;
+    height: 92vh;
+    height: 92dvh;
+}
+.modal-exame-box-detalhe .modal-exame-body { flex: 1 1 auto; overflow-y: auto; }
+@media (max-width: 1024px) {
+    .modal-exame-box-detalhe { width: 98%; height: 95vh; height: 95dvh; }
 }
 
 @keyframes exameScaleUp {
@@ -4828,4 +4837,43 @@ input.form-control[type="date"] {
     .rt-paginacao { flex-direction: column; align-items: stretch; }
     .rt-paginacao-botoes { justify-content: center; }
     .rt-pag-btn { min-height: 44px; flex: 1 1 auto; }
+}
+
+/* ── Reprovação de pagamento por pessoa ──────────────────────────────────── */
+.ff-col-situacao { white-space: nowrap; }
+.ff-sit { font-size: 10px; font-weight: 800; display: inline-block; }
+.ff-sit-ok    { color: #059669; }
+.ff-sit-conf  { color: #D97706; }
+.ff-sit-repro { color: #DC2626; }
+.ff-sit-corr  { color: #2563EB; }
+.ff-sit-dup   { color: #DC2626; }
+.ff-btn-linha {
+    display: inline-block; margin-left: 6px; padding: 3px 9px;
+    font-size: 10.5px; font-weight: 700; border-radius: 6px;
+    border: 1px solid transparent; cursor: pointer; background: #fff;
+}
+.ff-btn-reprovar { border-color: #FCA5A5; color: #DC2626; }
+.ff-btn-reprovar:hover { background: #FEF2F2; }
+.ff-btn-corrigir { border-color: #FCD34D; color: #B45309; background: #FFFBEB; }
+.ff-btn-corrigir:hover { background: #FEF3C7; }
+.ff-btn-aceitar  { border-color: #6EE7B7; color: #047857; background: #ECFDF5; }
+.ff-btn-aceitar:hover { background: #D1FAE5; }
+
+.ff-aviso-repro, .ff-aviso-corr {
+    border-radius: 12px; padding: 14px 16px; margin-bottom: 14px;
+    border: 1px solid; font-size: 13.5px;
+}
+.ff-aviso-repro { background: #FEF2F2; border-color: #FECACA; }
+.ff-aviso-corr  { background: #EFF6FF; border-color: #BFDBFE; }
+.ff-aviso-titulo { font-weight: 800; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.ff-aviso-repro .ff-aviso-titulo { color: #B91C1C; }
+.ff-aviso-corr  .ff-aviso-titulo { color: #1D4ED8; }
+.ff-aviso-lista { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; }
+.ff-aviso-lista li { line-height: 1.5; }
+.ff-aviso-cpf { font-size: 11.5px; color: var(--text-secondary, #64748b); font-weight: 600; }
+.ff-aviso-motivo { font-size: 12.5px; color: #0F172A; margin-top: 2px; }
+.ff-aviso-quem { font-size: 11px; color: var(--text-secondary, #64748b); font-weight: 600; }
+.ff-aviso-acao { margin-top: 10px; font-size: 12.5px; color: #7F1D1D; }
+@media (max-width: 768px) {
+    .ff-btn-linha { display: block; margin: 4px 0 0; min-height: 34px; width: 100%; }
 }

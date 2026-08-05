@@ -11832,6 +11832,11 @@ function _ffVeTudo() {
 // A ação que cabe ao usuário logado no status atual (usada nos KPIs e na lista)
 function _ffEhMinhaVez(f) {
   if (!loggedUser || !f) return false;
+  // Pagamento reprovado de UMA pessoa: a ficha volta a pedir ação de quem a
+  // montou (para corrigir) e, depois de corrigida, do Financeiro (para
+  // conferir). É assim que a "notificação" aparece — no contador Minha vez.
+  if (_ffLinhasReprovadas(f).length && (_ffEhDonoDaFicha(f) || _ffEhCoordenacao())) return true;
+  if (_ffLinhasCorrigidas(f).length && _ffEhFinanceiro()) return true;
   switch (f.status) {
     case 'rascunho':               return _ffPodeCriar() && (f.criadoPorLogin === loggedUser.login || _ffEhCoordenacao() || _ffVeTudo());
     case 'aguardando_coordenacao': return _ffEhCoordenacao() && !_ffEhCriador(f);
@@ -12673,6 +12678,184 @@ window.ffFiltroEnvio = function (campo, valor) {
   _ffRenderLista();
 };
 
+
+// ══════════════════════════════════════════════════════════════════════════
+// REPROVAR UMA PESSOA DENTRO DA FICHA (e o conserto de volta)
+// --------------------------------------------------------------------------
+// O banco devolve o pagamento de UMA pessoa (Pix errado, conta errada...).
+// Antes só dava para reprovar a ficha inteira. Agora o Financeiro reprova a
+// LINHA daquela pessoa, escreve o motivo, e a ficha volta a aparecer em
+// "Minha vez" para quem a montou. Essa pessoa corrige, descreve o que estava
+// errado e o que é o certo, e a ficha volta para o Financeiro conferir.
+//
+// Situações da linha:
+//   ok         → conferida, sem problema
+//   conferir   → o sistema não teve certeza ao ler o PDF
+//   reprovado  → o Financeiro devolveu (tem l.reprovacao com o motivo)
+//   corrigido  → quem montou já ajustou (tem l.correcao) e espera conferência
+// ══════════════════════════════════════════════════════════════════════════
+
+function _ffLinhasReprovadas(f) {
+  return (f && Array.isArray(f.linhas) ? f.linhas : []).filter(l => l && l.status === 'reprovado');
+}
+function _ffLinhasCorrigidas(f) {
+  return (f && Array.isArray(f.linhas) ? f.linhas : []).filter(l => l && l.status === 'corrigido');
+}
+// Quem montou a ficha precisa agir quando há linha reprovada.
+function _ffEhDonoDaFicha(f) {
+  return !!(loggedUser && f && f.criadoPorLogin === loggedUser.login);
+}
+
+// ── Financeiro reprova a linha de uma pessoa ──────────────────────────────
+window.ffReprovarPessoa = async function (indice) {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f) return;
+  if (!_ffEhFinanceiro() && !_ffVeTudo()) { alert('Só o Financeiro pode reprovar um pagamento.'); return; }
+  const l = (f.linhas || [])[indice];
+  if (!l) return;
+
+  const motivo = prompt(
+    'Reprovar o pagamento de:\n\n' + (l.nome || '(sem nome)') +
+    (l.cpf ? '\nCPF ' + l.cpf : '') + '\nValor: ' + _ffMoedaBR(l.valor) +
+    '\n\nQual foi o problema? (ex.: chave Pix inválida, conta bancária errada)', '');
+  if (motivo === null) return;
+  if (!String(motivo).trim()) { alert('Escreva o motivo — é ele que a pessoa vai ler para corrigir.'); return; }
+
+  l.status = 'reprovado';
+  l.reprovacao = {
+    motivo: String(motivo).trim(),
+    por: nomeExibido(loggedUser), login: loggedUser.login,
+    em: new Date().toISOString()
+  };
+  l.correcao = null;   // se já havia uma correção, ela foi recusada de novo
+
+  _ffHist(f, 'Financeiro REPROVOU o pagamento de "' + (l.nome || '—') + '": ' + l.reprovacao.motivo);
+  registrarLogGlobal('Reprovou o pagamento de "' + (l.nome || '—') + '" no Fluxo #' + f.numero + '.', 'dp');
+  await _ffSalvarERender(f, 'Pagamento reprovado. ' + (f.criadoPor || 'Quem montou a ficha') +
+    ' foi avisado e vai aparecer em "Minha vez" para corrigir.');
+};
+
+// ── Quem montou a ficha corrige ───────────────────────────────────────────
+window.ffCorrigirPessoa = async function (indice) {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f) return;
+  const l = (f.linhas || [])[indice];
+  if (!l || l.status !== 'reprovado') return;
+  if (!_ffEhDonoDaFicha(f) && !_ffEhCoordenacao() && !_ffVeTudo()) {
+    alert('Só quem montou a ficha (ou a Supervisão) pode corrigir.'); return;
+  }
+
+  const errado = prompt('Correção de "' + (l.nome || '—') + '"\n\nMotivo informado pelo Financeiro:\n' +
+    ((l.reprovacao && l.reprovacao.motivo) || '—') + '\n\n1) O que estava ERRADO?', '');
+  if (errado === null) return;
+  if (!String(errado).trim()) { alert('Descreva o que estava errado.'); return; }
+
+  const correto = prompt('2) Qual é o dado CORRETO?\n\n(ex.: Pix correto: 111.222.333-44 / Conta: 1234-5 ag. 0001)', '');
+  if (correto === null) return;
+  if (!String(correto).trim()) { alert('Informe o dado correto.'); return; }
+
+  const obs = prompt('3) Quer acrescentar alguma observação? (opcional)', '') || '';
+
+  l.status = 'corrigido';
+  l.correcao = {
+    oQueEstavaErrado: String(errado).trim(),
+    oCorreto: String(correto).trim(),
+    observacao: String(obs).trim(),
+    por: nomeExibido(loggedUser), login: loggedUser.login,
+    em: new Date().toISOString()
+  };
+
+  _ffHist(f, 'Correção de "' + (l.nome || '—') + '": estava "' + l.correcao.oQueEstavaErrado +
+    '", o correto é "' + l.correcao.oCorreto + '".' + (l.correcao.observacao ? ' Obs.: ' + l.correcao.observacao : ''));
+  registrarLogGlobal('Corrigiu o pagamento de "' + (l.nome || '—') + '" no Fluxo #' + f.numero + '.', 'dp');
+  await _ffSalvarERender(f, 'Correção enviada! O Financeiro foi avisado e vai conferir.');
+};
+
+// ── Financeiro aceita a correção ──────────────────────────────────────────
+window.ffAceitarCorrecao = async function (indice) {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f) return;
+  if (!_ffEhFinanceiro() && !_ffVeTudo()) return;
+  const l = (f.linhas || [])[indice];
+  if (!l || l.status !== 'corrigido') return;
+  if (!confirm('Confirmar que o dado de "' + (l.nome || '—') + '" está correto agora?')) return;
+
+  l.status = 'ok';
+  _ffHist(f, 'Financeiro conferiu e aceitou a correção de "' + (l.nome || '—') + '".');
+  await _ffSalvarERender(f, 'Correção aceita.');
+};
+
+// ── Faixa de aviso no topo da ficha ───────────────────────────────────────
+// Faz o papel da notificação: quem abre a ficha vê na hora o que precisa fazer.
+function _ffAvisoReprovacoes(f) {
+  const repro = _ffLinhasReprovadas(f);
+  const corr = _ffLinhasCorrigidas(f);
+  if (!repro.length && !corr.length) return '';
+
+  let html = '';
+  if (repro.length) {
+    const paraMim = _ffEhDonoDaFicha(f) || _ffEhCoordenacao() || _ffVeTudo();
+    html += '<div class="ff-aviso-repro">' +
+      '<div class="ff-aviso-titulo"><i class="fa-solid fa-circle-exclamation"></i> ' +
+        repro.length + ' pagamento(s) reprovado(s) pelo Financeiro</div>' +
+      '<ul class="ff-aviso-lista">' +
+        repro.map(l => '<li><b>' + escapeHTML(l.nome || '—') + '</b>' +
+          (l.cpf ? ' <span class="ff-aviso-cpf">CPF ' + escapeHTML(l.cpf) + '</span>' : '') +
+          '<div class="ff-aviso-motivo">' + escapeHTML((l.reprovacao && l.reprovacao.motivo) || '—') +
+          '<span class="ff-aviso-quem"> — ' + escapeHTML((l.reprovacao && l.reprovacao.por) || '') +
+          ', ' + _ffDataHora((l.reprovacao && l.reprovacao.em)) + '</span></div></li>').join('') +
+      '</ul>' +
+      (paraMim ? '<div class="ff-aviso-acao">Clique em <b>Corrigir</b> na linha da pessoa, na tabela abaixo.</div>' : '') +
+    '</div>';
+  }
+  if (corr.length) {
+    html += '<div class="ff-aviso-corr">' +
+      '<div class="ff-aviso-titulo"><i class="fa-solid fa-circle-check"></i> ' +
+        corr.length + ' correção(ões) aguardando o Financeiro conferir</div>' +
+      '<ul class="ff-aviso-lista">' +
+        corr.map(l => '<li><b>' + escapeHTML(l.nome || '—') + '</b>' +
+          '<div class="ff-aviso-motivo">Estava: ' + escapeHTML((l.correcao && l.correcao.oQueEstavaErrado) || '—') +
+          '<br>Correto: <b>' + escapeHTML((l.correcao && l.correcao.oCorreto) || '—') + '</b>' +
+          ((l.correcao && l.correcao.observacao) ? '<br>Obs.: ' + escapeHTML(l.correcao.observacao) : '') +
+          '<span class="ff-aviso-quem"> — ' + escapeHTML((l.correcao && l.correcao.por) || '') +
+          ', ' + _ffDataHora((l.correcao && l.correcao.em)) + '</span></div></li>').join('') +
+      '</ul>' +
+    '</div>';
+  }
+  return html;
+}
+
+function _ffDataHora(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  const p = n => String(n).padStart(2, '0');
+  return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
+// Botão que aparece na coluna de situação de cada linha.
+function _ffAcaoLinha(f, l, i) {
+  if (l.status === 'reprovado') {
+    const podeCorrigir = _ffEhDonoDaFicha(f) || _ffEhCoordenacao() || _ffVeTudo();
+    return '<span class="ff-sit ff-sit-repro" title="' + escapeHTML((l.reprovacao && l.reprovacao.motivo) || '') + '">🔴 reprovado</span>' +
+      (podeCorrigir ? '<button class="ff-btn-linha ff-btn-corrigir" onclick="ffCorrigirPessoa(' + i + ')">Corrigir</button>' : '');
+  }
+  if (l.status === 'corrigido') {
+    const podeAceitar = _ffEhFinanceiro() || _ffVeTudo();
+    return '<span class="ff-sit ff-sit-corr" title="Aguardando o Financeiro conferir">🔵 corrigido</span>' +
+      (podeAceitar ? '<button class="ff-btn-linha ff-btn-aceitar" onclick="ffAceitarCorrecao(' + i + ')">Aceitar</button>' : '');
+  }
+  if (l.status === 'conferir') {
+    return '<span class="ff-sit ff-sit-conf">🟡 conferir</span>' + _ffBotaoReprovar(i);
+  }
+  return '<span class="ff-sit ff-sit-ok">🟢 ok</span>' + _ffBotaoReprovar(i);
+}
+function _ffBotaoReprovar(i) {
+  return (_ffEhFinanceiro() || _ffVeTudo())
+    ? '<button class="ff-btn-linha ff-btn-reprovar" title="Reprovar o pagamento desta pessoa" onclick="ffReprovarPessoa(' + i + ')">Reprovar</button>'
+    : '';
+}
+
 function _ffRenderAPagar(cont) {
   if (!_ffEhFinanceiro() && !_ffPodeAdministrarWorkflow()) {
     cont.innerHTML = '<div class="ff-empty-box"><div class="ff-empty-title">Tela do Financeiro</div>' +
@@ -13411,6 +13594,8 @@ function _ffRenderDetalhe() {
         ${pendencias && f.status === 'rascunho' ? `<span style="font-size:11px;font-weight:700;color:#D97706;"><i class="fa-solid fa-triangle-exclamation"></i> ${pendencias} registro(s) precisam de conferência</span>` : ''}
       </div>
 
+      ${_ffAvisoReprovacoes(f)}
+
       ${(() => {
         const etId = _ffEtapaAtualId(f);
         if (!etId) return '';
@@ -13609,11 +13794,9 @@ function _ffRenderDetalhe() {
                   <td style="font-size:11px;font-family:monospace;">${escapeHTML(l.conta || '—')}${l.contaDg ? '-' + escapeHTML(l.contaDg) : ''}</td>
                   <td>${podeEditar ? `<input class="form-control" style="width:100px;font-size:12px;padding:4px 8px;text-align:right;" value="${(Number(l.valor) || 0).toFixed(2).replace('.', ',')}" onchange="ffEditarLinha(${i},'valor',this.value)">` : `<strong>${_ffMoedaBR(l.valor)}</strong>`}</td>
                   <td style="font-size:11px;">${escapeHTML(l.origem || '—')}</td>
-                  <td>${cpfsDup.has(l.id)
-                    ? '<span style="font-size:10px;font-weight:800;color:#DC2626;">⚠ duplicado?</span>'
-                    : l.status === 'conferir'
-                      ? '<span style="font-size:10px;font-weight:800;color:#D97706;">🟡 conferir</span>'
-                      : '<span style="font-size:10px;font-weight:800;color:#059669;">🟢 ok</span>'}</td>
+                  <td class="ff-col-situacao">${cpfsDup.has(l.id)
+                    ? '<span class="ff-sit ff-sit-dup">⚠ duplicado?</span>' + _ffAcaoLinha(f, l, i)
+                    : _ffAcaoLinha(f, l, i)}</td>
                   ${podeEditar ? `<td><button class="btn btn-sm btn-outline" style="border-color:#DC2626;color:#DC2626;padding:2px 8px;" onclick="ffRemoverLinha(${i})"><i class="fa-solid fa-trash-can"></i></button></td>` : ''}
                 </tr>`).join('')}
             </tbody>
