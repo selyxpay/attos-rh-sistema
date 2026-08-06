@@ -9737,6 +9737,7 @@ function renderConfiguracoes() {
 
   // Cadastros do Fluxo Financeiro (empresa / tomador / cliente)
   try { _cadRender(); } catch (e) { console.error('cadastros FF:', e); }
+  try { _sigRender(); } catch (e) { console.error('sigilo FF:', e); }
 
   const cfg = state.vagaFormConfig || { renomes: {}, camposExtras: [] };
 
@@ -13848,7 +13849,9 @@ let _ffVinculos = [];
 // Só cadastros ATIVOS aparecem para novos lançamentos. Os inativos continuam
 // visíveis no histórico, mas não podem ser escolhidos de novo.
 function _ffEmpresasAtivas() {
-  return (state.empresas || []).filter(e => e && e.ativo !== false)
+  const veSigilo = (typeof _ffVeSigilo === 'function') ? _ffVeSigilo() : false;
+  return (state.empresas || [])
+    .filter(e => e && e.ativo !== false && (veSigilo || e.sigilosa !== true))
     .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
 }
 function _ffTomadoresDaEmpresa(empresaId) {
@@ -13866,6 +13869,81 @@ function _ffNomeTomador(t) {
   if (!t) return '';
   return t.nome ? `${t.codigo} — ${t.nome}` : String(t.codigo);
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// EMPRESAS SIGILOSAS
+// --------------------------------------------------------------------------
+// Uma empresa marcada como sigilosa só aparece para quem está na lista de
+// acesso (state.ffSigiloLogins) — e o SERVIDOR é quem garante isso: para os
+// outros, esses dados nem saem de lá. O filtro daqui é a segunda camada, para
+// a tela nunca mostrar algo que escapou.
+//
+// A ficha de empresa sigilosa pula Supervisão e Gestão e cai direto em
+// "Aguardando Financeiro", com as duas aprovações registradas no histórico
+// como automáticas — assim o rastro não fica com buraco.
+// ══════════════════════════════════════════════════════════════════════════
+function _ffSigiloLogins() {
+  return Array.isArray(state.ffSigiloLogins) ? state.ffSigiloLogins : [];
+}
+function _ffVeSigilo() {
+  if (!loggedUser) return false;
+  if (ehMestre(loggedUser.login)) return true;
+  return _ffSigiloLogins().indexOf(loggedUser.login) >= 0;
+}
+function _ffEmpresaSigilosa(empresaId) {
+  const e = (state.empresas || []).find(x => x && x.id === empresaId);
+  return !!(e && e.sigilosa === true);
+}
+// A ficha é sigilosa se QUALQUER vínculo dela aponta para empresa sigilosa
+function _ffFichaSigilosa(f) {
+  if (!f) return false;
+  if (f.empresaId && _ffEmpresaSigilosa(f.empresaId)) return true;
+  return Array.isArray(f.vinculos) && f.vinculos.some(v => v && _ffEmpresaSigilosa(v.empresaId));
+}
+window._ffFichaSigilosa = _ffFichaSigilosa;
+
+// ── Lista de quem pode ver (Configurações) ────────────────────────────────
+function _sigRender() {
+  const cont = document.getElementById('sig-pessoas');
+  if (!cont) return;
+  const bloco = document.getElementById('sig-bloco');
+  // Só o mestre configura quem vê o sigiloso
+  if (bloco) bloco.style.display = (loggedUser && ehMestre(loggedUser.login)) ? '' : 'none';
+  if (!loggedUser || !ehMestre(loggedUser.login)) return;
+
+  const marcados = _ffSigiloLogins();
+  const conta = document.getElementById('sig-conta');
+  if (conta) conta.textContent = marcados.length;
+
+  const pessoas = (state.funcionarios || [])
+    .filter(f => f && f.login && f.status !== 'inativo' && !ehMestre(f.login))
+    .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+
+  if (!pessoas.length) { cont.innerHTML = '<p class="sig-vazio">Nenhum funcionário cadastrado ainda.</p>'; return; }
+
+  cont.innerHTML = '<div class="sig-grade">' + pessoas.map(f => {
+    const on = marcados.indexOf(f.login) >= 0;
+    return '<label class="sig-pessoa' + (on ? ' ativa' : '') + '">' +
+      '<input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="sigAlternar(\'' + escapeHTML(f.login) + '\', this.checked)">' +
+      '<span class="sig-nome">' + escapeHTML(nomeExibido(f)) + '</span>' +
+      '<span class="sig-depto">' + escapeHTML(f.cargo || f.departamento || '') + '</span>' +
+    '</label>';
+  }).join('') + '</div>';
+}
+window._sigRender = _sigRender;
+
+window.sigAlternar = async function (login, ligar) {
+  if (!loggedUser || !ehMestre(loggedUser.login)) { alert('Só a conta mestre define quem vê as empresas sigilosas.'); return; }
+  const lista = _ffSigiloLogins().slice();
+  const i = lista.indexOf(login);
+  if (ligar && i < 0) lista.push(login);
+  if (!ligar && i >= 0) lista.splice(i, 1);
+  state.ffSigiloLogins = lista;
+  try { await RTCloud.salvarAgora(state, { merge: true }); }
+  catch (e) { alert('Não consegui salvar: ' + (e.message || e)); return; }
+  registrarLogGlobal((ligar ? 'Liberou' : 'Removeu') + ' acesso a empresas sigilosas: ' + login + '.', 'sistema');
+  _sigRender();
+};
 
 // ══════════════════════════════════════════════════════════════════════════
 // CADASTROS DO FLUXO FINANCEIRO (Configurações) — empresa, tomador, cliente
@@ -13987,6 +14065,7 @@ function _cadRender() {
       '<div class="cad-item-txt">' +
         '<div class="cad-item-nome">' + escapeHTML(titulo) +
           (inativo ? ' <span class="cad-tag cad-tag-off">desativado</span>' : '') +
+          (r.sigilosa === true ? ' <span class="cad-tag cad-tag-sigilo"><i class="fa-solid fa-lock"></i> sigilosa</span>' : '') +
           (r.origem === 'manual' ? ' <span class="cad-tag cad-tag-novo">criado aqui</span>' : '') +
         '</div>' +
         '<div class="cad-item-sub">' + escapeHTML(sub) +
@@ -14033,6 +14112,7 @@ window.cadAbrirModal = function (id) {
   if (g('cad-f-nome'))   g('cad-f-nome').value   = reg ? (reg.nome || '') : '';
   if (g('cad-f-codigo')) g('cad-f-codigo').value = reg ? (reg.codigo || '') : '';
   if (g('cad-f-sigla'))  g('cad-f-sigla').value  = reg ? (reg.sigla || '') : '';
+  if (g('cad-f-sigilosa')) g('cad-f-sigilosa').checked = !!(reg && reg.sigilosa === true);
 
   cadTrocarTipo(tipo);
   const m = g('modal-cadastro-ff');
@@ -14051,6 +14131,8 @@ window.cadTrocarTipo = function (tipo) {
   ver('cad-campo-tomador', tipo === 'clientes');
   ver('cad-campo-codigo',  tipo === 'tomadores');
   ver('cad-campo-sigla',   tipo === 'empresas');
+  // Marcar como sigilosa é coisa da conta mestre
+  ver('cad-campo-sigilosa', tipo === 'empresas' && !!(loggedUser && ehMestre(loggedUser.login)));
   const rot = document.querySelector('#cad-campo-nome label');
   if (rot) rot.textContent = tipo === 'empresas' ? 'Nome da empresa *'
     : (tipo === 'tomadores' ? 'Nome do tomador (opcional)' : 'Nome do cliente *');
@@ -14110,13 +14192,13 @@ window.cadSalvar = async function () {
     // Editou algo que veio da planilha? Vira "manual" para não ser substituído.
     reg.origem = 'manual';
     reg.nome = nome;
-    if (tipo === 'empresas')  reg.sigla = sigla;
+    if (tipo === 'empresas')  { reg.sigla = sigla; if (ehMestre(loggedUser.login)) reg.sigilosa = !!(g('cad-f-sigilosa') || {}).checked; }
     if (tipo === 'tomadores') { reg.codigo = codigo; reg.empresaId = empresaId; }
     if (tipo === 'clientes')  { reg.empresaId = empresaId; reg.tomadorId = tomadorId; }
   } else {
     const novoId = tipo.slice(0, 3) + '-man-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     reg = { id: novoId, nome: nome, ativo: true, origem: 'manual' };
-    if (tipo === 'empresas')  { reg.sigla = sigla; reg.sigilosa = false; }
+    if (tipo === 'empresas')  { reg.sigla = sigla; reg.sigilosa = !!(ehMestre(loggedUser.login) && (g('cad-f-sigilosa') || {}).checked); }
     if (tipo === 'tomadores') { reg.empresaId = empresaId; reg.codigo = codigo; }
     if (tipo === 'clientes')  { reg.empresaId = empresaId; reg.tomadorId = tomadorId; }
     if (!Array.isArray(state[tipo])) state[tipo] = [];
@@ -14282,6 +14364,13 @@ function _ffVinculosParaSalvar() {
       tomadorId: tom.id, tomadorCodigo: String(tom.codigo), tomadorNome: tom.nome || '',
       clienteId: cli.id, clienteNome: cli.nome
     });
+  }
+  // Sigilosa e normal na mesma ficha não pode: a ficha inteira iria direto ao
+  // Financeiro (levando a normal junto) ou ficaria escondida de quem precisa.
+  const comSigilo = out.filter(o => _ffEmpresaSigilosa(o.empresaId));
+  if (comSigilo.length && comSigilo.length !== out.length) {
+    return { erro: 'Esta ficha mistura empresa sigilosa com empresa comum. ' +
+      'Separe em duas fichas: a sigilosa vai direto para o Financeiro e a comum passa pelas aprovações.' };
   }
   return { vinculos: out };
 }
@@ -15030,8 +15119,27 @@ window.ffEnviarParaAprovacao = async function() {
     _ffHist(f, `Enviou com divergência de totais reconhecida: ${det.replace(/\n/g, ' | ')}`);
   }
 
-  f.status = 'aguardando_coordenacao';
   f.enviadoEm = new Date().toISOString();
+
+  // Empresa sigilosa: pula Supervisão e Gestão e vai direto ao Financeiro.
+  // As duas aprovações ficam registradas como automáticas, para o histórico
+  // não ter buraco e dar para auditar depois.
+  if (_ffFichaSigilosa(f)) {
+    const agora = f.enviadoEm;
+    const quem = nomeExibido(loggedUser) + ' (empresa sigilosa)';
+    f.aprovacoes = f.aprovacoes || {};
+    f.aprovacoes.coordenacao = { por: quem, em: agora, automatica: true };
+    f.aprovacoes.gestao      = { por: quem, em: agora, automatica: true };
+    f.status = 'aguardando_financeiro';
+    _ffHist(f, `Confirmou a conferência (${f.linhas.length} registros · ${_ffMoedaBR(_ffTotal(f))}). ` +
+      `Empresa sigilosa: Supervisão e Gestão aprovadas automaticamente e a ficha seguiu direto para o Financeiro.`);
+    _ffNotificar(f, 'financeiro');
+    registrarLogGlobal(`Enviou o Fluxo Financeiro #${f.numero} (empresa sigilosa) direto para o Financeiro.`, 'dp');
+    await _ffSalvarERender(f, `Fluxo #${f.numero} enviado direto para o Financeiro (empresa sigilosa).`);
+    return;
+  }
+
+  f.status = 'aguardando_coordenacao';
   _ffHist(f, `Confirmou a conferência (${f.linhas.length} registros · ${_ffMoedaBR(_ffTotal(f))}) e enviou para a Supervisão DP.`);
   _ffNotificar(f, 'coordenacao');
   registrarLogGlobal(`Enviou o Fluxo Financeiro #${f.numero} para aprovação da Supervisão DP.`, 'dp');

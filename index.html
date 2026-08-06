@@ -35,16 +35,16 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260806h">
+    <link rel="stylesheet" href="css/style.css?v=20260806i">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260806h">
+    <link rel="stylesheet" href="css/design-system.css?v=20260806i">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260806h">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260806i">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260806h">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260806h">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260806i">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260806i">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260806h">
+    <link rel="stylesheet" href="css/mobile.css?v=20260806i">
 </head>
 <body class="app-shell">
 
@@ -1584,6 +1584,18 @@
                                 <label for="cad-f-sigla">Sigla (aparece nos resumos)</label>
                                 <input type="text" id="cad-f-sigla" class="form-control" placeholder="Ex.: GS" maxlength="12">
                             </div>
+                            <div class="form-group cad-sigilo-box" id="cad-campo-sigilosa">
+                                <label class="cad-check-grande">
+                                    <input type="checkbox" id="cad-f-sigilosa">
+                                    <span><i class="fa-solid fa-lock"></i> <strong>Empresa sigilosa</strong></span>
+                                </label>
+                                <small>
+                                    Só quem estiver na lista de acesso enxerga esta empresa e as fichas dela —
+                                    o servidor nem envia os dados para os outros.
+                                    A ficha criada aqui <strong>vai direto para o Financeiro</strong>, sem passar
+                                    por Supervisão e Gestão.
+                                </small>
+                            </div>
                             <div class="cad-erro" id="cad-erro"></div>
                         </div>
                         <div class="modal-exame-footer">
@@ -2160,6 +2172,22 @@
                                     <label class="cad-check"><input type="checkbox" id="cad-ver-inativos" onchange="cadVerInativos(this.checked)"> Mostrar desativados</label>
                                 </div>
                                 <div id="cad-lista"><!-- Gerado por JS --></div>
+
+                                <!-- Quem enxerga as empresas sigilosas -->
+                                <!-- Nasce escondido: só _sigRender() mostra, e só para a conta mestre.
+                                     Assim nunca sobra visível de uma renderização anterior. -->
+                                <div class="sig-bloco" id="sig-bloco" style="display:none;">
+                                    <div class="sig-topo">
+                                        <div>
+                                            <h4><i class="fa-solid fa-lock"></i> Quem pode ver as empresas sigilosas</h4>
+                                            <p>Marque as pessoas de confiança. Quem não estiver aqui não recebe esses dados —
+                                               nem as empresas, nem os tomadores, nem os clientes, nem as fichas.
+                                               <strong>Inclua também quem vai pagar</strong>, senão o Financeiro não enxerga.</p>
+                                        </div>
+                                        <span class="sig-conta" id="sig-conta">0</span>
+                                    </div>
+                                    <div id="sig-pessoas"><!-- Gerado por JS --></div>
+                                </div>
                             </div>
                         </div>
 
@@ -3832,11 +3860,11 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260806h"></script>
-    <script src="js/vps-sync.js?v=20260806h"></script>
-    <script src="js/exata-catalogo.js?v=20260806h"></script>
-    <script src="js/data.js?v=20260806h"></script>
-    <script src="js/app.js?v=20260806h"></script>
-    <script src="js/whatsapp.js?v=20260806h"></script>
+    <script src="js/security.js?v=20260806i"></script>
+    <script src="js/vps-sync.js?v=20260806i"></script>
+    <script src="js/exata-catalogo.js?v=20260806i"></script>
+    <script src="js/data.js?v=20260806i"></script>
+    <script src="js/app.js?v=20260806i"></script>
+    <script src="js/whatsapp.js?v=20260806i"></script>
 </body>
 </html>

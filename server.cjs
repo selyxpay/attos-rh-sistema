@@ -292,6 +292,75 @@ function podeTentarLogin(login) { const t = tentativasLogin[login]; return !(t &
 function registrarFalhaLogin(login) { const t = tentativasLogin[login] || { n: 0, ate: 0 }; t.n++; if (t.n % 5 === 0) t.ate = Date.now() + 60 * 1000; tentativasLogin[login] = t; }
 function limparFalhasLogin(login) { delete tentativasLogin[login]; }
 
+// ==========================================================================
+// EMPRESAS SIGILOSAS — sigilo de verdade, feito no SERVIDOR
+// --------------------------------------------------------------------------
+// Esconder só na tela não seria sigilo: o navegador receberia os dados e
+// bastaria abrir as ferramentas do desenvolvedor para ler. Então quem não
+// está autorizado simplesmente NÃO RECEBE essas empresas, seus tomadores e
+// clientes, nem as fichas que usam elas.
+//
+// Autorizado = conta mestre OU login listado em dados.ffSigiloLogins
+// (configurado pelo admin em Configurações).
+// ==========================================================================
+function _sigiloAutorizado(dados, login) {
+  if (!login) return false;
+  if (ehMestreLogin(login)) return true;
+  const lista = (dados && Array.isArray(dados.ffSigiloLogins)) ? dados.ffSigiloLogins : [];
+  return lista.indexOf(login) >= 0;
+}
+
+// Ids das empresas marcadas como sigilosas
+function _idsSigilosos(dados) {
+  const ids = {};
+  ((dados && dados.empresas) || []).forEach(function (e) {
+    if (e && e.sigilosa === true && e.id) ids[e.id] = true;
+  });
+  return ids;
+}
+
+// Uma ficha é sigilosa se QUALQUER vínculo dela aponta para empresa sigilosa
+function _fichaEhSigilosa(f, ids) {
+  if (!f) return false;
+  if (f.empresaId && ids[f.empresaId]) return true;
+  return Array.isArray(f.vinculos) && f.vinculos.some(function (v) { return v && ids[v.empresaId]; });
+}
+
+// Devolve uma CÓPIA do estado sem nada sigiloso (para quem não pode ver)
+function _semSigilo(dados) {
+  const d = Object.assign({}, dados || {});
+  const ids = _idsSigilosos(d);
+  if (!Object.keys(ids).length) return d;
+  d.empresas  = (d.empresas  || []).filter(function (e) { return !(e && ids[e.id]); });
+  d.tomadores = (d.tomadores || []).filter(function (t) { return !(t && ids[t.empresaId]); });
+  d.clientes  = (d.clientes  || []).filter(function (c) { return !(c && ids[c.empresaId]); });
+  d.fluxosFinanceiros = (d.fluxosFinanceiros || []).filter(function (f) { return !_fichaEhSigilosa(f, ids); });
+  return d;
+}
+
+// Ao gravar: quem não enxerga o sigiloso não pode apagá-lo sem querer.
+// Devolve para o payload tudo que tinha sido escondido dele.
+function _devolverSigilo(antes, novo) {
+  const ids = _idsSigilosos(antes || {});
+  if (!Object.keys(ids).length) return novo;
+  const d = novo || {};
+  const juntar = function (chave, ehDoSigilo) {
+    const guardados = ((antes && antes[chave]) || []).filter(ehDoSigilo);
+    if (!guardados.length) return;
+    const atual = Array.isArray(d[chave]) ? d[chave] : [];
+    const tem = {};
+    atual.forEach(function (r) { if (r && r.id != null) tem[r.id] = true; });
+    d[chave] = atual.concat(guardados.filter(function (r) { return r && !tem[r.id]; }));
+  };
+  juntar("empresas",  function (e) { return e && ids[e.id]; });
+  juntar("tomadores", function (t) { return t && ids[t.empresaId]; });
+  juntar("clientes",  function (c) { return c && ids[c.empresaId]; });
+  juntar("fluxosFinanceiros", function (f) { return _fichaEhSigilosa(f, ids); });
+  // A lista de quem pode ver também é preservada: só o admin autorizado mexe nela
+  if (antes && antes.ffSigiloLogins !== undefined) d.ffSigiloLogins = antes.ffSigiloLogins;
+  return d;
+}
+
 // Subconjunto PÚBLICO do estado (sem login): só o que as páginas públicas usam.
 // NUNCA expõe candidatos, banco de talentos, funcionários (senhas!), logs, etc.
 // ATENÇÃO — esta função responde a QUEM NÃO ESTÁ LOGADO.
@@ -1217,7 +1286,12 @@ http.createServer(function (req, res) {
     const s = lerEstado();
     if (autenticado) {
       // A senha visível é removida daqui — só sai pela rota /api/ver-senha (com registro)
-      const dadosFiltrados = filtrarSenhaVisivel(s.dados);
+      let dadosFiltrados = filtrarSenhaVisivel(s.dados);
+      // Empresas sigilosas: quem não está autorizado nem recebe os dados.
+      const _sessao = sessaoValida(tokenDaReq(req));
+      if (!_sigiloAutorizado(s.dados, _sessao && _sessao.login)) {
+        dadosFiltrados = _semSigilo(dadosFiltrados);
+      }
       responderJson(res, 200, { dados: dadosFiltrados, version: s.version, atualizadoEm: s.atualizadoEm });
     } else {
       responderJson(res, 200, { dados: subsetPublico(s.dados), version: s.version, atualizadoEm: s.atualizadoEm, publico: true });
@@ -1257,6 +1331,15 @@ http.createServer(function (req, res) {
           const filtrado = {};
           CHAVES_ESCRITA_PUBLICA.forEach(function (k) { if (local[k] !== undefined) filtrado[k] = local[k]; });
           dados = mesclarEstado(atual.dados || {}, filtrado, (body && body.upsertIds) || []);
+        }
+        // Empresas sigilosas: se quem gravou não podia vê-las, elas não vieram
+        // no payload dele. Devolvemos antes de gravar — senão um save comum
+        // apagaria tudo que é sigiloso sem ninguém perceber.
+        if (autenticado) {
+          const _s2 = sessaoValida(tokenDaReq(req));
+          if (!_sigiloAutorizado(atual.dados, _s2 && _s2.login)) {
+            dados = _devolverSigilo(atual.dados || {}, dados);
+          }
         }
         // A SENHA VISÍVEL é gerenciada só pelo servidor (registro/redefinir). Na gravação geral,
         // preserva a de cada funcionário existente — assim ninguém apaga a senha de outro depto.
