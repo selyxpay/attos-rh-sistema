@@ -9735,6 +9735,9 @@ const CAMPOS_PADRAO_VAGA = [
 function renderConfiguracoes() {
   if (!loggedUser || (loggedUser.departamento !== 'administracao' && !ehMestre(loggedUser.login))) return;
 
+  // Cadastros do Fluxo Financeiro (empresa / tomador / cliente)
+  try { _cadRender(); } catch (e) { console.error('cadastros FF:', e); }
+
   const cfg = state.vagaFormConfig || { renomes: {}, camposExtras: [] };
 
   // ── Bloco 1: Renomear labels dos campos padrão ────────────────────────
@@ -13863,6 +13866,312 @@ function _ffNomeTomador(t) {
   if (!t) return '';
   return t.nome ? `${t.codigo} — ${t.nome}` : String(t.codigo);
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// CADASTROS DO FLUXO FINANCEIRO (Configurações) — empresa, tomador, cliente
+// --------------------------------------------------------------------------
+// É esta lista que alimenta os selects ao montar uma ficha. O que for criado
+// aqui leva origem "manual" e nunca é substituído pela carga da planilha. E
+// se um registro da planilha for editado, ele VIRA manual — senão a correção
+// se perderia na próxima atualização da base.
+//
+// Nada é apagado por padrão: o caminho normal é DESATIVAR, que tira do
+// formulário e mantém as fichas antigas coerentes. Apagar de vez só é
+// oferecido para o que foi criado à mão e nunca entrou numa ficha.
+// ══════════════════════════════════════════════════════════════════════════
+let _cadAba = 'clientes';
+let _cadBusca = '';
+let _cadEmpresaFiltro = '';
+let _cadVerInativos = false;
+let _cadEditandoId = '';
+
+function _cadPode() {
+  return !!(loggedUser && (ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao'));
+}
+function _cadLista(tipo) { return Array.isArray(state[tipo]) ? state[tipo] : []; }
+function _cadEmpresa(id) { return _cadLista('empresas').find(e => e && e.id === id) || null; }
+function _cadTomador(id) { return _cadLista('tomadores').find(t => t && t.id === id) || null; }
+function _cadNorm(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toUpperCase();
+}
+// Quantas fichas usam este cadastro (para não deixar apagar algo em uso)
+function _cadUsosEmFichas(tipo, id) {
+  const campo = tipo === 'empresas' ? 'empresaId' : (tipo === 'tomadores' ? 'tomadorId' : 'clienteId');
+  return (state.fluxosFinanceiros || []).filter(f =>
+    Array.isArray(f.vinculos) && f.vinculos.some(v => v && v[campo] === id)
+  ).length;
+}
+
+window.cadTrocarAba = function (aba) {
+  _cadAba = aba; _cadBusca = ''; _cadEmpresaFiltro = '';
+  const b = document.getElementById('cad-busca'); if (b) b.value = '';
+  _cadRender();
+};
+window.cadFiltrar = function (txt) { _cadBusca = txt; _cadRender(); };
+window.cadFiltrarEmpresa = function (id) { _cadEmpresaFiltro = id; _cadRender(); };
+window.cadVerInativos = function (v) { _cadVerInativos = !!v; _cadRender(); };
+
+function _cadRender() {
+  const cont = document.getElementById('cad-lista');
+  if (!cont) return;
+  garantirFluxoFinanceiro();
+
+  // Abas + contadores
+  ['empresas', 'tomadores', 'clientes'].forEach(t => {
+    const btn = document.getElementById('cad-aba-' + t);
+    if (btn) btn.classList.toggle('ativa', t === _cadAba);
+    const c = document.getElementById('cad-conta-' + t);
+    if (c) c.textContent = _cadLista(t).filter(r => r && r.ativo !== false).length;
+  });
+
+  // Filtro de empresa: só faz sentido em tomadores/clientes
+  const selEmp = document.getElementById('cad-filtro-empresa');
+  if (selEmp) {
+    selEmp.style.display = _cadAba === 'empresas' ? 'none' : '';
+    if (_cadAba !== 'empresas') {
+      selEmp.innerHTML = '<option value="">Todas as empresas</option>' +
+        _ffEmpresasAtivas().map(e =>
+          `<option value="${escapeHTML(e.id)}"${e.id === _cadEmpresaFiltro ? ' selected' : ''}>${escapeHTML(e.nome)}</option>`).join('');
+    }
+  }
+
+  const q = _cadNorm(_cadBusca);
+  let itens = _cadLista(_cadAba).filter(r => {
+    if (!r) return false;
+    if (!_cadVerInativos && r.ativo === false) return false;
+    if (_cadEmpresaFiltro && _cadAba !== 'empresas' && r.empresaId !== _cadEmpresaFiltro) return false;
+    if (!q) return true;
+    const alvo = _cadNorm([r.nome, r.codigo, r.sigla].filter(Boolean).join(' '));
+    return alvo.includes(q);
+  });
+
+  itens = itens.sort((a, b) => {
+    if (_cadAba === 'tomadores') {
+      const ea = (_cadEmpresa(a.empresaId) || {}).nome || '';
+      const eb = (_cadEmpresa(b.empresaId) || {}).nome || '';
+      if (ea !== eb) return ea.localeCompare(eb, 'pt-BR');
+      return String(a.codigo || '').localeCompare(String(b.codigo || ''), 'pt-BR', { numeric: true });
+    }
+    return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR');
+  });
+
+  if (!itens.length) {
+    cont.innerHTML = '<div class="cad-vazio"><i class="fa-solid fa-magnifying-glass"></i>' +
+      '<p>' + (_cadBusca || _cadEmpresaFiltro ? 'Nada encontrado com esse filtro.' : 'Nenhum cadastro nesta lista ainda.') + '</p></div>';
+    return;
+  }
+
+  const linhas = itens.map(r => {
+    const inativo = r.ativo === false;
+    const usos = _cadUsosEmFichas(_cadAba, r.id);
+    const podeApagar = r.origem === 'manual' && usos === 0;
+
+    let titulo = '', sub = '';
+    if (_cadAba === 'empresas') {
+      titulo = r.nome || '(sem nome)';
+      sub = (r.sigla ? 'Sigla ' + r.sigla + ' · ' : '') +
+        _cadLista('tomadores').filter(t => t.empresaId === r.id && t.ativo !== false).length + ' tomador(es) · ' +
+        _cadLista('clientes').filter(c => c.empresaId === r.id && c.ativo !== false).length + ' cliente(s)';
+    } else if (_cadAba === 'tomadores') {
+      titulo = _ffNomeTomador(r);
+      const cli = _cadLista('clientes').filter(c => c.tomadorId === r.id && c.ativo !== false);
+      sub = ((_cadEmpresa(r.empresaId) || {}).nome || '—') + ' · ' +
+        (cli.length === 1 ? cli[0].nome : cli.length + ' cliente(s)');
+    } else {
+      titulo = r.nome || '(sem nome)';
+      const t = _cadTomador(r.tomadorId);
+      sub = ((_cadEmpresa(r.empresaId) || {}).nome || '—') + ' · tomador ' + (t ? t.codigo : '—');
+    }
+
+    return '<div class="cad-item' + (inativo ? ' inativo' : '') + '">' +
+      '<div class="cad-item-txt">' +
+        '<div class="cad-item-nome">' + escapeHTML(titulo) +
+          (inativo ? ' <span class="cad-tag cad-tag-off">desativado</span>' : '') +
+          (r.origem === 'manual' ? ' <span class="cad-tag cad-tag-novo">criado aqui</span>' : '') +
+        '</div>' +
+        '<div class="cad-item-sub">' + escapeHTML(sub) +
+          (usos ? ' · <b>' + usos + ' ficha(s)</b>' : '') + '</div>' +
+      '</div>' +
+      '<div class="cad-item-acoes">' +
+        '<button class="btn btn-sm btn-secondary" onclick="cadAbrirModal(\'' + r.id + '\')" title="Editar">' +
+          '<i class="fa-solid fa-pen"></i></button>' +
+        '<button class="btn btn-sm btn-secondary" onclick="cadAlternarAtivo(\'' + r.id + '\')" title="' +
+          (inativo ? 'Reativar' : 'Desativar') + '">' +
+          '<i class="fa-solid fa-' + (inativo ? 'rotate-left' : 'eye-slash') + '"></i></button>' +
+        (podeApagar
+          ? '<button class="btn btn-sm btn-outline cad-apagar" onclick="cadApagar(\'' + r.id + '\')" title="Apagar de vez">' +
+            '<i class="fa-solid fa-trash-can"></i></button>'
+          : '') +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  cont.innerHTML = '<div class="cad-itens">' + linhas + '</div>' +
+    '<div class="cad-rodape">' + itens.length + ' de ' + _cadLista(_cadAba).length + ' ' + _cadAba + '</div>';
+}
+window._cadRender = _cadRender;
+
+// ── Modal ─────────────────────────────────────────────────────────────────
+window.cadAbrirModal = function (id) {
+  if (!_cadPode()) { alert('Só o administrador altera estes cadastros.'); return; }
+  garantirFluxoFinanceiro();
+  _cadEditandoId = id || '';
+  const g = k => document.getElementById(k);
+  const reg = id ? _cadLista(_cadAba).find(r => r && r.id === id) : null;
+  const tipo = reg ? _cadAba : _cadAba;
+
+  if (g('cad-tipo')) g('cad-tipo').value = tipo;
+  if (g('cad-campo-tipo')) g('cad-campo-tipo').style.display = reg ? 'none' : '';
+  if (g('cad-modal-titulo')) g('cad-modal-titulo').textContent = reg ? 'Editar cadastro' : 'Novo cadastro';
+  if (g('cad-modal-sub')) g('cad-modal-sub').textContent = reg
+    ? (reg.origem === 'base' ? 'Veio da planilha — ao salvar, passa a ser seu e não será substituído' : 'Cadastro criado aqui')
+    : 'Empresa, tomador ou cliente';
+  if (g('cad-erro')) g('cad-erro').textContent = '';
+
+  _cadPreencherEmpresas(reg ? reg.empresaId : '');
+  _cadPreencherTomadores(reg ? reg.empresaId : '', reg ? reg.tomadorId : '');
+  if (g('cad-f-nome'))   g('cad-f-nome').value   = reg ? (reg.nome || '') : '';
+  if (g('cad-f-codigo')) g('cad-f-codigo').value = reg ? (reg.codigo || '') : '';
+  if (g('cad-f-sigla'))  g('cad-f-sigla').value  = reg ? (reg.sigla || '') : '';
+
+  cadTrocarTipo(tipo);
+  const m = g('modal-cadastro-ff');
+  if (m) m.style.display = 'flex';
+  setTimeout(() => { const n = g('cad-f-nome'); if (n && n.offsetParent) n.focus(); }, 120);
+};
+window.cadFecharModal = function () {
+  const m = document.getElementById('modal-cadastro-ff');
+  if (m) m.style.display = 'none';
+  _cadEditandoId = '';
+};
+// Mostra só os campos que aquele tipo precisa
+window.cadTrocarTipo = function (tipo) {
+  const ver = (id, mostrar) => { const el = document.getElementById(id); if (el) el.style.display = mostrar ? '' : 'none'; };
+  ver('cad-campo-empresa', tipo !== 'empresas');
+  ver('cad-campo-tomador', tipo === 'clientes');
+  ver('cad-campo-codigo',  tipo === 'tomadores');
+  ver('cad-campo-sigla',   tipo === 'empresas');
+  const rot = document.querySelector('#cad-campo-nome label');
+  if (rot) rot.textContent = tipo === 'empresas' ? 'Nome da empresa *'
+    : (tipo === 'tomadores' ? 'Nome do tomador (opcional)' : 'Nome do cliente *');
+  const inp = document.getElementById('cad-f-nome');
+  if (inp) inp.placeholder = tipo === 'empresas' ? 'Ex.: 25/Green Service'
+    : (tipo === 'tomadores' ? 'Deixe vazio se o tomador não tiver nome' : 'Ex.: SUPERPAV');
+};
+function _cadPreencherEmpresas(sel) {
+  const s = document.getElementById('cad-f-empresa');
+  if (!s) return;
+  s.innerHTML = '<option value="">Selecionar empresa...</option>' +
+    _ffEmpresasAtivas().map(e => `<option value="${escapeHTML(e.id)}"${e.id === sel ? ' selected' : ''}>${escapeHTML(e.nome)}</option>`).join('');
+}
+function _cadPreencherTomadores(empresaId, sel) {
+  const s = document.getElementById('cad-f-tomador');
+  if (!s) return;
+  const lista = _ffTomadoresDaEmpresa(empresaId);
+  s.innerHTML = '<option value="">' + (empresaId ? (lista.length ? 'Selecionar tomador...' : 'Nenhum tomador nesta empresa') : 'Escolha a empresa primeiro') + '</option>' +
+    lista.map(t => `<option value="${escapeHTML(t.id)}"${t.id === sel ? ' selected' : ''}>${escapeHTML(_ffNomeTomador(t))}</option>`).join('');
+}
+window.cadFormEmpresaMudou = function (id) { _cadPreencherTomadores(id, ''); };
+
+window.cadSalvar = async function () {
+  if (!_cadPode()) { alert('Só o administrador altera estes cadastros.'); return; }
+  const g = k => document.getElementById(k);
+  const erro = m => { if (g('cad-erro')) g('cad-erro').textContent = m; };
+  const tipo = _cadEditandoId ? _cadAba : (g('cad-tipo') || {}).value || 'clientes';
+  const nome = ((g('cad-f-nome') || {}).value || '').trim();
+  const empresaId = ((g('cad-f-empresa') || {}).value || '').trim();
+  const tomadorId = ((g('cad-f-tomador') || {}).value || '').trim();
+  const codigo = ((g('cad-f-codigo') || {}).value || '').trim();
+  const sigla = ((g('cad-f-sigla') || {}).value || '').trim();
+
+  if (tipo !== 'tomadores' && !nome) { erro('Escreva o nome.'); return; }
+  if (tipo !== 'empresas' && !empresaId) { erro('Escolha a empresa.'); return; }
+  if (tipo === 'clientes' && !tomadorId) { erro('Escolha o tomador.'); return; }
+  if (tipo === 'tomadores' && !codigo) { erro('Escreva o código do tomador.'); return; }
+
+  const lista = _cadLista(tipo);
+  const eu = _cadEditandoId;
+  // Repetido? (empresa: nome; tomador: empresa+código; cliente: empresa+tomador+nome)
+  const repetido = lista.some(r => {
+    if (!r || r.id === eu) return false;
+    if (tipo === 'empresas')  return _cadNorm(r.nome) === _cadNorm(nome);
+    if (tipo === 'tomadores') return r.empresaId === empresaId && _cadNorm(r.codigo) === _cadNorm(codigo);
+    return r.empresaId === empresaId && r.tomadorId === tomadorId && _cadNorm(r.nome) === _cadNorm(nome);
+  });
+  if (repetido) {
+    erro(tipo === 'empresas' ? 'Já existe uma empresa com esse nome.'
+      : tipo === 'tomadores' ? 'Essa empresa já tem um tomador com esse código.'
+      : 'Esse tomador já tem um cliente com esse nome.');
+    return;
+  }
+
+  let reg = eu ? lista.find(r => r && r.id === eu) : null;
+  if (reg) {
+    // Editou algo que veio da planilha? Vira "manual" para não ser substituído.
+    reg.origem = 'manual';
+    reg.nome = nome;
+    if (tipo === 'empresas')  reg.sigla = sigla;
+    if (tipo === 'tomadores') { reg.codigo = codigo; reg.empresaId = empresaId; }
+    if (tipo === 'clientes')  { reg.empresaId = empresaId; reg.tomadorId = tomadorId; }
+  } else {
+    const novoId = tipo.slice(0, 3) + '-man-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    reg = { id: novoId, nome: nome, ativo: true, origem: 'manual' };
+    if (tipo === 'empresas')  { reg.sigla = sigla; reg.sigilosa = false; }
+    if (tipo === 'tomadores') { reg.empresaId = empresaId; reg.codigo = codigo; }
+    if (tipo === 'clientes')  { reg.empresaId = empresaId; reg.tomadorId = tomadorId; }
+    if (!Array.isArray(state[tipo])) state[tipo] = [];
+    state[tipo].push(reg);
+    _cadAba = tipo;
+  }
+
+  try { await RTCloud.salvarAgora(state, { merge: true, upsertIds: [reg.id] }); }
+  catch (e) { erro('Não consegui salvar: ' + (e.message || e)); return; }
+  registrarLogGlobal((eu ? 'Editou' : 'Cadastrou') + ' ' + tipo.slice(0, -1) + ' do Fluxo Financeiro: ' + (nome || codigo) + '.', 'sistema');
+  cadFecharModal();
+  _cadRender();
+};
+
+window.cadAlternarAtivo = async function (id) {
+  if (!_cadPode()) return;
+  const reg = _cadLista(_cadAba).find(r => r && r.id === id);
+  if (!reg) return;
+  const desativando = reg.ativo !== false;
+  if (desativando) {
+    const usos = _cadUsosEmFichas(_cadAba, id);
+    const aviso = 'Desativar "' + (reg.nome || reg.codigo) + '"?\n\n' +
+      'Ele some do formulário de novas fichas.' +
+      (usos ? '\nAs ' + usos + ' ficha(s) que já usam continuam iguais.' : '') +
+      '\n\nDá para reativar depois.';
+    if (!confirm(aviso)) return;
+  }
+  reg.ativo = !desativando;
+  try { await RTCloud.salvarAgora(state, { merge: true, upsertIds: [reg.id] }); }
+  catch (e) { alert('Não consegui salvar: ' + (e.message || e)); return; }
+  _cadRender();
+};
+
+window.cadApagar = async function (id) {
+  if (!_cadPode()) return;
+  const lista = _cadLista(_cadAba);
+  const reg = lista.find(r => r && r.id === id);
+  if (!reg) return;
+  if (reg.origem !== 'manual') { alert('Este cadastro veio da planilha oficial. Use DESATIVAR.'); return; }
+  const usos = _cadUsosEmFichas(_cadAba, id);
+  if (usos) { alert('Não dá para apagar: ' + usos + ' ficha(s) usam este cadastro. Use DESATIVAR.'); return; }
+  // Apagar empresa/tomador que tem coisa pendurada quebraria a lista
+  if (_cadAba === 'empresas' && _cadLista('tomadores').some(t => t.empresaId === id)) {
+    alert('Esta empresa tem tomadores. Apague ou mova os tomadores antes.'); return;
+  }
+  if (_cadAba === 'tomadores' && _cadLista('clientes').some(c => c.tomadorId === id)) {
+    alert('Este tomador tem clientes. Apague os clientes antes.'); return;
+  }
+  if (!confirm('Apagar "' + (reg.nome || reg.codigo) + '" de vez?\n\nNão dá para desfazer.')) return;
+  state[_cadAba] = lista.filter(r => r && r.id !== id);
+  try { await RTCloud.salvarAgora(state); }
+  catch (e) { alert('Não consegui salvar: ' + (e.message || e)); return; }
+  registrarLogGlobal('Apagou ' + _cadAba.slice(0, -1) + ' do Fluxo Financeiro: ' + (reg.nome || reg.codigo) + '.', 'sistema');
+  _cadRender();
+};
 
 function _ffRenderVinculos() {
   const cont = document.getElementById('ff-vinculos-lista');

@@ -4714,6 +4714,95 @@ input.form-control[type="date"] {
     color: #059669; font-weight: 600;
 }
 .ff-auto-dica.ff-auto-escolha { color: #B45309; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   CADASTROS DO FLUXO FINANCEIRO (Configurações)
+   ══════════════════════════════════════════════════════════════════════ */
+.cad-corpo { padding: 18px 20px 20px; }
+.cad-explica {
+    font-size: 12.5px; line-height: 1.6; color: var(--text-secondary, #64748b);
+    margin: 0 0 16px; padding: 10px 14px; border-radius: 9px;
+    background: rgba(5, 150, 105, .06); border: 1px solid rgba(5, 150, 105, .2);
+}
+.cad-explica i { color: #059669; margin-right: 4px; }
+
+.cad-abas { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.cad-aba {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 16px; min-height: 40px; border-radius: 9px; cursor: pointer;
+    border: 1px solid var(--border-color, #e2e8f0); background: var(--bg-main, #f8fafc);
+    color: var(--text-secondary, #64748b); font-family: inherit;
+    font-size: 13px; font-weight: 700; transition: background .15s, color .15s, border-color .15s;
+}
+.cad-aba:hover { border-color: #059669; color: #059669; }
+.cad-aba.ativa { background: #059669; border-color: #059669; color: #fff; }
+.cad-conta {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 22px; height: 19px; padding: 0 6px; border-radius: 999px;
+    background: rgba(15, 23, 42, .1); font-size: 11px; font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+.cad-aba.ativa .cad-conta { background: rgba(255, 255, 255, .26); }
+
+.cad-filtros { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.cad-filtros #cad-busca { flex: 2 1 240px; min-width: 0; }
+.cad-filtros #cad-filtro-empresa { flex: 1 1 200px; min-width: 0; }
+.cad-check {
+    display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+    font-size: 12.5px; font-weight: 600; color: var(--text-secondary, #64748b); cursor: pointer;
+}
+
+.cad-itens {
+    display: flex; flex-direction: column;
+    border: 1px solid var(--border-color, #e2e8f0); border-radius: 11px;
+    /* A lista rola DENTRO da caixa: com 164 clientes a página não vira um rolo sem fim */
+    max-height: 460px; overflow-y: auto; overscroll-behavior: contain;
+}
+.cad-item {
+    display: flex; align-items: center; gap: 14px; padding: 11px 15px;
+    border-bottom: 1px solid var(--border-color, #e2e8f0); background: var(--bg-card, #fff);
+}
+.cad-item:last-child { border-bottom: 0; }
+.cad-item:hover { background: var(--bg-main, #f8fafc); }
+.cad-item.inativo { opacity: .55; }
+.cad-item-txt { flex: 1 1 auto; min-width: 0; }
+.cad-item-nome {
+    font-size: 13.5px; font-weight: 700; color: var(--text-primary, #0f172a);
+    display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+}
+.cad-item-sub { font-size: 11.5px; color: var(--text-secondary, #64748b); margin-top: 2px; }
+.cad-tag {
+    font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+    padding: 2px 7px; border-radius: 5px; white-space: nowrap;
+}
+.cad-tag-off  { background: #FEE2E2; color: #B91C1C; }
+.cad-tag-novo { background: #DCFCE7; color: #047857; }
+.cad-item-acoes { display: flex; gap: 6px; flex: 0 0 auto; }
+.cad-item-acoes .btn { min-height: 34px; padding: 0 10px; }
+.cad-apagar { border-color: #DC2626 !important; color: #DC2626 !important; }
+
+.cad-rodape {
+    margin-top: 10px; font-size: 11.5px; color: var(--text-secondary, #64748b);
+    text-align: right; font-variant-numeric: tabular-nums;
+}
+.cad-vazio {
+    text-align: center; padding: 34px 18px; color: var(--text-secondary, #64748b);
+    border: 1px dashed var(--border-color, #e2e8f0); border-radius: 11px;
+}
+.cad-vazio i { font-size: 24px; opacity: .4; display: block; margin-bottom: 8px; }
+.cad-vazio p { margin: 0; font-size: 13px; }
+.cad-erro { color: #B91C1C; font-size: 12.5px; font-weight: 600; min-height: 18px; margin-top: 4px; }
+
+@media (max-width: 768px) {
+    .cad-corpo { padding: 14px; }
+    .cad-abas { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+    .cad-aba { padding: 9px 8px; font-size: 12px; justify-content: center; }
+    .cad-filtros { flex-direction: column; align-items: stretch; }
+    .cad-filtros #cad-busca, .cad-filtros #cad-filtro-empresa { flex: 1 1 auto; width: 100%; }
+    .cad-item { flex-direction: column; align-items: stretch; gap: 9px; }
+    .cad-item-acoes { justify-content: flex-end; }
+    .cad-item-acoes .btn { flex: 1 1 auto; min-height: 40px; justify-content: center; }
+}
 .ff-btn-add-vinculo { width: 100%; justify-content: center; }
 
 /* Celular/tablet: empilha os campos, um embaixo do outro, sem estourar a tela */

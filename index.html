@@ -35,16 +35,16 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260806g">
+    <link rel="stylesheet" href="css/style.css?v=20260806h">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260806g">
+    <link rel="stylesheet" href="css/design-system.css?v=20260806h">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260806g">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260806h">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260806g">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260806g">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260806h">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260806h">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260806g">
+    <link rel="stylesheet" href="css/mobile.css?v=20260806h">
 </head>
 <body class="app-shell">
 
@@ -1542,6 +1542,57 @@
                 </section>
 
                 <!-- Modal: Gerar relatório de equipamentos para a empresa cliente -->
+                <!-- Modal: adicionar/editar cadastro do Fluxo Financeiro -->
+                <div id="modal-cadastro-ff" class="modal-overlay" style="display:none;" onclick="if(event.target===this)cadFecharModal()">
+                    <div class="modal-exame-box" style="max-width:560px;">
+                        <div class="modal-exame-header">
+                            <div style="display:flex;align-items:center;gap:12px;">
+                                <div class="modal-exame-icon" style="background:linear-gradient(135deg,#047857,#10B981);"><i class="fa-solid fa-sitemap"></i></div>
+                                <div>
+                                    <h2 style="margin:0;font-size:20px;" id="cad-modal-titulo">Novo cadastro</h2>
+                                    <p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary);" id="cad-modal-sub">Empresa, tomador ou cliente</p>
+                                </div>
+                            </div>
+                            <button class="modal-exame-close" onclick="cadFecharModal()"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="modal-exame-body">
+                            <div class="form-group" id="cad-campo-tipo">
+                                <label for="cad-tipo">O que você quer cadastrar?</label>
+                                <select id="cad-tipo" class="form-control" onchange="cadTrocarTipo(this.value)">
+                                    <option value="clientes">Cliente</option>
+                                    <option value="tomadores">Tomador</option>
+                                    <option value="empresas">Empresa</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="cad-campo-empresa">
+                                <label for="cad-f-empresa">Empresa *</label>
+                                <select id="cad-f-empresa" class="form-control" onchange="cadFormEmpresaMudou(this.value)"></select>
+                            </div>
+                            <div class="form-group" id="cad-campo-tomador">
+                                <label for="cad-f-tomador">Tomador *</label>
+                                <select id="cad-f-tomador" class="form-control"></select>
+                            </div>
+                            <div class="form-group" id="cad-campo-codigo">
+                                <label for="cad-f-codigo">Código do tomador *</label>
+                                <input type="text" id="cad-f-codigo" class="form-control" placeholder="Ex.: 00023" maxlength="20">
+                            </div>
+                            <div class="form-group" id="cad-campo-nome">
+                                <label for="cad-f-nome">Nome *</label>
+                                <input type="text" id="cad-f-nome" class="form-control" placeholder="Ex.: SUPERPAV" maxlength="120">
+                            </div>
+                            <div class="form-group" id="cad-campo-sigla">
+                                <label for="cad-f-sigla">Sigla (aparece nos resumos)</label>
+                                <input type="text" id="cad-f-sigla" class="form-control" placeholder="Ex.: GS" maxlength="12">
+                            </div>
+                            <div class="cad-erro" id="cad-erro"></div>
+                        </div>
+                        <div class="modal-exame-footer">
+                            <button class="btn btn-secondary" onclick="cadFecharModal()">Cancelar</button>
+                            <button class="btn btn-primary" onclick="cadSalvar()"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+                        </div>
+                    </div>
+                </div>
+
                 <div id="modal-relatorio-equip" class="modal-overlay" style="display:none;" onclick="if(event.target===this)fecharModalRelatorioEquip()">
                     <div class="modal-exame-box">
                         <div class="modal-exame-header">
@@ -2080,6 +2131,35 @@
                                     <h1 class="mod-header-title">Configurações do Sistema</h1>
                                     <p class="mod-header-subtitle">Personalize os campos do formulário de vagas, regras e dados avançados do CRM.</p>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- CADASTROS DO FLUXO FINANCEIRO — empresas, tomadores e clientes.
+                             É daqui que sai a lista dos selects do Fluxo Financeiro. -->
+                        <div class="table-box bg-glass" style="margin-bottom: 28px;">
+                            <div class="table-header-area">
+                                <h3><i class="fa-solid fa-sitemap" style="color:#059669;"></i> Cadastros do Fluxo Financeiro</h3>
+                                <button class="btn btn-primary btn-sm" onclick="cadAbrirModal()">
+                                    <i class="fa-solid fa-plus"></i> Adicionar
+                                </button>
+                            </div>
+                            <div class="cad-corpo">
+                                <p class="cad-explica">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                    Empresa &rarr; Tomador &rarr; Cliente. É esta lista que aparece ao montar uma ficha.
+                                    Para tirar algo do formulário, <strong>desative</strong> — assim as fichas antigas continuam certas.
+                                </p>
+                                <div class="cad-abas" id="cad-abas">
+                                    <button type="button" class="cad-aba ativa" id="cad-aba-empresas"  onclick="cadTrocarAba('empresas')">Empresas <span class="cad-conta" id="cad-conta-empresas">0</span></button>
+                                    <button type="button" class="cad-aba"       id="cad-aba-tomadores" onclick="cadTrocarAba('tomadores')">Tomadores <span class="cad-conta" id="cad-conta-tomadores">0</span></button>
+                                    <button type="button" class="cad-aba"       id="cad-aba-clientes"  onclick="cadTrocarAba('clientes')">Clientes <span class="cad-conta" id="cad-conta-clientes">0</span></button>
+                                </div>
+                                <div class="cad-filtros">
+                                    <input type="search" class="form-control" id="cad-busca" placeholder="Procurar por nome ou código…" oninput="cadFiltrar(this.value)">
+                                    <select class="form-control" id="cad-filtro-empresa" onchange="cadFiltrarEmpresa(this.value)"></select>
+                                    <label class="cad-check"><input type="checkbox" id="cad-ver-inativos" onchange="cadVerInativos(this.checked)"> Mostrar desativados</label>
+                                </div>
+                                <div id="cad-lista"><!-- Gerado por JS --></div>
                             </div>
                         </div>
 
@@ -3752,11 +3832,11 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260806g"></script>
-    <script src="js/vps-sync.js?v=20260806g"></script>
-    <script src="js/exata-catalogo.js?v=20260806g"></script>
-    <script src="js/data.js?v=20260806g"></script>
-    <script src="js/app.js?v=20260806g"></script>
-    <script src="js/whatsapp.js?v=20260806g"></script>
+    <script src="js/security.js?v=20260806h"></script>
+    <script src="js/vps-sync.js?v=20260806h"></script>
+    <script src="js/exata-catalogo.js?v=20260806h"></script>
+    <script src="js/data.js?v=20260806h"></script>
+    <script src="js/app.js?v=20260806h"></script>
+    <script src="js/whatsapp.js?v=20260806h"></script>
 </body>
 </html>
