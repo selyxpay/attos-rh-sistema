@@ -7315,6 +7315,7 @@ window.abrirModalGerenciarFuncionario = function(funcId) {
   // Papéis do Fluxo Financeiro desta pessoa
   const pf = func.permissoesFluxo || {};
   const gsel = id => document.getElementById(id);
+  if (gsel('gflx-lancar-enviar'))        gsel('gflx-lancar-enviar').checked = pf.lancarEnviar === true;
   if (gsel('gflx-aprovar-supervisao'))   gsel('gflx-aprovar-supervisao').checked = pf.aprovarSupervisao === true;
   if (gsel('gflx-aprovar-gestao'))       gsel('gflx-aprovar-gestao').checked = pf.aprovarGestao === true;
   if (gsel('gflx-processar-pagamento'))  gsel('gflx-processar-pagamento').checked = pf.processarPagamento === true;
@@ -7454,6 +7455,7 @@ function salvarPermissoesFuncionario() {
   // Papéis do Fluxo Financeiro (concessões individuais do admin)
   const gflx = id => document.getElementById(id);
   func.permissoesFluxo = {
+    lancarEnviar:       !!gflx('gflx-lancar-enviar')?.checked,
     aprovarSupervisao:  !!gflx('gflx-aprovar-supervisao')?.checked,
     aprovarGestao:      !!gflx('gflx-aprovar-gestao')?.checked,
     processarPagamento: !!gflx('gflx-processar-pagamento')?.checked,
@@ -12170,8 +12172,9 @@ function garantirFluxoFinanceiro() {
 //   Supervisão DP (dp + representante) valida a 1ª etapa;
 //   Gestão (administração) aprova a 2ª; Financeiro processa/paga/comprova.
 // Por cima disso, o admin pode CONCEDER poderes individuais no cadastro do
-// funcionário (func.permissoesFluxo): aprovarSupervisao, aprovarGestao,
-// processarPagamento, verTodos, e a visibilidade (padrao/meus/etapa/todos).
+// funcionário (func.permissoesFluxo): lancarEnviar, aprovarSupervisao,
+// aprovarGestao, processarPagamento, verTodos, e a visibilidade
+// (padrao/meus/etapa/todos).
 // Mestre pode tudo (o João testa tudo).
 function _ffPerm(chave) {
   return !!(loggedUser && loggedUser.permissoesFluxo && loggedUser.permissoesFluxo[chave] === true);
@@ -12198,7 +12201,8 @@ function _ffPodeVer() {
   return ehMestre(loggedUser.login)
     || ['dp', 'administracao', 'financeiro'].includes(loggedUser.departamento)
     || hasPermission('fluxo_financeiro', 'visualizar')
-    || _ffPerm('verTodos') || _ffPerm('aprovarSupervisao') || _ffPerm('aprovarGestao') || _ffPerm('processarPagamento')
+    || _ffPerm('lancarEnviar') || _ffPerm('verTodos') || _ffPerm('aprovarSupervisao')
+    || _ffPerm('aprovarGestao') || _ffPerm('processarPagamento')
     || _ffEhResponsavel('criar') || _ffEhResponsavel('coordenacao') || _ffEhResponsavel('gestao') || _ffEhResponsavel('financeiro');
 }
 // Etapa 1 — cria/confere/envia. Se o admin configurou responsáveis da criação,
@@ -12206,6 +12210,7 @@ function _ffPodeVer() {
 function _ffPodeCriar() {
   if (!loggedUser) return false;
   if (ehMestre(loggedUser.login)) return true;
+  if (_ffPerm('lancarEnviar')) return true;          // concedido no cadastro da pessoa
   if (hasPermission('fluxo_financeiro', 'criar')) return true;
   if (_ffConfigurado('criar')) return _ffEhResponsavel('criar');
   return loggedUser.departamento === 'dp' || loggedUser.departamento === 'administracao';
