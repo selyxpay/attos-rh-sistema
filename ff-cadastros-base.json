@@ -1,1764 +1,2692 @@
 {
- "_comentario": "Base inicial de EMPRESAS / TOMADORES / CLIENTES do Fluxo Financeiro. Chave logica: EMPRESA + TOMADOR + CLIENTE. A importacao no servidor e idempotente: rodar de novo NAO duplica.",
- "geradoEm": "2026-08-03",
- "empresas": [
-  {
-   "id": "emp-rt2",
-   "nome": "RT2",
-   "ativo": true,
-   "sigla": "RT2"
-  },
-  {
-   "id": "emp-rt1",
-   "nome": "RT1",
-   "ativo": true,
-   "sigla": "RT1"
-  },
-  {
-   "id": "emp-green-service",
-   "nome": "GREEN SERVICE",
-   "ativo": true,
-   "sigla": "GS"
-  }
- ],
- "tomadores": [
-  {
-   "id": "tom-green-service-23",
-   "empresaId": "emp-green-service",
-   "codigo": "23",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-24",
-   "empresaId": "emp-green-service",
-   "codigo": "24",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-25",
-   "empresaId": "emp-green-service",
-   "codigo": "25",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-26",
-   "empresaId": "emp-green-service",
-   "codigo": "26",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-29",
-   "empresaId": "emp-green-service",
-   "codigo": "29",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-31",
-   "empresaId": "emp-green-service",
-   "codigo": "31",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-34",
-   "empresaId": "emp-green-service",
-   "codigo": "34",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-35",
-   "empresaId": "emp-green-service",
-   "codigo": "35",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-36",
-   "empresaId": "emp-green-service",
-   "codigo": "36",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-37",
-   "empresaId": "emp-green-service",
-   "codigo": "37",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-38",
-   "empresaId": "emp-green-service",
-   "codigo": "38",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-39",
-   "empresaId": "emp-green-service",
-   "codigo": "39",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-42",
-   "empresaId": "emp-green-service",
-   "codigo": "42",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-43",
-   "empresaId": "emp-green-service",
-   "codigo": "43",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-47",
-   "empresaId": "emp-green-service",
-   "codigo": "47",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-48",
-   "empresaId": "emp-green-service",
-   "codigo": "48",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-49",
-   "empresaId": "emp-green-service",
-   "codigo": "49",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-50",
-   "empresaId": "emp-green-service",
-   "codigo": "50",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-51",
-   "empresaId": "emp-green-service",
-   "codigo": "51",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-53",
-   "empresaId": "emp-green-service",
-   "codigo": "53",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-55",
-   "empresaId": "emp-green-service",
-   "codigo": "55",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-58",
-   "empresaId": "emp-green-service",
-   "codigo": "58",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-59",
-   "empresaId": "emp-green-service",
-   "codigo": "59",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-60",
-   "empresaId": "emp-green-service",
-   "codigo": "60",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-61",
-   "empresaId": "emp-green-service",
-   "codigo": "61",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-62",
-   "empresaId": "emp-green-service",
-   "codigo": "62",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-63",
-   "empresaId": "emp-green-service",
-   "codigo": "63",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-64",
-   "empresaId": "emp-green-service",
-   "codigo": "64",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-65",
-   "empresaId": "emp-green-service",
-   "codigo": "65",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-67",
-   "empresaId": "emp-green-service",
-   "codigo": "67",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-68",
-   "empresaId": "emp-green-service",
-   "codigo": "68",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-70",
-   "empresaId": "emp-green-service",
-   "codigo": "70",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-green-service-71",
-   "empresaId": "emp-green-service",
-   "codigo": "71",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-1",
-   "empresaId": "emp-rt1",
-   "codigo": "1",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-2",
-   "empresaId": "emp-rt1",
-   "codigo": "2",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-3",
-   "empresaId": "emp-rt1",
-   "codigo": "3",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-5",
-   "empresaId": "emp-rt1",
-   "codigo": "5",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-8",
-   "empresaId": "emp-rt1",
-   "codigo": "8",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-12",
-   "empresaId": "emp-rt1",
-   "codigo": "12",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-16",
-   "empresaId": "emp-rt1",
-   "codigo": "16",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-21",
-   "empresaId": "emp-rt1",
-   "codigo": "21",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-23",
-   "empresaId": "emp-rt1",
-   "codigo": "23",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-24",
-   "empresaId": "emp-rt1",
-   "codigo": "24",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-27",
-   "empresaId": "emp-rt1",
-   "codigo": "27",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-28",
-   "empresaId": "emp-rt1",
-   "codigo": "28",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-32",
-   "empresaId": "emp-rt1",
-   "codigo": "32",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-33",
-   "empresaId": "emp-rt1",
-   "codigo": "33",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-34",
-   "empresaId": "emp-rt1",
-   "codigo": "34",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-35",
-   "empresaId": "emp-rt1",
-   "codigo": "35",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-37",
-   "empresaId": "emp-rt1",
-   "codigo": "37",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-39",
-   "empresaId": "emp-rt1",
-   "codigo": "39",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-40",
-   "empresaId": "emp-rt1",
-   "codigo": "40",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-41",
-   "empresaId": "emp-rt1",
-   "codigo": "41",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-42",
-   "empresaId": "emp-rt1",
-   "codigo": "42",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-43",
-   "empresaId": "emp-rt1",
-   "codigo": "43",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-44",
-   "empresaId": "emp-rt1",
-   "codigo": "44",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-45",
-   "empresaId": "emp-rt1",
-   "codigo": "45",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-46",
-   "empresaId": "emp-rt1",
-   "codigo": "46",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-47",
-   "empresaId": "emp-rt1",
-   "codigo": "47",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-48",
-   "empresaId": "emp-rt1",
-   "codigo": "48",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-51",
-   "empresaId": "emp-rt1",
-   "codigo": "51",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-56",
-   "empresaId": "emp-rt1",
-   "codigo": "56",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-61",
-   "empresaId": "emp-rt1",
-   "codigo": "61",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-65",
-   "empresaId": "emp-rt1",
-   "codigo": "65",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-66",
-   "empresaId": "emp-rt1",
-   "codigo": "66",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-67",
-   "empresaId": "emp-rt1",
-   "codigo": "67",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-73",
-   "empresaId": "emp-rt1",
-   "codigo": "73",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-74",
-   "empresaId": "emp-rt1",
-   "codigo": "74",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-76",
-   "empresaId": "emp-rt1",
-   "codigo": "76",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-77",
-   "empresaId": "emp-rt1",
-   "codigo": "77",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-81",
-   "empresaId": "emp-rt1",
-   "codigo": "81",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-82",
-   "empresaId": "emp-rt1",
-   "codigo": "82",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-84",
-   "empresaId": "emp-rt1",
-   "codigo": "84",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-85",
-   "empresaId": "emp-rt1",
-   "codigo": "85",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-87",
-   "empresaId": "emp-rt1",
-   "codigo": "87",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-88",
-   "empresaId": "emp-rt1",
-   "codigo": "88",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt1-89",
-   "empresaId": "emp-rt1",
-   "codigo": "89",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-6",
-   "empresaId": "emp-rt2",
-   "codigo": "6",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-12",
-   "empresaId": "emp-rt2",
-   "codigo": "12",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-13",
-   "empresaId": "emp-rt2",
-   "codigo": "13",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-20",
-   "empresaId": "emp-rt2",
-   "codigo": "20",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-23",
-   "empresaId": "emp-rt2",
-   "codigo": "23",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-36",
-   "empresaId": "emp-rt2",
-   "codigo": "36",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-37",
-   "empresaId": "emp-rt2",
-   "codigo": "37",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-38",
-   "empresaId": "emp-rt2",
-   "codigo": "38",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-48",
-   "empresaId": "emp-rt2",
-   "codigo": "48",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-55",
-   "empresaId": "emp-rt2",
-   "codigo": "55",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-58",
-   "empresaId": "emp-rt2",
-   "codigo": "58",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-64",
-   "empresaId": "emp-rt2",
-   "codigo": "64",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-65",
-   "empresaId": "emp-rt2",
-   "codigo": "65",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-68",
-   "empresaId": "emp-rt2",
-   "codigo": "68",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-69",
-   "empresaId": "emp-rt2",
-   "codigo": "69",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-80",
-   "empresaId": "emp-rt2",
-   "codigo": "80",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-81",
-   "empresaId": "emp-rt2",
-   "codigo": "81",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-84",
-   "empresaId": "emp-rt2",
-   "codigo": "84",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-85",
-   "empresaId": "emp-rt2",
-   "codigo": "85",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-86",
-   "empresaId": "emp-rt2",
-   "codigo": "86",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-87",
-   "empresaId": "emp-rt2",
-   "codigo": "87",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-89",
-   "empresaId": "emp-rt2",
-   "codigo": "89",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-90",
-   "empresaId": "emp-rt2",
-   "codigo": "90",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-91",
-   "empresaId": "emp-rt2",
-   "codigo": "91",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-93",
-   "empresaId": "emp-rt2",
-   "codigo": "93",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-94",
-   "empresaId": "emp-rt2",
-   "codigo": "94",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-95",
-   "empresaId": "emp-rt2",
-   "codigo": "95",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-96",
-   "empresaId": "emp-rt2",
-   "codigo": "96",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-97",
-   "empresaId": "emp-rt2",
-   "codigo": "97",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-98",
-   "empresaId": "emp-rt2",
-   "codigo": "98",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-100",
-   "empresaId": "emp-rt2",
-   "codigo": "100",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-101",
-   "empresaId": "emp-rt2",
-   "codigo": "101",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-102",
-   "empresaId": "emp-rt2",
-   "codigo": "102",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-103",
-   "empresaId": "emp-rt2",
-   "codigo": "103",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-104",
-   "empresaId": "emp-rt2",
-   "codigo": "104",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-106",
-   "empresaId": "emp-rt2",
-   "codigo": "106",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-107",
-   "empresaId": "emp-rt2",
-   "codigo": "107",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-111",
-   "empresaId": "emp-rt2",
-   "codigo": "111",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-112",
-   "empresaId": "emp-rt2",
-   "codigo": "112",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-113",
-   "empresaId": "emp-rt2",
-   "codigo": "113",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-114",
-   "empresaId": "emp-rt2",
-   "codigo": "114",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-117",
-   "empresaId": "emp-rt2",
-   "codigo": "117",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-118",
-   "empresaId": "emp-rt2",
-   "codigo": "118",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-119",
-   "empresaId": "emp-rt2",
-   "codigo": "119",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-120",
-   "empresaId": "emp-rt2",
-   "codigo": "120",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-121",
-   "empresaId": "emp-rt2",
-   "codigo": "121",
-   "nome": "",
-   "ativo": true
-  },
-  {
-   "id": "tom-rt2-122",
-   "empresaId": "emp-rt2",
-   "codigo": "122",
-   "nome": "",
-   "ativo": true
-  }
- ],
- "clientes": [
-  {
-   "id": "cli-rt2-102-10347-iguatemi-sp",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-102",
-   "nome": "10347 IGUATEMI SP",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-119-12641-sp-mooca-plaza-shopping",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-119",
-   "nome": "12641 SP MOOCA PLAZA SHOPPING",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-98-12964-leblon",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-98",
-   "nome": "12964 LEBLON",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-100-16279-sp-shopping-patio-higien",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-100",
-   "nome": "16279 SP SHOPPING PATIO HIGIEN",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-104-1688-jk",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-104",
-   "nome": "1688 JK",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-107-17259-bal-balneario-shopping",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-107",
-   "nome": "17259 BAL BALNEARIO SHOPPING",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-111-17261-sp-morumbi",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-111",
-   "nome": "17261 SP MORUMBI",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-101-1949-rio-sul",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-101",
-   "nome": "1949 RIO SUL",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-106-5659-poa",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-106",
-   "nome": "5659 POA",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-85-6937-bal-balneario-shopping",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-85",
-   "nome": "6937 BAL BALNEARIO SHOPPING",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-84-7015-sp-morumbi",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-84",
-   "nome": "7015 SP MORUMBI",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-95-7017-rj-barra",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-95",
-   "nome": "7017 RJ BARRA",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-96-7018-rj-rio-sul",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-96",
-   "nome": "7018 RJ RIO SUL",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-112-7021-cur-mueller-shopping",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-112",
-   "nome": "7021 CUR MUELLER SHOPPING",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-118-7022-bh-bh-shopping",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-118",
-   "nome": "7022 BH BH SHOPPING",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-86-7025-camp-iguatemi",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-86",
-   "nome": "7025 CAMP IGUATEMI",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-117-7026-camp-parque-dom-pedro",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-117",
-   "nome": "7026 CAMP PARQUE DOM PEDRO",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-89-7032-pa-iguatemi",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-89",
-   "nome": "7032 PA IGUATEMI",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-97-7038-rj-leblon",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-97",
-   "nome": "7038 RJ LEBLON",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-90-7040-cur-park-shopping",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-90",
-   "nome": "7040 CUR PARK SHOPPING",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-87-7045-flori-villa-romana-shoppi",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-87",
-   "nome": "7045 FLORI VILLA ROMANA SHOPPI",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-91-7056-lond-catuai-sh",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-91",
-   "nome": "7056 LOND CATUAI SH",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-93-7060-bar-iguatemi-i-alphaville",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-93",
-   "nome": "7060 BAR IGUATEMI I ALPHAVILLE",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-103-7061-sc-parkshopping-sao-caeta",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-103",
-   "nome": "7061 SC PARKSHOPPING SAO CAETA",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-113-7076-cur-shopping-patio-bate",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-113",
-   "nome": "7076 - CUR SHOPPING PATIO BATE",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-94-7077-iguatemi-jk",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-94",
-   "nome": "7077 IGUATEMI JK",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-56-access-gestao-de-documentos",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-56",
-   "nome": "ACCESS GESTAO DE DOCUMENTOS",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-36-adutora-peruibe",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-36",
-   "nome": "ADUTORA PERUIBE",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-25-akn-construtora-ltda",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-25",
-   "nome": "AKN CONSTRUTORA LTDA",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-6-ativa-distribuicao-e-log",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-6",
-   "nome": "ATIVA DISTRIBUICAO E LOG",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-12-ativa-distribuicao-e-log",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-12",
-   "nome": "ATIVA DISTRIBUICAO E LOG",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-13-ativa-distribuicao-e-log",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-13",
-   "nome": "ATIVA DISTRIBUICAO E LOG",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-20-ativa-distribuicao-e-log",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-20",
-   "nome": "ATIVA DISTRIBUICAO E LOG",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-23-ativa-distribuicao-e-log",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-23",
-   "nome": "ATIVA DISTRIBUICAO E LOG",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-36-ativa-distribuicao-e-log",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-36",
-   "nome": "ATIVA DISTRIBUICAO E LOG",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-58-ativa-distribuicao-e-log",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-58",
-   "nome": "ATIVA DISTRIBUICAO E LOG",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-64-ativa-distribuicao-e-log",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-64",
-   "nome": "ATIVA DISTRIBUICAO E LOG",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-68-ativa-distribuicao-e-log",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-68",
-   "nome": "ATIVA DISTRIBUICAO E LOG",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-81-ativa-distribuicao-e-log",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-81",
-   "nome": "ATIVA DISTRIBUICAO E LOG",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-114-ativa-distribuicao-e-log",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-114",
-   "nome": "ATIVA DISTRIBUICAO E LOG",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-120-ativa-distribuicao-e-log",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-120",
-   "nome": "ATIVA DISTRIBUICAO E LOG",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-58-binar-comercial-construtora",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-58",
-   "nome": "BINAR COMERCIAL CONSTRUTORA -",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-59-binar-comercial-construtora-m",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-59",
-   "nome": "BINAR COMERCIAL CONSTRUTORA M",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-16-brandao-e-marmo-bauducco",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-16",
-   "nome": "BRANDAO E MARMO - BAUDUCCO",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-87-brandao-e-marmo-graded-schoo",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-87",
-   "nome": "BRANDÃO E MARMO - GRADED SCHOO",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-77-brandao-e-marmo-huntington",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-77",
-   "nome": "BRANDAO E MARMO - HUNTINGTON",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-12-brandao-e-marmo-incor",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-12",
-   "nome": "BRANDAO E MARMO - INCOR",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-76-brandao-e-marmo-s-camilo",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-76",
-   "nome": "BRANDAO E MARMO - S CAMILO",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-66-brandao-e-marmo-sao-roque",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-66",
-   "nome": "BRANDAO E MARMO - SAO ROQUE",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-65-brandao-e-marmo-unimed",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-65",
-   "nome": "BRANDAO E MARMO - UNIMED",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-51-catui-jordanesia",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-51",
-   "nome": "CATUI - JORDANESIA",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-67-catui-engenharia",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-67",
-   "nome": "CATUI ENGENHARIA",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-31-catui-guaruhos-ete-sao-joao",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-31",
-   "nome": "CATUI GUARUHOS - ETE SAO JOÃO",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-37-ceva-logistics-ltda",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-37",
-   "nome": "CEVA LOGISTICS LTDA",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-51-cond-edificio-xavier",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-51",
-   "nome": "COND EDIFICIO XAVIER",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-55-consorcio-agcs-elevacao",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-55",
-   "nome": "CONSORCIO AGCS ELEVACAO",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-61-consorcio-baixo-cotia",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-61",
-   "nome": "CONSORCIO BAIXO COTIA",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-70-consorcio-ees-taiacupeba",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-70",
-   "nome": "CONSORCIO EES TAIACUPEBA",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-80-consorcio-hosp-tatuape",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-80",
-   "nome": "CONSORCIO HOSP TATUAPÉ",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-26-consorcio-sao-paulo",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-26",
-   "nome": "CONSORCIO SAO PAULO",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-42-consorcio-telar",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-42",
-   "nome": "CONSÓRCIO TELAR",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-55-consorcio-telar",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-55",
-   "nome": "CONSÓRCIO TELAR",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-62-construmedici-engenharia",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-62",
-   "nome": "CONSTRUMEDICI ENGENHARIA",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-29-cury-joao-dias",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-29",
-   "nome": "CURY - JOÃO DIAS",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-53-dpm-montagens-e-manutencao",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-53",
-   "nome": "DPM MONTAGENS E MANUTENCAO",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-48-ebazar",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-48",
-   "nome": "EBAZAR",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-41-edificio-residencial-upcon-blu",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-41",
-   "nome": "EDIFICIO RESIDENCIAL UPCON BLU",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-47-eee-cajamar-p1",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-47",
-   "nome": "EEE CAJAMAR P1",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-24-endeal-engenharia",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-24",
-   "nome": "ENDEAL ENGENHARIA",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-48-engeform-engenharia",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-48",
-   "nome": "ENGEFORM ENGENHARIA",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-35-eta-melvi",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-35",
-   "nome": "ETA MELVI",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-38-ete-varzea-do-palacio",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-38",
-   "nome": "ETE - VARZEA DO PALACIO",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-37-ete-agua-vermelha",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-37",
-   "nome": "ETE AGUA VERMELHA",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-34-ete-peruibe-p1",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-34",
-   "nome": "ETE PERUIBE P1",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-122-fac-comercial-comp-cosmeticos",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-122",
-   "nome": "FAC COMERCIAL COMP COSMETICOS",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-65-fitlog-transportes-e-logistica",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-65",
-   "nome": "FITLOG TRANSPORTES E LOGISTICA",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-38-foffylandia-com-e-confeccoes-l",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-38",
-   "nome": "FOFFYLANDIA COM E CONFECCOES L",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-121-id-do-brasil-logistica",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-121",
-   "nome": "ID DO BRASIL LOGISTICA",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-73-ind-embalagens-santa-ines-s-a",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-73",
-   "nome": "IND EMBALAGENS SANTA INES S/A",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-42-ind-embalagens-santa-ines-s-a",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-42",
-   "nome": "IND EMBALAGENS SANTA INES S/A",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-46-industria-marilia-auto-pecas-s",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-46",
-   "nome": "INDUSTRIA MARILIA AUTO PECAS S",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-43-industria-marilia-auto-pecas-s",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-43",
-   "nome": "INDUSTRIA MARILIA AUTO PECAS S",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-44-industria-marilia-auto-pecas-s",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-44",
-   "nome": "INDUSTRIA MARILIA AUTO PECAS S",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-45-industria-marilia-auto-pecas-s",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-45",
-   "nome": "INDUSTRIA MARILIA AUTO PECAS S",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-71-jacaranga-mineiro-emp-imobilia",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-71",
-   "nome": "JACARANGA MINEIRO EMP IMOBILIA",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-47-kim-neto-ind-com-de-panifica",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-47",
-   "nome": "KIM NETO IND. COM. DE PANIFICA",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-48-kim-neto-ind-com-de-panifica",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-48",
-   "nome": "KIM NETO IND. COM. DE PANIFICA",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-39-kmg-ete-tatui",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-39",
-   "nome": "KMG -ETE TATUÍ",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-68-lavvi-lisboa-empreendimento",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-68",
-   "nome": "LAVVI LISBOA EMPREENDIMENTO",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-60-lavvi-moscou-empreendimentos-i",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-60",
-   "nome": "LAVVI MOSCOU EMPREENDIMENTOS I",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-85-luft-insider",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-85",
-   "nome": "LUFT - INSIDER",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-84-luft-alpargatas",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-84",
-   "nome": "LUFT ALPARGATAS",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-8-luft-canoas-rs",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-8",
-   "nome": "LUFT CANOAS- RS",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-89-luft-cgh7",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-89",
-   "nome": "LUFT CGH7",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-74-luft-itapeva",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-74",
-   "nome": "LUFT ITAPEVA",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-3-luft-multiclientes",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-3",
-   "nome": "LUFT MULTICLIENTES",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-5-luft-multilivros",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-5",
-   "nome": "LUFT MULTILIVROS",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-2-luft-xcv9",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-2",
-   "nome": "LUFT XCV9",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-49-meta-f-express-logistica",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-49",
-   "nome": "META F EXPRESS- LOGISTICA",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-50-meta-f-express-logistica",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-50",
-   "nome": "META F EXPRESS- LOGISTICA",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-61-motus-servicos-dpsp-araraquara",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-61",
-   "nome": "MOTUS SERVICOS DPSP ARARAQUARA",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-40-motus-servicos-dpsp-vl-formosa",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-40",
-   "nome": "MOTUS SERVICOS DPSP VL FORMOSA",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-27-motus-servicos-ltda-bahia",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-27",
-   "nome": "MOTUS SERVICOS LTDA BAHIA",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-82-motus-servicos-ltda-boa-viagem",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-82",
-   "nome": "MOTUS SERVICOS LTDA BOA VIAGEM",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-67-motus-servicos-ltda-campinas",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-67",
-   "nome": "MOTUS SERVICOS LTDA CAMPINAS",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-23-motus-servicos-ltda-cd6",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-23",
-   "nome": "MOTUS SERVICOS LTDA CD6",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-21-motus-servicos-ltda-cdp",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-21",
-   "nome": "MOTUS SERVICOS LTDA CDP",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-35-motus-servicos-ltda-dark-rj",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-35",
-   "nome": "MOTUS SERVICOS LTDA DARK RJ",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-28-motus-servicos-ltda-dpsp-bh",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-28",
-   "nome": "MOTUS SERVICOS LTDA DPSP BH",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-37-motus-servicos-ltda-dpsp-cocai",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-37",
-   "nome": "MOTUS SERVICOS LTDA DPSP COCAI",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-34-motus-servicos-ltda-dpsp-es",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-34",
-   "nome": "MOTUS SERVICOS LTDA DPSP ES",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-24-motus-servicos-ltda-dpsp-limao",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-24",
-   "nome": "MOTUS SERVICOS LTDA DPSP LIMAO",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-33-motus-servicos-ltda-dpsp-tambo",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-33",
-   "nome": "MOTUS SERVICOS LTDA DPSP TAMBO",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-32-motus-servicos-ltda-go",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-32",
-   "nome": "MOTUS SERVICOS LTDA GO",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-81-motus-servicos-ltda-jardim-d-a",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-81",
-   "nome": "MOTUS SERVICOS LTDA JARDIM D A",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-39-motus-servicos-ltda-ribeirao-p",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-39",
-   "nome": "MOTUS SERVICOS LTDA RIBEIRAO P",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-88-motus-servicos-ltda-rj-pavuna",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-88",
-   "nome": "MOTUS SERVICOS LTDA RJ PAVUNA",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt2-69-rt1-rh",
-   "empresaId": "emp-rt2",
-   "tomadorId": "tom-rt2-69",
-   "nome": "RT1 RH",
-   "ativo": true
-  },
-  {
-   "id": "cli-rt1-1-rt1-rh-ltda",
-   "empresaId": "emp-rt1",
-   "tomadorId": "tom-rt1-1",
-   "nome": "RT1 RH LTDA",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-23-superpav",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-23",
-   "nome": "SUPERPAV",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-63-totus-engenharia-e-construcao",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-63",
-   "nome": "TOTUS ENGENHARIA E CONSTRUCAO",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-64-totus-engenharia-e-construcao",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-64",
-   "nome": "TOTUS ENGENHARIA E CONSTRUCAO",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-65-totus-engenharia-e-construcao",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-65",
-   "nome": "TOTUS ENGENHARIA E CONSTRUCAO",
-   "ativo": true
-  },
-  {
-   "id": "cli-green-service-43-unita-penha-iii",
-   "empresaId": "emp-green-service",
-   "tomadorId": "tom-green-service-43",
-   "nome": "UNITA PENHA III",
-   "ativo": true
-  }
- ]
+  "_comentario": "Base oficial de EMPRESAS / TOMADORES / CLIENTES do Fluxo Financeiro. Importado pelo servidor no boot. Registros com origem \"base\" sao substituidos quando a versao muda; o que o admin cadastrar pela tela (origem \"manual\") NAO e tocado.",
+  "versao": 2,
+  "geradoEm": "2026-08-06T15:47:44.231Z",
+  "empresas": [
+    {
+      "id": "emp-25-green-service",
+      "nome": "25/Green Service",
+      "codigo": "25",
+      "sigla": "GS",
+      "ativo": true,
+      "sigilosa": false,
+      "origem": "base"
+    },
+    {
+      "id": "emp-23-rt2",
+      "nome": "23/RT2",
+      "codigo": "23",
+      "sigla": "RT2",
+      "ativo": true,
+      "sigilosa": false,
+      "origem": "base"
+    },
+    {
+      "id": "emp-26-rt1",
+      "nome": "26/RT1",
+      "codigo": "26",
+      "sigla": "RT1",
+      "ativo": true,
+      "sigilosa": false,
+      "origem": "base"
+    },
+    {
+      "id": "emp-28-intermitente-meli-rt2",
+      "nome": "28/Intermitente Meli RT2",
+      "codigo": "28",
+      "sigla": "MELI",
+      "ativo": true,
+      "sigilosa": false,
+      "origem": "base"
+    },
+    {
+      "id": "emp-20-intermitente-rt1",
+      "nome": "20/Intermitente RT1",
+      "codigo": "20",
+      "sigla": "INT-RT1",
+      "ativo": true,
+      "sigilosa": false,
+      "origem": "base"
+    },
+    {
+      "id": "emp-22-green-service-outros",
+      "nome": "22/Green Service Outros",
+      "codigo": "22",
+      "sigla": "GS-OUT",
+      "ativo": true,
+      "sigilosa": false,
+      "origem": "base"
+    },
+    {
+      "id": "emp-15-diarias-rt2",
+      "nome": "15/Diarias RT2",
+      "codigo": "15",
+      "sigla": "DIARIAS",
+      "ativo": true,
+      "sigilosa": false,
+      "origem": "base"
+    },
+    {
+      "id": "emp-29-mart",
+      "nome": "29/Mart",
+      "codigo": "29",
+      "sigla": "MART",
+      "ativo": true,
+      "sigilosa": false,
+      "origem": "base"
+    },
+    {
+      "id": "emp-30-intermitente-rt1",
+      "nome": "30/Intermitente RT1",
+      "codigo": "30",
+      "sigla": "INT-RT1-30",
+      "ativo": true,
+      "sigilosa": false,
+      "origem": "base"
+    }
+  ],
+  "tomadores": [
+    {
+      "id": "tom-25-green-service-00023",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00023",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00024",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00024",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00025",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00025",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00026",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00026",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00029",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00029",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00031",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00031",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00034",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00034",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00035",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00035",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00036",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00036",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00037",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00037",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00038",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00038",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00039",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00039",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00042",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00042",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00043",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00043",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00047",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00047",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00048",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00048",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00049",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00049",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00051",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00051",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00053",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00053",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00055",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00055",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00058",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00058",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00059",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00059",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00060",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00060",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00061",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00061",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00062",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00062",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00063",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00063",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00064",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00064",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00065",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00065",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00068",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00068",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00070",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00070",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-00071",
+      "empresaId": "emp-25-green-service",
+      "codigo": "00071",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-0100050",
+      "empresaId": "emp-25-green-service",
+      "codigo": "0100050",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-25-green-service-0100067",
+      "empresaId": "emp-25-green-service",
+      "codigo": "0100067",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00006",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00006",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00012",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00012",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00013",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00013",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00020",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00020",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00023",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00023",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00036",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00036",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00037",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00037",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00038",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00038",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00048",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00048",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00055",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00055",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00058",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00058",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00064",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00064",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00065",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00065",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00068",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00068",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00069",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00069",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00080",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00080",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00081",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00081",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00084",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00084",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00085",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00085",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00086",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00086",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00087",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00087",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00089",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00089",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00090",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00090",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00091",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00091",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00093",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00093",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00094",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00094",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00095",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00095",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00096",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00096",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00097",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00097",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00098",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00098",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00100",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00100",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00101",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00101",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00102",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00102",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00103",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00103",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00104",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00104",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00106",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00106",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00107",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00107",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00111",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00111",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00112",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00112",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00113",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00113",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00114",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00114",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00117",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00117",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00118",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00118",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00119",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00119",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00120",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00120",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00121",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00121",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-23-rt2-00122",
+      "empresaId": "emp-23-rt2",
+      "codigo": "00122",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00001",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00001",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00002",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00002",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00003",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00003",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00005",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00005",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00008",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00008",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00021",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00021",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00023",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00023",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00024",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00024",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00027",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00027",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00028",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00028",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00032",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00032",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00033",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00033",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00034",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00034",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00035",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00035",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00037",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00037",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00039",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00039",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00040",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00040",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00041",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00041",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00046",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00046",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00047",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00047",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00048",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00048",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00056",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00056",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00061",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00061",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00065",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00065",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00066",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00066",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00067",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00067",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00073",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00073",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00074",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00074",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00076",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00076",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00081",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00081",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00082",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00082",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00084",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00084",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00085",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00085",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00087",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00087",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00088",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00088",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-00089",
+      "empresaId": "emp-26-rt1",
+      "codigo": "00089",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-0100016",
+      "empresaId": "emp-26-rt1",
+      "codigo": "0100016",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-0100041",
+      "empresaId": "emp-26-rt1",
+      "codigo": "0100041",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-0100042",
+      "empresaId": "emp-26-rt1",
+      "codigo": "0100042",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-0100043",
+      "empresaId": "emp-26-rt1",
+      "codigo": "0100043",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-0100044",
+      "empresaId": "emp-26-rt1",
+      "codigo": "0100044",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-0100045",
+      "empresaId": "emp-26-rt1",
+      "codigo": "0100045",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-0100051",
+      "empresaId": "emp-26-rt1",
+      "codigo": "0100051",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-0100066",
+      "empresaId": "emp-26-rt1",
+      "codigo": "0100066",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-0100076",
+      "empresaId": "emp-26-rt1",
+      "codigo": "0100076",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-0100077",
+      "empresaId": "emp-26-rt1",
+      "codigo": "0100077",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-26-rt1-0100087",
+      "empresaId": "emp-26-rt1",
+      "codigo": "0100087",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-28-intermitente-meli-rt2-00001",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "codigo": "00001",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-28-intermitente-meli-rt2-00003",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "codigo": "00003",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-28-intermitente-meli-rt2-00004",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "codigo": "00004",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-28-intermitente-meli-rt2-00005",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "codigo": "00005",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-28-intermitente-meli-rt2-00006",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "codigo": "00006",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-28-intermitente-meli-rt2-00007",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "codigo": "00007",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-28-intermitente-meli-rt2-00008",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "codigo": "00008",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-28-intermitente-meli-rt2-00009",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "codigo": "00009",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-28-intermitente-meli-rt2-00010",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "codigo": "00010",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-28-intermitente-meli-rt2-00012",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "codigo": "00012",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-28-intermitente-meli-rt2-00013",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "codigo": "00013",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-28-intermitente-meli-rt2-00014",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "codigo": "00014",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-20-intermitente-rt1-00002",
+      "empresaId": "emp-20-intermitente-rt1",
+      "codigo": "00002",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-20-intermitente-rt1-00013",
+      "empresaId": "emp-20-intermitente-rt1",
+      "codigo": "00013",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-20-intermitente-rt1-00024",
+      "empresaId": "emp-20-intermitente-rt1",
+      "codigo": "00024",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-20-intermitente-rt1-00032",
+      "empresaId": "emp-20-intermitente-rt1",
+      "codigo": "00032",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-20-intermitente-rt1-00033",
+      "empresaId": "emp-20-intermitente-rt1",
+      "codigo": "00033",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-20-intermitente-rt1-00034",
+      "empresaId": "emp-20-intermitente-rt1",
+      "codigo": "00034",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-20-intermitente-rt1-00035",
+      "empresaId": "emp-20-intermitente-rt1",
+      "codigo": "00035",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-20-intermitente-rt1-00036",
+      "empresaId": "emp-20-intermitente-rt1",
+      "codigo": "00036",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-20-intermitente-rt1-00037",
+      "empresaId": "emp-20-intermitente-rt1",
+      "codigo": "00037",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-20-intermitente-rt1-00038",
+      "empresaId": "emp-20-intermitente-rt1",
+      "codigo": "00038",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-22-green-service-outros-00001",
+      "empresaId": "emp-22-green-service-outros",
+      "codigo": "00001",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-22-green-service-outros-00002",
+      "empresaId": "emp-22-green-service-outros",
+      "codigo": "00002",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-22-green-service-outros-00003",
+      "empresaId": "emp-22-green-service-outros",
+      "codigo": "00003",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-22-green-service-outros-00081",
+      "empresaId": "emp-22-green-service-outros",
+      "codigo": "00081",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-15-diarias-rt2-00014",
+      "empresaId": "emp-15-diarias-rt2",
+      "codigo": "00014",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-15-diarias-rt2-00015",
+      "empresaId": "emp-15-diarias-rt2",
+      "codigo": "00015",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-15-diarias-rt2-00017",
+      "empresaId": "emp-15-diarias-rt2",
+      "codigo": "00017",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-15-diarias-rt2-00021",
+      "empresaId": "emp-15-diarias-rt2",
+      "codigo": "00021",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-15-diarias-rt2-99992",
+      "empresaId": "emp-15-diarias-rt2",
+      "codigo": "99992",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-15-diarias-rt2-00022",
+      "empresaId": "emp-15-diarias-rt2",
+      "codigo": "00022",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-15-diarias-rt2-00023",
+      "empresaId": "emp-15-diarias-rt2",
+      "codigo": "00023",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-29-mart-00001",
+      "empresaId": "emp-29-mart",
+      "codigo": "00001",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "tom-30-intermitente-rt1-00001",
+      "empresaId": "emp-30-intermitente-rt1",
+      "codigo": "00001",
+      "nome": "",
+      "ativo": true,
+      "origem": "base"
+    }
+  ],
+  "clientes": [
+    {
+      "id": "cli-25-green-service-00023-superpav",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00023",
+      "nome": "SUPERPAV",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00024-endeal-engenharia",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00024",
+      "nome": "ENDEAL ENGENHARIA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00025-akn-construtora-ltda",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00025",
+      "nome": "AKN CONSTRUTORA LTDA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00026-consorcio-sao-paulo",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00026",
+      "nome": "CONSORCIO SAO PAULO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00029-cury-joao-dias",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00029",
+      "nome": "CURY - JOAO DIAS",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00031-catui-guaruhos-ete-sao-joao",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00031",
+      "nome": "CATUI GUARUHOS - ETE SAO JOAO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00034-ete-peruibe-p1",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00034",
+      "nome": "ETE PERUIBE P1",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00035-eta-melvi",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00035",
+      "nome": "ETA MELVI",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00036-adutora-peruibe",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00036",
+      "nome": "ADUTORA PERUIBE",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00037-ete-agua-vermelha",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00037",
+      "nome": "ETE AGUA VERMELHA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00038-ete-varzea-do-palacio",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00038",
+      "nome": "ETE - VARZEA DO PALACIO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00039-kmg-ete-tatui",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00039",
+      "nome": "KMG - ETE TATUI",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00042-consorcio-telar",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00042",
+      "nome": "CONSORCIO TELAR",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00043-unita-penha-iii",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00043",
+      "nome": "UNITA PENHA III",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00047-eee-cajamar-p1",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00047",
+      "nome": "EEE CAJAMAR P1",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00048-engeform-engenharia",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00048",
+      "nome": "ENGEFORM ENGENHARIA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00049-meta-f-express-logistica",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00049",
+      "nome": "META F EXPRESS - LOGISTICA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00051-catui-jordanesia",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00051",
+      "nome": "CATUI - JORDANESIA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00053-dpm-montagens-e-manutencao",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00053",
+      "nome": "DPM MONTAGENS E MANUTENCAO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00055-consorcio-telar",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00055",
+      "nome": "CONSORCIO TELAR",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00058-binar-comercial-construtora",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00058",
+      "nome": "BINAR COMERCIAL CONSTRUTORA -",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00059-binar-comercial-construtora-m",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00059",
+      "nome": "BINAR COMERCIAL CONSTRUTORA M",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00060-lavvi-moscou-empreendimentos-i",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00060",
+      "nome": "LAVVI MOSCOU EMPREENDIMENTOS I",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00061-consorcio-baixo-cotia",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00061",
+      "nome": "CONSORCIO BAIXO COTIA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00062-construmedici-engenharia",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00062",
+      "nome": "CONSTRUMEDICI ENGENHARIA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00063-totus-engenharia-e-construcao",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00063",
+      "nome": "TOTUS ENGENHARIA E CONSTRUCAO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00064-totus-engenharia-e-construcao",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00064",
+      "nome": "TOTUS ENGENHARIA E CONSTRUCAO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00065-totus-engenharia-e-construcao",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00065",
+      "nome": "TOTUS ENGENHARIA E CONSTRUCAO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00068-lavvi-lisboa-empreendimento",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00068",
+      "nome": "LAVVI LISBOA EMPREENDIMENTO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00070-consorcio-ees-taiacupeba",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00070",
+      "nome": "CONSORCIO EES TAIACUPEBA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-00071-jacaranga-mineiro-emp-imobilia",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-00071",
+      "nome": "JACARANGA MINEIRO EMP IMOBILIA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-0100050-meta-f-express-logistica",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-0100050",
+      "nome": "META F EXPRESS - LOGISTICA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-25-green-service-0100067-catui-engenharia",
+      "empresaId": "emp-25-green-service",
+      "tomadorId": "tom-25-green-service-0100067",
+      "nome": "CATUI ENGENHARIA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00006-ativa-distribuicao-e-log",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00006",
+      "nome": "ATIVA DISTRIBUICAO E LOG",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00012-ativa-distribuicao-e-log",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00012",
+      "nome": "ATIVA DISTRIBUICAO E LOG",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00013-ativa-distribuicao-e-log",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00013",
+      "nome": "ATIVA DISTRIBUICAO E LOG",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00020-ativa-distribuicao-e-log",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00020",
+      "nome": "ATIVA DISTRIBUICAO E LOG",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00023-ativa-distribuicao-e-log",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00023",
+      "nome": "ATIVA DISTRIBUICAO E LOG",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00036-ativa-distribuicao-e-log",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00036",
+      "nome": "ATIVA DISTRIBUICAO E LOG",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00037-ceva-logistics-ltda",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00037",
+      "nome": "CEVA LOGISTICS LTDA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00038-foffylandia-com-e-confeccoes-l",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00038",
+      "nome": "FOFFYLANDIA COM E CONFECCOES L",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00048-ebazar",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00048",
+      "nome": "EBAZAR",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00055-consorcio-agcs-elevacao",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00055",
+      "nome": "CONSORCIO AGCS ELEVACAO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00058-ativa-distribuicao-e-log",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00058",
+      "nome": "ATIVA DISTRIBUICAO E LOG",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00064-ativa-distribuicao-e-log",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00064",
+      "nome": "ATIVA DISTRIBUICAO E LOG",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00065-fitlog-transportes-e-logistica",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00065",
+      "nome": "FITLOG TRANSPORTES E LOGISTICA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00068-ativa-distribuicao-e-log",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00068",
+      "nome": "ATIVA DISTRIBUICAO E LOG",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00069-rt1-rh",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00069",
+      "nome": "RT1 RH",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00080-consorcio-hosp-tatuape",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00080",
+      "nome": "CONSORCIO HOSP TATUAPE",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00081-ativa-distribuicao-e-log",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00081",
+      "nome": "ATIVA DISTRIBUICAO E LOG",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00084-7015-sp-morumbi",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00084",
+      "nome": "7015 SP MORUMBI",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00085-6937-bal-balneario-shopping",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00085",
+      "nome": "6937 BAL BALNEARIO SHOPPING",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00086-7025-camp-iguatemi",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00086",
+      "nome": "7025 CAMP IGUATEMI",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00087-7045-flori-villa-romana-shoppi",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00087",
+      "nome": "7045 FLORI VILLA ROMANA SHOPPI",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00089-7032-pa-iguatemi",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00089",
+      "nome": "7032 PA IGUATEMI",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00090-7040-cur-park-shopping",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00090",
+      "nome": "7040 CUR PARK SHOPPING",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00091-7056-lond-catuai-sh",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00091",
+      "nome": "7056 LOND CATUAI SH",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00093-7060-bar-iguatemi-i-alphaville",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00093",
+      "nome": "7060 BAR IGUATEMI I ALPHAVILLE",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00094-7077-iguatemi-jk",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00094",
+      "nome": "7077 IGUATEMI JK",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00095-7017-rj-barra",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00095",
+      "nome": "7017 RJ BARRA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00096-7018-rj-rio-sul",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00096",
+      "nome": "7018 RJ RIO SUL",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00097-7038-rj-leblon",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00097",
+      "nome": "7038 RJ LEBLON",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00098-12964-leblon",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00098",
+      "nome": "12964 LEBLON",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00100-16279-sp-shopping-patio-higien",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00100",
+      "nome": "16279 SP SHOPPING PATIO HIGIEN",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00101-1949-rio-sul",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00101",
+      "nome": "1949 RIO SUL",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00102-10347-iguatemi-sp",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00102",
+      "nome": "10347 IGUATEMI SP",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00103-7061-sc-parkshopping-sao-caeta",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00103",
+      "nome": "7061 SC PARKSHOPPING SAO CAETA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00104-1688-jk",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00104",
+      "nome": "1688 JK",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00106-5659-poa",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00106",
+      "nome": "5659 POA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00107-17259-bal-balneario-shopping",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00107",
+      "nome": "17259 BAL BALNEARIO SHOPPING",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00111-17261-sp-morumbi",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00111",
+      "nome": "17261 SP MORUMBI",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00112-7021-cur-mueller-shopping",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00112",
+      "nome": "7021 CUR MUELLER SHOPPING",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00113-7076-cur-shopping-patio-bate",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00113",
+      "nome": "7076 - CUR SHOPPING PATIO BATE",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00114-ativa-distribuicao-e-log",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00114",
+      "nome": "ATIVA DISTRIBUICAO E LOG",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00117-7026-camp-parque-dom-pedro",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00117",
+      "nome": "7026 CAMP PARQUE DOM PEDRO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00118-7022-bh-bh-shopping",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00118",
+      "nome": "7022 BH BH SHOPPING",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00119-12641-sp-mooca-plaza-shopping",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00119",
+      "nome": "12641 SP MOOCA PLAZA SHOPPING",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00120-ativa-distribuicao-e-log",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00120",
+      "nome": "ATIVA DISTRIBUICAO E LOG",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00121-id-do-brasil-logistica",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00121",
+      "nome": "ID DO BRASIL LOGISTICA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-23-rt2-00122-fac-comercial-comp-cosmeticos",
+      "empresaId": "emp-23-rt2",
+      "tomadorId": "tom-23-rt2-00122",
+      "nome": "FAC COMERCIAL COMP COSMETICOS",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00001-rt1-rh-ltda",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00001",
+      "nome": "RT1 RH LTDA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00002-luft-xcv9",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00002",
+      "nome": "LUFT XCV9",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00003-luft-multiclientes",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00003",
+      "nome": "LUFT MULTICLIENTES",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00005-luft-multilivros",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00005",
+      "nome": "LUFT MULTILIVROS",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00008-luft-canoas-rs",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00008",
+      "nome": "LUFT CANOAS - RS",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00021-motus-servicos-ltda-cdp",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00021",
+      "nome": "MOTUS SERVICOS LTDA CDP",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00023-motus-servicos-ltda-cd6",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00023",
+      "nome": "MOTUS SERVICOS LTDA CD6",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00024-motus-servicos-ltda-dpsp-limao",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00024",
+      "nome": "MOTUS SERVICOS LTDA DPSP LIMAO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00027-motus-servicos-ltda-bahia",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00027",
+      "nome": "MOTUS SERVICOS LTDA BAHIA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00028-motus-servicos-ltda-dpsp-bh",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00028",
+      "nome": "MOTUS SERVICOS LTDA DPSP BH",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00032-motus-servicos-ltda-go",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00032",
+      "nome": "MOTUS SERVICOS LTDA GO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00033-motus-servicos-ltda-dpsp-tambo",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00033",
+      "nome": "MOTUS SERVICOS LTDA DPSP TAMBO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00034-motus-servicos-ltda-dpsp-es",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00034",
+      "nome": "MOTUS SERVICOS LTDA DPSP ES",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00035-motus-servicos-ltda-dark-rj",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00035",
+      "nome": "MOTUS SERVICOS LTDA DARK RJ",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00037-motus-servicos-ltda-dpsp-cocai",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00037",
+      "nome": "MOTUS SERVICOS LTDA DPSP COCAI",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00039-motus-servicos-ltda-ribeirao-p",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00039",
+      "nome": "MOTUS SERVICOS LTDA RIBEIRAO P",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00040-motus-servicos-dpsp-vl-formosa",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00040",
+      "nome": "MOTUS SERVICOS DPSP VL FORMOSA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00041-edificio-residencial-upcon-blu",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00041",
+      "nome": "EDIFICIO RESIDENCIAL UPCON BLU",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00046-industria-marilia-auto-pecas-s",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00046",
+      "nome": "INDUSTRIA MARILIA AUTO PECAS S",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00047-kim-neto-ind-com-de-panifica",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00047",
+      "nome": "KIM NETO IND. COM. DE PANIFICA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00048-kim-neto-ind-com-de-panifica",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00048",
+      "nome": "KIM NETO IND. COM. DE PANIFICA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00056-access-gestao-de-documentos",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00056",
+      "nome": "ACCESS GESTAO DE DOCUMENTOS",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00061-motus-servicos-dpsp-araraquara",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00061",
+      "nome": "MOTUS SERVICOS DPSP ARARAQUARA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00065-brandao-e-marmo-unimed",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00065",
+      "nome": "BRANDAO E MARMO - UNIMED",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00066-brandao-e-marmo-sao-roque",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00066",
+      "nome": "BRANDAO E MARMO - SAO ROQUE",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00067-motus-servicos-ltda-campinas",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00067",
+      "nome": "MOTUS SERVICOS LTDA CAMPINAS",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00073-ind-embalagens-santa-ines-s-a",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00073",
+      "nome": "IND EMBALAGENS SANTA INES S/A",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00074-luft-itapeva",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00074",
+      "nome": "LUFT ITAPEVA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00076-brandao-e-marmo-s-camilo",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00076",
+      "nome": "BRANDAO E MARMO - S CAMILO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00081-motus-servicos-ltda-jardim-d-a",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00081",
+      "nome": "MOTUS SERVICOS LTDA JARDIM D A",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00082-motus-servicos-ltda-boa-viagem",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00082",
+      "nome": "MOTUS SERVICOS LTDA BOA VIAGEM",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00084-luft-alpargatas",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00084",
+      "nome": "LUFT ALPARGATAS",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00085-luft-insider",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00085",
+      "nome": "LUFT - INSIDER",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00087-brandao-e-marmo-graded-schoo",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00087",
+      "nome": "BRANDAO E MARMO - GRADED SCHOO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00088-motus-servicos-ltda-rj-pavuna",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00088",
+      "nome": "MOTUS SERVICOS LTDA RJ PAVUNA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-00089-luft-cgh7",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-00089",
+      "nome": "LUFT CGH7",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-0100016-brandao-e-marmo-bauducco",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-0100016",
+      "nome": "BRANDAO E MARMO - BAUDUCCO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-0100041-edificio-residencial-upcon-blu",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-0100041",
+      "nome": "EDIFICIO RESIDENCIAL UPCON BLU",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-0100042-ind-embalagens-santa-ines-s-a",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-0100042",
+      "nome": "IND EMBALAGENS SANTA INES S/A",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-0100043-industria-marilia-auto-pecas-s",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-0100043",
+      "nome": "INDUSTRIA MARILIA AUTO PECAS S",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-0100044-industria-marilia-auto-pecas-s",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-0100044",
+      "nome": "INDUSTRIA MARILIA AUTO PECAS S",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-0100045-industria-marilia-auto-pecas-s",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-0100045",
+      "nome": "INDUSTRIA MARILIA AUTO PECAS S",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-0100051-cond-edificio-xavier",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-0100051",
+      "nome": "COND EDIFICIO XAVIER",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-0100066-brandao-e-marmo-sao-roque",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-0100066",
+      "nome": "BRANDAO E MARMO - SAO ROQUE",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-0100076-brandao-e-marmo-s-camilo",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-0100076",
+      "nome": "BRANDAO E MARMO - S CAMILO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-0100077-brandao-e-marmo-huntington",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-0100077",
+      "nome": "BRANDAO E MARMO - HUNTINGTON",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-26-rt1-0100087-brandao-e-marmo-graded-schoo",
+      "empresaId": "emp-26-rt1",
+      "tomadorId": "tom-26-rt1-0100087",
+      "nome": "BRANDAO E MARMO - GRADED SCHOO",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-28-intermitente-meli-rt2-00001-ebazar-cajamar",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "tomadorId": "tom-28-intermitente-meli-rt2-00001",
+      "nome": "EBAZAR CAJAMAR",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-28-intermitente-meli-rt2-00003-ebazar-morro-da-fumaca",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "tomadorId": "tom-28-intermitente-meli-rt2-00003",
+      "nome": "EBAZAR MORRO DA FUMACA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-28-intermitente-meli-rt2-00004-ebazar-morro-londrina",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "tomadorId": "tom-28-intermitente-meli-rt2-00004",
+      "nome": "EBAZAR MORRO LONDRINA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-28-intermitente-meli-rt2-00005-ebazar-sumare",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "tomadorId": "tom-28-intermitente-meli-rt2-00005",
+      "nome": "EBAZAR SUMARE",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-28-intermitente-meli-rt2-00006-ebazar-betim",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "tomadorId": "tom-28-intermitente-meli-rt2-00006",
+      "nome": "EBAZAR BETIM",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-28-intermitente-meli-rt2-00007-ebazar-nova-santa-rita",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "tomadorId": "tom-28-intermitente-meli-rt2-00007",
+      "nome": "EBAZAR NOVA SANTA RITA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-28-intermitente-meli-rt2-00008-ebazar-ssc3-gaspar-sc",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "tomadorId": "tom-28-intermitente-meli-rt2-00008",
+      "nome": "EBAZAR SSC3-GASPAR SC",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-28-intermitente-meli-rt2-00009-ebazar-ssc3-sapucaia-do-sul",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "tomadorId": "tom-28-intermitente-meli-rt2-00009",
+      "nome": "EBAZAR SSC3- SAPUCAIA DO SUL",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-28-intermitente-meli-rt2-00010-ebazar-meli-maringa",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "tomadorId": "tom-28-intermitente-meli-rt2-00010",
+      "nome": "EBAZAR MELI MARINGA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-28-intermitente-meli-rt2-00012-ebazar-rj",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "tomadorId": "tom-28-intermitente-meli-rt2-00012",
+      "nome": "EBAZAR RJ",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-28-intermitente-meli-rt2-00013-ebazar-pelotas-rs",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "tomadorId": "tom-28-intermitente-meli-rt2-00013",
+      "nome": "EBAZAR PELOTAS- RS",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-28-intermitente-meli-rt2-00014-ebazar-celso-ramos-sc",
+      "empresaId": "emp-28-intermitente-meli-rt2",
+      "tomadorId": "tom-28-intermitente-meli-rt2-00014",
+      "nome": "EBAZAR CELSO RAMOS SC",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-20-intermitente-rt1-00002-customiza-logistica-terceiriza",
+      "empresaId": "emp-20-intermitente-rt1",
+      "tomadorId": "tom-20-intermitente-rt1-00002",
+      "nome": "CUSTOMIZA LOGISTICA TERCEIRIZA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-20-intermitente-rt1-00013-ativa-distribuicao-e-logisitic",
+      "empresaId": "emp-20-intermitente-rt1",
+      "tomadorId": "tom-20-intermitente-rt1-00013",
+      "nome": "ATIVA DISTRIBUICAO E LOGISITIC",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-20-intermitente-rt1-00024-customiza-logistica-contagem-m",
+      "empresaId": "emp-20-intermitente-rt1",
+      "tomadorId": "tom-20-intermitente-rt1-00024",
+      "nome": "CUSTOMIZA LOGISTICA CONTAGEM M",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-20-intermitente-rt1-00032-ativa-distribuicao-e-logisitic",
+      "empresaId": "emp-20-intermitente-rt1",
+      "tomadorId": "tom-20-intermitente-rt1-00032",
+      "nome": "ATIVA DISTRIBUICAO E LOGISITIC",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-20-intermitente-rt1-00033-ativa-distribuicao-e-logisitic",
+      "empresaId": "emp-20-intermitente-rt1",
+      "tomadorId": "tom-20-intermitente-rt1-00033",
+      "nome": "ATIVA DISTRIBUICAO E LOGISITIC",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-20-intermitente-rt1-00034-ativa-distribuicao-e-logisitic",
+      "empresaId": "emp-20-intermitente-rt1",
+      "tomadorId": "tom-20-intermitente-rt1-00034",
+      "nome": "ATIVA DISTRIBUICAO E LOGISITIC",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-20-intermitente-rt1-00035-ativa-distribuicao-e-logisitic",
+      "empresaId": "emp-20-intermitente-rt1",
+      "tomadorId": "tom-20-intermitente-rt1-00035",
+      "nome": "ATIVA DISTRIBUICAO E LOGISITIC",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-20-intermitente-rt1-00036-customiza-logistica-merc-livre",
+      "empresaId": "emp-20-intermitente-rt1",
+      "tomadorId": "tom-20-intermitente-rt1-00036",
+      "nome": "CUSTOMIZA LOGISTICA MERC LIVRE",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-20-intermitente-rt1-00037-ativa-distribuicao-e-logisitic",
+      "empresaId": "emp-20-intermitente-rt1",
+      "tomadorId": "tom-20-intermitente-rt1-00037",
+      "nome": "ATIVA DISTRIBUICAO E LOGISITIC",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-20-intermitente-rt1-00038-ativa-distribuicao-e-logisitic",
+      "empresaId": "emp-20-intermitente-rt1",
+      "tomadorId": "tom-20-intermitente-rt1-00038",
+      "nome": "ATIVA DISTRIBUICAO E LOGISITIC",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-22-green-service-outros-00001-green-service-recursos-humanos",
+      "empresaId": "emp-22-green-service-outros",
+      "tomadorId": "tom-22-green-service-outros-00001",
+      "nome": "GREEN SERVICE RECURSOS HUMANOS",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-22-green-service-outros-00002-meta-f-express-logistica",
+      "empresaId": "emp-22-green-service-outros",
+      "tomadorId": "tom-22-green-service-outros-00002",
+      "nome": "META F EXPRESS - LOGISTICA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-22-green-service-outros-00003-rt2-rh",
+      "empresaId": "emp-22-green-service-outros",
+      "tomadorId": "tom-22-green-service-outros-00003",
+      "nome": "RT2 RH",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-22-green-service-outros-00081-mart-atacadista",
+      "empresaId": "emp-22-green-service-outros",
+      "tomadorId": "tom-22-green-service-outros-00081",
+      "nome": "MART ATACADISTA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-15-diarias-rt2-00014-ebazar",
+      "empresaId": "emp-15-diarias-rt2",
+      "tomadorId": "tom-15-diarias-rt2-00014",
+      "nome": "EBAZAR",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-15-diarias-rt2-00015-customiza-logistica-terceiriza",
+      "empresaId": "emp-15-diarias-rt2",
+      "tomadorId": "tom-15-diarias-rt2-00015",
+      "nome": "CUSTOMIZA LOGISTICA TERCEIRIZA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-15-diarias-rt2-00017-customiza-logistica-contagem-m",
+      "empresaId": "emp-15-diarias-rt2",
+      "tomadorId": "tom-15-diarias-rt2-00017",
+      "nome": "CUSTOMIZA LOGISTICA CONTAGEM M",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-15-diarias-rt2-00021-ativa",
+      "empresaId": "emp-15-diarias-rt2",
+      "tomadorId": "tom-15-diarias-rt2-00021",
+      "nome": "ATIVA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-15-diarias-rt2-99992-logfar-diaristas",
+      "empresaId": "emp-15-diarias-rt2",
+      "tomadorId": "tom-15-diarias-rt2-99992",
+      "nome": "LOGFAR DIARISTAS",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-15-diarias-rt2-00021-ativa-sjp",
+      "empresaId": "emp-15-diarias-rt2",
+      "tomadorId": "tom-15-diarias-rt2-00021",
+      "nome": "ATIVA SJP",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-15-diarias-rt2-00022-ativa-contagem",
+      "empresaId": "emp-15-diarias-rt2",
+      "tomadorId": "tom-15-diarias-rt2-00022",
+      "nome": "ATIVA - CONTAGEM",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-15-diarias-rt2-00023-ativa-extrema-mg",
+      "empresaId": "emp-15-diarias-rt2",
+      "tomadorId": "tom-15-diarias-rt2-00023",
+      "nome": "ATIVA EXTREMA MG",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-29-mart-00001-mart-atacadista-ltda",
+      "empresaId": "emp-29-mart",
+      "tomadorId": "tom-29-mart-00001",
+      "nome": "MART ATACADISTA LTDA",
+      "ativo": true,
+      "origem": "base"
+    },
+    {
+      "id": "cli-30-intermitente-rt1-00001-motus-servicos-ltda-cd6",
+      "empresaId": "emp-30-intermitente-rt1",
+      "tomadorId": "tom-30-intermitente-rt1-00001",
+      "nome": "MOTUS SERVICOS LTDA CD6",
+      "ativo": true,
+      "origem": "base"
+    }
+  ]
 }

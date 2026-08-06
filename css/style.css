@@ -4708,6 +4708,12 @@ input.form-control[type="date"] {
 .ff-vinculo-campos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .ff-vinculo-campos .form-group { margin-bottom: 0; min-width: 0; }
 .ff-vinculo-campos select { width: 100%; max-width: 100%; }
+/* Dica embaixo do cliente: se veio sozinho pelo tomador ou se precisa escolher */
+.ff-auto-dica {
+    display: block; margin-top: 4px; font-size: 11px; line-height: 1.4;
+    color: #059669; font-weight: 600;
+}
+.ff-auto-dica.ff-auto-escolha { color: #B45309; }
 .ff-btn-add-vinculo { width: 100%; justify-content: center; }
 
 /* Celular/tablet: empilha os campos, um embaixo do outro, sem estourar a tela */

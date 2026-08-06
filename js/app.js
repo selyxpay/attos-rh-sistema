@@ -13902,6 +13902,11 @@ function _ffRenderVinculos() {
               ${opt('', v.tomadorId ? (clientes.length ? 'Selecionar cliente...' : 'Nenhum cliente neste tomador') : 'Escolha o tomador primeiro', !v.clienteId)}
               ${clientes.map(c => opt(c.id, c.nome, c.id === v.clienteId)).join('')}
             </select>
+            ${v.clienteId && clientes.length === 1
+              ? '<small class="ff-auto-dica"><i class="fa-solid fa-wand-magic-sparkles"></i> preenchido pelo tomador</small>'
+              : (clientes.length > 1
+                  ? '<small class="ff-auto-dica ff-auto-escolha"><i class="fa-solid fa-circle-info"></i> este tomador tem ' + clientes.length + ' clientes — escolha qual</small>'
+                  : '')}
           </div>
         </div>
       </div>`;
@@ -13909,14 +13914,32 @@ function _ffRenderVinculos() {
 }
 
 // Trocar a empresa zera tomador e cliente (senão sobraria uma combinação inválida).
+// Ao escolher o tomador, o cliente se preenche sozinho — mas SÓ quando aquele
+// código tem um cliente só. Existe caso na planilha com dois (Diárias RT2 ·
+// 00021 = ATIVA e ATIVA SJP): aí a lista continua aberta para a pessoa escolher.
 window.ffVinculoMudou = function (i, campo, valor) {
   const v = _ffVinculos[i];
   if (!v) return;
-  if (campo === 'empresa') { v.empresaId = valor; v.tomadorId = ''; v.clienteId = ''; }
-  else if (campo === 'tomador') { v.tomadorId = valor; v.clienteId = ''; }
-  else { v.clienteId = valor; }
+  if (campo === 'empresa') {
+    v.empresaId = valor; v.tomadorId = ''; v.clienteId = '';
+    // Empresa com um tomador só: já desce para ele (e o cliente vem junto).
+    const tods = _ffTomadoresDaEmpresa(valor);
+    if (tods.length === 1) { v.tomadorId = tods[0].id; _ffAutoCliente(v); }
+  } else if (campo === 'tomador') {
+    v.tomadorId = valor; v.clienteId = '';
+    _ffAutoCliente(v);
+  } else {
+    v.clienteId = valor;
+  }
   _ffRenderVinculos();
 };
+
+// Preenche o cliente quando não há dúvida (um único cliente naquele tomador).
+function _ffAutoCliente(v) {
+  if (!v || !v.tomadorId) return;
+  const cli = _ffClientesDoTomador(v.empresaId, v.tomadorId);
+  if (cli.length === 1) v.clienteId = cli[0].id;
+}
 window.ffAdicionarVinculo = function () {
   _ffVinculos.push({ empresaId: '', tomadorId: '', clienteId: '' });
   _ffRenderVinculos();

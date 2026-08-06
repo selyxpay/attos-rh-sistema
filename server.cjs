@@ -336,12 +336,18 @@ const CHAVES_ESCRITA_PUBLICA = ['candidatos', 'bancoTalentos', 'fila', '_docsMet
 // ==========================================================================
 // CADASTROS DO FLUXO FINANCEIRO — EMPRESAS / TOMADORES / CLIENTES
 // --------------------------------------------------------------------------
-// Carrega a base inicial de ff-cadastros-base.json.
+// Carrega a base oficial de ff-cadastros-base.json (a planilha do cliente).
 //
-// IDEMPOTENTE: a chave lógica é EMPRESA + TOMADOR + CLIENTE. Rodar de novo
-// (novo deploy, restart) NÃO duplica nada. Só ACRESCENTA o que ainda não
-// existe — nunca altera, renomeia, inativa ou apaga cadastro já gravado, e
-// nunca encosta nos fluxos financeiros existentes.
+// COMO A TROCA FUNCIONA, sem perder nada:
+//   - Todo registro vindo do arquivo leva origem "base".
+//   - Quando a VERSÃO do arquivo muda, os registros de origem "base" são
+//     recriados do zero — é assim que uma lista errada é corrigida por inteiro.
+//   - O que o admin cadastrar pela tela (origem "manual") NUNCA é tocado.
+//   - Fichas já criadas NÃO são afetadas: cada vínculo guarda, junto do id, o
+//     nome da empresa, o código do tomador e o nome do cliente. Ficha antiga
+//     continua mostrando exatamente o que mostrava.
+//
+// Rodar de novo na mesma versão não muda nada (idempotente).
 // ==========================================================================
 function garantirCadastrosFinanceiro() {
   comTrava(function () {
@@ -354,67 +360,43 @@ function garantirCadastrosFinanceiro() {
 
     const st = lerEstado();
     const d = st.dados || {};
-    let novos = { empresas: 0, tomadores: 0, clientes: 0 };
+    if (!Array.isArray(d.empresas))  d.empresas  = [];
+    if (!Array.isArray(d.tomadores)) d.tomadores = [];
+    if (!Array.isArray(d.clientes))  d.clientes  = [];
 
-    if (!Array.isArray(d.empresas))   d.empresas = [];
-    if (!Array.isArray(d.tomadores))  d.tomadores = [];
-    if (!Array.isArray(d.clientes))   d.clientes = [];
+    const versaoArquivo = Number(base.versao || 1);
+    const versaoAtual   = Number(d.ffCadastrosVersao || 0);
+    const primeiraVez   = !d.empresas.length && !d.tomadores.length && !d.clientes.length;
 
-    // EMPRESAS — chave: nome (comparado sem diferenciar maiúsculas/acentos)
-    const norm = function (s) {
-      return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toUpperCase();
-    };
-    const idPorEmpresa = {};
-    d.empresas.forEach(function (e) { if (e) idPorEmpresa[norm(e.nome)] = e.id; });
-    (base.empresas || []).forEach(function (e) {
-      const k = norm(e.nome);
-      if (idPorEmpresa[k]) return;                       // já existe: preserva o que está lá
-      d.empresas.push({ id: e.id, nome: e.nome, ativo: true });
-      idPorEmpresa[k] = e.id;
-      novos.empresas++;
-    });
-
-    // TOMADORES — chave: empresa + código
-    const idPorTomador = {};
-    d.tomadores.forEach(function (t) {
-      if (t) idPorTomador[t.empresaId + '||' + String(t.codigo).trim()] = t.id;
-    });
-    (base.tomadores || []).forEach(function (t) {
-      const empresaBase = (base.empresas || []).find(function (e) { return e.id === t.empresaId; });
-      const empresaId = empresaBase ? idPorEmpresa[norm(empresaBase.nome)] : t.empresaId;
-      const k = empresaId + '||' + String(t.codigo).trim();
-      if (idPorTomador[k]) return;
-      d.tomadores.push({ id: t.id, empresaId: empresaId, codigo: String(t.codigo), nome: t.nome || '', ativo: true });
-      idPorTomador[k] = t.id;
-      novos.tomadores++;
-    });
-
-    // CLIENTES — chave: empresa + tomador + nome do cliente
-    const jaTem = {};
-    d.clientes.forEach(function (c) {
-      if (c) jaTem[c.empresaId + '||' + c.tomadorId + '||' + norm(c.nome)] = true;
-    });
-    (base.clientes || []).forEach(function (c) {
-      const empresaBase = (base.empresas || []).find(function (e) { return e.id === c.empresaId; });
-      const empresaId = empresaBase ? idPorEmpresa[norm(empresaBase.nome)] : c.empresaId;
-      const tomadorBase = (base.tomadores || []).find(function (t) { return t.id === c.tomadorId; });
-      const tomadorId = tomadorBase
-        ? (idPorTomador[empresaId + '||' + String(tomadorBase.codigo).trim()] || c.tomadorId)
-        : c.tomadorId;
-      const k = empresaId + '||' + tomadorId + '||' + norm(c.nome);
-      if (jaTem[k]) return;
-      d.clientes.push({ id: c.id, empresaId: empresaId, tomadorId: tomadorId, nome: c.nome, ativo: true });
-      jaTem[k] = true;
-      novos.clientes++;
-    });
-
-    if (novos.empresas || novos.tomadores || novos.clientes) {
-      gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-      console.log('[RT] Cadastros do Fluxo Financeiro importados: ' +
-        novos.empresas + ' empresa(s), ' + novos.tomadores + ' tomador(es), ' + novos.clientes + ' cliente(s).');
-    } else {
-      console.log('[RT] Cadastros do Fluxo Financeiro já estavam completos (nada duplicado).');
+    if (versaoAtual === versaoArquivo && !primeiraVez) {
+      console.log('[RT] Cadastros do Fluxo Financeiro já na versão ' + versaoArquivo + ' (nada a fazer).');
+      return;
     }
+
+    // O que o admin criou pela tela fica de fora da troca.
+    const doAdmin = {
+      empresas:  d.empresas.filter(function (e)  { return e && e.origem === 'manual'; }),
+      tomadores: d.tomadores.filter(function (t) { return t && t.origem === 'manual'; }),
+      clientes:  d.clientes.filter(function (c)  { return c && c.origem === 'manual'; })
+    };
+    const antes = { e: d.empresas.length, t: d.tomadores.length, c: d.clientes.length };
+
+    const daBase = function (lista) {
+      return (lista || []).map(function (r) {
+        return Object.assign({}, r, { ativo: r.ativo !== false, origem: 'base' });
+      });
+    };
+    d.empresas  = daBase(base.empresas).concat(doAdmin.empresas);
+    d.tomadores = daBase(base.tomadores).concat(doAdmin.tomadores);
+    d.clientes  = daBase(base.clientes).concat(doAdmin.clientes);
+    d.ffCadastrosVersao = versaoArquivo;
+
+    gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+    console.log('[RT] Cadastros do Fluxo Financeiro na versão ' + versaoArquivo + ': ' +
+      d.empresas.length + ' empresa(s), ' + d.tomadores.length + ' tomador(es), ' +
+      d.clientes.length + ' cliente(s). (antes: ' + antes.e + '/' + antes.t + '/' + antes.c +
+      '; preservados do admin: ' + doAdmin.empresas.length + '/' + doAdmin.tomadores.length +
+      '/' + doAdmin.clientes.length + ')');
   });
 }
 
