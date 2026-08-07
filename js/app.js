@@ -12601,6 +12601,38 @@ function _ffChequesTecnicos(f) {
 
 // Duplicidades no fluxo inteiro (todos os arquivos juntos). O CPF é o principal
 // identificador. NADA é excluído sozinho — só sinalizado para conferência humana.
+// ── Quem subiu a ficha ────────────────────────────────────────────────────
+// Aparece antes do número em todas as listas: assim dá para saber de bate-
+// pronto que a Tayla subiu a #20 e a #12. Fichas antigas, de antes deste
+// campo existir, caem no login gravado e, em último caso, mostram "—".
+function _ffQuemSubiu(f) {
+  if (!f) return '<span class="ff-quem-vazio">—</span>';
+  let nome = String(f.criadoPor || '').trim();
+  if (!nome && f.criadoPorLogin) {
+    const func = (state.funcionarios || []).find(x => x && x.login === f.criadoPorLogin);
+    nome = func ? nomeExibido(func) : f.criadoPorLogin;
+  }
+  if (!nome) return '<span class="ff-quem-vazio" title="Ficha antiga, sem esse registro">—</span>';
+  const inic = nome.trim().split(/\s+/).slice(0, 2).map(p => p[0] || '').join('').toUpperCase();
+  return '<span class="ff-quem" title="Subiu os arquivos: ' + escapeHTML(nome) + '">' +
+    '<span class="ff-quem-bola">' + escapeHTML(inic) + '</span>' +
+    '<span class="ff-quem-nome">' + escapeHTML(_ffPrimeiroNome(nome)) + '</span></span>';
+}
+// Nome curto para caber na coluna sem quebrar a tabela
+function _ffPrimeiroNome(nome) {
+  const p = String(nome || '').trim().split(/\s+/);
+  if (p.length <= 2) return p.join(' ');
+  return p[0] + ' ' + p[p.length - 1];
+}
+window._ffQuemSubiu = _ffQuemSubiu;
+
+// O LOTE é o tipo de pagamento (salário, benefício, rescisão...). A MESMA
+// pessoa pode aparecer em lotes diferentes sem ser erro — são pagamentos
+// distintos. Duplicidade de verdade é a mesma pessoa DUAS VEZES NO MESMO LOTE.
+// Por isso a chave é CPF + LOTE, e não só o CPF.
+function _ffLoteDaLinha(l) { return String((l && l.lote) || '').trim(); }
+function _ffLoteRotulo(l) { const v = _ffLoteDaLinha(l); return v || '—'; }
+
 function _ffDuplicidades(f) {
   const grupos = { cpf: [], codigo: [], nome: [] };
   const por = (campo, normaliza) => {
@@ -12608,11 +12640,13 @@ function _ffDuplicidades(f) {
     (f.linhas || []).forEach(l => {
       const v = normaliza(l[campo]);
       if (!v) return;
-      if (!mapa.has(v)) mapa.set(v, []);
-      mapa.get(v).push(l);
+      // Mesma pessoa em lotes diferentes = pagamentos diferentes, não é duplicata
+      const chave = v + '||lote:' + _ffLoteDaLinha(l);
+      if (!mapa.has(chave)) mapa.set(chave, []);
+      mapa.get(chave).push(l);
     });
     return [...mapa.entries()].filter(([, ls]) => ls.length > 1)
-      .map(([chave, ls]) => ({ chave, linhas: ls }));
+      .map(([chave, ls]) => ({ chave: chave.split('||lote:')[0], lote: chave.split('||lote:')[1] || '', linhas: ls }));
   };
   grupos.cpf    = por('cpf',    v => String(v || '').replace(/\D/g, ''));
   grupos.codigo = por('codigo', v => String(v || '').trim());
@@ -13011,6 +13045,7 @@ function _ffRenderMonitor(cont) {
     const parado = Date.now() - new Date(desde || f.criadoEm).getTime();
     const alerta = parado > 86400000 ? '#DC2626' : (parado > 14400000 ? '#D97706' : '#059669');   // >24h vermelho, >4h laranja
     return `<tr>
+      <td>${_ffQuemSubiu(f)}</td>
       <td style="font-weight:800;color:#0284c7;">#${escapeHTML(f.numero)}</td>
       <td style="font-weight:700;">${escapeHTML(f.empresaNome || '—')}</td>
       <td class="ff-val-destaque">${_ffMoedaBR(_ffTotal(f))}</td>
@@ -13026,7 +13061,7 @@ function _ffRenderMonitor(cont) {
       <p style="margin:0;font-size:12.5px;color:#64748b;">Todo processo em andamento, com quem está parado e há quanto tempo. 🟢 no prazo · 🟡 mais de 4h · 🔴 mais de 24h.</p>
     </div>
     ${emAndamento.length ? `<div class="ff-table-container"><table class="ff-table">
-      <thead><tr><th>Nº</th><th>Empresa</th><th style="text-align:right;">Valor</th><th>Etapa atual</th><th>Responsável</th><th>Aguardando desde</th><th>Tempo parado</th></tr></thead>
+      <thead><tr><th>Enviado por</th><th>Nº</th><th>Empresa</th><th style="text-align:right;">Valor</th><th>Etapa atual</th><th>Responsável</th><th>Aguardando desde</th><th>Tempo parado</th></tr></thead>
       <tbody>${emAndamento.map(linha).join('')}</tbody>
     </table></div>` : `<div class="ff-empty-box"><div class="ff-empty-icon"><i class="fa-solid fa-mug-hot"></i></div><div class="ff-empty-title">Nada parado 👌</div><div class="ff-empty-text">Não há processos aguardando ação no momento.</div></div>`}`;
 }
@@ -13456,6 +13491,7 @@ function _ffRenderAPagar(cont) {
     return '<tr>' +
       '<td data-label="" style="width:38px;"><input type="checkbox" ' + (f.divergencia ? 'disabled' : '') + ' ' +
         (_ffPagarSelecao[f.id] ? 'checked' : '') + ' onchange="ffSelecionarPagar(\'' + f.id + '\', this.checked)"></td>' +
+      '<td data-label="Enviado por">' + _ffQuemSubiu(f) + '</td>' +
       '<td data-label="Empresa" style="font-weight:600;">' + escapeHTML(_ffIdentificacao(f)) + '</td>' +
       '<td data-label="Documento">#' + escapeHTML(f.numero) + trava +
         '<div style="font-size:11px;color:var(--text-secondary);">' + escapeHTML(f.tipo || '') + '</div></td>' +
@@ -13478,7 +13514,7 @@ function _ffRenderAPagar(cont) {
           '<i class="fa-solid fa-circle-check"></i> Finalizar Pagamentos</button>' +
       '</div>' +
       '<div class="table-scroll-container"><table class="excel-table ff-tabela-pagar"><thead><tr>' +
-        '<th></th><th>Empresa / Identificação</th><th>Documento</th><th>Relação</th><th>Enviado ao financeiro</th>' +
+        '<th></th><th>Enviado por</th><th>Empresa / Identificação</th><th>Documento</th><th>Relação</th><th>Enviado ao financeiro</th>' +
         '<th style="text-align:center;">Colab.</th><th>Valor</th><th>Status</th><th>Ação</th>' +
       '</tr></thead><tbody>' + linhas + '</tbody></table></div>'
     : '<div class="ff-empty-box"><div class="ff-empty-title">Nada para pagar ' +
@@ -13636,6 +13672,7 @@ function _ffRenderFinalizados(cont) {
 
   const linhas = lista.map(function (f) {
     return '<tr>' +
+      '<td data-label="Enviado por">' + _ffQuemSubiu(f) + '</td>' +
       '<td data-label="Empresa" style="font-weight:600;">' + escapeHTML(_ffIdentificacao(f)) + '</td>' +
       '<td data-label="Documento">#' + escapeHTML(f.numero) +
         '<div style="font-size:11px;color:var(--text-secondary);">' + escapeHTML(f.tipo || '') + '</div></td>' +
@@ -13651,7 +13688,7 @@ function _ffRenderFinalizados(cont) {
 
   const tabela = lista.length
     ? '<div class="table-scroll-container"><table class="excel-table ff-tabela-pagar"><thead><tr>' +
-        '<th>Empresa / Identificação</th><th>Documento</th><th>Relação</th><th>Enviado ao financeiro</th>' +
+        '<th>Enviado por</th><th>Empresa / Identificação</th><th>Documento</th><th>Relação</th><th>Enviado ao financeiro</th>' +
         '<th style="text-align:center;">Colab.</th><th>Valor</th><th>Status</th><th>Ação</th>' +
       '</tr></thead><tbody>' + linhas + '</tbody></table></div>'
     : '<div class="ff-empty-box"><div class="ff-empty-title">Nenhuma ficha paga ' +
@@ -13804,12 +13841,13 @@ function _ffRenderLista() {
   cont.innerHTML = calloutHtml + toolbarHtml + `
     <div class="ff-table-container">
       <table class="ff-table">
-        <thead><tr><th>Nº</th><th>Empresa</th><th>Tipo</th><th>Data Pagamento</th><th>Competência</th><th>Colab.</th><th style="text-align:right;">Valor Total</th><th>Status</th><th style="text-align:center;">Ação</th></tr></thead>
+        <thead><tr><th>Enviado por</th><th>Nº</th><th>Empresa</th><th>Tipo</th><th>Data Pagamento</th><th>Competência</th><th>Colab.</th><th style="text-align:right;">Valor Total</th><th>Status</th><th style="text-align:center;">Ação</th></tr></thead>
         <tbody>
           ${lista.map(f => {
             const st = FF_STATUS[f.status] || FF_STATUS.rascunho;
             const minha = _ffEhMinhaVez(f);
             return `<tr class="${minha ? 'ff-row-highlight' : ''}">
+              <td data-label="Enviado por">${_ffQuemSubiu(f)}</td>
               <td style="font-weight:800;color:#0284c7;">#${escapeHTML(f.numero)}</td>
               <td style="font-weight:700;color:#0f172a;">${escapeHTML(f.empresaNome || '—')}</td>
               <td>${escapeHTML(f.tipo || '—')}</td>
@@ -14807,13 +14845,16 @@ function _ffRenderDetalhe() {
           return `
         <div class="table-scroll-container" style="max-height:340px;overflow-y:auto;">
           <table class="excel-table">
-            <thead><tr><th>Código</th><th>Colaborador</th><th>CPF</th><th>Comp.</th><th>Bco</th><th>Ag.</th><th>Conta</th><th>Valor</th><th>Orig</th><th>Situação</th>${podeEditar ? '<th></th>' : ''}</tr></thead>
+            <thead><tr><th>Código</th><th>Colaborador</th><th>CPF</th><th title="Tipo de pagamento: a mesma pessoa em lotes diferentes é normal">Lote</th><th>Comp.</th><th>Bco</th><th>Ag.</th><th>Conta</th><th>Valor</th><th>Orig</th><th>Situação</th>${podeEditar ? '<th></th>' : ''}</tr></thead>
             <tbody>
               ${(f.linhas || []).map((l, i) => `
                 <tr style="${cpfsDup.has(l.id) ? 'background:rgba(220,38,38,.08);' : l.status === 'conferir' ? 'background:rgba(217,119,6,.07);' : ''}">
                   <td style="font-family:monospace;font-size:11px;">${escapeHTML(l.codigo || '—')}</td>
                   <td>${podeEditar ? `<input class="form-control" style="min-width:170px;font-size:12px;padding:4px 8px;" value="${escapeHTML(l.nome || '')}" onchange="ffEditarLinha(${i},'nome',this.value)">` : escapeHTML(l.nome || '—')}</td>
                   <td>${podeEditar ? `<input class="form-control" style="width:135px;font-size:12px;padding:4px 8px;" value="${escapeHTML(l.cpf || '')}" onchange="ffEditarLinha(${i},'cpf',this.value)">` : escapeHTML(l.cpf || '—')}</td>
+                  <td class="ff-col-lote">${podeEditar
+                    ? `<input class="form-control ff-inp-lote" value="${escapeHTML(l.lote || '')}" placeholder="—" onchange="ffEditarLinha(${i},'lote',this.value)">`
+                    : `<span class="ff-lote-selo">${escapeHTML(_ffLoteRotulo(l))}</span>`}</td>
                   <td style="font-size:11px;">${escapeHTML(l.competencia || '—')}</td>
                   <td style="font-size:11px;">${escapeHTML(l.banco || '—')}</td>
                   <td style="font-size:11px;font-family:monospace;">${escapeHTML(l.agencia || '—')}${l.agenciaDg ? '-' + escapeHTML(l.agenciaDg) : ''}</td>
@@ -14821,7 +14862,8 @@ function _ffRenderDetalhe() {
                   <td>${podeEditar ? `<input class="form-control" style="width:100px;font-size:12px;padding:4px 8px;text-align:right;" value="${(Number(l.valor) || 0).toFixed(2).replace('.', ',')}" onchange="ffEditarLinha(${i},'valor',this.value)">` : `<strong>${_ffMoedaBR(l.valor)}</strong>`}</td>
                   <td style="font-size:11px;">${escapeHTML(l.origem || '—')}</td>
                   <td class="ff-col-situacao">${cpfsDup.has(l.id)
-                    ? '<span class="ff-sit ff-sit-dup">⚠ duplicado?</span>' + _ffAcaoLinha(f, l, i)
+                    ? '<span class="ff-sit ff-sit-dup" title="Mesmo CPF repetido no MESMO lote ' +
+                      escapeHTML(_ffLoteRotulo(l)) + '">⚠ repetido no lote ' + escapeHTML(_ffLoteRotulo(l)) + '</span>' + _ffAcaoLinha(f, l, i)
                     : _ffAcaoLinha(f, l, i)}</td>
                   ${podeEditar ? `<td><button class="btn btn-sm btn-outline" style="border-color:#DC2626;color:#DC2626;padding:2px 8px;" onclick="ffRemoverLinha(${i})"><i class="fa-solid fa-trash-can"></i></button></td>` : ''}
                 </tr>`).join('')}

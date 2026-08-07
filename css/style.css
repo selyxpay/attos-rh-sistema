@@ -4875,6 +4875,39 @@ input.form-control[type="date"] {
 .drv-cx input { width: 16px; height: 16px; cursor: pointer; }
 .drv-nome { font-weight: 700; max-width: 230px; overflow: hidden; text-overflow: ellipsis; }
 .drv-cargo { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   FLUXO FINANCEIRO — quem subiu a ficha e o lote de pagamento
+   ══════════════════════════════════════════════════════════════════════ */
+.ff-quem { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.ff-quem-bola {
+    flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #0284C7, #38BDF8); color: #fff;
+    font-size: 10px; font-weight: 800; letter-spacing: .02em;
+}
+.ff-quem-nome {
+    font-size: 12px; font-weight: 700; color: var(--text-primary, #0f172a);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;
+}
+.ff-quem-vazio { color: var(--text-secondary, #94a3b8); font-size: 12px; }
+
+/* Lote = tipo de pagamento. Mesma pessoa em lotes diferentes é normal. */
+.ff-col-lote { white-space: nowrap; }
+.ff-lote-selo {
+    display: inline-block; padding: 2px 8px; border-radius: 6px;
+    background: #EEF2FF; color: #3730A3; font-size: 11px; font-weight: 800;
+    font-variant-numeric: tabular-nums; letter-spacing: .02em;
+}
+.ff-inp-lote {
+    width: 78px !important; font-size: 12px !important;
+    padding: 4px 8px !important; text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 768px) {
+    .ff-quem-nome { max-width: 100px; }
+}
 .drv-num { font-variant-numeric: tabular-nums; }
 .drv-tag-ok {
     margin-left: 7px; font-size: 9.5px; font-weight: 800; text-transform: uppercase;
