@@ -12262,14 +12262,19 @@ function _ffEhMinhaVez(f) {
   if (_ffLinhasCorrigidas(f).length && _ffEhFinanceiro()) return true;
   switch (f.status) {
     case 'rascunho':               return _ffPodeCriar() && (f.criadoPorLogin === loggedUser.login || _ffEhCoordenacao() || _ffVeTudo());
-    case 'aguardando_coordenacao': return _ffEhCoordenacao() && !_ffEhCriador(f);
+    case 'aguardando_coordenacao': return _ffEhCoordenacao();
     case 'aguardando_gestao':      return _ffEhGestao();
     case 'aguardando_financeiro':  return _ffEhFinanceiro();
     case 'pago':                   return _ffEhFinanceiro();
     default: return false;
   }
 }
-// Ninguém aprova o PRÓPRIO fluxo (menos o mestre, que administra tudo)
+// Quem montou a ficha. NÃO é mais uma trava para aprovar: quem é responsável
+// pela etapa aprova, mesmo tendo subido os documentos — e segue aprovando as
+// etapas seguintes de que também for responsável. Numa equipe pequena a
+// supervisora costuma ser a mesma pessoa que lança, e a trava antiga travava
+// o trabalho. Quem NÃO é responsável pela etapa continua sem aprovar.
+// A função segue em uso para permissões de rascunho, cancelar e excluir.
 function _ffEhCriador(f) {
   return !!(loggedUser && f && f.criadoPorLogin === loggedUser.login && !ehMestre(loggedUser.login));
 }
@@ -14666,7 +14671,7 @@ function _ffRenderDetalhe() {
         const nomes = _ffNomesResponsaveis(etId);
         const cfg = _ffCfg(etId);
         const desde = _ffAguardandoDesde(f);
-        if (_ffEhMinhaVez(f) && !_ffEhCriador(f)) {
+        if (_ffEhMinhaVez(f)) {
           return `<div style="display:flex;align-items:center;gap:12px;background:linear-gradient(90deg,rgba(217,119,6,.14),rgba(217,119,6,.02));border:1px solid rgba(217,119,6,.4);border-left:5px solid #D97706;border-radius:12px;padding:12px 16px;margin-bottom:14px;">
             <i class="fa-solid fa-bell" style="font-size:22px;color:#D97706;"></i>
             <div><div style="font-weight:800;color:#0f172a;font-size:14px;">AGUARDANDO SUA APROVAÇÃO</div>
@@ -14917,9 +14922,7 @@ function _ffRenderDetalhe() {
       b.push(`<button class="btn btn-outline" style="border-color:#DC2626;color:#DC2626;" title="Só o administrador vê esta opção" onclick="ffExcluirFluxo()"><i class="fa-solid fa-trash"></i> Excluir ficha (admin)</button>`);
     }
     if (f.status === 'aguardando_coordenacao' && _ffEhCoordenacao()) {
-      if (_ffEhCriador(f)) {
-        b.push(`<span style="font-size:11px;color:#D97706;font-weight:700;align-self:center;"><i class="fa-solid fa-ban"></i> Você criou este fluxo — outra pessoa da Supervisão precisa aprovar.</span>`);
-      } else {
+      {
         if (_ffAcaoPermitida('coordenacao', 'aprovar')) b.push(`<button class="btn btn-success" onclick="ffAprovar('coordenacao')"><i class="fa-solid fa-check"></i> Aprovar e Enviar (Supervisão DP)</button>`);
         if (_ffAcaoPermitida('coordenacao', 'devolver')) b.push(`<button class="btn btn-outline" style="border-color:#D97706;color:#D97706;" onclick="ffDevolver()"><i class="fa-solid fa-rotate-left"></i> Devolver p/ correção</button>`);
         if (_ffAcaoPermitida('coordenacao', 'reprovar')) b.push(`<button class="btn btn-danger" onclick="ffReprovar()"><i class="fa-solid fa-ban"></i> Reprovar</button>`);
@@ -15193,23 +15196,25 @@ window.ffAprovar = async function(etapa) {
   if (!f) return;
   const agora = new Date().toISOString();
   const quem = nomeExibido(loggedUser);
+  // Quem é responsável pela etapa aprova mesmo tendo subido a ficha. Fica
+  // anotado no histórico para a auditoria enxergar depois.
+  const mesmaPessoa = _ffEhCriador(f) ? ' (mesma pessoa que montou a ficha)' : '';
 
   if (etapa === 'coordenacao' && f.status === 'aguardando_coordenacao' && _ffEhCoordenacao()) {
-    if (_ffEhCriador(f)) { alert('Você criou este fluxo — outra pessoa da Supervisão precisa aprovar.'); return; }
-    f.aprovacoes.coordenacao = { por: quem, login: loggedUser.login, em: agora };
+    f.aprovacoes.coordenacao = { por: quem, login: loggedUser.login, em: agora, proprioAutor: !!mesmaPessoa };
     f.status = 'aguardando_gestao';
     f.enviadoEm = agora;
-    _ffHist(f, 'Supervisão DP aprovou. Enviado para a Gestão.');
+    _ffHist(f, 'Supervisão DP aprovou' + mesmaPessoa + '. Enviado para a Gestão.');
     _ffNotificar(f, 'gestao');
-    registrarLogGlobal(`Aprovou (Supervisão DP) o Fluxo Financeiro #${f.numero}.`, 'dp');
+    registrarLogGlobal(`Aprovou (Supervisão DP) o Fluxo Financeiro #${f.numero}${mesmaPessoa}.`, 'dp');
     await _ffSalvarERender(f, 'Aprovado! O fluxo seguiu para a Gestão.');
   } else if (etapa === 'gestao' && f.status === 'aguardando_gestao' && _ffEhGestao()) {
-    f.aprovacoes.gestao = { por: quem, login: loggedUser.login, em: agora };
+    f.aprovacoes.gestao = { por: quem, login: loggedUser.login, em: agora, proprioAutor: !!mesmaPessoa };
     f.status = 'aguardando_financeiro';
     f.enviadoEm = agora;
-    _ffHist(f, 'Gestão aprovou. Enviado para o Financeiro.');
+    _ffHist(f, 'Gestão aprovou' + mesmaPessoa + '. Enviado para o Financeiro.');
     _ffNotificar(f, 'financeiro');
-    registrarLogGlobal(`Aprovou (Gestão) o Fluxo Financeiro #${f.numero}.`, 'dp');
+    registrarLogGlobal(`Aprovou (Gestão) o Fluxo Financeiro #${f.numero}${mesmaPessoa}.`, 'dp');
     await _ffSalvarERender(f, 'Aprovado! O fluxo seguiu para o Financeiro.');
   }
 };
