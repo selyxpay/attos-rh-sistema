@@ -4838,6 +4838,84 @@ input.form-control[type="date"] {
 /* Selo de sigilosa na lista de cadastros e na ficha */
 .cad-tag-sigilo { background: #FEF3C7; color: #B45309; }
 
+/* ══════════════════════════════════════════════════════════════════════
+   EXAME MÉDICO → PLANILHA DA CLÍNICA
+   ══════════════════════════════════════════════════════════════════════ */
+.drv-explica {
+    font-size: 12.5px; line-height: 1.65; margin: 0 0 12px; padding: 11px 14px;
+    border-radius: 9px; background: rgba(15, 157, 88, .07);
+    border: 1px solid rgba(15, 157, 88, .24); color: var(--text-secondary, #64748b);
+}
+.drv-explica i { color: #0F9D58; margin-right: 4px; }
+.drv-check {
+    display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+    font-size: 12.5px; font-weight: 600; color: var(--text-secondary, #64748b); margin-bottom: 12px;
+}
+.drv-alerta { color: #B45309; font-weight: 700; }
+
+.drv-tabela-wrap {
+    border: 1px solid var(--border-color, #e2e8f0); border-radius: 10px;
+    max-height: 420px; overflow: auto; overscroll-behavior: contain;
+}
+.drv-tabela { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.drv-tabela thead th {
+    position: sticky; top: 0; z-index: 2; background: var(--bg-main, #f1f5f9);
+    text-align: left; padding: 9px 10px; font-size: 11px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .04em; color: var(--text-secondary, #64748b);
+    border-bottom: 1px solid var(--border-color, #e2e8f0); white-space: nowrap;
+}
+.drv-tabela td {
+    padding: 7px 10px; border-bottom: 1px solid var(--border-color, #e2e8f0);
+    vertical-align: middle; white-space: nowrap;
+}
+.drv-tabela tbody tr:hover { background: var(--bg-main, #f8fafc); }
+.drv-tabela tr.drv-incompleta { background: rgba(180, 83, 9, .06); }
+.drv-tabela tr.drv-enviada { opacity: .62; }
+.drv-cx { width: 34px; text-align: center; }
+.drv-cx input { width: 16px; height: 16px; cursor: pointer; }
+.drv-nome { font-weight: 700; max-width: 230px; overflow: hidden; text-overflow: ellipsis; }
+.drv-cargo { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
+.drv-num { font-variant-numeric: tabular-nums; }
+.drv-tag-ok {
+    margin-left: 7px; font-size: 9.5px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .04em; padding: 2px 6px; border-radius: 5px;
+    background: #DCFCE7; color: #047857;
+}
+.drv-emp { width: 158px; min-width: 158px; }
+/* appearance:none é obrigatório: sem isso o Chrome desenha o select nativo e
+   ignora a cor de fundo — que é justamente o que faz a empresa ser
+   reconhecida de bate-pronto, igual à bolinha colorida da planilha. */
+.drv-select {
+    width: 100%; min-height: 32px; cursor: pointer; font-family: inherit; font-weight: 700;
+    /* !important porque o design-system aplica select{...!important} em tudo */
+    padding: 5px 26px 5px 9px !important;
+    border-radius: 7px !important;
+    border: 1px solid var(--border-color, #e2e8f0) !important;
+    font-size: 12px !important;
+    appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    background-repeat: no-repeat;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23667085'/%3E%3C/svg%3E");
+    background-position: right 9px center;
+}
+.drv-select option { background: #fff; color: #0F172A; font-weight: 600; }
+.drv-vazio {
+    text-align: center; padding: 36px 18px; color: var(--text-secondary, #64748b);
+    border: 1px dashed var(--border-color, #e2e8f0); border-radius: 10px;
+}
+.drv-vazio i { font-size: 26px; opacity: .4; display: block; margin-bottom: 9px; }
+.drv-vazio p { margin: 0; font-size: 13px; }
+.mod-badge-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 20px; height: 19px; padding: 0 6px; margin-left: 5px; border-radius: 999px;
+    background: rgba(15, 23, 42, .14); font-size: 11px; font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 768px) {
+    .drv-tabela-wrap { max-height: 60vh; }
+    .drv-nome { max-width: 160px; }
+}
+
 @media (max-width: 768px) {
     .sig-grade { grid-template-columns: 1fr; }
     .sig-topo { flex-direction: column; }

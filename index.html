@@ -35,16 +35,16 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260806i">
+    <link rel="stylesheet" href="css/style.css?v=20260807a">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260806i">
+    <link rel="stylesheet" href="css/design-system.css?v=20260807a">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260806i">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260807a">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260806i">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260806i">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260807a">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260807a">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260806i">
+    <link rel="stylesheet" href="css/mobile.css?v=20260807a">
 </head>
 <body class="app-shell">
 
@@ -1542,6 +1542,38 @@
                 </section>
 
                 <!-- Modal: Gerar relatório de equipamentos para a empresa cliente -->
+                <!-- Modal: montar as colunas da planilha da clínica ("o Drive") -->
+                <div id="modal-drive-exame" class="modal-overlay" style="display:none;" onclick="if(event.target===this)fecharModalDrive()">
+                    <div class="modal-exame-box" style="max-width:1080px;">
+                        <div class="modal-exame-header">
+                            <div style="display:flex;align-items:center;gap:12px;">
+                                <div class="modal-exame-icon" style="background:linear-gradient(135deg,#0F9D58,#34A853);"><i class="fa-solid fa-table-list"></i></div>
+                                <div>
+                                    <h2 style="margin:0;font-size:20px;">Enviar para a planilha da clínica</h2>
+                                    <p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary);" id="drv-resumo">0 selecionado(s)</p>
+                                </div>
+                            </div>
+                            <button class="modal-exame-close" onclick="fecharModalDrive()"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="modal-exame-body">
+                            <p class="drv-explica">
+                                <i class="fa-solid fa-circle-info"></i>
+                                Estas são as <strong>7 primeiras colunas</strong> da planilha, na mesma ordem — do nome até a empresa.
+                                Do <strong>STATUS</strong> em diante quem preenche é a clínica, e a gente não mexe.
+                                Clique em <strong>Copiar</strong>, vá na planilha, clique na <strong>primeira linha vazia</strong> e dê <strong>Ctrl+V</strong>.
+                                Nada do que já está lá é apagado.
+                            </p>
+                            <label class="drv-check"><input type="checkbox" onchange="drvVerEnviados(this.checked)"> Mostrar também quem já foi enviado</label>
+                            <div id="drv-lista"><!-- Gerado por JS --></div>
+                        </div>
+                        <div class="modal-exame-footer">
+                            <button class="btn btn-secondary" onclick="fecharModalDrive()">Fechar</button>
+                            <button class="btn btn-secondary" onclick="drvBaixarExcel()"><i class="fa-solid fa-file-excel"></i> Baixar Excel</button>
+                            <button class="btn btn-primary" onclick="drvCopiar()"><i class="fa-solid fa-copy"></i> Copiar para o Drive</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Modal: adicionar/editar cadastro do Fluxo Financeiro -->
                 <div id="modal-cadastro-ff" class="modal-overlay" style="display:none;" onclick="if(event.target===this)cadFecharModal()">
                     <div class="modal-exame-box" style="max-width:560px;">
@@ -3860,11 +3892,11 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260806i"></script>
-    <script src="js/vps-sync.js?v=20260806i"></script>
-    <script src="js/exata-catalogo.js?v=20260806i"></script>
-    <script src="js/data.js?v=20260806i"></script>
-    <script src="js/app.js?v=20260806i"></script>
-    <script src="js/whatsapp.js?v=20260806i"></script>
+    <script src="js/security.js?v=20260807a"></script>
+    <script src="js/vps-sync.js?v=20260807a"></script>
+    <script src="js/exata-catalogo.js?v=20260807a"></script>
+    <script src="js/data.js?v=20260807a"></script>
+    <script src="js/app.js?v=20260807a"></script>
+    <script src="js/whatsapp.js?v=20260807a"></script>
 </body>
 </html>

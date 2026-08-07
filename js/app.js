@@ -15307,6 +15307,241 @@ function trocarSubAbaExame(sub) {
 window.trocarSubAbaExame = trocarSubAbaExame;
 
 // Render principal da aba Exame Médico
+// ══════════════════════════════════════════════════════════════════════════
+// EXAME MÉDICO → PLANILHA DA CLÍNICA (o "Drive")
+// --------------------------------------------------------------------------
+// A clínica trabalha numa planilha compartilhada. A R&T preenche as 7
+// primeiras colunas (NOME até EMPRESA); do STATUS em diante é a clínica que
+// mexe. Aqui a gente monta exatamente essas 7 colunas, na ordem da planilha,
+// e joga no CTRL+V — assim é só colar na primeira linha vazia e nada do que
+// já está lá é tocado.
+//
+// A coluna EMPRESA da planilha tem uma lista fechada com cores. Se o texto
+// colado for IGUAL a uma dessas opções, a bolinha colorida aparece sozinha.
+// Por isso a escolha aqui é feita nessa mesma lista, com as mesmas cores.
+// ══════════════════════════════════════════════════════════════════════════
+const EXAME_EMPRESAS_DRIVE = [
+  { nome: 'LUFT',            fundo: '#D0DEFB', texto: '#1E3A8A' },
+  { nome: 'MOTUS',           fundo: '#D93025', texto: '#FFFFFF' },
+  { nome: 'ATIVA LOG',       fundo: '#E8617D', texto: '#FFFFFF' },
+  { nome: 'CEVA',            fundo: '#CFE2F3', texto: '#1F4E79' },
+  { nome: 'MERCADO LIVRE',   fundo: '#EFEFEF', texto: '#3C4043' },
+  { nome: 'CUSTOMIZA',       fundo: '#D9EAD3', texto: '#38761D' },
+  { nome: 'KIM PÃES',        fundo: '#F1C232', texto: '#3C2F00' },
+  { nome: 'ATIVA',           fundo: '#7F6000', texto: '#FFFFFF' },
+  { nome: 'FITLOG',          fundo: '#DDE6F0', texto: '#37474F' },
+  { nome: 'METAF',           fundo: '#6B7A8F', texto: '#FFFFFF' },
+  { nome: 'MANOS DOCES',     fundo: '#8E44AD', texto: '#FFFFFF' },
+  { nome: 'LUFT/Customiza',  fundo: '#7A4F01', texto: '#FFFFFF' }
+];
+// Cabeçalho, na ORDEM da planilha da clínica (A até G)
+const EXAME_DRIVE_COLUNAS = ['Coluna 1', 'NASC', 'CPF', 'CARGO', 'ADMISSÃO', 'TELEFONE', 'EMPRESA'];
+
+function _drvNorm(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9]+/g, ' ').trim().toUpperCase();
+}
+// Tenta adivinhar a empresa do Drive a partir do que está no cadastro
+function _drvAdivinharEmpresa(texto) {
+  const n = _drvNorm(texto);
+  if (!n) return '';
+  const exata = EXAME_EMPRESAS_DRIVE.find(e => _drvNorm(e.nome) === n);
+  if (exata) return exata.nome;
+  const contem = EXAME_EMPRESAS_DRIVE.find(e => n.includes(_drvNorm(e.nome)) || _drvNorm(e.nome).includes(n));
+  return contem ? contem.nome : '';
+}
+function _drvCor(nome) {
+  return EXAME_EMPRESAS_DRIVE.find(e => e.nome === nome) || null;
+}
+function _drvSoDigitos(s) { return String(s || '').replace(/\D/g, ''); }
+function _drvData(iso) {
+  if (!iso) return '';
+  const t = String(iso);
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(t)) return t;
+  const d = new Date(t.length <= 10 ? t + 'T12:00:00' : t);
+  if (isNaN(d)) return '';
+  const p = n => String(n).padStart(2, '0');
+  return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear();
+}
+
+// Monta a linha de um exame com as 7 colunas da planilha
+function _drvLinha(e) {
+  const cand = (state.candidatos || []).find(c => c && c.id === e.candidatoId) || {};
+  const vaga = (state.vagas || []).find(v => v && v.id === cand.vagaId) || {};
+  return {
+    id: e.id,
+    nome:      (e.nomeCompleto || cand.nome || '').toUpperCase(),
+    nasc:      _drvData(e.dataNascimento || cand.dataNascimento),
+    cpf:       _drvSoDigitos(e.cpf || cand.cpf),
+    cargo:     (cand.cargo || vaga.cargo || '').toUpperCase(),
+    admissao:  _drvData(cand.dataAdmissao || cand.dataContratacao),
+    telefone:  _drvSoDigitos(e.telefone || cand.telefone),
+    empresa:   e.empresaDrive || _drvAdivinharEmpresa(e.empresa || vaga.empresaNome),
+    jaEnviado: !!e.enviadoDrive,
+    enviadoEm: e.enviadoDrive || ''
+  };
+}
+
+let _drvSel = {};        // { idDoExame: true }
+let _drvVerEnviados = false;
+
+function _drvExames() {
+  garantirExamesMedicos();
+  return (state.examesMedicos || [])
+    .filter(e => e && (_drvVerEnviados || !e.enviadoDrive))
+    .map(_drvLinha)
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
+window.abrirModalDrive = function () {
+  garantirExamesMedicos();
+  _drvSel = {};
+  // Já vem marcado quem tem tudo preenchido — o caminho comum é mandar todos
+  _drvExames().forEach(l => { if (_drvCompleta(l)) _drvSel[l.id] = true; });
+  _drvRender();
+  const m = document.getElementById('modal-drive-exame');
+  if (m) m.style.display = 'flex';
+};
+window.fecharModalDrive = function () {
+  const m = document.getElementById('modal-drive-exame');
+  if (m) m.style.display = 'none';
+};
+function _drvCompleta(l) { return !!(l.nome && l.cpf && l.empresa); }
+
+window.drvMarcar = function (id, on) { if (on) _drvSel[id] = true; else delete _drvSel[id]; _drvRender(); };
+window.drvMarcarTodos = function (on) {
+  _drvSel = {};
+  if (on) _drvExames().forEach(l => { if (_drvCompleta(l)) _drvSel[l.id] = true; });
+  _drvRender();
+};
+window.drvVerEnviados = function (on) { _drvVerEnviados = !!on; _drvRender(); };
+
+// Trocar a empresa de uma linha (fica gravado no exame)
+window.drvTrocarEmpresa = async function (id, valor) {
+  const e = (state.examesMedicos || []).find(x => x && x.id === id);
+  if (!e) return;
+  e.empresaDrive = valor;
+  try { await RTCloud.salvarAgora(state, { merge: true, upsertIds: [e.id] }); } catch (err) { /* segue mostrando */ }
+  _drvRender();
+};
+
+function _drvRender() {
+  const cont = document.getElementById('drv-lista');
+  if (!cont) return;
+  const linhas = _drvExames();
+  const marcados = Object.keys(_drvSel).length;
+
+  const cont2 = document.getElementById('drv-resumo');
+  if (cont2) cont2.innerHTML = '<b>' + marcados + '</b> de ' + linhas.length + ' selecionado(s)' +
+    (linhas.some(l => !_drvCompleta(l))
+      ? ' &middot; <span class="drv-alerta">' + linhas.filter(l => !_drvCompleta(l)).length +
+        ' sem empresa ou CPF — preencha para poder enviar</span>'
+      : '');
+
+  if (!linhas.length) {
+    cont.innerHTML = '<div class="drv-vazio"><i class="fa-solid fa-inbox"></i>' +
+      '<p>' + (_drvVerEnviados ? 'Nenhum exame cadastrado.' : 'Nada novo para mandar — tudo já foi enviado.') + '</p></div>';
+    return;
+  }
+
+  const opcoes = (sel) => '<option value="">— escolher —</option>' +
+    EXAME_EMPRESAS_DRIVE.map(e =>
+      `<option value="${escapeHTML(e.nome)}"${e.nome === sel ? ' selected' : ''}>${escapeHTML(e.nome)}</option>`).join('');
+
+  cont.innerHTML =
+    '<div class="drv-tabela-wrap"><table class="drv-tabela"><thead><tr>' +
+      '<th class="drv-cx"><input type="checkbox" ' + (marcados && marcados === linhas.filter(_drvCompleta).length ? 'checked' : '') +
+        ' onchange="drvMarcarTodos(this.checked)" title="Marcar todos"></th>' +
+      EXAME_DRIVE_COLUNAS.map(c => '<th>' + escapeHTML(c) + '</th>').join('') +
+    '</tr></thead><tbody>' +
+    linhas.map(l => {
+      const cor = _drvCor(l.empresa);
+      const falta = !_drvCompleta(l);
+      return '<tr class="' + (falta ? 'drv-incompleta' : '') + (l.jaEnviado ? ' drv-enviada' : '') + '">' +
+        '<td class="drv-cx"><input type="checkbox" ' + (_drvSel[l.id] ? 'checked' : '') +
+          (falta ? ' disabled title="Falta empresa ou CPF"' : '') +
+          ' onchange="drvMarcar(\'' + l.id + '\', this.checked)"></td>' +
+        '<td class="drv-nome">' + escapeHTML(l.nome || '—') +
+          (l.jaEnviado ? '<span class="drv-tag-ok" title="Enviado em ' + escapeHTML(_ffDataHora(l.enviadoEm)) + '">já enviado</span>' : '') + '</td>' +
+        '<td>' + escapeHTML(l.nasc || '—') + '</td>' +
+        '<td class="drv-num">' + escapeHTML(l.cpf || '—') + '</td>' +
+        '<td class="drv-cargo" title="' + escapeHTML(l.cargo || '') + '">' + escapeHTML(l.cargo || '—') + '</td>' +
+        '<td>' + escapeHTML(l.admissao || '—') + '</td>' +
+        '<td class="drv-num">' + escapeHTML(l.telefone || '—') + '</td>' +
+        '<td class="drv-emp">' +
+          '<select class="drv-select" onchange="drvTrocarEmpresa(\'' + l.id + '\', this.value)"' +
+            // o !important é necessário: o design-system tem "select { background: #fff !important }"
+            (cor ? ' style="background-color:' + cor.fundo + ' !important;color:' + cor.texto +
+                   ' !important;border-color:' + cor.fundo + ' !important;"' : '') + '>' +
+            opcoes(l.empresa) +
+          '</select>' +
+        '</td>' +
+      '</tr>';
+    }).join('') +
+    '</tbody></table></div>';
+}
+
+// Texto separado por TAB: colando no Google Sheets cada campo cai na sua coluna
+function _drvTexto(comCabecalho) {
+  const linhas = _drvExames().filter(l => _drvSel[l.id]);
+  const corpo = linhas.map(l => [l.nome, l.nasc, l.cpf, l.cargo, l.admissao, l.telefone, l.empresa].join('\t'));
+  return (comCabecalho ? [EXAME_DRIVE_COLUNAS.join('\t')].concat(corpo) : corpo).join('\n');
+}
+
+window.drvCopiar = async function () {
+  const qtd = Object.keys(_drvSel).length;
+  if (!qtd) { alert('Marque pelo menos uma pessoa para copiar.'); return; }
+  const txt = _drvTexto(false);
+  const feito = () => {
+    alert(qtd + ' pessoa(s) copiada(s)!\n\n' +
+      'Agora, na planilha da clínica:\n' +
+      '1) clique na PRIMEIRA LINHA VAZIA, na coluna do nome\n' +
+      '2) aperte Ctrl+V\n\n' +
+      'Cada dado cai na sua coluna e a bolinha colorida da empresa aparece sozinha. ' +
+      'Nada do que já está na planilha é apagado.');
+    _drvMarcarComoEnviados();
+  };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(txt); feito(); }
+    else { _drvCopiaManual(txt); feito(); }
+  } catch (e) { _drvCopiaManual(txt); feito(); }
+};
+function _drvCopiaManual(txt) {
+  const ta = document.createElement('textarea');
+  ta.value = txt; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch (e) { /* nada */ }
+  document.body.removeChild(ta);
+}
+
+async function _drvMarcarComoEnviados() {
+  const ids = Object.keys(_drvSel);
+  if (!ids.length) return;
+  const agora = new Date().toISOString();
+  ids.forEach(id => {
+    const e = (state.examesMedicos || []).find(x => x && x.id === id);
+    if (e) { e.enviadoDrive = agora; e.enviadoDrivePor = loggedUser ? loggedUser.nome : ''; }
+  });
+  try { await RTCloud.salvarAgora(state, { merge: true, upsertIds: ids }); } catch (e) { /* segue */ }
+  registrarLogGlobal('Enviou ' + ids.length + ' exame(s) médico(s) para a planilha da clínica.', 'selecao');
+  _drvSel = {};
+  _drvRender();
+}
+
+window.drvBaixarExcel = function () {
+  const linhas = _drvExames().filter(l => _drvSel[l.id]);
+  if (!linhas.length) { alert('Marque pelo menos uma pessoa.'); return; }
+  if (typeof XLSX === 'undefined') { alert('A planilha não carregou. Use o botão "Copiar para o Drive".'); return; }
+  const dados = [EXAME_DRIVE_COLUNAS].concat(
+    linhas.map(l => [l.nome, l.nasc, l.cpf, l.cargo, l.admissao, l.telefone, l.empresa]));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(dados);
+  ws['!cols'] = [{ wch: 38 }, { wch: 12 }, { wch: 15 }, { wch: 30 }, { wch: 12 }, { wch: 15 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Exames');
+  XLSX.writeFile(wb, 'exames_para_a_clinica_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+  _drvMarcarComoEnviados();
+};
+
 function renderExameMedico() {
   garantirExamesMedicos();
 
@@ -15325,9 +15560,14 @@ function renderExameMedico() {
   const actions = document.getElementById('exame-header-actions');
   if (actions) {
     if (isSelecao) {
-      actions.innerHTML = `<button class="mod-btn-primary" onclick="abrirModalNovoExame()">
-        <i class="fa-solid fa-plus"></i> + NOVO EXAME
-      </button>`;
+      const pendentes = (state.examesMedicos || []).filter(e => e && !e.enviadoDrive).length;
+      actions.innerHTML =
+        `<button class="mod-btn-secondary" onclick="abrirModalDrive()" title="Monta as colunas da planilha da clínica prontas para colar">
+          <i class="fa-solid fa-table-list"></i> Enviar para a clínica${pendentes ? ` <span class="mod-badge-num">${pendentes}</span>` : ''}
+        </button>
+        <button class="mod-btn-primary" onclick="abrirModalNovoExame()">
+          <i class="fa-solid fa-plus"></i> + NOVO EXAME
+        </button>`;
     } else {
       actions.innerHTML = '';
     }
