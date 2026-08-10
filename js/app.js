@@ -12668,6 +12668,10 @@ let _ffDetalheId = null;
 function trocarSubAbaFF(sub) {
   _ffSubAba = sub;
   document.querySelectorAll('#ff-subtabs .exame-subtab').forEach(b => b.classList.toggle('active', b.dataset.subaba === sub));
+  // Os cartões do painel e os contadores das abas são recalculados aqui
+  // também: sem isso eles ficavam com o número velho até a pessoa sair e
+  // voltar do módulo — e o estorno que acabou de entrar não aparecia.
+  try { _ffAtualizarNumeros(); } catch (e) { console.error('KPIs do Fluxo:', e); }
   _ffRenderLista();
 }
 window.trocarSubAbaFF = trocarSubAbaFF;
@@ -12681,7 +12685,14 @@ function renderFluxoFinanceiro() {
       ? `<button class="mod-btn-primary" onclick="abrirModalNovoFluxo()"><i class="fa-solid fa-plus"></i> + NOVO FLUXO FINANCEIRO</button>`
       : '';
   }
+  _ffAtualizarNumeros();
+  _ffRenderLista();
+}
 
+// Todos os cartões do painel e os números das abas num lugar só, para poderem
+// ser recalculados de qualquer lugar (trocar de aba, salvar, reprovar...).
+function _ffAtualizarNumeros() {
+  garantirFluxoFinanceiro();
   const fluxos = _ffVisiveis();   // cada um vê só o que o papel/permissão permite
   const hoje = new Date(); const p = n => String(n).padStart(2, '0');
   const hojeStr = `${hoje.getFullYear()}-${p(hoje.getMonth() + 1)}-${p(hoje.getDate())}`;
@@ -12713,11 +12724,19 @@ function renderFluxoFinanceiro() {
   set('ff-count-problemas', problemas.length);
   set('ff-count-todos', fluxos.length);
 
-  // ── Estornos: contador da aba + cartão do painel + aba piscando ──────────
+  // ── Estornos: contador da aba + cartões do painel + aba piscando ────────
   const estornos = _ffEstornosPendentes();
   set('ff-count-estornos', estornos.length);
   set('ff-kpi-estornos', estornos.length);
-  set('ff-kpi-estornos-valor', estornos.length ? _ffMoedaBR(_ffTotalEstornosPendentes()) : '—');
+  set('ff-kpi-estornos-valor', estornos.length
+    ? _ffMoedaBR(_ffTotalEstornosPendentes())
+    : 'nada devolvido pelo banco');
+  // Estornos que o DP já reenviou — fecha a conta com o cartão de cima
+  const resolvidos = _ffEstornosResolvidos();
+  set('ff-kpi-estornos-ok', resolvidos.length);
+  set('ff-kpi-estornos-ok-valor', resolvidos.length
+    ? _ffMoedaBR(resolvidos.reduce((s, e) => s + (Number(e.l.valor) || 0), 0)) + ' já reenviado'
+    : 'nenhum reenviado ainda');
   const abaEst = document.querySelector('#ff-subtabs [data-subaba="estornos"]');
   if (abaEst) abaEst.classList.toggle('tem-estorno', estornos.length > 0);
   const cardEst = document.getElementById('ff-card-estornos');
@@ -12733,8 +12752,8 @@ function renderFluxoFinanceiro() {
   if (abaCfg) abaCfg.style.display = _ffPodeAdministrarWorkflow() ? '' : 'none';
 
   atualizarBadgeFluxoFinanceiro();
-  _ffRenderLista();
 }
+window._ffAtualizarNumeros = _ffAtualizarNumeros;
 
 // Bolinha vermelha no menu lateral com o nº de fluxos aguardando VOCÊ
 function atualizarBadgeFluxoFinanceiro() {
@@ -13398,6 +13417,22 @@ window._ffEstornosPendentes = _ffEstornosPendentes;
 function _ffTotalEstornosPendentes() {
   return _ffEstornosPendentes().reduce(function (s, e) { return s + (Number(e.l.valor) || 0); }, 0);
 }
+
+// Estornos que o DP já reenviou numa ficha de estorno. Junto com a fila de
+// pendentes, dão o retrato completo: quanto voltou e quanto já foi resolvido.
+function _ffEstornosResolvidos() {
+  const out = [];
+  _ffVisiveis().forEach(function (f) {
+    if (_ffEhFichaEstorno(f)) return;
+    (Array.isArray(f.linhas) ? f.linhas : []).forEach(function (l) {
+      if (l && l.estornoCobertoPor && l.reprovacao && l.reprovacao.tipo === FF_MOTIVO_ESTORNO) {
+        out.push({ f: f, l: l });
+      }
+    });
+  });
+  return out;
+}
+window._ffEstornosResolvidos = _ffEstornosResolvidos;
 
 // Estornos que ESTA ficha de estorno veio cobrir
 function _ffEstornosCobertos(f) {

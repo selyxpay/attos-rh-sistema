@@ -35,16 +35,16 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260807f">
+    <link rel="stylesheet" href="css/style.css?v=20260807g">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260807f">
+    <link rel="stylesheet" href="css/design-system.css?v=20260807g">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260807f">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260807g">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260807f">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260807f">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260807g">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260807g">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260807f">
+    <link rel="stylesheet" href="css/mobile.css?v=20260807g">
 </head>
 <body class="app-shell">
 
@@ -1308,6 +1308,16 @@
                                 <div>
                                     <div class="ff-kpi-val" id="ff-kpi-finalizados">0</div>
                                     <div class="ff-kpi-lbl">Finalizados</div>
+                                </div>
+                            </div>
+                            <!-- Fecha a conta do estorno: quantos o DP já reenviou -->
+                            <div class="ff-kpi-card" style="border-left:4px solid #059669;cursor:pointer;"
+                                 onclick="trocarSubAbaFF('estornos')" title="Ver a aba de Estornos">
+                                <div class="ff-kpi-icon" style="background:rgba(5,150,105,0.1);color:#059669;"><i class="fa-solid fa-arrow-rotate-left"></i></div>
+                                <div>
+                                    <div class="ff-kpi-val" id="ff-kpi-estornos-ok">0</div>
+                                    <div class="ff-kpi-lbl">Estornos resolvidos</div>
+                                    <div class="ff-kpi-extra" id="ff-kpi-estornos-ok-valor" style="color:#059669;">nenhum reenviado ainda</div>
                                 </div>
                             </div>
                         </div>
@@ -3925,11 +3935,11 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260807f"></script>
-    <script src="js/vps-sync.js?v=20260807f"></script>
-    <script src="js/exata-catalogo.js?v=20260807f"></script>
-    <script src="js/data.js?v=20260807f"></script>
-    <script src="js/app.js?v=20260807f"></script>
-    <script src="js/whatsapp.js?v=20260807f"></script>
+    <script src="js/security.js?v=20260807g"></script>
+    <script src="js/vps-sync.js?v=20260807g"></script>
+    <script src="js/exata-catalogo.js?v=20260807g"></script>
+    <script src="js/data.js?v=20260807g"></script>
+    <script src="js/app.js?v=20260807g"></script>
+    <script src="js/whatsapp.js?v=20260807g"></script>
 </body>
 </html>
