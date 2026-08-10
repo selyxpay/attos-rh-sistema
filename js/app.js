@@ -12713,6 +12713,16 @@ function renderFluxoFinanceiro() {
   set('ff-count-problemas', problemas.length);
   set('ff-count-todos', fluxos.length);
 
+  // ── Estornos: contador da aba + cartão do painel + aba piscando ──────────
+  const estornos = _ffEstornosPendentes();
+  set('ff-count-estornos', estornos.length);
+  set('ff-kpi-estornos', estornos.length);
+  set('ff-kpi-estornos-valor', estornos.length ? _ffMoedaBR(_ffTotalEstornosPendentes()) : '—');
+  const abaEst = document.querySelector('#ff-subtabs [data-subaba="estornos"]');
+  if (abaEst) abaEst.classList.toggle('tem-estorno', estornos.length > 0);
+  const cardEst = document.getElementById('ff-card-estornos');
+  if (cardEst) cardEst.classList.toggle('tem-estorno', estornos.length > 0);
+
   // Aba "Gerencial" (planilha) e "Monitoramento" só para quem tem visão geral
   const abaGer = document.querySelector('#ff-subtabs [data-subaba="gerencial"]');
   if (abaGer) abaGer.style.display = _ffVeTudo() ? '' : 'none';
@@ -13337,6 +13347,244 @@ function _rtAtualizarSinoMenu() {
 }
 window._rtAtualizarSinoMenu = _rtAtualizarSinoMenu;
 
+// ══════════════════════════════════════════════════════════════════════════
+// ESTORNO — o pagamento saiu, o banco devolveu, e o dinheiro voltou à conta
+// --------------------------------------------------------------------------
+// Por que existe uma aba só para isso:
+//   O valor devolvido JÁ FOI SOLICITADO num dia anterior. Não dá para pedir
+//   de novo. Mas o Financeiro PAGA de novo, porque o dinheiro está de volta
+//   na conta. Então o mesmo valor circula duas vezes e é solicitado uma só.
+//   Se entrar junto com o pagamento do dia, a conta com quem libera o dinheiro
+//   não fecha. Por isso: telas separadas, total somado.
+//
+// O caminho:
+//   1) Financeiro reprova a pessoa e marca o motivo como ESTORNO
+//   2) A pessoa entra na fila de estornos — todo mundo enxerga
+//   3) O DP sobe uma ficha NOVA marcada como Estorno, só com essas pessoas,
+//      e aponta quais estornos ela cobre
+//   4) Quem foi coberto sai da fila (5 -> cobre 3 -> sobram 2), sem lançamento
+//      manual
+//   5) No "A Pagar" o total aparece quebrado: folha + estorno = total do dia
+// ══════════════════════════════════════════════════════════════════════════
+const FF_MOTIVO_ESTORNO  = 'estorno';
+const FF_MOTIVO_CORRIGIR = 'corrigir';
+
+function _ffEhFichaEstorno(f) { return !!(f && f.tipoLancamento === 'estorno'); }
+window._ffEhFichaEstorno = _ffEhFichaEstorno;
+
+// A linha é um estorno em aberto? (reprovada como estorno e ainda não coberta)
+function _ffLinhaEstornoAberto(l) {
+  return !!(l && l.status === 'reprovado' &&
+    l.reprovacao && l.reprovacao.tipo === FF_MOTIVO_ESTORNO &&
+    !l.estornoCobertoPor);
+}
+
+// Fila de estornos: todas as pessoas devolvidas que ainda não voltaram numa
+// ficha de estorno. É o que a aba mostra e o que alimenta o contador.
+function _ffEstornosPendentes() {
+  const out = [];
+  _ffVisiveis().forEach(function (f) {
+    if (_ffEhFichaEstorno(f)) return;                 // a própria ficha de estorno não gera estorno
+    (Array.isArray(f.linhas) ? f.linhas : []).forEach(function (l, i) {
+      if (_ffLinhaEstornoAberto(l)) out.push({ f: f, l: l, indice: i });
+    });
+  });
+  return out.sort(function (a, b) {
+    return String((b.l.reprovacao || {}).em || '').localeCompare(String((a.l.reprovacao || {}).em || ''));
+  });
+}
+window._ffEstornosPendentes = _ffEstornosPendentes;
+
+function _ffTotalEstornosPendentes() {
+  return _ffEstornosPendentes().reduce(function (s, e) { return s + (Number(e.l.valor) || 0); }, 0);
+}
+
+// Estornos que ESTA ficha de estorno veio cobrir
+function _ffEstornosCobertos(f) {
+  const ids = Array.isArray(f && f.estornosCobertos) ? f.estornosCobertos : [];
+  const out = [];
+  ids.forEach(function (ref) {
+    const orig = (state.fluxosFinanceiros || []).find(function (x) { return x.id === ref.fichaId; });
+    if (!orig) return;
+    const linha = (orig.linhas || []).find(function (l) { return l.id === ref.linhaId; });
+    if (linha) out.push({ f: orig, l: linha });
+  });
+  return out;
+}
+
+// ── Nova ficha: pagamento do dia ou estorno ───────────────────────────────
+// Quando é estorno, o DP escolhe QUAIS pessoas da fila esta ficha vem cobrir.
+// É essa escolha que dá baixa automática: 5 na fila, cobre 3, sobram 2.
+let _ffLancamento = 'pagamento';
+let _ffEstornosEscolhidos = {};     // { 'fichaId||linhaId': true }
+
+window.ffTrocarLancamento = function (tipo) {
+  _ffLancamento = tipo === 'estorno' ? 'estorno' : 'pagamento';
+  const marca = (id, on) => { const el = document.getElementById(id); if (el) el.classList.toggle('ativa', on); };
+  marca('ff-lanc-op-pagamento', _ffLancamento === 'pagamento');
+  marca('ff-lanc-op-estorno', _ffLancamento === 'estorno');
+  const area = document.getElementById('ff-lanc-estorno-area');
+  if (area) area.style.display = _ffLancamento === 'estorno' ? '' : 'none';
+  if (_ffLancamento === 'estorno') _ffRenderEscolhaEstornos();
+};
+
+window.ffMarcarEstorno = function (chave, on) {
+  if (on) _ffEstornosEscolhidos[chave] = true; else delete _ffEstornosEscolhidos[chave];
+  _ffRenderEscolhaEstornos();
+};
+window.ffMarcarTodosEstornos = function (on) {
+  _ffEstornosEscolhidos = {};
+  if (on) _ffEstornosPendentes().forEach(e => { _ffEstornosEscolhidos[e.f.id + '||' + e.l.id] = true; });
+  _ffRenderEscolhaEstornos();
+};
+
+function _ffRenderEscolhaEstornos() {
+  const area = document.getElementById('ff-lanc-estorno-area');
+  if (!area) return;
+  const pend = _ffEstornosPendentes();
+  if (!pend.length) {
+    area.innerHTML = '<div class="ff-lanc-vazio"><i class="fa-solid fa-circle-check"></i> ' +
+      'Não há estorno em aberto. Se esta ficha não é um acerto de estorno, volte para ' +
+      '<b>Pagamento do dia</b>.</div>';
+    return;
+  }
+  const marcados = Object.keys(_ffEstornosEscolhidos).length;
+  const soma = pend.filter(e => _ffEstornosEscolhidos[e.f.id + '||' + e.l.id])
+    .reduce((s, e) => s + (Number(e.l.valor) || 0), 0);
+
+  area.innerHTML =
+    '<p class="ff-lanc-dica"><i class="fa-solid fa-circle-info"></i> ' +
+      'Marque quem esta ficha vem acertar. Quem for marcado <b>sai da fila de estornos</b> ' +
+      'assim que a ficha for salva. Esta ficha <b>não leva número de relação novo</b> — ' +
+      'o valor já foi solicitado no dia do pagamento original.</p>' +
+    '<div class="ff-lanc-barra">' +
+      '<label><input type="checkbox" ' + (marcados === pend.length ? 'checked' : '') +
+        ' onchange="ffMarcarTodosEstornos(this.checked)"> Marcar todos (' + pend.length + ')</label>' +
+      '<span><b>' + marcados + '</b> marcado(s) &middot; <b>' + _ffMoedaBR(soma) + '</b></span>' +
+    '</div>' +
+    '<div class="ff-lanc-lista">' + pend.map(function (e) {
+      const ch = e.f.id + '||' + e.l.id;
+      return '<label class="ff-lanc-item' + (_ffEstornosEscolhidos[ch] ? ' marcado' : '') + '">' +
+        '<input type="checkbox" ' + (_ffEstornosEscolhidos[ch] ? 'checked' : '') +
+          ' onchange="ffMarcarEstorno(\'' + escapeHTML(ch) + '\', this.checked)">' +
+        '<span class="ff-lanc-nome">' + escapeHTML(e.l.nome || '(sem nome)') +
+          (e.l.lote ? ' <span class="ff-lote-selo">' + escapeHTML(e.l.lote) + '</span>' : '') + '</span>' +
+        '<span class="ff-lanc-meta">' + escapeHTML(e.l.cpf || '') + ' · ficha #' + escapeHTML(e.f.numero) + '</span>' +
+        '<span class="ff-lanc-val">' + _ffMoedaBR(e.l.valor) + '</span>' +
+      '</label>';
+    }).join('') + '</div>';
+}
+
+// Dá baixa na fila: marca cada linha coberta e guarda o vínculo dos dois lados
+function _ffAplicarBaixaEstornos(novaFicha) {
+  const refs = [];
+  Object.keys(_ffEstornosEscolhidos).forEach(function (ch) {
+    const p = ch.split('||');
+    const orig = (state.fluxosFinanceiros || []).find(x => x.id === p[0]);
+    if (!orig) return;
+    const l = (orig.linhas || []).find(x => x && x.id === p[1]);
+    if (!l || !_ffLinhaEstornoAberto(l)) return;
+    l.estornoCobertoPor = novaFicha.id;
+    l.estornoCobertoEm = new Date().toISOString();
+    refs.push({ fichaId: orig.id, linhaId: l.id, nome: l.nome || '', valor: Number(l.valor) || 0 });
+    _ffHist(orig, 'Estorno de "' + (l.nome || '—') + '" foi reenviado na ficha de estorno #' + novaFicha.numero + '.');
+  });
+  novaFicha.estornosCobertos = refs;
+  return refs;
+}
+
+// ── Aba ESTORNOS ──────────────────────────────────────────────────────────
+function _ffRenderEstornos(cont) {
+  const pend = _ffEstornosPendentes();
+  const total = pend.reduce(function (s, e) { return s + (Number(e.l.valor) || 0); }, 0);
+
+  // Fichas de estorno já criadas, para dar o retrato completo
+  const fichasEst = _ffVisiveis().filter(_ffEhFichaEstorno)
+    .sort(function (a, b) { return String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')); });
+
+  const cabecalho =
+    '<div class="est-topo">' +
+      '<div class="est-kpi est-kpi-alerta">' +
+        '<span class="est-kpi-num">' + pend.length + '</span>' +
+        '<span class="est-kpi-rot">pessoa(s) com estorno em aberto</span></div>' +
+      '<div class="est-kpi">' +
+        '<span class="est-kpi-num">' + _ffMoedaBR(total) + '</span>' +
+        '<span class="est-kpi-rot">valor a devolver ao pagamento</span></div>' +
+      '<div class="est-kpi">' +
+        '<span class="est-kpi-num">' + fichasEst.length + '</span>' +
+        '<span class="est-kpi-rot">ficha(s) de estorno criada(s)</span></div>' +
+    '</div>' +
+    '<p class="est-explica"><i class="fa-solid fa-circle-info"></i> ' +
+      'Aqui fica quem o banco devolveu. O valor <b>já foi solicitado</b> num dia anterior, então ' +
+      'a ficha de acerto entra como <b>Estorno</b> — nunca junto do pagamento do dia. ' +
+      'Quem for coberto por uma ficha de estorno sai desta lista sozinho.</p>';
+
+  if (!pend.length && !fichasEst.length) {
+    cont.innerHTML = cabecalho +
+      '<div class="ff-empty-box"><div class="ff-empty-icon"><i class="fa-solid fa-circle-check"></i></div>' +
+      '<div class="ff-empty-title">Nenhum estorno 👌</div>' +
+      '<div class="ff-empty-text">Quando o Financeiro reprovar um pagamento como estorno, ele aparece aqui.</div></div>';
+    return;
+  }
+
+  const cartoes = pend.map(function (e) {
+    const l = e.l, f = e.f;
+    const arq = (typeof _ffArquivoDaLinha === 'function') ? _ffArquivoDaLinha(f, l) : null;
+    const rel = (arq && arq.relacaoNumero) ? String(arq.relacaoNumero) : _ffRelacaoTexto(f);
+    const dado = function (rot, val) {
+      return val ? '<span><b>' + rot + ':</b> ' + escapeHTML(String(val)) + '</span>' : '';
+    };
+    return '<article class="est-card">' +
+      '<header class="est-card-topo">' +
+        '<div><div class="est-nome">' + escapeHTML(l.nome || '(sem nome)') + '</div>' +
+          '<div class="est-sub">' + escapeHTML(_ffIdentificacao(f)) + '</div></div>' +
+        '<div class="est-valor">' + _ffMoedaBR(l.valor) + '</div>' +
+      '</header>' +
+      '<div class="est-dados">' +
+        dado('CPF', l.cpf) +
+        dado('Código', l.codigo) +
+        (l.lote ? '<span><b>Lote:</b> <span class="ff-lote-selo">' + escapeHTML(l.lote) + '</span></span>' : '') +
+        dado('Banco', l.banco) +
+        dado('Agência', (l.agencia || '') + (l.agenciaDg ? '-' + l.agenciaDg : '')) +
+        dado('Conta', (l.conta || '') + (l.contaDg ? '-' + l.contaDg : '')) +
+        dado('Competência', l.competencia) +
+        (rel ? '<span><b>Relação:</b> <span class="ff-relacao">N. ' + escapeHTML(rel) + '</span></span>' : '') +
+        '<span><b>Ficha:</b> #' + escapeHTML(f.numero) + '</span>' +
+      '</div>' +
+      '<div class="est-motivo"><b>Motivo do estorno:</b> ' +
+        escapeHTML((l.reprovacao && l.reprovacao.motivo) || '—') +
+        '<div class="est-quem">Por ' + escapeHTML((l.reprovacao && l.reprovacao.por) || '—') +
+          ' · ' + _ffDataHora((l.reprovacao || {}).em) + '</div></div>' +
+      '<div class="est-acoes">' +
+        '<button class="btn btn-sm btn-secondary" onclick="abrirDetalheFluxo(\'' + f.id + '\')">' +
+          '<i class="fa-solid fa-eye"></i> Abrir a ficha original</button>' +
+      '</div>' +
+    '</article>';
+  }).join('');
+
+  const historico = fichasEst.length
+    ? '<h4 class="est-titulo-sec"><i class="fa-solid fa-rotate-left"></i> Fichas de estorno criadas</h4>' +
+      '<div class="est-fichas">' + fichasEst.map(function (f) {
+        const st = FF_STATUS[f.status] || FF_STATUS.rascunho;
+        const cob = _ffEstornosCobertos(f);
+        return '<div class="est-ficha-item">' +
+          '<div><b>#' + escapeHTML(f.numero) + '</b> · ' + escapeHTML(_ffIdentificacao(f)) +
+            '<div class="est-sub">' + cob.length + ' estorno(s) coberto(s) · ' + _ffMoedaBR(_ffTotal(f)) +
+            ' · ' + _ffQuemSubiu(f) + '</div></div>' +
+          '<span class="ff-badge" style="color:' + st.cor + ';">' + escapeHTML(st.rotulo) + '</span>' +
+          '<button class="btn btn-sm btn-secondary" onclick="abrirDetalheFluxo(\'' + f.id + '\')">Abrir</button>' +
+        '</div>';
+      }).join('') + '</div>'
+    : '';
+
+  cont.innerHTML = cabecalho +
+    (pend.length
+      ? '<h4 class="est-titulo-sec"><i class="fa-solid fa-triangle-exclamation"></i> Aguardando o DP reenviar</h4>' +
+        '<div class="est-lista">' + cartoes + '</div>'
+      : '<div class="est-ok"><i class="fa-solid fa-circle-check"></i> Nenhum estorno em aberto — tudo já foi reenviado.</div>') +
+    historico;
+}
+
 function _ffLinhasReprovadas(f) {
   return (f && Array.isArray(f.linhas) ? f.linhas : []).filter(l => l && l.status === 'reprovado');
 }
@@ -13356,9 +13604,19 @@ window.ffReprovarPessoa = async function (indice) {
   const l = (f.linhas || [])[indice];
   if (!l) return;
 
-  const motivo = prompt(
+  // O tipo muda o caminho: ESTORNO entra na fila da aba Estornos (o dinheiro
+  // voltou e vai ser pago de novo, sem solicitar de novo). CORRIGIR é quando
+  // o dinheiro nem saiu — é só acertar o dado e seguir.
+  const ehEstorno = confirm(
     'Reprovar o pagamento de:\n\n' + (l.nome || '(sem nome)') +
     (l.cpf ? '\nCPF ' + l.cpf : '') + '\nValor: ' + _ffMoedaBR(l.valor) +
+    '\n\n────────────────────────\n' +
+    'É ESTORNO? (o dinheiro saiu e o banco DEVOLVEU para a conta)\n\n' +
+    '   OK       = sim, é ESTORNO\n' +
+    '   Cancelar = não, o dinheiro NÃO saiu (só corrigir o dado)');
+
+  const motivo = prompt(
+    (ehEstorno ? 'ESTORNO de ' : 'Corrigir ') + (l.nome || '(sem nome)') +
     '\n\nQual foi o problema? (ex.: chave Pix inválida, conta bancária errada)', '');
   if (motivo === null) return;
   if (!String(motivo).trim()) { alert('Escreva o motivo — é ele que a pessoa vai ler para corrigir.'); return; }
@@ -13366,15 +13624,21 @@ window.ffReprovarPessoa = async function (indice) {
   l.status = 'reprovado';
   l.reprovacao = {
     motivo: String(motivo).trim(),
+    tipo: ehEstorno ? FF_MOTIVO_ESTORNO : FF_MOTIVO_CORRIGIR,
     por: nomeExibido(loggedUser), login: loggedUser.login,
     em: new Date().toISOString()
   };
   l.correcao = null;   // se já havia uma correção, ela foi recusada de novo
 
-  _ffHist(f, 'Financeiro REPROVOU o pagamento de "' + (l.nome || '—') + '": ' + l.reprovacao.motivo);
-  registrarLogGlobal('Reprovou o pagamento de "' + (l.nome || '—') + '" no Fluxo #' + f.numero + '.', 'dp');
-  await _ffSalvarERender(f, 'Pagamento reprovado. ' + (f.criadoPor || 'Quem montou a ficha') +
-    ' foi avisado e vai aparecer em "Minha vez" para corrigir.');
+  const rot = ehEstorno ? 'ESTORNO' : 'REPROVOU';
+  _ffHist(f, 'Financeiro ' + rot + ' o pagamento de "' + (l.nome || '—') + '": ' + l.reprovacao.motivo +
+    (ehEstorno ? ' (o valor voltou para a conta e entrou na fila de estornos)' : ''));
+  registrarLogGlobal((ehEstorno ? 'Lançou ESTORNO de "' : 'Reprovou o pagamento de "') +
+    (l.nome || '—') + '" no Fluxo #' + f.numero + '.', 'dp');
+  await _ffSalvarERender(f, ehEstorno
+    ? 'Estorno registrado. ' + (l.nome || 'A pessoa') + ' entrou na aba ESTORNOS — o DP precisa reenviar numa ficha de estorno.'
+    : 'Pagamento reprovado. ' + (f.criadoPor || 'Quem montou a ficha') +
+      ' foi avisado e vai aparecer em "Minha vez" para corrigir.');
 };
 
 // ── Quem montou a ficha corrige ───────────────────────────────────────────
@@ -13550,12 +13814,30 @@ function _ffRenderAPagar(cont) {
         (todas.length ? 'Existem ' + todas.length + ' ficha(s) aguardando pagamento — ajuste o filtro de data.'
                       : 'Assim que a Gestão aprovar, as fichas aparecem aqui.') + '</div></div>';
 
-  cont.innerHTML = _ffBarraFiltroEnvio('pagar') +
-    '<div class="ff-resumo-pagar">' +
-      '<div><span>Fichas a pagar</span><strong>' + lista.length + '</strong></div>' +
-      '<div><span>Colaboradores</span><strong>' + totalPessoas + '</strong></div>' +
-      '<div><span>Total do período</span><strong>' + _ffMoedaBR(totalValor) + '</strong></div>' +
-    '</div>' + corpo;
+  // O total precisa vir QUEBRADO: o estorno já foi solicitado num dia
+  // anterior, então ele soma no que a Letícia paga hoje, mas não pode ser
+  // confundido com a folha do dia na hora de acertar com quem libera o dinheiro.
+  const daFolha  = lista.filter(f => !_ffEhFichaEstorno(f));
+  const doEstorno = lista.filter(_ffEhFichaEstorno);
+  const valFolha   = daFolha.reduce((s, f) => s + _ffTotal(f), 0);
+  const valEstorno = doEstorno.reduce((s, f) => s + _ffTotal(f), 0);
+
+  const resumo = doEstorno.length
+    ? '<div class="ff-resumo-pagar ff-resumo-quebrado">' +
+        '<div><span>Pagamento do dia</span><strong>' + _ffMoedaBR(valFolha) + '</strong>' +
+          '<small>' + daFolha.length + ' ficha(s)</small></div>' +
+        '<div class="ff-parcela-estorno"><span>Estorno</span><strong>' + _ffMoedaBR(valEstorno) + '</strong>' +
+          '<small>' + doEstorno.length + ' ficha(s) — já solicitado antes</small></div>' +
+        '<div class="ff-parcela-total"><span>Total a aprovar hoje</span><strong>' + _ffMoedaBR(totalValor) + '</strong>' +
+          '<small>' + totalPessoas + ' colaborador(es)</small></div>' +
+      '</div>'
+    : '<div class="ff-resumo-pagar">' +
+        '<div><span>Fichas a pagar</span><strong>' + lista.length + '</strong></div>' +
+        '<div><span>Colaboradores</span><strong>' + totalPessoas + '</strong></div>' +
+        '<div><span>Total do período</span><strong>' + _ffMoedaBR(totalValor) + '</strong></div>' +
+      '</div>';
+
+  cont.innerHTML = _ffBarraFiltroEnvio('pagar') + resumo + corpo;
 }
 
 window.ffSelecionarPagar = function (id, marcado) {
@@ -13744,6 +14026,7 @@ function _ffRenderLista() {
   if (_ffSubAba === 'painel') { _ffRenderPainel(cont); return; }
 
   // Telas do Financeiro
+  if (_ffSubAba === 'estornos')    { _ffRenderEstornos(cont); return; }
   if (_ffSubAba === 'a-pagar')     { _ffRenderAPagar(cont); return; }
   if (_ffSubAba === 'finalizados') { _ffRenderFinalizados(cont); return; }
 
@@ -14468,6 +14751,11 @@ function abrirModalNovoFluxo() {
 
   _ffVinculos = [{ empresaId: '', tomadorId: '', clienteId: '' }];   // sempre começa com 1 linha
   _ffRenderVinculos();
+  // toda ficha nasce como pagamento do dia; estorno é escolha explícita
+  _ffEstornosEscolhidos = {};
+  const radio = document.querySelector('input[name="ff-lanc"][value="pagamento"]');
+  if (radio) radio.checked = true;
+  ffTrocarLancamento('pagamento');
   const selTipo = document.getElementById('ff-form-tipo');
   if (selTipo) selTipo.innerHTML = '<option value="">Selecione...</option>' +
     state.tiposPagamentoFluxo.map(t => `<option value="${escapeHTML(t)}">${escapeHTML(t)}</option>`).join('');
@@ -14575,6 +14863,8 @@ async function criarFluxoFinanceiro() {
       empresaId, empresaNome: empresa.nome || '',
       vinculos,                       // formato novo: EMPRESA + TOMADOR + CLIENTE (1 ou vários)
       tipo, dataPagamento: data, competencia: comp, observacao: obs,
+      // 'pagamento' (folha do dia) ou 'estorno' (o banco devolveu e vai sair de novo)
+      tipoLancamento: _ffLancamento === 'estorno' ? 'estorno' : 'pagamento',
       arquivos, linhas,
       paginasProcessadas: paginasTotal,
       status: 'rascunho',
@@ -14586,6 +14876,13 @@ async function criarFluxoFinanceiro() {
       historico: []
     };
     _ffHist(fluxo, `Criou o Fluxo Financeiro #${numero} (${empresa.nome} · ${tipo}).`);
+    // Ficha de ESTORNO: dá baixa em quem ela veio acertar e explica no histórico
+    if (fluxo.tipoLancamento === 'estorno') {
+      const cobertos = _ffAplicarBaixaEstornos(fluxo);
+      _ffHist(fluxo, 'Ficha de ESTORNO: acerta ' + cobertos.length + ' pagamento(s) que o banco devolveu' +
+        (cobertos.length ? ' (' + cobertos.map(c => c.nome).join(', ') + ')' : '') +
+        '. Sem número de relação novo — o valor já foi solicitado no dia do pagamento original.');
+    }
     _ffHist(fluxo, `Importou ${arquivos.length} arquivo(s) PDF (${paginasTotal} página(s)) — ${linhas.length} registro(s) identificados.`);
     state.fluxosFinanceiros.push(fluxo);
 
@@ -15197,6 +15494,24 @@ window.ffEnviarParaAprovacao = async function() {
   }
 
   f.enviadoEm = new Date().toISOString();
+
+  // Ficha de ESTORNO: já passou por todas as aprovações no pagamento original.
+  // Repetir a fila só atrasaria o acerto, então vai direto ao Financeiro, com
+  // as duas aprovações registradas como automáticas para o histórico fechar.
+  if (_ffEhFichaEstorno(f)) {
+    const agoraE = f.enviadoEm;
+    const quemE = nomeExibido(loggedUser) + ' (ficha de estorno)';
+    f.aprovacoes = f.aprovacoes || {};
+    f.aprovacoes.coordenacao = { por: quemE, em: agoraE, automatica: true };
+    f.aprovacoes.gestao      = { por: quemE, em: agoraE, automatica: true };
+    f.status = 'aguardando_financeiro';
+    _ffHist(f, 'Ficha de ESTORNO enviada direto para o Financeiro (' + f.linhas.length +
+      ' registro(s) · ' + _ffMoedaBR(_ffTotal(f)) + '). Supervisão e Gestão já aprovaram no pagamento original.');
+    _ffNotificar(f, 'financeiro');
+    registrarLogGlobal('Enviou a ficha de ESTORNO #' + f.numero + ' para o Financeiro.', 'dp');
+    await _ffSalvarERender(f, 'Estorno #' + f.numero + ' enviado direto para o Financeiro.');
+    return;
+  }
 
   // Empresa sigilosa: pula Supervisão e Gestão e vai direto ao Financeiro.
   // As duas aprovações ficam registradas como automáticas, para o histórico

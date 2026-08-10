@@ -35,16 +35,16 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260807d">
+    <link rel="stylesheet" href="css/style.css?v=20260807e">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260807d">
+    <link rel="stylesheet" href="css/design-system.css?v=20260807e">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260807d">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260807e">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260807d">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260807d">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260807e">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260807e">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260807d">
+    <link rel="stylesheet" href="css/mobile.css?v=20260807e">
 </head>
 <body class="app-shell">
 
@@ -1272,6 +1272,16 @@
                                     <div class="ff-kpi-lbl">Aguardando VOCÊ</div>
                                 </div>
                             </div>
+                            <!-- Estornos: pagamentos que o banco devolveu e ainda não voltaram -->
+                            <div class="ff-kpi-card ff-kpi-estorno" id="ff-card-estornos" style="border-left:4px solid #B45309;cursor:pointer;"
+                                 onclick="trocarSubAbaFF('estornos')" title="Ver a lista de estornos">
+                                <div class="ff-kpi-icon" style="background:rgba(180,83,9,0.12);color:#B45309;"><i class="fa-solid fa-rotate-left"></i></div>
+                                <div>
+                                    <div class="ff-kpi-val" id="ff-kpi-estornos">0</div>
+                                    <div class="ff-kpi-lbl">Estornos em aberto</div>
+                                    <div class="ff-kpi-extra" id="ff-kpi-estornos-valor">—</div>
+                                </div>
+                            </div>
                             <div class="ff-kpi-card" style="border-left:4px solid #2563eb;">
                                 <div class="ff-kpi-icon" style="background:rgba(37,99,235,0.1);color:#2563eb;"><i class="fa-solid fa-calendar-day"></i></div>
                                 <div>
@@ -1317,6 +1327,11 @@
                             </button>
                             <!-- Tela do Financeiro: tudo que já passou por todas as aprovações
                                  e está pronto para pagar, de todas as empresas juntas. -->
+                            <!-- Estornos: o banco devolveu o pagamento. Todo mundo enxerga. -->
+                            <button type="button" class="ff-tab-btn exame-subtab ff-tab-estorno" data-subaba="estornos" onclick="trocarSubAbaFF('estornos')">
+                                <i class="fa-solid fa-rotate-left"></i> Estornos
+                                <span class="ff-tab-badge exame-subtab-count" id="ff-count-estornos">0</span>
+                            </button>
                             <button type="button" class="ff-tab-btn exame-subtab" data-subaba="a-pagar" onclick="trocarSubAbaFF('a-pagar')">
                                 <i class="fa-solid fa-money-check-dollar"></i> A Pagar
                                 <span class="ff-tab-badge exame-subtab-count" id="ff-count-a-pagar">0</span>
@@ -1359,6 +1374,24 @@
                             <button class="modal-exame-close" onclick="fecharModalNovoFluxo()"><i class="fa-solid fa-xmark"></i></button>
                         </div>
                         <div class="modal-exame-body">
+                            <!-- Esta ficha é do pagamento do dia ou é um ESTORNO?
+                                 O estorno já foi solicitado num dia anterior, por isso ele
+                                 anda separado e não leva número de relação novo. -->
+                            <div class="ff-lanc-bloco">
+                                <label class="ff-lanc-rot">Esta ficha é de quê?</label>
+                                <div class="ff-lanc-opcoes">
+                                    <label class="ff-lanc-op ativa" id="ff-lanc-op-pagamento">
+                                        <input type="radio" name="ff-lanc" value="pagamento" checked onchange="ffTrocarLancamento('pagamento')">
+                                        <span><b>Pagamento do dia</b><small>folha, benefício, rescisão — o normal</small></span>
+                                    </label>
+                                    <label class="ff-lanc-op" id="ff-lanc-op-estorno">
+                                        <input type="radio" name="ff-lanc" value="estorno" onchange="ffTrocarLancamento('estorno')">
+                                        <span><b>Estorno</b><small>o banco devolveu e vai ser pago de novo</small></span>
+                                    </label>
+                                </div>
+                                <div id="ff-lanc-estorno-area" style="display:none;"></div>
+                            </div>
+
                             <!-- Identificação: um ou mais vínculos EMPRESA -> TOMADOR -> CLIENTE.
                                  O select de Tomador só lista os tomadores da empresa escolhida, e o
                                  de Cliente só os clientes daquele tomador. As linhas são montadas
@@ -3892,11 +3925,11 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260807d"></script>
-    <script src="js/vps-sync.js?v=20260807d"></script>
-    <script src="js/exata-catalogo.js?v=20260807d"></script>
-    <script src="js/data.js?v=20260807d"></script>
-    <script src="js/app.js?v=20260807d"></script>
-    <script src="js/whatsapp.js?v=20260807d"></script>
+    <script src="js/security.js?v=20260807e"></script>
+    <script src="js/vps-sync.js?v=20260807e"></script>
+    <script src="js/exata-catalogo.js?v=20260807e"></script>
+    <script src="js/data.js?v=20260807e"></script>
+    <script src="js/app.js?v=20260807e"></script>
+    <script src="js/whatsapp.js?v=20260807e"></script>
 </body>
 </html>
