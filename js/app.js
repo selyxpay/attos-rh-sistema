@@ -13180,15 +13180,39 @@ function _ffQtdColaboradores(f) {
   return Array.isArray(f && f.linhas) ? f.linhas.length : 0;
 }
 
+// Linhas (pessoas) de uma ficha que batem com o que foi digitado — por nome
+// ou por CPF. Usada tanto para filtrar as fichas quanto para montar o bloco
+// "achei fulano em tal ficha".
+function _ffLinhasQueBatem(f, q) {
+  const termo = String(q || '').trim().toLowerCase();
+  if (!termo) return [];
+  const soDigitos = termo.replace(/\D/g, '');
+  const out = [];
+  (Array.isArray(f.linhas) ? f.linhas : []).forEach(function (l, i) {
+    if (!l) return;
+    const nome = String(l.nome || '').toLowerCase();
+    const cpf = String(l.cpf || '').replace(/\D/g, '');
+    const bateNome = termo.length >= 2 && nome.includes(termo);
+    const bateCpf = soDigitos.length >= 3 && cpf.includes(soDigitos);
+    if (bateNome || bateCpf) out.push({ l: l, posicao: i + 1 });
+  });
+  return out;
+}
+
 function _ffFiltraPorEnvio(lista) {
   return lista.filter(f => {
     const d = _ffSoData(_ffDataEnvioFinanceiro(f));
     if (_ffPagarDe && (!d || d < _ffPagarDe)) return false;
     if (_ffPagarAte && (!d || d > _ffPagarAte)) return false;
     if (_ffPagarBusca) {
-      const q = _ffPagarBusca.toLowerCase();
+      const q = _ffPagarBusca.toLowerCase().trim();
+      // O MESMO campo procura ficha e COLABORADOR: quem digita um nome não
+      // precisa saber em qual ficha a pessoa está — é justamente isso que ele
+      // quer descobrir. Nome e CPF das linhas entram na busca junto com o
+      // número, a empresa e o tipo.
       const alvo = [f.numero, f.empresaNome, f.tipo, _ffIdentificacao(f), _ffRelacaoTexto(f)].join(' ').toLowerCase();
-      if (!alvo.includes(q)) return false;
+      if (alvo.includes(q)) return true;
+      return _ffLinhasQueBatem(f, q).length > 0;
     }
     return true;
   });
@@ -13203,9 +13227,10 @@ function _ffBarraFiltroEnvio(tela) {
       '<input type="date" id="ff-filtro-ate" class="form-control" value="' + escapeHTML(_ffPagarAte) + '" onchange="ffFiltroEnvio(\'ate\', this.value)"></div>' +
     '<div class="ff-filtro-campo ff-filtro-cresce">' +
       // id fixo: é ele que permite devolver o foco depois de redesenhar a lista
-      '<label>' + (ehFin ? 'Buscar colaborador (nome ou CPF)' : 'Buscar ficha (nº, empresa, tipo)') + '</label>' +
+      '<label>' + (ehFin ? 'Buscar colaborador (nome ou CPF)' : 'Buscar ficha OU colaborador') + '</label>' +
       '<input type="text" id="ff-filtro-busca" class="form-control" placeholder="' +
-      (ehFin ? 'Ex.: João Silva — procura em TODAS as fichas' : 'Ex.: 000123 ou RT1') + '"' +
+      (ehFin ? 'Ex.: João Silva — procura em TODAS as fichas'
+             : 'Nome, CPF, nº da ficha, empresa ou tipo') + '"' +
       ' value="' + escapeHTML(ehFin ? _ffFinBuscaPessoa : _ffPagarBusca) + '"' +
       ' oninput="ffFiltroEnvio(\'' + (ehFin ? 'pessoa' : 'busca') + '\', this.value)"></div>' +
     '<button class="btn btn-secondary" onclick="ffFiltroEnvio(\'limpar\')"><i class="fa-solid fa-eraser"></i> Limpar</button>' +
@@ -13887,7 +13912,56 @@ function _ffRenderAPagar(cont) {
         '<div><span>Total do período</span><strong>' + _ffMoedaBR(totalValor) + '</strong></div>' +
       '</div>';
 
-  cont.innerHTML = _ffBarraFiltroEnvio('pagar') + resumo + corpo;
+  // Digitou um nome? Mostra a pessoa e em qual ficha ela está, antes da lista.
+  let achouPessoa = '';
+  const qp = String(_ffPagarBusca || '').trim();
+  if (qp) {
+    const achados = [];
+    lista.forEach(function (f) {
+      _ffLinhasQueBatem(f, qp).forEach(function (a) { achados.push({ f: f, l: a.l, posicao: a.posicao }); });
+    });
+    if (achados.length) {
+      const somaAchados = achados.reduce(function (s, a) { return s + (Number(a.l.valor) || 0); }, 0);
+      achouPessoa = '<div class="ff-busca-pessoa">' +
+        '<div class="ff-busca-titulo"><i class="fa-solid fa-user-check"></i> ' +
+          achados.length + ' pagamento(s) a fazer para &ldquo;' + escapeHTML(qp) + '&rdquo;' +
+          ' &middot; <b>' + _ffMoedaBR(somaAchados) + '</b></div>' +
+        achados.map(function (a) {
+          const arq = (typeof _ffArquivoDaLinha === 'function') ? _ffArquivoDaLinha(a.f, a.l) : null;
+          const rel = (arq && arq.relacaoNumero) ? String(arq.relacaoNumero) : _ffRelacaoTexto(a.f);
+          const semVal = a.l.semValorNoPdf && !(Number(a.l.valor) > 0);
+          return '<div class="ff-achado">' +
+            '<div class="ff-achado-nome">' + escapeHTML(a.l.nome || '(sem nome)') +
+              (a.l.cpf ? '<span class="ff-achado-cpf">CPF ' + escapeHTML(a.l.cpf) + '</span>' : '') +
+              (_ffEhFichaEstorno(a.f) ? '<span class="ff-achado-etapa" style="color:#B45309;border-color:#B45309;">estorno</span>' : '') +
+            '</div>' +
+            '<div class="ff-achado-posicao">Está na <b>posição ' + a.posicao + '</b> de ' +
+              _ffQtdColaboradores(a.f) + ' pessoa(s) desta ficha</div>' +
+            '<div class="ff-achado-linhas">' +
+              '<span><b>Ficha:</b> #' + escapeHTML(a.f.numero) + '</span>' +
+              '<span><b>Empresa:</b> ' + escapeHTML(_ffIdentificacao(a.f)) + '</span>' +
+              (a.l.lote ? '<span><b>Lote:</b> <span class="ff-lote-selo">' + escapeHTML(a.l.lote) + '</span></span>' : '') +
+              (rel ? '<span><b>Relação:</b> <span class="ff-relacao">N. ' + escapeHTML(rel) + '</span></span>' : '') +
+              '<span><b>Enviado ao financeiro:</b> ' +
+                (_formatarDataBR(_ffSoData(_ffDataEnvioFinanceiro(a.f))) || '—') + '</span>' +
+              '<span><b>Valor da pessoa:</b> ' +
+                (semVal ? '<span class="ff-sem-valor">— sem valor no PDF</span>'
+                        : _ffMoedaBR(Number(a.l.valor) || 0)) + '</span>' +
+            '</div>' +
+            '<div class="ff-achado-acoes"><button class="btn btn-secondary btn-sm" onclick="abrirDetalheFluxo(\'' + a.f.id + '\')">' +
+              '<i class="fa-solid fa-eye"></i> Abrir a ficha</button></div>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+    } else if (!lista.length) {
+      achouPessoa = '<div class="ff-busca-pessoa ff-busca-vazia">' +
+        'Ninguém com &ldquo;' + escapeHTML(qp) + '&rdquo; nas fichas a pagar' +
+        ((_ffPagarDe || _ffPagarAte) ? ' deste período.' : '.') +
+        ' Se a pessoa já foi paga, procure em <b>Pagos / Finalizados</b>.</div>';
+    }
+  }
+
+  cont.innerHTML = _ffBarraFiltroEnvio('pagar') + resumo + achouPessoa + corpo;
 }
 
 window.ffSelecionarPagar = function (id, marcado) {
