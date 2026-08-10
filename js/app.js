@@ -13592,7 +13592,15 @@ function _ffRenderEstornos(cont) {
     '<p class="est-explica"><i class="fa-solid fa-circle-info"></i> ' +
       'Aqui fica quem o banco devolveu. O valor <b>já foi solicitado</b> num dia anterior, então ' +
       'a ficha de acerto entra como <b>Estorno</b> — nunca junto do pagamento do dia. ' +
-      'Quem for coberto por uma ficha de estorno sai desta lista sozinho.</p>';
+      'Quem for coberto por uma ficha de estorno sai desta lista sozinho.</p>' +
+    ((pend.length || fichasEst.length)
+      ? '<div class="est-acoes-topo">' +
+          '<button class="btn btn-secondary" onclick="ffExportarEstornosExcel()">' +
+            '<i class="fa-solid fa-file-excel"></i> Baixar relatório em Excel</button>' +
+          '<small>Uma linha com os dados e a bancária de cada pessoa, e a linha de baixo com o motivo do estorno. ' +
+          'Inclui os que já foram reenviados.</small>' +
+        '</div>'
+      : '');
 
   if (!pend.length && !fichasEst.length) {
     cont.innerHTML = cabecalho +
@@ -13877,6 +13885,10 @@ function _ffRenderAPagar(cont) {
         '<label class="ff-selecionar-todas"><input type="checkbox" ' +
           (selecionadas.length === lista.length ? 'checked' : '') + ' onchange="ffSelecionarTodasPagar(this.checked)"> Selecionar todas</label>' +
         '<span class="ff-selecao-info">' + selecionadas.length + ' selecionada(s) &middot; <strong>' + _ffMoedaBR(valorSel) + '</strong></span>' +
+        // Baixa as bancárias das fichas marcadas sem precisar abrir uma por uma
+        '<button class="btn btn-secondary" id="ff-btn-pdf-lote" ' + (selecionadas.length ? '' : 'disabled') +
+          ' title="Junta as bancárias das fichas marcadas num PDF só" onclick="ffBaixarPdfSelecionadas()">' +
+          '<i class="fa-solid fa-file-pdf"></i> Baixar bancárias (PDF único)</button>' +
         '<button class="btn btn-primary" ' + (selecionadas.length ? '' : 'disabled') + ' onclick="ffFinalizarPagamentos()">' +
           '<i class="fa-solid fa-circle-check"></i> Finalizar Pagamentos</button>' +
       '</div>' +
@@ -15357,10 +15369,14 @@ function _ffRenderDetalhe() {
           const qtd = (f.arquivos || []).length + (f.comprovante ? 1 : 0);
           if (!qtd) return '';
           return `<div class="ff-baixar-tudo">
-            <button class="btn btn-secondary" id="ff-btn-baixar-tudo" onclick="ffBaixarTodosPdfs()">
-              <i class="fa-solid fa-file-zipper"></i> Baixar todos os arquivos (${qtd})
+            <button class="btn btn-primary" id="ff-btn-pdf-unico" onclick="ffBaixarPdfUnico()">
+              <i class="fa-solid fa-file-pdf"></i> Baixar tudo num PDF só (${qtd})
             </button>
-            <small>Junta os ${qtd} arquivo(s) num único .zip — não precisa abrir e salvar um por um.</small>
+            <button class="btn btn-secondary" id="ff-btn-baixar-tudo" onclick="ffBaixarTodosPdfs()">
+              <i class="fa-solid fa-file-zipper"></i> Baixar em .zip
+            </button>
+            <small>O PDF único abre com as ${qtd} bancária(s) emendadas, uma embaixo da outra — dá para
+            rolar e imprimir tudo de uma vez. O .zip traz os arquivos separados.</small>
           </div>`;
         })()}
       </div>
@@ -15623,6 +15639,188 @@ function _ffBytesDoArquivo(item) {
     .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
     .then(function (b) { return new Uint8Array(b); });
 }
+
+// ── Juntar as bancárias num PDF SÓ ────────────────────────────────────────
+// Em vez de um .zip com vários arquivos, sai UM PDF com todas as páginas
+// emendadas — abre e rola de cima a baixo, e imprime tudo de uma vez.
+// As páginas originais são copiadas como estão (não viram imagem), então o
+// texto continua pesquisável e a impressão sai na qualidade do original.
+function _ffTemPdfLib() { return typeof PDFLib !== 'undefined' && PDFLib && PDFLib.PDFDocument; }
+
+// Traz a biblioteca só na hora de usar. Ela é grande e serve para uma ação
+// pontual — deixá-la no carregamento da página atrasava a abertura do sistema
+// para todo mundo, todos os dias, por causa de um botão usado de vez em quando.
+let _ffPdfLibCarregando = null;
+function _ffCarregarPdfLib() {
+  if (_ffTemPdfLib()) return Promise.resolve(true);
+  if (_ffPdfLibCarregando) return _ffPdfLibCarregando;
+  _ffPdfLibCarregando = new Promise(function (resolve) {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js';
+    s.crossOrigin = 'anonymous';
+    s.referrerPolicy = 'no-referrer';
+    s.onload = function () { resolve(_ffTemPdfLib()); };
+    s.onerror = function () { _ffPdfLibCarregando = null; resolve(false); };
+    document.head.appendChild(s);
+  });
+  return _ffPdfLibCarregando;
+}
+window._ffCarregarPdfLib = _ffCarregarPdfLib;
+
+// Todos os arquivos de uma ficha (documentos + comprovante), na ordem
+function _ffArquivosDaFicha(f, comComprovante) {
+  const itens = (Array.isArray(f.arquivos) ? f.arquivos : []).slice();
+  if (comComprovante && f.comprovante && f.comprovante.arquivo) {
+    itens.push({ nome: 'COMPROVANTE - ' + (f.comprovante.nome || 'comprovante.pdf'), arquivo: f.comprovante.arquivo });
+  }
+  return itens.filter(a => a && a.arquivo);
+}
+
+// Junta os PDFs das fichas indicadas e baixa um arquivo só.
+// `fichas` = array de fluxos. `rotulo` entra no nome do arquivo.
+async function _ffJuntarPdfs(fichas, rotulo, botaoId) {
+  const btn = botaoId ? document.getElementById(botaoId) : null;
+  const rotOriginal = btn ? btn.innerHTML : '';
+  const passo = t => { if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + t; };
+  if (btn) btn.disabled = true;
+
+  try {
+    passo('Preparando...');
+    if (!(await _ffCarregarPdfLib())) {
+      alert('Não consegui carregar a ferramenta de juntar PDFs.\n\n' +
+            'Verifique a internet e tente de novo. Enquanto isso, use o botão "Baixar em .zip", ' +
+            'que traz os mesmos arquivos separados.');
+      return false;
+    }
+    const juntos = await PDFLib.PDFDocument.create();
+    let paginas = 0, arquivosOk = 0;
+    const falhou = [];
+    const lista = [];
+    fichas.forEach(f => _ffArquivosDaFicha(f, true).forEach(a => lista.push({ f: f, a: a })));
+
+    if (!lista.length) { alert('Nenhuma das fichas selecionadas tem arquivo para baixar.'); return false; }
+
+    for (let i = 0; i < lista.length; i++) {
+      passo('Juntando ' + (i + 1) + ' de ' + lista.length + '...');
+      try {
+        const bytes = await _ffBytesDoArquivo(lista[i].a);
+        const doc = await PDFLib.PDFDocument.load(bytes, { ignoreEncryption: true });
+        const copiadas = await juntos.copyPages(doc, doc.getPageIndices());
+        copiadas.forEach(p => juntos.addPage(p));
+        paginas += copiadas.length;
+        arquivosOk++;
+      } catch (e) {
+        falhou.push((lista[i].a.nome || 'arquivo') + ' (ficha #' + lista[i].f.numero + ')');
+      }
+    }
+
+    if (!paginas) {
+      alert('Não consegui ler nenhum dos arquivos.\n\nEles podem estar protegidos por senha ou não ser PDF. ' +
+            'Tente abrir um deles pelo botão "Abrir".');
+      return false;
+    }
+
+    passo('Montando o arquivo...');
+    const blob = new Blob([await juntos.save()], { type: 'application/pdf' });
+    const nome = 'bancarias_' + rotulo + '_' + new Date().toISOString().slice(0, 10) + '.pdf';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = nome;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+
+    registrarLogGlobal('Baixou ' + arquivosOk + ' bancária(s) num PDF único (' + paginas + ' páginas).', 'dp');
+    if (falhou.length) {
+      alert('Juntei ' + arquivosOk + ' de ' + lista.length + ' arquivo(s), num total de ' + paginas + ' página(s).\n\n' +
+        'Não consegui estes:\n• ' + falhou.join('\n• ') +
+        '\n\nAbra cada um pelo botão "Abrir" para conferir.');
+    }
+    return true;
+  } catch (e) {
+    alert('Não consegui montar o PDF: ' + (e.message || e));
+    return false;
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = rotOriginal; }
+  }
+}
+
+// Dentro da ficha: junta os arquivos daquela ficha
+window.ffBaixarPdfUnico = async function () {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f) return;
+  await _ffJuntarPdfs([f], 'ficha-' + (f.numero || 's-n'), 'ff-btn-pdf-unico');
+};
+
+// Na tela A Pagar: junta os arquivos de TODAS as fichas marcadas, sem precisar
+// abrir uma por uma
+window.ffBaixarPdfSelecionadas = async function () {
+  const ids = Object.keys(_ffPagarSelecao || {}).filter(id => _ffPagarSelecao[id]);
+  if (!ids.length) { alert('Marque as fichas que você quer baixar.'); return; }
+  const fichas = (state.fluxosFinanceiros || []).filter(f => ids.indexOf(f.id) >= 0);
+  const semArquivo = fichas.filter(f => !_ffArquivosDaFicha(f, true).length);
+  if (semArquivo.length === fichas.length) {
+    alert('As fichas marcadas não têm arquivo anexado.'); return;
+  }
+  const ok = await _ffJuntarPdfs(fichas, fichas.length + '-fichas', 'ff-btn-pdf-lote');
+  if (ok && semArquivo.length) {
+    alert('Atenção: ' + semArquivo.length + ' ficha(s) marcada(s) não têm arquivo e ficaram de fora:\n• ' +
+      semArquivo.map(f => '#' + f.numero).join('\n• '));
+  }
+};
+
+// ── Relatório de ESTORNOS em Excel ────────────────────────────────────────
+// Cada pessoa ocupa DUAS linhas: a de cima com os dados e a bancária, a de
+// baixo com o motivo escrito pelo Financeiro. Assim dá para ler de corrido.
+window.ffExportarEstornosExcel = function () {
+  if (typeof XLSX === 'undefined') { alert('A planilha não carregou. Recarregue a página e tente de novo.'); return; }
+  const pend = _ffEstornosPendentes().map(e => Object.assign({}, e, { situacao: 'EM ABERTO — aguardando o DP reenviar' }));
+  const feitos = _ffEstornosResolvidos().map(e => {
+    const ficha = (state.fluxosFinanceiros || []).find(x => x.id === e.l.estornoCobertoPor);
+    return Object.assign({}, e, { situacao: 'REENVIADO na ficha de estorno #' + ((ficha && ficha.numero) || '—') });
+  });
+  const todos = pend.concat(feitos);
+  if (!todos.length) { alert('Não há estorno para exportar.'); return; }
+
+  const cab = ['Situação', 'Colaborador', 'CPF', 'Código', 'Lote', 'Banco', 'Agência', 'Conta',
+               'Competência', 'Relação', 'Ficha', 'Empresa / Cliente', 'Valor',
+               'Reprovado por', 'Data do estorno'];
+  const linhas = [cab];
+
+  todos.forEach(function (e) {
+    const l = e.l, f = e.f;
+    const arq = (typeof _ffArquivoDaLinha === 'function') ? _ffArquivoDaLinha(f, l) : null;
+    const rel = (arq && arq.relacaoNumero) ? String(arq.relacaoNumero) : _ffRelacaoTexto(f);
+    linhas.push([
+      e.situacao,
+      l.nome || '', l.cpf || '', l.codigo || '', l.lote || '',
+      l.banco || '', (l.agencia || '') + (l.agenciaDg ? '-' + l.agenciaDg : ''),
+      (l.conta || '') + (l.contaDg ? '-' + l.contaDg : ''),
+      l.competencia || '', rel || '', '#' + (f.numero || ''),
+      _ffIdentificacao(f), Number(l.valor) || 0,
+      (l.reprovacao && l.reprovacao.por) || '',
+      (l.reprovacao && l.reprovacao.em) ? _ffDataHora(l.reprovacao.em) : ''
+    ]);
+    // Linha de baixo: o motivo, por extenso
+    linhas.push(['MOTIVO DO ESTORNO', (l.reprovacao && l.reprovacao.motivo) || '(sem motivo registrado)',
+                 '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    linhas.push([]);   // respiro entre uma pessoa e outra
+  });
+
+  // Fecho com os totais
+  const soma = todos.reduce((s, e) => s + (Number(e.l.valor) || 0), 0);
+  linhas.push([]);
+  linhas.push(['TOTAL', todos.length + ' estorno(s)', '', '', '', '', '', '', '', '', '', '', soma, '', '']);
+  linhas.push(['', 'Em aberto: ' + pend.length + '   ·   Reenviados: ' + feitos.length]);
+
+  const ws = XLSX.utils.aoa_to_sheet(linhas);
+  ws['!cols'] = [{ wch: 34 }, { wch: 34 }, { wch: 16 }, { wch: 10 }, { wch: 8 }, { wch: 8 },
+                 { wch: 10 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 34 },
+                 { wch: 13 }, { wch: 22 }, { wch: 18 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Estornos');
+  XLSX.writeFile(wb, 'estornos_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+  registrarLogGlobal('Exportou o relatório de estornos (' + todos.length + ' registro(s)).', 'dp');
+};
 
 window.ffBaixarTodosPdfs = async function () {
   const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);

@@ -22,6 +22,10 @@
     <!-- JSZip — protegido via CSP no servidor -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
             crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- O pdf-lib (junta vários PDFs num só) NÃO é carregado aqui de propósito:
+         ele é pesado e só serve quando alguém clica em "Baixar tudo num PDF só".
+         Carregar aqui atrasava a abertura do sistema para todo mundo, todo dia.
+         O carregamento sob demanda está em _ffCarregarPdfLib(), no app.js. -->
     <!-- SheetJS — protegido via CSP no servidor -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
             crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -35,16 +39,16 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260807i">
+    <link rel="stylesheet" href="css/style.css?v=20260807j">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260807i">
+    <link rel="stylesheet" href="css/design-system.css?v=20260807j">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260807i">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260807j">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260807i">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260807i">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260807j">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260807j">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260807i">
+    <link rel="stylesheet" href="css/mobile.css?v=20260807j">
 </head>
 <body class="app-shell">
 
@@ -3935,11 +3939,11 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260807i"></script>
-    <script src="js/vps-sync.js?v=20260807i"></script>
-    <script src="js/exata-catalogo.js?v=20260807i"></script>
-    <script src="js/data.js?v=20260807i"></script>
-    <script src="js/app.js?v=20260807i"></script>
-    <script src="js/whatsapp.js?v=20260807i"></script>
+    <script src="js/security.js?v=20260807j"></script>
+    <script src="js/vps-sync.js?v=20260807j"></script>
+    <script src="js/exata-catalogo.js?v=20260807j"></script>
+    <script src="js/data.js?v=20260807j"></script>
+    <script src="js/app.js?v=20260807j"></script>
+    <script src="js/whatsapp.js?v=20260807j"></script>
 </body>
 </html>

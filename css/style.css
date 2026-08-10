@@ -4944,6 +4944,13 @@ input.form-control[type="date"] {
     color: var(--text-secondary, #64748b);
 }
 .est-explica i { color: #B45309; margin-right: 4px; }
+.est-acoes-topo {
+    display: flex; align-items: center; gap: 13px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.est-acoes-topo .btn { min-height: 42px; }
+.est-acoes-topo small {
+    font-size: 11.5px; line-height: 1.5; color: var(--text-secondary, #64748b); flex: 1 1 260px;
+}
 .est-titulo-sec { margin: 18px 0 10px; font-size: 14px; font-weight: 800; color: var(--text-primary, #0f172a); }
 .est-titulo-sec i { color: #B45309; margin-right: 5px; }
 .est-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
