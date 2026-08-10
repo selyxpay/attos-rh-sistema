@@ -4892,6 +4892,9 @@ input.form-control[type="date"] {
 }
 .ff-quem-vazio { color: var(--text-secondary, #94a3b8); font-size: 12px; }
 
+/* Pessoa que veio SEM valor no PDF: mostra traço, igual ao arquivo */
+.ff-sem-valor { color: var(--text-secondary, #94a3b8); font-weight: 700; }
+
 /* Baixar todos os documentos da ficha de uma vez */
 .ff-baixar-tudo {
     margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border-color, #e2e8f0);

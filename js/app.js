@@ -12494,10 +12494,15 @@ function _ffAnalisarTexto(texto) {
   const mRel = txt.match(/rela[çc][ãa]o\s+N\.?\s*(\d{4,12})/i) || txt.match(/ordem\s+pagamento\s+nr\.?\s*(\d{3,12})/i);
   if (mRel) relacaoNumero = mRel[1];
 
-  // Linha de colaborador: código + nome + CPF + (meio) + valor + origem.
+  // Linha de colaborador: código + nome + CPF + (meio) + [valor] + origem.
   // O CPF aceita ponto, espaço, traço OU vírgula antes dos 2 últimos dígitos
   // (RT2 imprime "380802298,13"). O valor é o último "0.000,00" antes da origem.
-  const rxLinha = /^\s*(\d{3,10})\s+(.+?)\s+(\d{3}[.\s]?\d{3}[.\s]?\d{3}[.,\s-]?\d{2})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+(\S{1,6})\s*$/;
+  //
+  // O VALOR É OPCIONAL de propósito: na relação bancária existem pessoas SEM
+  // valor nenhum — a linha termina direto na origem (PR01). Elas não têm nada
+  // a receber, e antes o sistema inventava um valor para elas (pegava o
+  // "068,38" do próprio CPF). Agora ficam com valor zero, como no PDF.
+  const rxLinha = /^\s*(\d{3,10})\s+(.+?)\s+(\d{3}[.\s]?\d{3}[.\s]?\d{3}[.,\s-]?\d{2})\s+(.+?)(?:\s+(\d{1,3}(?:\.\d{3})*,\d{2}))?\s+(\S{1,6})\s*$/;
 
   const novaLinha = extra => Object.assign({
     id: 'ffl-' + Date.now() + '-' + out.length + '-' + Math.random().toString(36).slice(2, 5),
@@ -12526,20 +12531,26 @@ function _ffAnalisarTexto(texto) {
     const m = rxLinha.exec(linha);
     if (m) {
       const nome = m[2].replace(/[^\p{L}\s'.-]/gu, ' ').replace(/\s+/g, ' ').trim();
-      const valor = _ffParseValor(m[5]);
+      const semValor = !m[5];                       // a linha veio sem valor no PDF
+      const valor = semValor ? 0 : _ffParseValor(m[5]);
       const meio = _ffParseMeioExata(m[4]);
       out.push(novaLinha(Object.assign({
         codigo: m[1], nome, cpf: _ffNormalizarCpf(m[3]),
-        valor, origem: m[6],
-        status: (nome && nome.length >= 5 && valor > 0) ? 'ok' : 'conferir'
+        valor, origem: m[6], semValorNoPdf: semValor,
+        // Sem valor no PDF é uma situação legítima (nada a receber), não erro
+        status: (nome && nome.length >= 5 && (valor > 0 || semValor)) ? 'ok' : 'conferir'
       }, meio)));
       return;
     }
 
     // ── Fallback genérico (outros layouts) — exige CPF para confiar ──
-    const valores = [...linha.matchAll(/(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})\b/g)];
-    if (!valores.length) return;
     const cpfM = linha.match(/\d{3}[.\s]?\d{3}[.\s]?\d{3}[.,\s-]?\d{2}(?!\d)/);
+    // O CPF sai impresso com vírgula em alguns modelos ("588587068,38"), e o
+    // final dele parece dinheiro. Tira o CPF da linha ANTES de procurar valor,
+    // senão a pessoa sem valor acaba recebendo um número que não existe.
+    const semCpf = cpfM ? (linha.slice(0, cpfM.index) + ' ' + linha.slice(cpfM.index + cpfM[0].length)) : linha;
+    const valores = [...semCpf.matchAll(/(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})\b/g)];
+    if (!valores.length) return;
     const valor = _ffParseValor(valores[valores.length - 1][1]);
     let nome = linha;
     if (cpfM) nome = linha.slice(0, cpfM.index);
@@ -12569,7 +12580,11 @@ function _ffChequesTecnicos(f) {
   cheques.cpfInvalidos = linhas.filter(l => l.cpf && !_ffCpfValido(l.cpf));
 
   // 2) Valores zerados/negativos — nunca deveriam existir num pagamento
-  cheques.valoresZerados = linhas.filter(l => !(Number(l.valor) > 0));
+  // Zerado porque o PDF veio SEM valor (nada a receber) é normal e fica de
+  // fora. O que continua sendo apontado é o zerado inesperado, que costuma
+  // ser leitura errada do arquivo.
+  cheques.valoresZerados = linhas.filter(l => !(Number(l.valor) > 0) && !l.semValorNoPdf);
+  cheques.semValorNoPdf = linhas.filter(l => l.semValorNoPdf);
 
   // 3) Competências encontradas nas linhas (misturadas = alerta)
   cheques.competencias = [...new Set(linhas.map(l => l.competencia).filter(Boolean))];
@@ -15161,8 +15176,11 @@ function _ffRenderDetalhe() {
           const partes = [];
 
           // valores zerados = erro de verdade
+          if ((t.semValorNoPdf || []).length) {
+            partes.push(okl(`${t.semValorNoPdf.length} pessoa(s) vieram SEM valor no PDF (nada a receber) — mantidas com valor zero, como no arquivo`));
+          }
           partes.push(t.valoresZerados.length
-            ? err(`${t.valoresZerados.length} registro(s) com valor ZERADO — pagamento não pode ter valor zero`)
+            ? err(`${t.valoresZerados.length} registro(s) com valor ZERADO sem ser no PDF — pode ser leitura errada do arquivo`)
             : okl('Nenhum valor zerado ou negativo'));
 
           // dígito verificador do CPF (alerta: pode ser máscara do relatório)
@@ -15228,7 +15246,11 @@ function _ffRenderDetalhe() {
                   <td style="font-size:11px;">${escapeHTML(l.banco || '—')}</td>
                   <td style="font-size:11px;font-family:monospace;">${escapeHTML(l.agencia || '—')}${l.agenciaDg ? '-' + escapeHTML(l.agenciaDg) : ''}</td>
                   <td style="font-size:11px;font-family:monospace;">${escapeHTML(l.conta || '—')}${l.contaDg ? '-' + escapeHTML(l.contaDg) : ''}</td>
-                  <td>${podeEditar ? `<input class="form-control" style="width:100px;font-size:12px;padding:4px 8px;text-align:right;" value="${(Number(l.valor) || 0).toFixed(2).replace('.', ',')}" onchange="ffEditarLinha(${i},'valor',this.value)">` : `<strong>${_ffMoedaBR(l.valor)}</strong>`}</td>
+                  <td>${podeEditar
+                    ? `<input class="form-control" style="width:100px;font-size:12px;padding:4px 8px;text-align:right;" value="${(Number(l.valor) || 0).toFixed(2).replace('.', ',')}" onchange="ffEditarLinha(${i},'valor',this.value)">`
+                    : (l.semValorNoPdf && !(Number(l.valor) > 0)
+                        ? `<span class="ff-sem-valor" title="O PDF veio sem valor para esta pessoa — nada a receber">—</span>`
+                        : `<strong>${_ffMoedaBR(l.valor)}</strong>`)}</td>
                   <td style="font-size:11px;">${escapeHTML(l.origem || '—')}</td>
                   <td class="ff-col-situacao">${cpfsDup.has(l.id)
                     ? '<span class="ff-sit ff-sit-dup" title="Mesmo CPF repetido no MESMO lote ' +
