@@ -15221,6 +15221,17 @@ function _ffRenderDetalhe() {
             <div class="exame-pdf-info"><strong>Comprovante: ${escapeHTML(f.comprovante.nome)}</strong></div>
             <button class="btn btn-sm btn-primary" onclick="ffAbrirArquivo('comprovante')"><i class="fa-solid fa-eye"></i> Abrir</button>
           </div>` : ''}
+        ${(() => {
+          // Baixar tudo de uma vez, em vez de abrir e salvar um por um
+          const qtd = (f.arquivos || []).length + (f.comprovante ? 1 : 0);
+          if (!qtd) return '';
+          return `<div class="ff-baixar-tudo">
+            <button class="btn btn-secondary" id="ff-btn-baixar-tudo" onclick="ffBaixarTodosPdfs()">
+              <i class="fa-solid fa-file-zipper"></i> Baixar todos os arquivos (${qtd})
+            </button>
+            <small>Junta os ${qtd} arquivo(s) num único .zip — não precisa abrir e salvar um por um.</small>
+          </div>`;
+        })()}
       </div>
 
       <div class="exame-detalhe-laudo" style="margin-top:16px;">
@@ -15460,6 +15471,87 @@ window.ffAbrirArquivo = function(i) {
   } else if (src.charAt(0) === '/') src = window.location.origin + src;
   const w = window.open(src, '_blank');
   if (!w) alert('Habilite os pop-ups deste site para abrir o arquivo.');
+};
+
+// ── Baixar TODOS os documentos de uma vez ─────────────────────────────────
+// Antes era abrir e salvar PDF por PDF. Aqui os arquivos da ficha (mais o
+// comprovante, se já houver) vão para um único .zip. Nome repetido ganha
+// sufixo, senão um sobrescreveria o outro dentro do pacote.
+function _ffBytesDoArquivo(item) {
+  const src = String((item && item.arquivo) || '');
+  if (!src) return Promise.reject(new Error('sem arquivo'));
+  if (src.indexOf('data:') === 0) {
+    const v = src.indexOf(',');
+    const bin = atob(src.slice(v + 1));
+    const bytes = new Uint8Array(bin.length);
+    for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
+    return Promise.resolve(bytes);
+  }
+  const url = src.charAt(0) === '/' ? (window.location.origin + src) : src;
+  return fetch(url, { credentials: 'same-origin' })
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+    .then(function (b) { return new Uint8Array(b); });
+}
+
+window.ffBaixarTodosPdfs = async function () {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f) return;
+  const itens = (Array.isArray(f.arquivos) ? f.arquivos : []).slice();
+  if (f.comprovante && f.comprovante.arquivo) {
+    itens.push({ nome: 'COMPROVANTE - ' + (f.comprovante.nome || 'comprovante.pdf'), arquivo: f.comprovante.arquivo });
+  }
+  if (!itens.length) { alert('Esta ficha não tem nenhum arquivo para baixar.'); return; }
+  if (typeof JSZip === 'undefined') {
+    alert('O compactador não carregou. Recarregue a página (Ctrl+Shift+R) e tente de novo.');
+    return;
+  }
+
+  const btn = document.getElementById('ff-btn-baixar-tudo');
+  const rotuloOriginal = btn ? btn.innerHTML : '';
+  const passo = (txt) => { if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + txt; };
+  if (btn) btn.disabled = true;
+
+  try {
+    const zip = new JSZip();
+    const usados = {};
+    const falhou = [];
+    for (let i = 0; i < itens.length; i++) {
+      passo('Juntando ' + (i + 1) + ' de ' + itens.length + '...');
+      let nome = String(itens[i].nome || ('arquivo-' + (i + 1) + '.pdf')).replace(/[\\/:*?"<>|]/g, '-');
+      if (!/\.[a-z0-9]{2,5}$/i.test(nome)) nome += '.pdf';
+      if (usados[nome]) { const n = ++usados[nome]; nome = nome.replace(/(\.[^.]+)$/, ' (' + n + ')$1'); }
+      else usados[nome] = 1;
+      try {
+        zip.file(nome, await _ffBytesDoArquivo(itens[i]));
+      } catch (e) {
+        falhou.push(itens[i].nome || ('arquivo ' + (i + 1)));
+      }
+    }
+    if (!Object.keys(zip.files).length) {
+      alert('Não consegui baixar nenhum dos arquivos. Tente abrir um deles para conferir se ainda está no servidor.');
+      return;
+    }
+    passo('Compactando...');
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+    const nomeZip = 'fluxo_' + (f.numero || 'sem-numero') + '_' +
+      String(f.empresaNome || 'documentos').replace(/[^\w]+/g, '_') + '.zip';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = nomeZip;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+    registrarLogGlobal('Baixou todos os documentos do Fluxo #' + f.numero + ' (' +
+      (itens.length - falhou.length) + ' arquivo(s)).', 'dp');
+    if (falhou.length) {
+      alert('Baixei ' + (itens.length - falhou.length) + ' de ' + itens.length + ' arquivo(s).\n\n' +
+        'Não consegui estes:\n• ' + falhou.join('\n• ') +
+        '\n\nAbra cada um pelo botão "Abrir" para conferir se ainda estão no servidor.');
+    }
+  } catch (e) {
+    alert('Não consegui montar o pacote: ' + (e.message || e));
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = rotuloOriginal; }
+  }
 };
 
 // ── Ações do fluxo ─────────────────────────────────────────────────────────
