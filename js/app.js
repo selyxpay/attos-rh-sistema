@@ -10761,7 +10761,8 @@ window.equipTrocarVisao = function (visao) {
 
 window.relFiltrarHistorico = function (txt) {
   _relBusca = txt;
-  _renderHistoricoRelatorios();
+  // sem isto o campo é recriado a cada letra e o cursor sai
+  (window._rtComFoco || function (fn) { fn(); })(_renderHistoricoRelatorios);
 };
 
 function _relSituacao(r) {
@@ -10895,7 +10896,7 @@ function _renderHistoricoRelatorios() {
   cont.innerHTML =
     '<div class="rel-busca">' +
       '<input type="search" class="form-control" placeholder="Procurar por colaborador, empresa ou título…" ' +
-      'value="' + escapeHTML(_relBusca) + '" oninput="relFiltrarHistorico(this.value)">' +
+      'id="rel-busca-hist" value="' + escapeHTML(_relBusca) + '" oninput="relFiltrarHistorico(this.value)">' +
     '</div>' +
     blocoPessoa +
     (rels.length ? cartoes : '<div class="exame-empty-state"><p>Nenhum relatório com esse termo.</p></div>');
@@ -13153,17 +13154,39 @@ function _ffBarraFiltroEnvio(tela) {
   const ehFin = tela === 'fin';
   return '<div class="ff-filtros-envio">' +
     '<div class="ff-filtro-campo"><label>Enviado ao financeiro — de</label>' +
-      '<input type="date" class="form-control" value="' + escapeHTML(_ffPagarDe) + '" onchange="ffFiltroEnvio(\'de\', this.value)"></div>' +
+      '<input type="date" id="ff-filtro-de" class="form-control" value="' + escapeHTML(_ffPagarDe) + '" onchange="ffFiltroEnvio(\'de\', this.value)"></div>' +
     '<div class="ff-filtro-campo"><label>até</label>' +
-      '<input type="date" class="form-control" value="' + escapeHTML(_ffPagarAte) + '" onchange="ffFiltroEnvio(\'ate\', this.value)"></div>' +
+      '<input type="date" id="ff-filtro-ate" class="form-control" value="' + escapeHTML(_ffPagarAte) + '" onchange="ffFiltroEnvio(\'ate\', this.value)"></div>' +
     '<div class="ff-filtro-campo ff-filtro-cresce">' +
+      // id fixo: é ele que permite devolver o foco depois de redesenhar a lista
       '<label>' + (ehFin ? 'Buscar colaborador (nome ou CPF)' : 'Buscar ficha (nº, empresa, tipo)') + '</label>' +
-      '<input type="text" class="form-control" placeholder="' + (ehFin ? 'Ex.: João Silva' : 'Ex.: 000123 ou RT1') + '"' +
+      '<input type="text" id="ff-filtro-busca" class="form-control" placeholder="' +
+      (ehFin ? 'Ex.: João Silva — procura em TODAS as fichas' : 'Ex.: 000123 ou RT1') + '"' +
       ' value="' + escapeHTML(ehFin ? _ffFinBuscaPessoa : _ffPagarBusca) + '"' +
       ' oninput="ffFiltroEnvio(\'' + (ehFin ? 'pessoa' : 'busca') + '\', this.value)"></div>' +
     '<button class="btn btn-secondary" onclick="ffFiltroEnvio(\'limpar\')"><i class="fa-solid fa-eraser"></i> Limpar</button>' +
   '</div>';
 }
+
+// ── O campo perdia o foco a cada letra ────────────────────────────────────
+// Ao digitar, a lista inteira é redesenhada e o input é recriado do zero —
+// o cursor ia embora e era preciso clicar de novo a cada tecla. Aqui a gente
+// guarda quem estava com o foco e onde estava o cursor, redesenha, e devolve.
+function _rtComFoco(render) {
+  const antes = document.activeElement;
+  const id = antes && antes.id;
+  const ini = (antes && antes.selectionStart != null) ? antes.selectionStart : null;
+  const fim = (antes && antes.selectionEnd != null) ? antes.selectionEnd : null;
+  render();
+  if (!id) return;
+  const depois = document.getElementById(id);
+  if (!depois || depois === antes) return;
+  try {
+    depois.focus({ preventScroll: true });
+    if (ini != null && depois.setSelectionRange) depois.setSelectionRange(ini, fim);
+  } catch (e) { /* campo que não aceita seleção: o foco já basta */ }
+}
+window._rtComFoco = _rtComFoco;
 
 window.ffFiltroEnvio = function (campo, valor) {
   if (campo === 'de') _ffPagarDe = valor;
@@ -13171,7 +13194,7 @@ window.ffFiltroEnvio = function (campo, valor) {
   else if (campo === 'busca') _ffPagarBusca = valor;
   else if (campo === 'pessoa') _ffFinBuscaPessoa = valor;
   else if (campo === 'limpar') { _ffPagarDe = ''; _ffPagarAte = ''; _ffPagarBusca = ''; _ffFinBuscaPessoa = ''; }
-  _ffRenderLista();
+  _rtComFoco(_ffRenderLista);
 };
 
 
@@ -13596,12 +13619,17 @@ function _ffRenderFinalizados(cont) {
 
   let blocoBusca = '';
   const q = (_ffFinBuscaPessoa || '').trim().toLowerCase();
+  // A busca varre TODAS as fichas que a pessoa pode ver — não só as já pagas
+  // e não só as do período filtrado. Antes ela procurava dentro da lista já
+  // filtrada, então quem estava numa ficha em aprovação, ou de outro mês,
+  // simplesmente "não existia". Cada resultado mostra em que etapa está.
+  const universo = _ffVisiveis();
   // Digitar o número da relação também funciona: mostra a bancária inteira.
   const porRelacao = q && lista.filter(f => _ffRelacaoTexto(f).toLowerCase().includes(q));
   if (q) {
     const soDigitos = q.replace(/\D/g, '');
     const achados = [];
-    lista.forEach(function (f) {
+    universo.forEach(function (f) {
       (Array.isArray(f.linhas) ? f.linhas : []).forEach(function (l, i) {
         const nome = String((l && l.nome) || '');
         const cpf = String((l && l.cpf) || '').replace(/\D/g, '');
@@ -13623,9 +13651,13 @@ function _ffRenderFinalizados(cont) {
           // para a pessoa reconhecer a planilha na pasta de downloads.
           const arquivo = 'fluxo_financeiro_' + a.f.numero + '_' +
             String(a.f.empresaNome || 'sem_empresa').replace(/[^\w]+/g, '_') + '.xlsx';
+          const et = FF_STATUS[a.f.status] || FF_STATUS.rascunho;
           return '<div class="ff-achado">' +
             '<div class="ff-achado-nome">' + escapeHTML(a.l.nome || '(sem nome)') +
-              (a.l.cpf ? '<span class="ff-achado-cpf">CPF ' + escapeHTML(a.l.cpf) + '</span>' : '') + '</div>' +
+              (a.l.cpf ? '<span class="ff-achado-cpf">CPF ' + escapeHTML(a.l.cpf) + '</span>' : '') +
+              // Como a busca varre tudo, dizer em que etapa está é essencial
+              '<span class="ff-achado-etapa" style="color:' + et.cor + ';border-color:' + et.cor + ';">' +
+                escapeHTML(et.rotulo) + '</span>' + '</div>' +
             '<div class="ff-achado-posicao">Está na <b>posição ' + a.posicao + '</b> de ' +
               _ffQtdColaboradores(a.f) + ' pessoa(s) desta ficha</div>' +
             '<div class="ff-achado-linhas">' +

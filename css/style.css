@@ -4892,6 +4892,13 @@ input.form-control[type="date"] {
 }
 .ff-quem-vazio { color: var(--text-secondary, #94a3b8); font-size: 12px; }
 
+/* Etapa do resultado da busca: a busca varre tudo, então precisa dizer onde está */
+.ff-achado-etapa {
+    display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px;
+    border: 1px solid currentColor; font-size: 10.5px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .03em; vertical-align: middle;
+}
+
 /* Lote = tipo de pagamento. Mesma pessoa em lotes diferentes é normal. */
 .ff-col-lote { white-space: nowrap; }
 .ff-lote-selo {
