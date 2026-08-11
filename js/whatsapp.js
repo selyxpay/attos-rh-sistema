@@ -673,23 +673,39 @@ window.waSincronizarTemplates = async function () {
   else _waToast((r && r.error) || 'Falha ao sincronizar (verifique o Access Token e o WABA ID).', true);
 };
 
+// ── Autopreenchimento do navegador: fora daqui ───────────────────────────────
+// Como estes formulários têm um campo de senha (o Access Token), o Chrome os
+// confunde com uma tela de login e joga o USUÁRIO salvo dele no campo de texto
+// mais próximo e a SENHA salva no token. Já aconteceu: apareceu um login de
+// Facebook dentro do "Phone Number ID".
+//
+// O que resolve:
+//   • autocomplete="new-password" no token — o Chrome entende "senha nova" e
+//     para de oferecer as guardadas (e, sem senha para preencher, também para
+//     de preencher o usuário nos campos de cima);
+//   • autocomplete="off" + sem atributo name nos demais, para não virarem
+//     candidatos de preenchimento nem serem gravados;
+//   • data-lpignore / data-form-type, para LastPass, 1Password e Dashlane.
+const _WA_SEM_AUTO = 'autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore';
+const _WA_SEM_SENHA = 'autocomplete="new-password" data-lpignore="true" data-form-type="other" data-1p-ignore';
+
 // ── Conexão com a Meta (conta) — admin ───────────────────────────────────────
 window.waConfigurarConexao = async function () {
   if (!_waPode('aprovar')) return;
   await _waCarregarContas();
   const c = _waContas[0] || {};
   _waModal('Conexão com a Meta (WhatsApp Business)',
-    `<div class="wa-form">
+    `<div class="wa-form" autocomplete="off">
        <p style="font-size:12px;color:var(--text-secondary,#64748b);margin:0 0 8px;">Estes dados vêm do painel <b>Meta for Developers</b>. O Access Token fica só no servidor — nunca no navegador de quem atende.</p>
        <input type="hidden" id="wa-ac-id" value="${c.id || ''}">
        <label>Nome do número (referência)</label>
-       <input type="text" id="wa-ac-display" value="${_waEsc(c.display_phone || '')}" placeholder="Ex: Atendimento R&T">
+       <input type="text" id="wa-ac-display" ${_WA_SEM_AUTO} value="${_waEsc(c.display_phone || '')}" placeholder="Ex: Atendimento R&T">
        <label>Phone Number ID</label>
-       <input type="text" id="wa-ac-pnid" value="${_waEsc(c.phone_number_id || '')}" placeholder="ID do número (Meta)">
+       <input type="text" id="wa-ac-pnid" ${_WA_SEM_AUTO} value="${_waEsc(c.phone_number_id || '')}" placeholder="ID do número (Meta)">
        <label>WhatsApp Business Account ID (WABA)</label>
-       <input type="text" id="wa-ac-waba" value="${_waEsc(c.waba_id || '')}" placeholder="ID da conta comercial">
+       <input type="text" id="wa-ac-waba" ${_WA_SEM_AUTO} value="${_waEsc(c.waba_id || '')}" placeholder="ID da conta comercial">
        <label>Access Token (permanente)</label>
-       <input type="password" id="wa-ac-token" value="" placeholder="${c.has_token ? '•••••• (já configurado — deixe vazio p/ manter)' : 'Cole o token aqui'}">
+       <input type="password" id="wa-ac-token" ${_WA_SEM_SENHA} value="" placeholder="${c.has_token ? '•••••• (já configurado — deixe vazio p/ manter)' : 'Cole o token aqui'}">
        ${c.has_token ? '<small style="color:#059669;font-size:11px;"><i class="fa-solid fa-lock"></i> Token já configurado e guardado no servidor. Deixe vazio para manter o atual.</small>' : ''}
        <div id="wa-ac-msg" class="wa-form-msg"></div>
      </div>`,
@@ -823,18 +839,18 @@ function _waFormConexao(c) {
   const funcs = _waFuncionariosAtivos();
   const opts = funcs.map(f => `<option value="${_waEsc(f.login)}" data-nome="${_waEsc(f.nomeExibicao || f.nome)}" ${c.responsavel_login === f.login ? 'selected' : ''}>${_waEsc(f.nomeExibicao || f.nome)} (${_waEsc(f.login)})</option>`).join('');
   return `
-    <form onsubmit="return false;" class="wa-form">
+    <form onsubmit="return false;" class="wa-form" autocomplete="off">
       <input type="hidden" id="wa-cx-id" value="${c.id || ''}">
       <label>Nome interno da conexão</label>
-      <input type="text" id="wa-cx-nome" value="${_waEsc(c.business_name || '')}" placeholder="Ex: RT Recrutamento 01">
+      <input type="text" id="wa-cx-nome" ${_WA_SEM_AUTO} value="${_waEsc(c.business_name || '')}" placeholder="Ex: RT Recrutamento 01">
       <label>Número (para exibição)</label>
-      <input type="text" id="wa-cx-num" value="${_waEsc(c.display_phone || '')}" placeholder="Ex: 5511999998888">
+      <input type="text" id="wa-cx-num" ${_WA_SEM_AUTO} value="${_waEsc(c.display_phone || '')}" placeholder="Ex: 5511999998888">
       <label>Phone Number ID (Meta)</label>
-      <input type="text" id="wa-cx-pnid" value="${_waEsc(c.phone_number_id || '')}" placeholder="ID do número">
+      <input type="text" id="wa-cx-pnid" ${_WA_SEM_AUTO} value="${_waEsc(c.phone_number_id || '')}" placeholder="ID do número">
       <label>WABA ID (WhatsApp Business Account)</label>
-      <input type="text" id="wa-cx-waba" value="${_waEsc(c.waba_id || '')}" placeholder="ID da conta comercial">
+      <input type="text" id="wa-cx-waba" ${_WA_SEM_AUTO} value="${_waEsc(c.waba_id || '')}" placeholder="ID da conta comercial">
       <label>Access Token (permanente)</label>
-      <input type="password" id="wa-cx-token" value="" placeholder="${c.has_token ? '•••••• (já configurado — vazio mantém)' : 'Cole o token aqui'}">
+      <input type="password" id="wa-cx-token" ${_WA_SEM_SENHA} value="" placeholder="${c.has_token ? '•••••• (já configurado — vazio mantém)' : 'Cole o token aqui'}">
       <label>Funcionário responsável</label>
       <select id="wa-cx-resp"><option value="">— Ninguém —</option>${opts}</select>
       <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer;">
