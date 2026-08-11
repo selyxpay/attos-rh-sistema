@@ -264,6 +264,11 @@ function isAbaAutorizada(abaId) {
   if (abaId === 'whatsapp') return ehMestre(loggedUser.login)
     || loggedUser.departamento === 'administracao'
     || hasPermission('whatsapp', 'visualizar');
+  // WhatsApp QR (não oficial): mais restrito que o Oficial — só quem administra,
+  // porque é aqui que se conecta o aparelho e se corre o risco de bloqueio.
+  if (abaId === 'whatsapp-qr') return ehMestre(loggedUser.login)
+    || loggedUser.departamento === 'administracao'
+    || hasPermission('whatsapp', 'aprovar');
   // Exame Médico: clínica (anexa o laudo online), seleção (envia o candidato),
   // DP (anexa a foto da ficha nos exames presenciais) e administração.
   // Também vale a permissão granular marcada no cadastro do funcionário.
@@ -1828,6 +1833,9 @@ function _renderCurrentAbaInterno() {
       break;
     case 'whatsapp':
       if (typeof renderWhatsApp === 'function') renderWhatsApp();
+      break;
+    case 'whatsapp-qr':
+      if (typeof renderWhatsappQr === 'function') renderWhatsappQr();
       break;
   }
 }
@@ -16371,6 +16379,183 @@ window.drvBaixarExcel = function () {
   XLSX.utils.book_append_sheet(wb, ws, 'Exames');
   XLSX.writeFile(wb, 'exames_para_a_clinica_' + new Date().toISOString().slice(0, 10) + '.xlsx');
   _drvMarcarComoEnviados();
+};
+
+// ══════════════════════════════════════════════════════════════════════════
+// WHATSAPP QR — segundo WhatsApp, servido pelo OpenWA
+// --------------------------------------------------------------------------
+// O OpenWA é um serviço À PARTE (Docker, porta 2785). Esta tela conversa com
+// ele através do NOSSO servidor (/api/openwa/*), que guarda a chave de acesso
+// — ela nunca chega ao navegador.
+//
+// Tudo aqui é tolerante a falha: se o serviço não existir, estiver iniciando
+// ou cair, a tela explica o que houve e o resto do sistema segue intacto.
+// ══════════════════════════════════════════════════════════════════════════
+let _owaSessao = 'rt';
+let _owaRelogioQr = null;
+
+function _owaPode() {
+  return !!(loggedUser && (ehMestre(loggedUser.login) ||
+    loggedUser.departamento === 'administracao' ||
+    (loggedUser.permissoes && loggedUser.permissoes.whatsapp && loggedUser.permissoes.whatsapp.aprovar === true)));
+}
+
+async function _owaApi(caminho, opcoes) {
+  try {
+    const r = await fetch('/api/openwa' + caminho, Object.assign({
+      credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }
+    }, opcoes || {}));
+    return await r.json();
+  } catch (e) {
+    return { ok: false, erro: 'Não consegui falar com o servidor: ' + (e.message || e) };
+  }
+}
+
+function _owaPararRelogio() {
+  if (_owaRelogioQr) { clearInterval(_owaRelogioQr); _owaRelogioQr = null; }
+}
+
+function renderWhatsappQr() {
+  const cont = document.getElementById('owa-conteudo');
+  if (!cont) return;
+  _owaPararRelogio();
+  if (!_owaPode()) {
+    cont.innerHTML = '<div class="owa-caixa"><h3>Sem acesso</h3>' +
+      '<p>Só quem administra o WhatsApp pode usar esta área.</p></div>';
+    return;
+  }
+  cont.innerHTML = '<div class="owa-caixa"><p><i class="fa-solid fa-spinner fa-spin"></i> Consultando o serviço...</p></div>';
+  owaAtualizar();
+}
+window.renderWhatsappQr = renderWhatsappQr;
+
+window.owaAtualizar = async function () {
+  const cont = document.getElementById('owa-conteudo');
+  if (!cont) return;
+  _owaPararRelogio();
+  const st = await _owaApi('/situacao');
+
+  // 1) Ainda não configurado — mostra o passo a passo, sem parecer defeito
+  if (!st || st.configurado === false) {
+    cont.innerHTML =
+      '<div class="owa-caixa owa-pendente">' +
+        '<h3><i class="fa-solid fa-plug-circle-xmark"></i> Ainda não está ligado</h3>' +
+        '<p>' + escapeHTML((st && st.motivo) || 'O segundo WhatsApp ainda não foi configurado.') + '</p>' +
+        '<p class="owa-passos-titulo">Para ligar, é preciso subir o OpenWA como um serviço separado:</p>' +
+        '<ol class="owa-passos">' +
+          '<li>No Coolify, criar um <b>novo serviço</b> a partir do repositório <code>rmyndharis/OpenWA</code> (porta <b>2785</b>).</li>' +
+          '<li>Nele, definir uma chave de acesso (a <code>API_KEY</code> do OpenWA).</li>' +
+          '<li>Aqui neste sistema, criar as variáveis <code>OPENWA_URL</code> e <code>OPENWA_API_KEY</code> e dar Redeploy.</li>' +
+        '</ol>' +
+        '<p class="owa-nota">O guia completo está em <code>docs/WHATSAPP-QR-OPENWA.md</code>.</p>' +
+      '</div>';
+    return;
+  }
+
+  // 2) Configurado, mas o serviço não responde
+  if (!st.noAr) {
+    cont.innerHTML =
+      '<div class="owa-caixa owa-erro">' +
+        '<h3><i class="fa-solid fa-triangle-exclamation"></i> O serviço não respondeu</h3>' +
+        '<p>' + escapeHTML(st.motivo || 'Sem resposta do OpenWA.') + '</p>' +
+        (st.url ? '<p class="owa-nota">Endereço configurado: <code>' + escapeHTML(st.url) + '</code></p>' : '') +
+        '<p class="owa-nota">Ele pode estar iniciando (leva ~1 minuto na primeira vez). ' +
+        'Nada no resto do sistema é afetado por isso.</p>' +
+        '<button class="btn btn-secondary" onclick="owaAtualizar()"><i class="fa-solid fa-rotate"></i> Tentar de novo</button>' +
+      '</div>';
+    return;
+  }
+
+  // 3) No ar — mostra as sessões e o que dá para fazer
+  const sessoes = Array.isArray(st.sessoes) ? st.sessoes : [];
+  const minha = sessoes.find(s => s && (s.sessionId === _owaSessao || s.id === _owaSessao || s.name === _owaSessao));
+  const situacao = minha ? String(minha.status || minha.state || '').toUpperCase() : '';
+  const conectado = /CONNECTED|AUTHENTICATED|READY|WORKING/.test(situacao);
+
+  cont.innerHTML =
+    '<div class="owa-caixa owa-ok">' +
+      '<h3><i class="fa-solid fa-circle-check"></i> Serviço no ar</h3>' +
+      '<p class="owa-nota">Endereço: <code>' + escapeHTML(st.url || '') + '</code> &middot; ' +
+        sessoes.length + ' conexão(ões) cadastrada(s)</p>' +
+    '</div>' +
+    (conectado
+      ? '<div class="owa-caixa owa-ok">' +
+          '<h3><i class="fa-brands fa-whatsapp"></i> Conectado</h3>' +
+          '<p>A conexão <b>' + escapeHTML(_owaSessao) + '</b> está ativa' +
+            (minha && (minha.phone || minha.me) ? ' no número <b>' + escapeHTML(String(minha.phone || minha.me)) + '</b>' : '') + '.</p>' +
+        '</div>'
+      : '<div class="owa-caixa">' +
+          '<h3><i class="fa-solid fa-qrcode"></i> Conectar o aparelho</h3>' +
+          '<p>Clique abaixo e leia o código com o celular: <b>WhatsApp &rarr; Aparelhos conectados &rarr; Conectar um aparelho</b>.</p>' +
+          '<button class="btn btn-primary" id="owa-btn-qr" onclick="owaGerarQr()"><i class="fa-solid fa-qrcode"></i> Gerar QR Code</button>' +
+          '<div id="owa-qr"></div>' +
+        '</div>') +
+    '<div class="owa-caixa">' +
+      '<h3><i class="fa-solid fa-paper-plane"></i> Enviar uma mensagem de teste</h3>' +
+      '<div class="owa-form">' +
+        '<div class="form-group"><label for="owa-para">Número (com DDD)</label>' +
+          '<input type="text" id="owa-para" class="form-control" placeholder="Ex.: 11912345678"></div>' +
+        '<div class="form-group"><label for="owa-texto">Mensagem</label>' +
+          '<input type="text" id="owa-texto" class="form-control" placeholder="Ex.: Teste do sistema R&amp;T"></div>' +
+      '</div>' +
+      '<button class="btn btn-primary" id="owa-btn-enviar" onclick="owaEnviar()"><i class="fa-solid fa-paper-plane"></i> Enviar</button>' +
+      '<div id="owa-resultado"></div>' +
+    '</div>';
+};
+
+window.owaGerarQr = async function () {
+  const alvo = document.getElementById('owa-qr');
+  const btn = document.getElementById('owa-btn-qr');
+  if (!alvo) return;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparando...'; }
+  alvo.innerHTML = '<p class="owa-nota">Iniciando a conexão...</p>';
+
+  const ini = await _owaApi('/iniciar', { method: 'POST', body: JSON.stringify({ sessao: _owaSessao }) });
+  if (!ini || ini.ok === false) {
+    alvo.innerHTML = '<div class="owa-erro-linha">' + escapeHTML((ini && ini.erro) || 'Não consegui iniciar.') + '</div>';
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-qrcode"></i> Tentar de novo'; }
+    return;
+  }
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Atualizar o código'; }
+
+  // O QR muda a cada ~20s. Buscamos de tempos em tempos até conectar.
+  let tentativas = 0;
+  const buscar = async () => {
+    tentativas++;
+    const r = await _owaApi('/qr/' + encodeURIComponent(_owaSessao));
+    const d = (r && r.dados) || {};
+    const img = d.qr || d.qrCode || d.image || d.base64 || (typeof d === 'string' ? d : '');
+    if (r && r.ok && img) {
+      const src = String(img).indexOf('data:') === 0 ? img : ('data:image/png;base64,' + img);
+      alvo.innerHTML = '<img class="owa-qr-img" src="' + escapeHTML(src) + '" alt="QR Code">' +
+        '<p class="owa-nota">O código muda sozinho a cada poucos segundos. Depois de ler, clique em <b>Atualizar</b> no topo.</p>';
+    } else if (r && r.ok) {
+      alvo.innerHTML = '<p class="owa-nota">Sem código no momento — se o aparelho já leu, clique em <b>Atualizar</b> no topo.</p>';
+    } else {
+      alvo.innerHTML = '<div class="owa-erro-linha">' + escapeHTML((r && r.erro) || 'Não consegui pegar o código.') + '</div>';
+    }
+    if (tentativas > 40) _owaPararRelogio();   // ~2 minutos e para
+  };
+  await buscar();
+  _owaPararRelogio();
+  _owaRelogioQr = setInterval(buscar, 3000);
+};
+
+window.owaEnviar = async function () {
+  const g = k => document.getElementById(k);
+  const alvo = g('owa-resultado');
+  const btn = g('owa-btn-enviar');
+  const para = (g('owa-para') || {}).value || '';
+  const texto = (g('owa-texto') || {}).value || '';
+  if (alvo) alvo.innerHTML = '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...'; }
+  const r = await _owaApi('/enviar', { method: 'POST', body: JSON.stringify({ sessao: _owaSessao, para: para, texto: texto }) });
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Enviar'; }
+  if (!alvo) return;
+  alvo.innerHTML = (r && r.ok)
+    ? '<div class="owa-ok-linha"><i class="fa-solid fa-circle-check"></i> Enviado para ' + escapeHTML(r.para || para) + '.</div>'
+    : '<div class="owa-erro-linha"><i class="fa-solid fa-circle-exclamation"></i> ' +
+      escapeHTML((r && r.erro) || 'Não consegui enviar.') + '</div>';
 };
 
 function renderExameMedico() {

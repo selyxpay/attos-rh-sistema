@@ -645,6 +645,16 @@ function filtrarSenhaVisivel(dados) {
 // sistema. Se o sql.js não estiver instalado ou um arquivo do módulo falhar, o
 // servidor sobe do mesmo jeito — Vagas, Seleção, DP, Equipamentos e Financeiro
 // continuam funcionando e só o WhatsApp fica indisponível (responde 503).
+// Segundo WhatsApp (QR Code, via OpenWA). Módulo isolado: se ele não carregar,
+// o sistema sobe igual e só essa aba responde que está indisponível.
+let openwa = null;
+try {
+  openwa = require('./openwa.cjs');
+  console.log('[OpenWA] ponte carregada' + (openwa.configurado() ? ' — apontando para ' + openwa.URL_BASE : ' (ainda NÃO configurado)'));
+} catch (e) {
+  console.error('[OpenWA] não carregou (o sistema segue normal):', e.message);
+  openwa = null;
+}
 let waDb = null, waApi = null, waWebhook = null, _waCarregado = false;
 try {
   waDb      = require('./whatsapp-db.cjs');
@@ -1437,6 +1447,85 @@ http.createServer(function (req, res) {
   // ==========================================================================
 
   // ---- WEBHOOK: Verificação (GET) — pública, sem login ----
+  // ==========================================================================
+  // PONTE PARA O OPENWA (segundo WhatsApp, por QR Code)
+  // --------------------------------------------------------------------------
+  // A chave de acesso do OpenWA fica SÓ aqui no servidor. O navegador nunca a
+  // recebe. Toda rota exige login e a permissão de WhatsApp — e qualquer falha
+  // do OpenWA vira uma resposta explicada, sem derrubar nada.
+  // ==========================================================================
+  if (urlPath.indexOf('/api/openwa/') === 0) {
+    if (!autenticado) { responderJson(res, 401, { error: 'Faça login.' }); return; }
+    const _u = usuarioDaReq(req);
+    if (!waEhAdminWhatsapp(_u)) {
+      responderJson(res, 403, { error: 'Só quem administra o WhatsApp pode usar esta área.' }); return;
+    }
+    if (!openwa) {
+      responderJson(res, 503, { error: 'A ponte do segundo WhatsApp não carregou no servidor.' }); return;
+    }
+
+    // Situação: configurado? no ar? quais sessões existem?
+    if (urlPath === '/api/openwa/situacao' && req.method === 'GET') {
+      openwa.situacao().then(function (st) { responderJson(res, 200, st); })
+        .catch(function (e) { responderJson(res, 200, { configurado: false, noAr: false, motivo: String(e.message || e) }); });
+      return;
+    }
+
+    // Criar a sessão (uma vez) e começar, para o QR Code aparecer
+    if (urlPath === '/api/openwa/iniciar' && req.method === 'POST') {
+      lerCorpo(req, function (err, body) {
+        const nome = String((body && body.sessao) || 'rt').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'rt';
+        // Criar pode falhar porque já existe — nesse caso seguimos para o start
+        openwa.chamar('/api/sessions', { metodo: 'POST', corpo: { sessionId: nome } })
+          .then(function () {
+            return openwa.chamar('/api/sessions/' + encodeURIComponent(nome) + '/start', { metodo: 'POST' });
+          })
+          .then(function (r) {
+            if (!r.ok && !r.naoConfigurado) { responderJson(res, 200, { ok: false, erro: r.erro, sessao: nome }); return; }
+            if (r.naoConfigurado) { responderJson(res, 200, { ok: false, erro: r.erro, naoConfigurado: true }); return; }
+            responderJson(res, 200, { ok: true, sessao: nome, dados: r.dados });
+          })
+          .catch(function (e) { responderJson(res, 200, { ok: false, erro: String(e.message || e) }); });
+      });
+      return;
+    }
+
+    // QR Code da sessão (o servidor busca e devolve; a imagem vem do OpenWA)
+    if (urlPath.indexOf('/api/openwa/qr/') === 0 && req.method === 'GET') {
+      const nome = decodeURIComponent(urlPath.slice('/api/openwa/qr/'.length)).replace(/[^a-zA-Z0-9_-]/g, '');
+      if (!nome) { responderJson(res, 400, { error: 'sessão inválida' }); return; }
+      openwa.chamar('/api/sessions/' + encodeURIComponent(nome) + '/qr')
+        .then(function (r) { responderJson(res, 200, { ok: r.ok, erro: r.erro || null, dados: r.dados || null }); })
+        .catch(function (e) { responderJson(res, 200, { ok: false, erro: String(e.message || e) }); });
+      return;
+    }
+
+    // Enviar uma mensagem (teste ou uso normal)
+    if (urlPath === '/api/openwa/enviar' && req.method === 'POST') {
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
+        const nome = String((body && body.sessao) || 'rt').replace(/[^a-zA-Z0-9_-]/g, '');
+        const paraDig = String((body && body.para) || '').replace(/\D/g, '');
+        const texto = String((body && body.texto) || '').trim();
+        if (paraDig.length < 10) { responderJson(res, 200, { ok: false, erro: 'Número inválido. Use DDD + número.' }); return; }
+        if (!texto) { responderJson(res, 200, { ok: false, erro: 'Escreva a mensagem.' }); return; }
+        // Brasil: se vier sem o 55 na frente, acrescenta
+        const destino = paraDig.length <= 11 ? '55' + paraDig : paraDig;
+        openwa.chamar('/api/sessions/' + encodeURIComponent(nome) + '/messages/send-text',
+          { metodo: 'POST', corpo: { to: destino, text: texto } })
+          .then(function (r) {
+            if (r.ok) console.log('[OpenWA] ' + ((_u && _u.login) || '?') + ' enviou mensagem para ' + destino);
+            responderJson(res, 200, { ok: r.ok, erro: r.erro || null, dados: r.dados || null, para: destino });
+          })
+          .catch(function (e) { responderJson(res, 200, { ok: false, erro: String(e.message || e) }); });
+      });
+      return;
+    }
+
+    responderJson(res, 404, { error: 'Rota não encontrada.' });
+    return;
+  }
+
   if (urlPath === '/webhooks/whatsapp' && req.method === 'GET') {
     if (!_waCarregado) { responderJson(res, 503, { error: 'Módulo WhatsApp indisponível.' }); return; }
     if (!WA_VERIFY_TOKEN) { responderJson(res, 500, { error: 'WHATSAPP_VERIFY_TOKEN não configurado.' }); return; }

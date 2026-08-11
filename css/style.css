@@ -4892,6 +4892,55 @@ input.form-control[type="date"] {
 }
 .ff-quem-vazio { color: var(--text-secondary, #94a3b8); font-size: 12px; }
 
+/* ══════════════════════════════════════════════════════════════════════
+   WHATSAPP QR (segundo WhatsApp, via OpenWA)
+   ══════════════════════════════════════════════════════════════════════ */
+.owa-aviso {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 14px 18px; margin-bottom: 18px; border-radius: 11px;
+    background: rgba(180, 83, 9, .07); border: 1px solid rgba(180, 83, 9, .3);
+    font-size: 13px; line-height: 1.6; color: var(--text-primary, #0f172a);
+}
+.owa-aviso i { color: #B45309; font-size: 19px; flex: 0 0 auto; margin-top: 1px; }
+.owa-caixa {
+    padding: 18px 20px; margin-bottom: 14px; border-radius: 12px;
+    background: var(--bg-card, #fff); border: 1px solid var(--border-color, #e2e8f0);
+    border-left: 4px solid #7C3AED;
+}
+.owa-caixa h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; color: var(--text-primary, #0f172a); }
+.owa-caixa h3 i { margin-right: 6px; color: #7C3AED; }
+.owa-caixa p { margin: 0 0 8px; font-size: 13.5px; line-height: 1.6; }
+.owa-caixa.owa-ok { border-left-color: #059669; }
+.owa-caixa.owa-ok h3, .owa-caixa.owa-ok h3 i { color: #047857; }
+.owa-caixa.owa-erro { border-left-color: #DC2626; background: rgba(220, 38, 38, .04); }
+.owa-caixa.owa-erro h3, .owa-caixa.owa-erro h3 i { color: #B91C1C; }
+.owa-caixa.owa-pendente { border-left-color: #B45309; background: rgba(180, 83, 9, .04); }
+.owa-caixa.owa-pendente h3, .owa-caixa.owa-pendente h3 i { color: #B45309; }
+.owa-nota { font-size: 12px !important; color: var(--text-secondary, #64748b); }
+.owa-nota code, .owa-passos code {
+    padding: 1px 6px; border-radius: 5px; background: var(--bg-main, #f1f5f9);
+    font-family: ui-monospace, monospace; font-size: 11.5px;
+}
+.owa-passos-titulo { font-weight: 700; margin-top: 12px !important; }
+.owa-passos { margin: 6px 0 0; padding-left: 20px; font-size: 13px; line-height: 1.8; }
+.owa-qr-img {
+    display: block; width: 260px; max-width: 100%; height: auto; margin: 14px 0 8px;
+    border: 8px solid #fff; border-radius: 10px; box-shadow: 0 3px 14px rgba(15, 23, 42, .14);
+}
+.owa-form { display: grid; grid-template-columns: 220px 1fr; gap: 12px; margin-bottom: 12px; }
+.owa-form .form-group { margin-bottom: 0; }
+.owa-ok-linha, .owa-erro-linha {
+    margin-top: 11px; padding: 10px 13px; border-radius: 9px;
+    font-size: 13px; font-weight: 600; line-height: 1.5;
+}
+.owa-ok-linha { background: #ECFDF5; border: 1px solid #A7F3D0; color: #047857; }
+.owa-erro-linha { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; }
+
+@media (max-width: 768px) {
+    .owa-form { grid-template-columns: 1fr; }
+    .owa-qr-img { width: 100%; max-width: 300px; }
+}
+
 /* Pessoa que veio SEM valor no PDF: mostra traço, igual ao arquivo */
 .ff-sem-valor { color: var(--text-secondary, #94a3b8); font-weight: 700; }
 

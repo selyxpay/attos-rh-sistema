@@ -39,16 +39,16 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260807k">
+    <link rel="stylesheet" href="css/style.css?v=20260807l">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260807k">
+    <link rel="stylesheet" href="css/design-system.css?v=20260807l">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260807k">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260807l">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260807k">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260807k">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260807l">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260807l">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260807k">
+    <link rel="stylesheet" href="css/mobile.css?v=20260807l">
 </head>
 <body class="app-shell">
 
@@ -204,7 +204,12 @@
                         <a href="#"><i class="fa-solid fa-sack-dollar"></i> <span>Comissão</span></a>
                     </li>
                     <li class="nav-item" data-aba="whatsapp" id="nav-item-whatsapp" style="display:none;">
-                        <a href="#"><i class="fa-brands fa-whatsapp"></i> <span>WhatsApp</span> <span class="wa-nav-badge" id="wa-nav-badge" style="display:none;"></span></a>
+                        <a href="#"><i class="fa-brands fa-whatsapp"></i> <span>WhatsApp Oficial</span> <span class="wa-nav-badge" id="wa-nav-badge" style="display:none;"></span></a>
+                    </li>
+                    <!-- Segundo WhatsApp: por leitura de QR Code, num serviço à parte (OpenWA).
+                         Fica separado do Oficial de propósito — são dois caminhos diferentes. -->
+                    <li class="nav-item" data-aba="whatsapp-qr" id="nav-item-whatsapp-qr" style="display:none;">
+                        <a href="#"><i class="fa-solid fa-qrcode"></i> <span>WhatsApp QR</span></a>
                     </li>
 
                     <!-- CATEGORIA: ADMINISTRAÇÃO -->
@@ -2195,6 +2200,33 @@
                 <input type="file" id="input-pdf-exame" accept=".pdf,.jpg,.jpeg,.png,.webp" class="input-arquivo-oculto" onchange="processarUploadPdfExame(this)">
 
                 <!-- ABA: WHATSAPP (API oficial WhatsApp Business — só quem tem permissão) -->
+                <!-- SEGUNDO WHATSAPP — por QR Code, servido pelo OpenWA (serviço à parte) -->
+                <section id="aba-whatsapp-qr" class="aba-content">
+                    <div style="max-width:1000px;margin:0 auto;padding:0 0 60px;">
+                        <div class="mod-header-banner">
+                            <div class="mod-header-left">
+                                <div class="mod-header-icon-badge" style="background:linear-gradient(135deg,#7C3AED,#A78BFA);"><i class="fa-solid fa-qrcode"></i></div>
+                                <div>
+                                    <h1 class="mod-header-title">WhatsApp QR</h1>
+                                    <p class="mod-header-subtitle">Segundo WhatsApp, conectado pela leitura do QR Code — separado do Oficial.</p>
+                                </div>
+                            </div>
+                            <div class="mod-header-actions">
+                                <button class="mod-btn-secondary" onclick="owaAtualizar()"><i class="fa-solid fa-rotate"></i> Atualizar</button>
+                            </div>
+                        </div>
+
+                        <div class="owa-aviso">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            <div><b>Use um número dedicado.</b> Esta é uma conexão <b>não oficial</b>, feita lendo o QR Code
+                            como no WhatsApp Web. O próprio projeto avisa que existe risco de o número ser bloqueado pelo
+                            WhatsApp. <b>Nunca use aqui o mesmo número do WhatsApp Oficial</b> nem o número principal da empresa.</div>
+                        </div>
+
+                        <div id="owa-conteudo"><!-- Gerado por JS --></div>
+                    </div>
+                </section>
+
                 <section id="aba-whatsapp" class="aba-content">
                     <div class="wa-container">
                         <div class="mod-header-banner">
@@ -3939,11 +3971,11 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260807k"></script>
-    <script src="js/vps-sync.js?v=20260807k"></script>
-    <script src="js/exata-catalogo.js?v=20260807k"></script>
-    <script src="js/data.js?v=20260807k"></script>
-    <script src="js/app.js?v=20260807k"></script>
-    <script src="js/whatsapp.js?v=20260807k"></script>
+    <script src="js/security.js?v=20260807l"></script>
+    <script src="js/vps-sync.js?v=20260807l"></script>
+    <script src="js/exata-catalogo.js?v=20260807l"></script>
+    <script src="js/data.js?v=20260807l"></script>
+    <script src="js/app.js?v=20260807l"></script>
+    <script src="js/whatsapp.js?v=20260807l"></script>
 </body>
 </html>

@@ -29,6 +29,9 @@ COPY verificar-sistema.cjs backup-dados.cjs limpar-fotos-embutidas.cjs reparar-l
 # Módulo WhatsApp (API Oficial da Meta). Se faltar, o servidor sobe do mesmo
 # jeito e só o WhatsApp responde 503 — o resto do sistema não é afetado.
 COPY whatsapp-db.cjs whatsapp-api.cjs whatsapp-webhook.cjs ./
+# Ponte para o SEGUNDO WhatsApp (QR Code, serviço OpenWA à parte). Mesma regra:
+# se faltar ou não estiver configurado, só essa aba avisa — nada mais é afetado.
+COPY openwa.cjs ./
 
 # --- Frontend --------------------------------------------------------------
 COPY index.html login.html candidato.html talento.html fila-display.html relatorio-equip.html ./
