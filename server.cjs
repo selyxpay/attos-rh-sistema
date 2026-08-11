@@ -313,7 +313,7 @@ function _sigiloAutorizado(dados, login) {
 // Ids das empresas marcadas como sigilosas
 function _idsSigilosos(dados) {
   const ids = {};
-  ((dados && dados.empresas) || []).forEach(function (e) {
+  ((dados && dados.ffEmpresas) || []).forEach(function (e) {
     if (e && e.sigilosa === true && e.id) ids[e.id] = true;
   });
   return ids;
@@ -331,9 +331,9 @@ function _semSigilo(dados) {
   const d = Object.assign({}, dados || {});
   const ids = _idsSigilosos(d);
   if (!Object.keys(ids).length) return d;
-  d.empresas  = (d.empresas  || []).filter(function (e) { return !(e && ids[e.id]); });
-  d.tomadores = (d.tomadores || []).filter(function (t) { return !(t && ids[t.empresaId]); });
-  d.clientes  = (d.clientes  || []).filter(function (c) { return !(c && ids[c.empresaId]); });
+  d.ffEmpresas  = (d.ffEmpresas  || []).filter(function (e) { return !(e && ids[e.id]); });
+  d.ffTomadores = (d.ffTomadores || []).filter(function (t) { return !(t && ids[t.empresaId]); });
+  d.ffClientes  = (d.ffClientes  || []).filter(function (c) { return !(c && ids[c.empresaId]); });
   d.fluxosFinanceiros = (d.fluxosFinanceiros || []).filter(function (f) { return !_fichaEhSigilosa(f, ids); });
   return d;
 }
@@ -352,9 +352,9 @@ function _devolverSigilo(antes, novo) {
     atual.forEach(function (r) { if (r && r.id != null) tem[r.id] = true; });
     d[chave] = atual.concat(guardados.filter(function (r) { return r && !tem[r.id]; }));
   };
-  juntar("empresas",  function (e) { return e && ids[e.id]; });
-  juntar("tomadores", function (t) { return t && ids[t.empresaId]; });
-  juntar("clientes",  function (c) { return c && ids[c.empresaId]; });
+  juntar("ffEmpresas",  function (e) { return e && ids[e.id]; });
+  juntar("ffTomadores", function (t) { return t && ids[t.empresaId]; });
+  juntar("ffClientes",  function (c) { return c && ids[c.empresaId]; });
   juntar("fluxosFinanceiros", function (f) { return _fichaEhSigilosa(f, ids); });
   // A lista de quem pode ver também é preservada: só o admin autorizado mexe nela
   if (antes && antes.ffSigiloLogins !== undefined) d.ffSigiloLogins = antes.ffSigiloLogins;
@@ -429,43 +429,70 @@ function garantirCadastrosFinanceiro() {
 
     const st = lerEstado();
     const d = st.dados || {};
-    if (!Array.isArray(d.empresas))  d.empresas  = [];
-    if (!Array.isArray(d.tomadores)) d.tomadores = [];
-    if (!Array.isArray(d.clientes))  d.clientes  = [];
+    let mudou = false;
 
+    // ── MIGRAÇÃO (roda uma vez) ────────────────────────────────────────────
+    // Antes, os cadastros do financeiro dividiam as listas empresas/tomadores/
+    // clientes com a parte OPERACIONAL (Vagas, Contratações, gráficos do
+    // Dashboard, mapa do Banco de Talentos). Atualizar a lista do financeiro
+    // apagava a operacional junto. Aqui os registros de origem "base" são
+    // MOVIDOS para chaves próprias e a lista operacional é devolvida intacta.
+    if (!Array.isArray(d.ffEmpresas))  d.ffEmpresas  = [];
+    if (!Array.isArray(d.ffTomadores)) d.ffTomadores = [];
+    if (!Array.isArray(d.ffClientes))  d.ffClientes  = [];
+    [['empresas', 'ffEmpresas'], ['tomadores', 'ffTomadores'], ['clientes', 'ffClientes']]
+      .forEach(function (par) {
+        const velha = par[0], nova = par[1];
+        if (!Array.isArray(d[velha]) || !d[velha].length) return;
+        const doFF = d[velha].filter(function (r) { return r && (r.origem === 'base' || r.origem === 'manual'); });
+        if (!doFF.length) return;
+        const jaTem = {};
+        d[nova].forEach(function (r) { if (r && r.id != null) jaTem[r.id] = true; });
+        doFF.forEach(function (r) { if (!jaTem[r.id]) { d[nova].push(r); jaTem[r.id] = true; } });
+        d[velha] = d[velha].filter(function (r) {
+          return !(r && (r.origem === 'base' || r.origem === 'manual'));
+        });
+        mudou = true;
+        console.log('[RT] Migrou ' + doFF.length + ' ' + velha + ' do financeiro para ' + nova + '.');
+      });
+
+    // ── Carga da base oficial ─────────────────────────────────────────────
+    // Registro vindo do arquivo leva origem "base". Quando a VERSÃO do arquivo
+    // muda, os "base" são recriados do zero — é assim que uma lista errada é
+    // corrigida inteira. O que o admin cadastrar pela tela (origem "manual")
+    // NUNCA é tocado. E nada disso encosta na lista operacional.
     const versaoArquivo = Number(base.versao || 1);
     const versaoAtual   = Number(d.ffCadastrosVersao || 0);
-    const primeiraVez   = !d.empresas.length && !d.tomadores.length && !d.clientes.length;
+    const primeiraVez   = !d.ffEmpresas.length && !d.ffTomadores.length && !d.ffClientes.length;
 
-    if (versaoAtual === versaoArquivo && !primeiraVez) {
-      console.log('[RT] Cadastros do Fluxo Financeiro já na versão ' + versaoArquivo + ' (nada a fazer).');
-      return;
+    if (versaoAtual !== versaoArquivo || primeiraVez) {
+      const doAdmin = {
+        empresas:  d.ffEmpresas.filter(function (e)  { return e && e.origem === 'manual'; }),
+        tomadores: d.ffTomadores.filter(function (t) { return t && t.origem === 'manual'; }),
+        clientes:  d.ffClientes.filter(function (c)  { return c && c.origem === 'manual'; })
+      };
+      const daBase = function (lista) {
+        return (lista || []).map(function (r) {
+          return Object.assign({}, r, { ativo: r.ativo !== false, origem: 'base' });
+        });
+      };
+      d.ffEmpresas  = daBase(base.empresas).concat(doAdmin.empresas);
+      d.ffTomadores = daBase(base.tomadores).concat(doAdmin.tomadores);
+      d.ffClientes  = daBase(base.clientes).concat(doAdmin.clientes);
+      d.ffCadastrosVersao = versaoArquivo;
+      mudou = true;
+      console.log('[RT] Cadastros do Fluxo Financeiro na versão ' + versaoArquivo + ': ' +
+        d.ffEmpresas.length + ' empresa(s), ' + d.ffTomadores.length + ' tomador(es), ' +
+        d.ffClientes.length + ' cliente(s). (preservados do admin: ' + doAdmin.empresas.length +
+        '/' + doAdmin.tomadores.length + '/' + doAdmin.clientes.length + ')');
     }
 
-    // O que o admin criou pela tela fica de fora da troca.
-    const doAdmin = {
-      empresas:  d.empresas.filter(function (e)  { return e && e.origem === 'manual'; }),
-      tomadores: d.tomadores.filter(function (t) { return t && t.origem === 'manual'; }),
-      clientes:  d.clientes.filter(function (c)  { return c && c.origem === 'manual'; })
-    };
-    const antes = { e: d.empresas.length, t: d.tomadores.length, c: d.clientes.length };
-
-    const daBase = function (lista) {
-      return (lista || []).map(function (r) {
-        return Object.assign({}, r, { ativo: r.ativo !== false, origem: 'base' });
-      });
-    };
-    d.empresas  = daBase(base.empresas).concat(doAdmin.empresas);
-    d.tomadores = daBase(base.tomadores).concat(doAdmin.tomadores);
-    d.clientes  = daBase(base.clientes).concat(doAdmin.clientes);
-    d.ffCadastrosVersao = versaoArquivo;
-
-    gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-    console.log('[RT] Cadastros do Fluxo Financeiro na versão ' + versaoArquivo + ': ' +
-      d.empresas.length + ' empresa(s), ' + d.tomadores.length + ' tomador(es), ' +
-      d.clientes.length + ' cliente(s). (antes: ' + antes.e + '/' + antes.t + '/' + antes.c +
-      '; preservados do admin: ' + doAdmin.empresas.length + '/' + doAdmin.tomadores.length +
-      '/' + doAdmin.clientes.length + ')');
+    if (mudou) {
+      gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+    } else {
+      console.log('[RT] Cadastros do Fluxo Financeiro já na versão ' + versaoArquivo + ' (nada a fazer).');
+    }
+    console.log('[RT] Empresas OPERACIONAIS (vagas/dashboard): ' + ((d.empresas || []).length));
   });
 }
 

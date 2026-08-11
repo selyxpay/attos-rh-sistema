@@ -14342,20 +14342,37 @@ let _ffVinculos = [];
 
 // Só cadastros ATIVOS aparecem para novos lançamentos. Os inativos continuam
 // visíveis no histórico, mas não podem ser escolhidos de novo.
+// ══════════════════════════════════════════════════════════════════════════
+// As três listas do Fluxo Financeiro moram em chaves PRÓPRIAS.
+// --------------------------------------------------------------------------
+// state.empresas é a lista OPERACIONAL — Vagas, Contratações, os gráficos do
+// Dashboard e o mapa de empresas próximas do Banco de Talentos dependem dela,
+// com cor e coordenadas. O Fluxo Financeiro tem outra realidade (EMPRESA ->
+// TOMADOR -> CLIENTE, vindo da planilha do cliente). Enquanto as duas dividiam
+// a mesma lista, atualizar a do financeiro apagava a operacional.
+// ══════════════════════════════════════════════════════════════════════════
+const FF_CHAVE = { empresas: 'ffEmpresas', tomadores: 'ffTomadores', clientes: 'ffClientes' };
+function _ffLista(tipo) {
+  const k = FF_CHAVE[tipo] || tipo;
+  if (!Array.isArray(state[k])) state[k] = [];
+  return state[k];
+}
+window._ffLista = _ffLista;
+
 function _ffEmpresasAtivas() {
   const veSigilo = (typeof _ffVeSigilo === 'function') ? _ffVeSigilo() : false;
-  return (state.empresas || [])
+  return _ffLista('empresas')
     .filter(e => e && e.ativo !== false && (veSigilo || e.sigilosa !== true))
     .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
 }
 function _ffTomadoresDaEmpresa(empresaId) {
   if (!empresaId) return [];
-  return (state.tomadores || []).filter(t => t && t.ativo !== false && t.empresaId === empresaId)
+  return _ffLista('tomadores').filter(t => t && t.ativo !== false && t.empresaId === empresaId)
     .sort((a, b) => (Number(a.codigo) || 0) - (Number(b.codigo) || 0));
 }
 function _ffClientesDoTomador(empresaId, tomadorId) {
   if (!empresaId || !tomadorId) return [];
-  return (state.clientes || []).filter(c => c && c.ativo !== false &&
+  return _ffLista('clientes').filter(c => c && c.ativo !== false &&
       c.empresaId === empresaId && c.tomadorId === tomadorId)
     .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
 }
@@ -14385,7 +14402,7 @@ function _ffVeSigilo() {
   return _ffSigiloLogins().indexOf(loggedUser.login) >= 0;
 }
 function _ffEmpresaSigilosa(empresaId) {
-  const e = (state.empresas || []).find(x => x && x.id === empresaId);
+  const e = _ffLista('empresas').find(x => x && x.id === empresaId);
   return !!(e && e.sigilosa === true);
 }
 // A ficha é sigilosa se QUALQUER vínculo dela aponta para empresa sigilosa
@@ -14460,7 +14477,7 @@ let _cadEditandoId = '';
 function _cadPode() {
   return !!(loggedUser && (ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao'));
 }
-function _cadLista(tipo) { return Array.isArray(state[tipo]) ? state[tipo] : []; }
+function _cadLista(tipo) { return _ffLista(tipo); }
 function _cadEmpresa(id) { return _cadLista('empresas').find(e => e && e.id === id) || null; }
 function _cadTomador(id) { return _cadLista('tomadores').find(t => t && t.id === id) || null; }
 function _cadNorm(s) {
@@ -14695,8 +14712,7 @@ window.cadSalvar = async function () {
     if (tipo === 'empresas')  { reg.sigla = sigla; reg.sigilosa = !!(ehMestre(loggedUser.login) && (g('cad-f-sigilosa') || {}).checked); }
     if (tipo === 'tomadores') { reg.empresaId = empresaId; reg.codigo = codigo; }
     if (tipo === 'clientes')  { reg.empresaId = empresaId; reg.tomadorId = tomadorId; }
-    if (!Array.isArray(state[tipo])) state[tipo] = [];
-    state[tipo].push(reg);
+    _ffLista(tipo).push(reg);
     _cadAba = tipo;
   }
 
@@ -14742,7 +14758,7 @@ window.cadApagar = async function (id) {
     alert('Este tomador tem clientes. Apague os clientes antes.'); return;
   }
   if (!confirm('Apagar "' + (reg.nome || reg.codigo) + '" de vez?\n\nNão dá para desfazer.')) return;
-  state[_cadAba] = lista.filter(r => r && r.id !== id);
+  state[FF_CHAVE[_cadAba] || _cadAba] = lista.filter(r => r && r.id !== id);
   try { await RTCloud.salvarAgora(state); }
   catch (e) { alert('Não consegui salvar: ' + (e.message || e)); return; }
   registrarLogGlobal('Apagou ' + _cadAba.slice(0, -1) + ' do Fluxo Financeiro: ' + (reg.nome || reg.codigo) + '.', 'sistema');
@@ -14843,9 +14859,9 @@ function _ffVinculosParaSalvar() {
   const out = [];
   for (let i = 0; i < _ffVinculos.length; i++) {
     const v = _ffVinculos[i];
-    const emp = (state.empresas  || []).find(e => e.id === v.empresaId);
-    const tom = (state.tomadores || []).find(t => t.id === v.tomadorId);
-    const cli = (state.clientes  || []).find(c => c.id === v.clienteId);
+    const emp = _ffLista('empresas').find(e => e.id === v.empresaId);
+    const tom = _ffLista('tomadores').find(t => t.id === v.tomadorId);
+    const cli = _ffLista('clientes').find(c => c.id === v.clienteId);
     if (!emp || !tom || !cli) {
       return { erro: `Vínculo ${i + 1}: escolha empresa, tomador e cliente.` };
     }
@@ -14958,7 +14974,7 @@ async function criarFluxoFinanceiro() {
   if (!comp)      { alert('Informe a competência.'); return; }
   if (!_ffPdfsTemp.length) { alert('Adicione ao menos um PDF do Exata.'); return; }
 
-  const empresa = (state.empresas || []).find(e => e.id === empresaId) || {};
+  const empresa = _ffLista('empresas').find(e => e.id === empresaId) || {};
   const btn = g('ff-btn-criar'); if (btn) btn.disabled = true;
   const proc = g('ff-processando'); if (proc) proc.style.display = '';
   const barra = g('ff-barra'); const txt = g('ff-processando-txt');
