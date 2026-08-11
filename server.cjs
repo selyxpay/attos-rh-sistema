@@ -1471,12 +1471,26 @@ http.createServer(function (req, res) {
       return;
     }
 
+    // Testar um endereço na hora, sem gravar variável nem redeployar.
+    // É como se acha o nome interno do serviço no Coolify sem ficar chutando.
+    if (urlPath === '/api/openwa/testar' && req.method === 'POST') {
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
+        openwa.testar((body && body.url) || '', (body && body.chave) || '')
+          .then(function (r) { responderJson(res, 200, r); })
+          .catch(function (e) { responderJson(res, 200, { ok: false, erro: String(e.message || e) }); });
+      });
+      return;
+    }
+
     // Criar a sessão (uma vez) e começar, para o QR Code aparecer
     if (urlPath === '/api/openwa/iniciar' && req.method === 'POST') {
       lerCorpo(req, function (err, body) {
         const nome = String((body && body.sessao) || 'rt').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'rt';
-        // Criar pode falhar porque já existe — nesse caso seguimos para o start
-        openwa.chamar('/api/sessions', { metodo: 'POST', corpo: { sessionId: nome } })
+        // Criar pode falhar porque já existe — nesse caso seguimos para o start.
+        // O campo obrigatório é "name" (documentação do OpenWA); "sessionId" vai
+        // junto só por compatibilidade com versões antigas.
+        openwa.chamar('/api/sessions', { metodo: 'POST', corpo: { name: nome, sessionId: nome } })
           .then(function () {
             return openwa.chamar('/api/sessions/' + encodeURIComponent(nome) + '/start', { metodo: 'POST' });
           })
@@ -1497,6 +1511,21 @@ http.createServer(function (req, res) {
       openwa.chamar('/api/sessions/' + encodeURIComponent(nome) + '/qr')
         .then(function (r) { responderJson(res, 200, { ok: r.ok, erro: r.erro || null, dados: r.dados || null }); })
         .catch(function (e) { responderJson(res, 200, { ok: false, erro: String(e.message || e) }); });
+      return;
+    }
+
+    // Desconectar o número (para trocar de chip). Não apaga a sessão: só sai
+    // do WhatsApp, e o mesmo nome serve para conectar o número novo.
+    if (urlPath === '/api/openwa/desconectar' && req.method === 'POST') {
+      lerCorpo(req, function (err, body) {
+        const nome = String((body && body.sessao) || 'rt').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'rt';
+        openwa.chamar('/api/sessions/' + encodeURIComponent(nome) + '/logout', { metodo: 'POST' })
+          .then(function (r) {
+            if (r.ok) console.log('[OpenWA] ' + ((_u && _u.login) || '?') + ' desconectou a sessão ' + nome);
+            responderJson(res, 200, { ok: r.ok, erro: r.erro || null });
+          })
+          .catch(function (e) { responderJson(res, 200, { ok: false, erro: String(e.message || e) }); });
+      });
       return;
     }
 

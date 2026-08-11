@@ -16443,12 +16443,14 @@ window.owaAtualizar = async function () {
         '<p>' + escapeHTML((st && st.motivo) || 'O segundo WhatsApp ainda não foi configurado.') + '</p>' +
         '<p class="owa-passos-titulo">Para ligar, é preciso subir o OpenWA como um serviço separado:</p>' +
         '<ol class="owa-passos">' +
-          '<li>No Coolify, criar um <b>novo serviço</b> a partir do repositório <code>rmyndharis/OpenWA</code> (porta <b>2785</b>).</li>' +
-          '<li>Nele, definir uma chave de acesso (a <code>API_KEY</code> do OpenWA).</li>' +
-          '<li>Aqui neste sistema, criar as variáveis <code>OPENWA_URL</code> e <code>OPENWA_API_KEY</code> e dar Redeploy.</li>' +
+          '<li>No Coolify, criar um <b>novo serviço</b> a partir do repositório <code>rmyndharis/OpenWA</code> (porta <b>2785</b>), ' +
+            'com um volume persistente em <code>/app/data</code>.</li>' +
+          '<li>Nele, definir a chave de acesso na variável <code>API_MASTER_KEY</code>. ' +
+            '<b>Se ficar vazia, o OpenWA aceita qualquer um</b> — não deixe vazia.</li>' +
+          '<li>Aqui neste sistema, criar <code>OPENWA_URL</code> e <code>OPENWA_API_KEY</code> e dar Redeploy.</li>' +
         '</ol>' +
         '<p class="owa-nota">O guia completo está em <code>docs/WHATSAPP-QR-OPENWA.md</code>.</p>' +
-      '</div>';
+      '</div>' + _owaCaixaTeste();
     return;
   }
 
@@ -16462,15 +16464,14 @@ window.owaAtualizar = async function () {
         '<p class="owa-nota">Ele pode estar iniciando (leva ~1 minuto na primeira vez). ' +
         'Nada no resto do sistema é afetado por isso.</p>' +
         '<button class="btn btn-secondary" onclick="owaAtualizar()"><i class="fa-solid fa-rotate"></i> Tentar de novo</button>' +
-      '</div>';
+      '</div>' + _owaCaixaTeste(st.url || '');
     return;
   }
 
   // 3) No ar — mostra as sessões e o que dá para fazer
   const sessoes = Array.isArray(st.sessoes) ? st.sessoes : [];
-  const minha = sessoes.find(s => s && (s.sessionId === _owaSessao || s.id === _owaSessao || s.name === _owaSessao));
-  const situacao = minha ? String(minha.status || minha.state || '').toUpperCase() : '';
-  const conectado = /CONNECTED|AUTHENTICATED|READY|WORKING/.test(situacao);
+  const minha = sessoes.find(s => s && (s.id === _owaSessao || s.name === _owaSessao || s.sessionId === _owaSessao));
+  const situacao = _owaSituacao(minha);
 
   cont.innerHTML =
     '<div class="owa-caixa owa-ok">' +
@@ -16478,18 +16479,8 @@ window.owaAtualizar = async function () {
       '<p class="owa-nota">Endereço: <code>' + escapeHTML(st.url || '') + '</code> &middot; ' +
         sessoes.length + ' conexão(ões) cadastrada(s)</p>' +
     '</div>' +
-    (conectado
-      ? '<div class="owa-caixa owa-ok">' +
-          '<h3><i class="fa-brands fa-whatsapp"></i> Conectado</h3>' +
-          '<p>A conexão <b>' + escapeHTML(_owaSessao) + '</b> está ativa' +
-            (minha && (minha.phone || minha.me) ? ' no número <b>' + escapeHTML(String(minha.phone || minha.me)) + '</b>' : '') + '.</p>' +
-        '</div>'
-      : '<div class="owa-caixa">' +
-          '<h3><i class="fa-solid fa-qrcode"></i> Conectar o aparelho</h3>' +
-          '<p>Clique abaixo e leia o código com o celular: <b>WhatsApp &rarr; Aparelhos conectados &rarr; Conectar um aparelho</b>.</p>' +
-          '<button class="btn btn-primary" id="owa-btn-qr" onclick="owaGerarQr()"><i class="fa-solid fa-qrcode"></i> Gerar QR Code</button>' +
-          '<div id="owa-qr"></div>' +
-        '</div>') +
+    _owaCaixaRestricao(minha) +
+    _owaCaixaConexao(minha, situacao) +
     '<div class="owa-caixa">' +
       '<h3><i class="fa-solid fa-paper-plane"></i> Enviar uma mensagem de teste</h3>' +
       '<div class="owa-form">' +
@@ -16501,6 +16492,151 @@ window.owaAtualizar = async function () {
       '<button class="btn btn-primary" id="owa-btn-enviar" onclick="owaEnviar()"><i class="fa-solid fa-paper-plane"></i> Enviar</button>' +
       '<div id="owa-resultado"></div>' +
     '</div>';
+};
+
+// Os estados que o OpenWA devolve, em minúsculas (documentação do projeto):
+//   created | initializing | qr_ready | authenticating | ready
+//   disconnected | action_required | failed
+//
+// CUIDADO: comparar por "contém" aqui é armadilha — "disconnected" CONTÉM
+// "connected". Por isso a comparação é exata, valor por valor.
+const OWA_ESTADOS = {
+  created:         { rotulo: 'Criada, ainda não iniciada', qr: true },
+  initializing:    { rotulo: 'Iniciando...',               qr: true,  aguardar: true },
+  qr_ready:        { rotulo: 'Esperando a leitura do QR',  qr: true },
+  authenticating:  { rotulo: 'Lendo o código...',          qr: true,  aguardar: true },
+  ready:           { rotulo: 'Conectado',                  conectado: true },
+  disconnected:    { rotulo: 'Desconectado',               qr: true },
+  action_required: { rotulo: 'Precisa da sua atenção',     problema: true },
+  failed:          { rotulo: 'Falhou',                     problema: true }
+};
+
+function _owaSituacao(sessao) {
+  const bruto = String((sessao && (sessao.status || sessao.state)) || '').trim().toLowerCase();
+  const def = OWA_ESTADOS[bruto] || {};
+  return {
+    bruto: bruto,
+    rotulo: def.rotulo || (bruto ? bruto : 'Nenhuma conexão ainda'),
+    conectado: def.conectado === true,
+    aguardar: def.aguardar === true,
+    problema: def.problema === true,
+    existe: !!sessao
+  };
+}
+
+// O WhatsApp avisa quando limitou a conta. É exatamente o risco desta aba —
+// então isto aparece grande, não escondido numa nota de rodapé.
+function _owaCaixaRestricao(sessao) {
+  const r = sessao && sessao.restriction;
+  if (!r) return '';
+  const texto = typeof r === 'string' ? r : (r.reason || r.type || JSON.stringify(r));
+  return '<div class="owa-caixa owa-erro">' +
+    '<h3><i class="fa-solid fa-ban"></i> O WhatsApp limitou este número</h3>' +
+    '<p>' + escapeHTML(String(texto)) + '</p>' +
+    '<p class="owa-nota">Isto vem do próprio WhatsApp, não do sistema. Reduza os envios. ' +
+      'Se virar bloqueio, só trocando o chip.</p>' +
+  '</div>';
+}
+
+function _owaCaixaConexao(sessao, s) {
+  if (s.conectado) {
+    const numero = sessao && (sessao.phone || sessao.me);
+    const nome = sessao && sessao.pushName;
+    return '<div class="owa-caixa owa-ok">' +
+      '<h3><i class="fa-brands fa-whatsapp"></i> Conectado</h3>' +
+      '<p>A conexão <b>' + escapeHTML(_owaSessao) + '</b> está ativa' +
+        (numero ? ' no número <b>' + escapeHTML(String(numero)) + '</b>' : '') +
+        (nome ? ' (' + escapeHTML(String(nome)) + ')' : '') + '.</p>' +
+      (sessao && sessao.connectedAt
+        ? '<p class="owa-nota">Conectado desde ' + escapeHTML(_owaData(sessao.connectedAt)) + '.</p>' : '') +
+      '<button class="btn btn-secondary" id="owa-btn-sair" onclick="owaDesconectar()">' +
+        '<i class="fa-solid fa-right-from-bracket"></i> Desconectar este número</button>' +
+      '<p class="owa-nota">Use isto para trocar de chip. Depois é só ler o QR do número novo.</p>' +
+      '<div id="owa-sair-res"></div>' +
+    '</div>';
+  }
+
+  if (s.problema) {
+    const erro = sessao && sessao.lastError;
+    return '<div class="owa-caixa owa-erro">' +
+      '<h3><i class="fa-solid fa-triangle-exclamation"></i> ' + escapeHTML(s.rotulo) + '</h3>' +
+      (erro ? '<p>' + escapeHTML(typeof erro === 'string' ? erro : JSON.stringify(erro)) + '</p>' : '') +
+      '<p>Tente conectar de novo lendo o QR Code.</p>' +
+      '<button class="btn btn-primary" id="owa-btn-qr" onclick="owaGerarQr()">' +
+        '<i class="fa-solid fa-qrcode"></i> Gerar QR Code</button>' +
+      '<div id="owa-qr"></div>' +
+    '</div>';
+  }
+
+  return '<div class="owa-caixa">' +
+    '<h3><i class="fa-solid fa-qrcode"></i> Conectar o aparelho</h3>' +
+    (s.existe ? '<p class="owa-nota">Situação agora: <b>' + escapeHTML(s.rotulo) + '</b></p>' : '') +
+    '<p>Clique abaixo e leia o código com o celular: <b>WhatsApp &rarr; Aparelhos conectados &rarr; Conectar um aparelho</b>.</p>' +
+    '<button class="btn btn-primary" id="owa-btn-qr" onclick="owaGerarQr()">' +
+      '<i class="fa-solid fa-qrcode"></i> Gerar QR Code</button>' +
+    '<div id="owa-qr"></div>' +
+  '</div>';
+}
+
+function _owaData(v) {
+  try {
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return String(v);
+    return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch (e) { return String(v); }
+}
+
+window.owaDesconectar = async function () {
+  if (!confirm('Desconectar este número do sistema?\n\nAs mensagens param de sair até você ler o QR de novo.')) return;
+  const alvo = document.getElementById('owa-sair-res');
+  const btn = document.getElementById('owa-btn-sair');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Desconectando...'; }
+  const r = await _owaApi('/desconectar', { method: 'POST', body: JSON.stringify({ sessao: _owaSessao }) });
+  if (r && r.ok) { owaAtualizar(); return; }
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-right-from-bracket"></i> Desconectar este número'; }
+  if (alvo) alvo.innerHTML = '<div class="owa-erro-linha"><i class="fa-solid fa-circle-exclamation"></i> ' +
+    escapeHTML((r && r.erro) || 'Não consegui desconectar.') + '</div>';
+};
+
+// Descobrir o endereço interno do serviço no Coolify é a parte que mais trava.
+// Sem isto, cada palpite custa um Redeploy inteiro. Com isto, custa 2 segundos.
+function _owaCaixaTeste(sugestao) {
+  return '<div class="owa-caixa">' +
+    '<h3><i class="fa-solid fa-magnifying-glass"></i> Achar o endereço certo</h3>' +
+    '<p>Não sabe o nome do serviço no Coolify? Teste aqui antes de gravar as variáveis — ' +
+      'assim você não precisa dar Redeploy a cada tentativa.</p>' +
+    '<div class="owa-form">' +
+      '<div class="form-group"><label for="owa-teste-url">Endereço do OpenWA</label>' +
+        '<input type="text" id="owa-teste-url" class="form-control" placeholder="Ex.: openwa   ou   http://openwa:2785" ' +
+        'value="' + escapeHTML(sugestao || '') + '"></div>' +
+      '<div class="form-group"><label for="owa-teste-chave">Chave (deixe vazio para usar a já configurada)</label>' +
+        '<input type="password" id="owa-teste-chave" class="form-control" autocomplete="new-password" placeholder="API_MASTER_KEY do OpenWA"></div>' +
+    '</div>' +
+    '<button class="btn btn-secondary" id="owa-btn-teste" onclick="owaTestar()">' +
+      '<i class="fa-solid fa-plug-circle-check"></i> Testar este endereço</button>' +
+    '<div id="owa-teste-res"></div>' +
+  '</div>';
+}
+
+window.owaTestar = async function () {
+  const g = k => document.getElementById(k);
+  const alvo = g('owa-teste-res');
+  const btn = g('owa-btn-teste');
+  const url = (g('owa-teste-url') || {}).value || '';
+  const chave = (g('owa-teste-chave') || {}).value || '';
+  if (alvo) alvo.innerHTML = '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Testando...'; }
+  const r = await _owaApi('/testar', { method: 'POST', body: JSON.stringify({ url: url, chave: chave }) });
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-plug-circle-check"></i> Testar este endereço'; }
+  if (!alvo) return;
+  if (r && r.ok) {
+    alvo.innerHTML = '<div class="owa-ok-linha"><i class="fa-solid fa-circle-check"></i> Achei! ' +
+      'Use este valor em <code>OPENWA_URL</code>:<br><b>' + escapeHTML(r.url || '') + '</b></div>';
+  } else {
+    alvo.innerHTML = '<div class="owa-erro-linha"><i class="fa-solid fa-circle-exclamation"></i> ' +
+      escapeHTML((r && r.erro) || 'Não consegui testar.') +
+      (r && r.url ? '<br><span class="owa-nota">Testei: <code>' + escapeHTML(r.url) + '</code></span>' : '') + '</div>';
+  }
 };
 
 window.owaGerarQr = async function () {
@@ -16519,18 +16655,23 @@ window.owaGerarQr = async function () {
   if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Atualizar o código'; }
 
   // O QR muda a cada ~20s. Buscamos de tempos em tempos até conectar.
+  // Quando o celular lê, o próprio OpenWA muda o status para "ready" — aí a
+  // tela se atualiza sozinha, sem ninguém precisar clicar em Atualizar.
   let tentativas = 0;
   const buscar = async () => {
     tentativas++;
     const r = await _owaApi('/qr/' + encodeURIComponent(_owaSessao));
     const d = (r && r.dados) || {};
-    const img = d.qr || d.qrCode || d.image || d.base64 || (typeof d === 'string' ? d : '');
+    const estado = String(d.status || d.state || '').trim().toLowerCase();
+    if (estado === 'ready') { _owaPararRelogio(); owaAtualizar(); return; }
+    const img = d.qrCode || d.qr || d.image || d.base64 || (typeof d === 'string' ? d : '');
     if (r && r.ok && img) {
       const src = String(img).indexOf('data:') === 0 ? img : ('data:image/png;base64,' + img);
       alvo.innerHTML = '<img class="owa-qr-img" src="' + escapeHTML(src) + '" alt="QR Code">' +
-        '<p class="owa-nota">O código muda sozinho a cada poucos segundos. Depois de ler, clique em <b>Atualizar</b> no topo.</p>';
+        '<p class="owa-nota">O código se renova sozinho. Assim que o celular ler, esta tela muda para <b>Conectado</b> sozinha.</p>';
     } else if (r && r.ok) {
-      alvo.innerHTML = '<p class="owa-nota">Sem código no momento — se o aparelho já leu, clique em <b>Atualizar</b> no topo.</p>';
+      alvo.innerHTML = '<p class="owa-nota">Preparando o código' +
+        (estado ? ' (' + escapeHTML(estado) + ')' : '') + '...</p>';
     } else {
       alvo.innerHTML = '<div class="owa-erro-linha">' + escapeHTML((r && r.erro) || 'Não consegui pegar o código.') + '</div>';
     }

@@ -37,22 +37,30 @@ Docker. Você sobe ele no Coolify e depois avisa este sistema onde ele está.
 2. Repositório: `https://github.com/rmyndharis/OpenWA`
 3. Build Pack: **Dockerfile**
 4. Porta exposta: **2785**
-5. **Storages**: monte um volume persistente para a pasta de sessões do OpenWA
-   (o repositório indica o caminho). **Sem volume, toda vez que fizer deploy
+5. **Storages**: monte um volume persistente em **`/app/data`**. É onde ficam a
+   sessão do WhatsApp e o banco SQLite. **Sem volume, toda vez que fizer deploy
    o WhatsApp desconecta e você tem que ler o QR de novo.**
 6. Memória: reserve **pelo menos 1 GB** para esse serviço. Cada conexão de
    WhatsApp sobe um navegador por baixo e come de 300 a 500 MB.
+
+> Não precisa de Postgres, Redis nem MinIO. Por padrão o OpenWA usa SQLite e
+> disco local — um container só resolve.
 
 ### 1.2 Definir a chave de acesso
 
 Ainda no serviço do OpenWA, em **Environment Variables**, crie:
 
 ```
-API_KEY = <invente uma senha longa, tipo 40 caracteres aleatórios>
+API_MASTER_KEY   = <invente uma senha longa, tipo 40 caracteres aleatórios>
+AUTO_START_SESSIONS = true
 ```
 
-Guarde essa chave. Ela é o que impede qualquer um de mandar mensagem pelo seu
-WhatsApp.
+⚠️ **A variável é `API_MASTER_KEY`, não `API_KEY`.** E se ela ficar **vazia**, o
+OpenWA fica **sem autenticação nenhuma** — qualquer um que alcançar o endereço
+manda mensagem pelo seu WhatsApp. Nunca deixe vazia.
+
+O `AUTO_START_SESSIONS=true` faz a conexão voltar sozinha depois de um restart,
+em vez de esperar você ler o QR de novo.
 
 Faça o **Deploy** e espere ficar verde. A primeira subida demora (~2 a 5 min).
 
@@ -63,13 +71,22 @@ crie duas variáveis:
 
 ```
 OPENWA_URL      = http://<nome-do-servico-openwa>:2785
-OPENWA_API_KEY  = <a MESMA chave que você pôs no OpenWA>
+OPENWA_API_KEY  = <a MESMA chave do API_MASTER_KEY>
 ```
 
 > O `<nome-do-servico-openwa>` é o nome interno que o Coolify deu ao container.
 > Se os dois serviços estiverem na mesma rede do Coolify, esse endereço interno
 > funciona e é o mais seguro — o OpenWA nem precisa ficar aberto na internet.
 > Se preferir domínio público, use `https://wa.seudominio.com.br`.
+
+**Não sabe o nome interno?** Não precisa ficar chutando e redeployando. Entre no
+sistema, abra **WhatsApp QR** e use a caixa **"Achar o endereço certo"**: você
+digita um palpite e a tela responde na hora se aquele endereço atende. Quando
+acertar, ela devolve o valor pronto para colar em `OPENWA_URL`. Ela também
+distingue *"não achei o serviço"* de *"achei, mas a chave está errada"*.
+
+O campo aceita o endereço escrito de qualquer jeito: `openwa`, `openwa:2785`,
+`http://openwa:2785/` — tudo vira a mesma coisa.
 
 Depois **Redeploy** no R&T VAGAS IA.
 
@@ -94,8 +111,22 @@ Entre no sistema → menu **WhatsApp QR**.
 4. Aponte a câmera para o código na tela do computador.
 5. O código se renova sozinho a cada poucos segundos — se ele mudar antes de
    você ler, tudo bem, leia o novo.
-6. Depois de ler, clique em **Atualizar** no topo da tela. Deve aparecer
-   **"Conectado"**.
+6. Assim que o celular ler, **a tela vira sozinha para "Conectado"**. Não
+   precisa clicar em nada.
+
+Quando estiver conectado, a tela mostra o número, o nome do perfil e desde
+quando está no ar.
+
+### Para trocar de chip
+
+Botão **Desconectar este número**. Ele sai do WhatsApp sem apagar a conexão —
+depois é só ler o QR do número novo, na mesma tela.
+
+### Se o WhatsApp limitar a conta
+
+Se o WhatsApp aplicar alguma limitação ao número, aparece um aviso vermelho no
+topo da tela com o motivo que veio do próprio WhatsApp. É o sinal de alerta
+antes do bloqueio: **reduza os envios na hora.**
 
 ---
 
@@ -118,7 +149,7 @@ Aparece *"Enviado para 5511912345678"* em verde, ou o motivo do erro em vermelho
 |---|---|
 | "Ainda não está ligado" | Criar `OPENWA_URL` e `OPENWA_API_KEY` no Coolify e dar Redeploy. |
 | "O serviço não respondeu" | O OpenWA está fora do ar ou ainda subindo. Veja os logs dele no Coolify. |
-| "O OpenWA recusou a chave de acesso" | A `OPENWA_API_KEY` daqui está diferente da `API_KEY` de lá. As duas têm que ser idênticas. |
+| "O OpenWA recusou a chave de acesso" | A `OPENWA_API_KEY` daqui está diferente da `API_MASTER_KEY` de lá. As duas têm que ser idênticas. |
 | "Não consegui pegar o código" | Clique em **Gerar QR Code** de novo. Se insistir, reinicie o serviço OpenWA. |
 | Estava conectado e parou | Alguém desconectou no celular, ou o serviço subiu sem volume persistente. Leia o QR de novo e confira o volume. |
 | "Sem acesso" | Seu login não tem permissão de WhatsApp. Peça ao administrador. |
@@ -144,7 +175,17 @@ mesmo tentando chamar direto.
 - `openwa.cjs` — a ponte. Lê `OPENWA_URL` e `OPENWA_API_KEY`, tem tempo limite
   de 15s e **nunca lança exceção**: devolve sempre `{ ok, status, dados, erro }`.
 - `server.cjs` — rotas `/api/openwa/situacao`, `/iniciar`, `/qr/:sessao`,
-  `/enviar`. Todas exigem login **e** permissão de WhatsApp.
+  `/enviar`, `/testar`, `/desconectar`. Todas exigem login **e** permissão de
+  WhatsApp.
+- **Estados do OpenWA** (minúsculos, conforme a especificação do projeto):
+  `created`, `initializing`, `qr_ready`, `authenticating`, `ready`,
+  `disconnected`, `action_required`, `failed`. Só `ready` é "conectado".
+  ⚠️ Nunca compare com "contém": **`disconnected` contém `connected`** e
+  `qr_ready` contém `ready`. A comparação tem que ser exata — foi exatamente
+  esse o bug que fazia a tela dizer "Conectado" com o WhatsApp caído e nunca
+  mostrar o botão do QR.
+- Ao criar a sessão, o campo obrigatório é **`name`** (não `sessionId`), e o QR
+  volta em **`qrCode`**, já como data URI.
 - `js/app.js` — `renderWhatsappQr()`, `owaAtualizar()`, `owaGerarQr()`,
   `owaEnviar()`.
 - **A chave nunca vai para o navegador.** O front fala só com `/api/openwa/*`;
