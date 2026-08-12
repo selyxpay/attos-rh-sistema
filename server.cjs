@@ -655,6 +655,22 @@ try {
   console.error('[OpenWA] não carregou (o sistema segue normal):', e.message);
   openwa = null;
 }
+
+// "erro 400" não ajuda ninguém. O OpenWA manda o motivo no corpo da resposta
+// (ex.: "property sessionId should not exist") — isto puxa esse texto para a
+// tela, para não ser preciso ir caçar em log de container.
+function _openwaDetalhe(r) {
+  const d = r && r.dados;
+  let msg = '';
+  if (d) {
+    if (Array.isArray(d.message)) msg = d.message.join('; ');
+    else if (typeof d.message === 'string') msg = d.message;
+    else if (typeof d.error === 'string') msg = d.error;
+    else if (typeof d.texto === 'string') msg = d.texto.slice(0, 300);
+  }
+  const base = (r && r.erro) || 'O OpenWA recusou a chamada.';
+  return msg ? base + ' Motivo: ' + msg : base;
+}
 let waDb = null, waApi = null, waWebhook = null, _waCarregado = false;
 try {
   waDb      = require('./whatsapp-db.cjs');
@@ -1487,16 +1503,23 @@ http.createServer(function (req, res) {
     if (urlPath === '/api/openwa/iniciar' && req.method === 'POST') {
       lerCorpo(req, function (err, body) {
         const nome = String((body && body.sessao) || 'rt').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'rt';
-        // Criar pode falhar porque já existe — nesse caso seguimos para o start.
-        // O campo obrigatório é "name" (documentação do OpenWA); "sessionId" vai
-        // junto só por compatibilidade com versões antigas.
-        openwa.chamar('/api/sessions', { metodo: 'POST', corpo: { name: nome, sessionId: nome } })
-          .then(function () {
+        // O corpo leva SÓ "name". Mandar campo a mais (ex.: sessionId) faz a
+        // validação do OpenWA responder 400 e a sessão nunca nasce — foi
+        // exatamente isso que aconteceu na primeira tentativa em produção.
+        let erroCriar = null;
+        openwa.chamar('/api/sessions', { metodo: 'POST', corpo: { name: nome } })
+          .then(function (c) {
+            // Já existir não é problema: seguimos para o start. Qualquer outro
+            // erro fica guardado, para explicar caso o start também falhe.
+            if (!c.ok && c.status !== 409) erroCriar = _openwaDetalhe(c);
             return openwa.chamar('/api/sessions/' + encodeURIComponent(nome) + '/start', { metodo: 'POST' });
           })
           .then(function (r) {
-            if (!r.ok && !r.naoConfigurado) { responderJson(res, 200, { ok: false, erro: r.erro, sessao: nome }); return; }
             if (r.naoConfigurado) { responderJson(res, 200, { ok: false, erro: r.erro, naoConfigurado: true }); return; }
+            if (!r.ok) {
+              responderJson(res, 200, { ok: false, sessao: nome, erro: erroCriar || _openwaDetalhe(r) });
+              return;
+            }
             responderJson(res, 200, { ok: true, sessao: nome, dados: r.dados });
           })
           .catch(function (e) { responderJson(res, 200, { ok: false, erro: String(e.message || e) }); });
