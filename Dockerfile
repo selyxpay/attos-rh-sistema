@@ -25,7 +25,7 @@ COPY ff-cadastros-base.json ./
 # Sem estes arquivos o sistema sobe, mas SEM a rede de segurança.
 COPY equipamentos-protecao.cjs restaurar-equipamentos.cjs ./
 # Ferramentas de diagnostico e backup (somente leitura / nao destrutivas).
-COPY verificar-sistema.cjs backup-dados.cjs limpar-fotos-embutidas.cjs reparar-listas-infladas.cjs restaurar-empresas.cjs ./
+COPY verificar-sistema.cjs backup-dados.cjs limpar-fotos-embutidas.cjs reparar-listas-infladas.cjs restaurar-empresas.cjs restaurar-registros.cjs ./
 # Módulo WhatsApp (API Oficial da Meta). Se faltar, o servidor sobe do mesmo
 # jeito e só o WhatsApp responde 503 — o resto do sistema não é afetado.
 COPY whatsapp-db.cjs whatsapp-api.cjs whatsapp-webhook.cjs ./

@@ -42,7 +42,11 @@ window.RTCloud = (function () {
   async function init(opts) {
     onRemote = (opts && opts.onRemoteUpdate) || null;
     onSessaoPerdida = (opts && opts.onSessaoPerdida) || null;
-    try { const s = await apiGet('/state'); lastVersion = s.version || 0; } catch (e) {}
+    // NÃO marcamos lastVersion aqui. Quem carrega o estado para valer é o
+    // loadState() logo em seguida — e é lá que a versão passa a valer. Enquanto
+    // isso não acontece, lastVersion fica em 0 de propósito: se algum save sair
+    // antes da carga, o servidor o trata como desatualizado e mescla, em vez de
+    // substituir o estado inteiro com o que a tela ainda não tinha.
     if (pollTimer) clearInterval(pollTimer);
     pollTimer = setInterval(verificarRemoto, POLL_MS);
     return true;
@@ -62,10 +66,24 @@ window.RTCloud = (function () {
       if (v && v.autenticado === false && onSessaoPerdida) { onSessaoPerdida(); return; }
       if ((v.version || 0) === lastVersion) return;      // nada mudou: acabou aqui
       const s = await apiGet('/state');
-      if ((s.version || 0) !== lastVersion) {
-        lastVersion = s.version || 0;
-        if (onRemote && s.dados) onRemote(s.dados);
+      const nova = s.version || 0;
+      if (nova === lastVersion) return;
+
+      // ATENÇÃO — aqui morava um sumiço de dados:
+      // antes, lastVersion subia SEMPRE, mesmo quando a tela não chegava a
+      // absorver o estado novo (ex.: resposta sem dados, ou erro no meio).
+      // O cliente passava a se achar atualizado carregando um estado VELHO, e
+      // o save seguinte (que substitui o estado inteiro) apagava tudo que as
+      // outras pessoas tinham cadastrado nesse intervalo.
+      // Agora a versão só avança quando os dados foram REALMENTE aplicados.
+      // Se não foram, lastVersion fica para trás de propósito: o servidor
+      // enxerga o próximo save como desatualizado e MESCLA em vez de substituir.
+      let aplicou = false;
+      if (onRemote && s.dados) {
+        try { aplicou = onRemote(s.dados) !== false; }
+        catch (e) { console.error('[RT VPS] não consegui aplicar o estado novo:', e); aplicou = false; }
       }
+      if (aplicou) lastVersion = nova;
     } catch (e) { /* silencioso: instabilidade de rede */ }
   }
 

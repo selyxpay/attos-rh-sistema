@@ -772,13 +772,17 @@ async function ativarNuvem() {
         alert('Sua sessão expirou por segurança. Entre novamente para continuar.');
         location.replace('/login.html');
       },
+      // Devolve TRUE só quando o estado novo foi mesmo absorvido. Devolver
+      // false faz o sincronizador NÃO avançar a versão — assim o próximo save
+      // é tratado como desatualizado e mesclado, em vez de substituir tudo com
+      // um estado velho. Era por aqui que registros sumiam.
       onRemoteUpdate: (dados) => {
-        if (!dados) return;
+        if (!dados) return false;
         // Sessão perdida/expirada no servidor (veio só o subconjunto público) → volta pro login
         if (loggedUser && !dados.funcionarios) {
           try { localStorage.removeItem('rt_logged_user'); } catch (e) {}
           location.reload();
-          return;
+          return false;
         }
         state = dados;
         garantirEstruturasBase();
@@ -790,14 +794,19 @@ async function ativarNuvem() {
           focusedEl.tagName === 'TEXTAREA' ||
           focusedEl.tagName === 'SELECT'
         );
-        if (userEditando) {
-          // Adia o render para depois que o campo perder o foco (máximo 4s)
-          clearTimeout(_remoteUpdateTimer);
-          _remoteUpdateTimer = setTimeout(() => renderCurrentAba(), 4000);
-        } else {
-          clearTimeout(_remoteUpdateTimer);
-          renderCurrentAba();
-        }
+        // O estado JÁ está aplicado neste ponto. Um erro de desenho de tela não
+        // pode fazer o sincronizador achar que a carga falhou.
+        try {
+          if (userEditando) {
+            // Adia o render para depois que o campo perder o foco (máximo 4s)
+            clearTimeout(_remoteUpdateTimer);
+            _remoteUpdateTimer = setTimeout(() => renderCurrentAba(), 4000);
+          } else {
+            clearTimeout(_remoteUpdateTimer);
+            renderCurrentAba();
+          }
+        } catch (e) { console.error('Falha ao redesenhar depois da atualização:', e); }
+        return true;
       }
     });
     const nuvem = await RTCloud.loadState();
