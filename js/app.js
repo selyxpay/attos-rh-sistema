@@ -16391,7 +16391,8 @@ window.drvBaixarExcel = function () {
 // Tudo aqui é tolerante a falha: se o serviço não existir, estiver iniciando
 // ou cair, a tela explica o que houve e o resto do sistema segue intacto.
 // ══════════════════════════════════════════════════════════════════════════
-let _owaSessao = 'rt';
+// O OpenWA exige nome de sessão com 3 letras ou mais — "rt" era recusado.
+let _owaSessao = 'rt-vagas';
 let _owaRelogioQr = null;
 
 function _owaPode() {

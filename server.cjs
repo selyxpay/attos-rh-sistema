@@ -656,6 +656,15 @@ try {
   openwa = null;
 }
 
+// Nome da sessão do OpenWA. Ele exige 3 caracteres ou mais — "rt" era recusado
+// com "name must be longer than or equal to 3 characters". Aqui a regra fica
+// num lugar só, para não voltar a divergir entre as rotas.
+const OPENWA_SESSAO_PADRAO = 'rt-vagas';
+function _openwaNome(valor) {
+  const limpo = String(valor || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
+  return limpo.length >= 3 ? limpo : OPENWA_SESSAO_PADRAO;
+}
+
 // "erro 400" não ajuda ninguém. O OpenWA manda o motivo no corpo da resposta
 // (ex.: "property sessionId should not exist") — isto puxa esse texto para a
 // tela, para não ser preciso ir caçar em log de container.
@@ -1502,7 +1511,7 @@ http.createServer(function (req, res) {
     // Criar a sessão (uma vez) e começar, para o QR Code aparecer
     if (urlPath === '/api/openwa/iniciar' && req.method === 'POST') {
       lerCorpo(req, function (err, body) {
-        const nome = String((body && body.sessao) || 'rt').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'rt';
+        const nome = _openwaNome(body && body.sessao);
         // O corpo leva SÓ "name". Mandar campo a mais (ex.: sessionId) faz a
         // validação do OpenWA responder 400 e a sessão nunca nasce — foi
         // exatamente isso que aconteceu na primeira tentativa em produção.
@@ -1529,7 +1538,7 @@ http.createServer(function (req, res) {
 
     // QR Code da sessão (o servidor busca e devolve; a imagem vem do OpenWA)
     if (urlPath.indexOf('/api/openwa/qr/') === 0 && req.method === 'GET') {
-      const nome = decodeURIComponent(urlPath.slice('/api/openwa/qr/'.length)).replace(/[^a-zA-Z0-9_-]/g, '');
+      const nome = _openwaNome(decodeURIComponent(urlPath.slice('/api/openwa/qr/'.length)));
       if (!nome) { responderJson(res, 400, { error: 'sessão inválida' }); return; }
       openwa.chamar('/api/sessions/' + encodeURIComponent(nome) + '/qr')
         .then(function (r) { responderJson(res, 200, { ok: r.ok, erro: r.erro || null, dados: r.dados || null }); })
@@ -1541,7 +1550,7 @@ http.createServer(function (req, res) {
     // do WhatsApp, e o mesmo nome serve para conectar o número novo.
     if (urlPath === '/api/openwa/desconectar' && req.method === 'POST') {
       lerCorpo(req, function (err, body) {
-        const nome = String((body && body.sessao) || 'rt').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'rt';
+        const nome = _openwaNome(body && body.sessao);
         openwa.chamar('/api/sessions/' + encodeURIComponent(nome) + '/logout', { metodo: 'POST' })
           .then(function (r) {
             if (r.ok) console.log('[OpenWA] ' + ((_u && _u.login) || '?') + ' desconectou a sessão ' + nome);
