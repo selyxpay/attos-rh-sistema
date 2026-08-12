@@ -47,10 +47,46 @@ function lista(dados, chave) {
   const v = dados && dados[chave];
   return Array.isArray(v) ? v : [];
 }
-// Um rótulo curto para a pessoa entender de quem é o registro
-function rotulo(r) {
-  const n = r && (r.nome || r.nomeCompleto || r.razaoSocial || r.descricao || r.titulo);
-  const doc = r && (r.cpf || r.cnpj || r.matricula);
+// Um rótulo que dá para reconhecer. Sem isso a lista vira "(sem nome)" 30 vezes
+// e ninguém consegue decidir o que devolver — que é justamente a decisão que
+// este script NÃO toma sozinho.
+function data(v) {
+  if (!v) return '';
+  const s = String(v);
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  return m ? m[3] + '/' + m[2] + '/' + m[1] : s.slice(0, 16).replace('T', ' ');
+}
+function dinheiro(n) {
+  const v = Number(n || 0);
+  return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function rotulo(r, chave) {
+  if (!r) return '(vazio)';
+
+  if (chave === 'fluxosFinanceiros') {
+    const total = (r.linhas || []).reduce(function (s, l) { return s + Number((l && l.valor) || 0); }, 0);
+    const partes = [
+      '#' + (r.numero || '?'),
+      r.empresaNome || '(sem empresa)',
+      'pgto ' + (data(r.dataPagamento) || '?'),
+      (r.linhas || []).length + ' pessoa(s)',
+      'R$ ' + dinheiro(total),
+      String(r.status || '?').toUpperCase()
+    ];
+    if (r.tipoLancamento === 'estorno') partes.push('ESTORNO');
+    return partes.join(' · ') + '\n      criada por ' + (r.criadoPor || '?') + ' em ' + (data(r.criadoEm) || '?');
+  }
+
+  if (chave === 'funcionarios') {
+    return (r.nome || '(sem nome)') +
+      (r.login ? ' (' + r.login + ')' : '') +
+      (r.cargo ? ' — ' + r.cargo : '') +
+      (r.departamento ? ' / ' + r.departamento : '') +
+      (r.status ? ' [' + r.status + ']' : '');
+  }
+
+  const n = r.nome || r.nomeCompleto || r.razaoSocial || r.descricao || r.titulo;
+  const doc = r.cpf || r.cnpj || r.matricula;
   return (n ? String(n) : '(sem nome)') + (doc ? ' — ' + doc : '');
 }
 
@@ -147,10 +183,10 @@ ALVO.forEach(function (chave) {
   console.log('\n' + '-'.repeat(70));
   console.log(chave.toUpperCase() + ': tem ' + agora.length + ' hoje, ' +
     faltando.size + ' sumiram e podem voltar');
-  plano[chave].slice(0, 25).forEach(function (x) {
-    console.log('  • ' + rotulo(x.registro) + '   [' + x.de + ']');
+  plano[chave].forEach(function (x) {
+    console.log('  • ' + rotulo(x.registro, chave));
+    console.log('      veio de ' + x.de);
   });
-  if (plano[chave].length > 25) console.log('  ... e mais ' + (plano[chave].length - 25) + '.');
 });
 
 if (!totalDevolver) {
@@ -165,7 +201,17 @@ console.log('TOTAL a devolver: ' + totalDevolver + ' registro(s).');
 
 if (!APLICAR) {
   console.log('\nIsto foi só uma SIMULAÇÃO — nada foi gravado.');
-  console.log('Para devolver de verdade:');
+  console.log('');
+  console.log('ATENÇÃO — LEIA ANTES DE APLICAR:');
+  console.log('  Este script NÃO sabe distinguir "sumiu sozinho" de "alguém');
+  console.log('  excluiu de propósito". Ele só compara com os backups.');
+  console.log('  Confira a lista acima. Se tiver algo que foi excluído de');
+  console.log('  propósito, devolva só as listas que você quer:');
+  console.log('');
+  console.log('   node restaurar-registros.cjs fluxosFinanceiros --aplicar');
+  console.log('   node restaurar-registros.cjs funcionarios --aplicar');
+  console.log('');
+  console.log('  Ou tudo de uma vez:');
   console.log('   node restaurar-registros.cjs --aplicar');
   console.log('='.repeat(70));
   process.exit(0);
