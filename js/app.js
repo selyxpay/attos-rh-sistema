@@ -450,107 +450,6 @@ function adicionarDocumentoAoZip(folder, filename, dado) {
     });
 }
 
-function gerarFichaCadastralTexto(cand) {
-  const vaga = state.vagas.find(v => v.id === cand.vagaId);
-  const rec   = state.recrutadores.find(r => r.id === cand.recrutadorId);
-  const recNome = rec
-    ? rec.nome
-    : (cand.origemLink === 'agencia_rt' ? 'Agência R&T' : 'Não definido');
-  const foto3x4 = cand.foto3x4Contrato || {};
-  const foto3x4Resumo = foto3x4.opcao === 'convenio_desconto'
-    ? 'Sim, vai tirar pelo convênio da empresa. Autorizou desconto único de R$ 25,00 no salário.'
-    : foto3x4.opcao === 'providenciar_propria'
-      ? 'Não, vai providenciar a foto 3x4 por conta própria.'
-      : 'Não informado';
-
-  const linha = (label, valor) => `${label}: ${valor || 'Não informado'}`;
-
-  const historicoTxt = (cand.historico && cand.historico.length > 0)
-    ? cand.historico.map((h, i) => `  ${i + 1}. [${h.data}] ${h.autor}\n     ${h.acao}`).join('\n')
-    : '  Nenhum histórico registrado.';
-
-  return [
-    '================================================================',
-    'FICHA CADASTRAL — R&T EMPREGOS (GRUPO RT)',
-    `Gerado em: ${new Date().toLocaleString('pt-BR')}`,
-    '================================================================',
-    '',
-    '[ IDENTIFICAÇÃO ]',
-    linha('Número da fila',       cand.numeroFila ? `#${cand.numeroFila}` : null),
-    linha('Data do cadastro',     cand.dataCadastro ? new Date(cand.dataCadastro).toLocaleString('pt-BR') : null),
-    '',
-    '[ DADOS PESSOAIS ]',
-    linha('Nome completo',        cand.nome),
-    linha('CPF',                  cand.cpf),
-    linha('RG',                   cand.rg),
-    linha('PIS/NIS',              cand.pis),
-    linha('Data de nascimento',   cand.dataNascimento),
-    linha('Nome da mãe',          cand.nomeMae),
-    linha('Nome do pai',          cand.nomePai),
-    linha('Telefone',             cand.telefone),
-    linha('E-mail',               cand.email),
-    '',
-    '[ ENDEREÇO ]',
-    linha('CEP',                  cand.cep),
-    linha('Rua',                  cand.rua),
-    linha('Número',               cand.numeroCasa),
-    linha('Bairro',               cand.bairro),
-    linha('Cidade',               cand.cidade),
-    linha('Estado',               cand.estado),
-    '',
-    '[ DADOS BANCÁRIOS ]',
-    linha('Banco',                cand.banco),
-    linha('Tipo de chave PIX',    cand.tipoPix),
-    linha('Chave PIX',            cand.chavePix),
-    '',
-    '[ UNIFORME ]',
-    linha('Tamanho da camiseta',  cand.tamanhoCamiseta),
-    linha('Tamanho da calça',     cand.tamanhoCalca),
-    linha('Tamanho da bota',      cand.tamanhoBota),
-    '',
-    '[ FOTO 3X4 DO CONTRATO ]',
-    linha('Opção escolhida',      foto3x4Resumo),
-    '',
-    '[ VAGA & EMPRESA ]',
-    linha('Vaga',                 vaga ? vaga.cargo : cand.codigoVaga),
-    linha('Empresa',              vaga ? vaga.empresaNome : null),
-    linha('Unidade / Código',     vaga ? vaga.codigo : null),
-    linha('Local de trabalho',    vaga ? vaga.localTrabalho : null),
-    linha('Salário base',         vaga ? `R$ ${Number(vaga.salario).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : null),
-    linha('Turno',                cand.turnoTrabalho),
-    linha('Escala',               cand.escala),
-    linha('Linha de fretado',     cand.linhaFretado),
-    '',
-    '[ RECRUTAMENTO ]',
-    linha('Recrutado por',        recNome),
-    linha('Tipo de cadastro',     cand.origemCadastro === 'presencial' ? 'PRESENCIAL (Agência R&T)' : 'ONLINE'),
-    linha('Como soube da vaga',   cand.comoSoube ? ({instagram:'Instagram R&T',facebook:'Facebook R&T',anuncios_fb:'Anúncios Facebook',sel_mayara:'Selecionadora Mayara',sel_alessandra:'Selecionadora Alessandra',sel_lucas:'Selecionadora Lucas',sel_julio:'Selecionadora Júlio',sel_julia:'Selecionadora Júlia',sel_milena:'Selecionadora Milena',sel_vitoria:'Selecionadora Vitória',sel_sara:'Selecionadora Sara'}[cand.comoSoube] || cand.comoSoube) : null),
-    linha('Origem do link',       cand.origemLink),
-    linha('Data envio ao DP',     cand.dataSubiuDP),
-    linha('Aprovador Seleção',    cand.aprovadorSelecao),
-    '',
-    '[ DEVOLUÇÃO / CORREÇÃO ]',
-    cand.devolvidoPor
-      ? [
-          linha('Devolvida por',      cand.devolvidoPor),
-          linha('Data devolução',     cand.dataDevolucaoDP),
-          linha('Motivo',             cand.motivoDevolucaoDP),
-          linha('Corrigida por',      cand.corrigidoPor),
-          linha('Data correção',      cand.dataCorrecao),
-        ].join('\n')
-      : '  Sem devolução pelo DP.',
-    '',
-    '[ OBSERVAÇÕES DA SELEÇÃO ]',
-    cand.observacoesSelecao ? `  ${cand.observacoesSelecao}` : '  Nenhuma observação.',
-    '',
-    '[ HISTÓRICO DA FICHA ]',
-    historicoTxt,
-    '',
-    '================================================================',
-    'Documento gerado pelo CRM R&T Empregos. Uso interno — LGPD.',
-    '================================================================',
-  ].join('\n');
-}
 
 // Gera a Ficha do Candidato em Word (.docx) montando OOXML com o JSZip já carregado.
 async function gerarFichaDocx(cand) {
@@ -3592,7 +3491,11 @@ function renderBancoTalentos(filtroNome = '') {
 
   container.innerHTML = '';
 
-  state.empresas.forEach(emp => {
+  // Quem já apareceu em algum grupo de empresa. Serve para, no fim, achar quem
+  // não apareceu em NENHUM — ver comentário do grupo "Sem empresa" lá embaixo.
+  const _mostrados = new Set();
+
+  (state.empresas || []).forEach(emp => {
     // Candidatos vinculados a esta empresa parceira
     const candEmpresa = state.candidatos.filter(c => {
       const matchEmp = c.empresaId === emp.id;
@@ -3601,6 +3504,8 @@ function renderBancoTalentos(filtroNome = '') {
     });
 
     if (candEmpresa.length === 0 && filtroNome !== '') return; // oculta grupo vazio na busca
+
+    candEmpresa.forEach(c => _mostrados.add(c.id));
 
     const candHtml = candEmpresa.map(c => {
       const initials = c.nome.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
@@ -3638,6 +3543,48 @@ function renderBancoTalentos(filtroNome = '') {
 
     container.insertAdjacentHTML('beforeend', groupHtml);
   });
+
+  // ── NINGUÉM PODE FICAR INVISÍVEL ────────────────────────────────────────
+  // Esta tela agrupa por empresa. Quem estiver ligado a uma empresa que não
+  // existe mais (empresa apagada, id trocado, cadastro antigo) não caía em
+  // nenhum grupo e simplesmente NÃO APARECIA — a pessoa continuava no banco,
+  // mas ninguém conseguia vê-la. Foi assim que "sumiu gente do banco de dados".
+  // Agora quem sobra vai para um grupo próprio, à vista, com aviso.
+  const orfaos = (state.candidatos || []).filter(c => {
+    if (!c || c.excluido || _mostrados.has(c.id)) return false;
+    if (filtroNome && !String(c.nome || '').toLowerCase().includes(filtroNome.toLowerCase())) return false;
+    return true;
+  });
+
+  if (orfaos.length) {
+    const cards = orfaos.map(c => {
+      const iniciais = String(c.nome || '?').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+      return `
+        <div class="banco-candidato-card" onclick="abrirDrawerDetalhes('${c.id}')" style="cursor: pointer;">
+          <div class="avatar-circle c-yellow">${iniciais}</div>
+          <div class="banco-cand-info">
+            <span class="banco-cand-name">${escapeHTML(c.nome || '')}</span>
+            <span class="banco-cand-sub">${escapeHTML(c.codigoVaga || 'sem empresa vinculada')}</span>
+          </div>
+        </div>`;
+    }).join('');
+
+    container.insertAdjacentHTML('beforeend', `
+      <div class="banco-grupo-secao">
+        <div class="banco-grupo-header">
+          <div class="banco-grupo-title">
+            <div class="banco-logo-badge" style="background-color:#B45309;">?</div>
+            <h2>Sem empresa vinculada</h2>
+          </div>
+          <span class="banco-count-badge">${orfaos.length}</span>
+        </div>
+        <p style="font-size:12px;color:var(--text-secondary);padding:0 4px 10px;">
+          Estas pessoas estão no banco, mas a empresa delas não existe mais no cadastro.
+          Abra cada uma e escolha a empresa certa para ela voltar ao grupo dela.
+        </p>
+        <div class="banco-grupo-grid">${cards}</div>
+      </div>`);
+  }
 
   // Render simple talent bank entries at the bottom
   setupBTFilters();
@@ -5136,13 +5083,6 @@ function getBtNovosPorRecrutadora(recrutadorId) {
   return state.bancoTalentos.filter(bt => bt.recrutadorId === recrutadorId && !bt.visualizadoPelaRecrutadora);
 }
 
-function marcarBtVisualizadoPorRecrutadora(recrutadorId) {
-  if (!state.bancoTalentos) return;
-  state.bancoTalentos.forEach(bt => {
-    if (bt.recrutadorId === recrutadorId) bt.visualizadoPelaRecrutadora = true;
-  });
-  saveState();
-}
 
 // ==========================================================================
 // MÓDULO: INAPTOS — RENDER DA ABA ADMIN
@@ -6334,13 +6274,6 @@ function _ctpsDoCpf(cpf) {
   if (d.length < 11) return { ctps: '', serie: '' };
   return { ctps: d.slice(0, 7), serie: d.slice(7, 11) };
 }
-// Filial automática pelo vínculo: 101(CLT)->01 · 106(Temporário)->00
-function _filialPorVinculo(vinculo) {
-  const v = String(vinculo || '');
-  if (v === '101') return '01';
-  if (v === '106') return '00';
-  return '';
-}
 function _dataExataParaDate(v) {
   if (!v) return null;
   const s = String(v).trim();
@@ -7039,15 +6972,6 @@ function getContratacoesFiltradas() {
   });
 }
 
-function getCandidatosFiltrados() {
-  return state.candidatos.filter(c => {
-    if (filtrosRelatorios.recrutadorId !== 'todos' && c.recrutadorId !== filtrosRelatorios.recrutadorId) return false;
-    if (filtrosRelatorios.empresaId !== 'todas' && c.empresaId !== filtrosRelatorios.empresaId) return false;
-    if (filtrosRelatorios.vagaId !== 'todas' && c.vagaId !== filtrosRelatorios.vagaId) return false;
-    if (filtrosRelatorios.status !== 'todos' && c.status !== filtrosRelatorios.status) return false;
-    return true;
-  });
-}
 
 function popularFiltrosRelatorios() {
   const selEmpresa = document.getElementById('filtro-empresa');
@@ -7682,88 +7606,7 @@ function detectarLinkCaptacao() {
   window.location.replace(dest);
 }
 
-function renderLinksRecrutadores() {
-  // Remove bloco anterior se existir
-  const old = document.getElementById('bloco-links-recrutadores');
-  if (old) old.remove();
 
-  if (!loggedUser) return; // Só mostra para staff logado
-
-  const baseUrl = `${window.location.origin}${window.location.pathname}`;
-
-  const bloco = document.createElement('div');
-  bloco.id = 'bloco-links-recrutadores';
-  bloco.style.cssText = `
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 24px;
-  `;
-  bloco.innerHTML = `
-    <h3 style="font-size:15px; font-weight:700; color:var(--text-primary); margin-bottom:8px; display:flex; align-items:center; gap:8px;">
-      <i class="fa-solid fa-link" style="color:var(--primary);"></i> Links Personalizados de Captação
-    </h3>
-    <p style="font-size:12px; color:var(--text-secondary); margin-bottom:16px;">
-      Compartilhe o link do(a) recrutador(a) com candidatos. Quem se cadastrar via esse link será automaticamente atribuído a ele(a) no painel.
-    </p>
-    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px;">
-      ${state.recrutadores.map(r => {
-        const link = `${baseUrl}?rec=${r.id}`;
-        return `
-          <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:8px; padding:14px; display:flex; flex-direction:column; gap:8px;">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <div style="width:34px; height:34px; border-radius:50%; background:${r.corHex}; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:14px; flex-shrink:0;">${r.nome[0]}</div>
-              <span style="font-weight:600; color:var(--text-primary); font-size:14px;">${r.nome}</span>
-            </div>
-            <div style="font-size:10px; color:var(--text-secondary); word-break:break-all; font-family:monospace; background:rgba(0,0,0,0.2); padding:6px 8px; border-radius:4px;">${link}</div>
-            <button onclick="copiarLinkRecrutador('${r.id}', this)"
-              style="width:100%; padding:6px 10px; background:transparent; border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition:all .2s;">
-              <i class="fa-solid fa-copy"></i> Copiar link de ${r.nome}
-            </button>
-          </div>
-        `;
-      }).join('')}
-    </div>
-  `;
-
-  // Inserir acima da seção do formulário na aba Site
-  const formSection = document.querySelector('#aba-site .site-form-section');
-  if (formSection) {
-    formSection.insertBefore(bloco, formSection.firstChild);
-  }
-}
-
-window.copiarLinkRecrutador = function(recId, btn) {
-  const baseUrl = `${window.location.origin}${window.location.pathname}`;
-  const link = `${baseUrl}?rec=${recId}`;
-  const rec = state.recrutadores.find(r => r.id === recId);
-  const nomeRec = rec ? rec.nome : recId;
-
-  const copy = (text) => {
-    if (navigator.clipboard) {
-      return navigator.clipboard.writeText(text);
-    }
-    return new Promise((_, reject) => {
-      const val = prompt(`Link de captação de ${nomeRec}:`, text);
-      val !== null ? Promise.resolve() : reject();
-    });
-  };
-
-  copy(link).then(() => {
-    const orig = btn.innerHTML;
-    btn.innerHTML = `<i class="fa-solid fa-check"></i> Copiado!`;
-    btn.style.background = '#22c55e';
-    btn.style.color = '#fff';
-    btn.style.border = '1px solid #22c55e';
-    setTimeout(() => {
-      btn.innerHTML = orig;
-      btn.style.background = '';
-      btn.style.color = '';
-      btn.style.border = '';
-    }, 2500);
-  }).catch(() => {});
-};
 
 // ==========================================================================
 // MÓDULO 14: INICIALIZAÇÃO COMPLETA
@@ -8572,21 +8415,7 @@ function mostrarResultadoImport(total, inseridos, erros) {
 // MÓDULO 23: LINK OFICIAL DA AGÊNCIA R&T (QR Code)
 // ==========================================================================
 
-function getAgenciaLinkUrl() {
-  return `${window.location.origin}${window.location.pathname}?rec=agencia`;
-}
 
-window.copiarLinkAgencia = function(btn) {
-  const link = getAgenciaLinkUrl();
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(link).then(() => {
-      const orig = btn.innerHTML;
-      btn.innerHTML = '<i class="fa-solid fa-check"></i> Copiado!';
-      btn.style.background = '#22c55e'; btn.style.color = '#fff';
-      setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; btn.style.color = ''; }, 2500);
-    });
-  } else { prompt('Link da agência:', link); }
-};
 
 // ==========================================================================
 // UPGRADE VISUAL PREMIUM - NOVAS FUNÇÕES DE MÉTRIAS, GRÁFICOS E ANIMAÇÕES
@@ -9132,27 +8961,6 @@ window.autoSiglaCliente = function() {
   siglaEl.value = sigla;
 };
 
-window.autoLatLngCliente = function() {
-  const cidade = document.getElementById('cli-cidade').value.trim().toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const coords = CIDADE_COORDS[cidade];
-  const latEl  = document.getElementById('cli-lat');
-  const lngEl  = document.getElementById('cli-lng');
-  const box    = document.getElementById('cli-coords-box');
-  const txt    = document.getElementById('cli-coords-txt');
-  if (coords && latEl && lngEl) {
-    latEl.value = coords.lat;
-    lngEl.value = coords.lng;
-    if (box && txt) {
-      txt.textContent = 'Localização encontrada automaticamente: ' + coords.lat + ', ' + coords.lng + ' — cálculo de proximidade ativo!';
-      box.style.display = 'block';
-    }
-  } else if (box) {
-    box.style.display = 'none';
-    if (latEl) latEl.value = '';
-    if (lngEl) lngEl.value = '';
-  }
-};
 
 // ==========================================================================
 // MÓDULO: SISTEMA DE SENHAS / FILA
@@ -9261,14 +9069,6 @@ window.definirNomeSenha = function(senhaId) {
   renderFila();
 };
 
-// Marca senha como atendida
-window.finalizarSenha = function(senhaId) {
-  const senha = (state.fila.senhas || []).find(s => s.id === senhaId);
-  if (!senha) return;
-  senha.status = 'atendida';
-  saveState();
-  renderFila();
-};
 
 // Cancela/remove senha da fila
 window.cancelarSenha = function(senhaId) {
@@ -9706,24 +9506,7 @@ function _renderPainelCompleto(container, rec) {
     </div>`;
 }
 
-window.vincularPerfilRecrutadora = function() {
-  const sel = document.getElementById('meu-painel-select-rec');
-  if (!sel || !sel.value) { alert('Selecione um perfil para vincular.'); return; }
-  const rec = state.recrutadores.find(r => r.id === sel.value);
-  if (!rec) return;
-  rec.loginVinculado = loggedUser.login;
-  saveState();
-  renderMeuPainel();
-};
 
-window.desvincularPerfilRecrutadora = function() {
-  const rec = state.recrutadores.find(r => (r.usuarioId && r.usuarioId === loggedUser.id) || (r.loginVinculado && r.loginVinculado === loggedUser.login));
-  if (!rec) return;
-  if (!confirm(`Desvincular o perfil "${rec.nome}" da sua conta? Você poderá vincular outro.`)) return;
-  rec.loginVinculado = '';
-  saveState();
-  renderMeuPainel();
-};
 
 window.toggleQrMeuPainel = function(id) {
   const el = document.getElementById(id);
@@ -10077,16 +9860,6 @@ function _examePerfilSelecao() {
     loggedUser.departamento === 'administracao' ||
     ehMestre(loggedUser.login) ||
     hasPermission('exame_medico', 'criar')
-  ));
-}
-// Quem pode ANEXAR o laudo do resultado: a clínica, admin/mestre (ex.: clínica manda por
-// WhatsApp e o admin anexa) OU quem tiver a permissão "editar" marcada no cadastro.
-function _examePodeEnviarLaudo() {
-  return !!(loggedUser && (
-    _examePerfilClinica() ||
-    loggedUser.departamento === 'administracao' ||
-    ehMestre(loggedUser.login) ||
-    hasPermission('exame_medico', 'editar')
   ));
 }
 
@@ -10477,10 +10250,6 @@ const _RT_TAMANHO_POR_LISTA = {
   comissao: 40,        // linhas de tabela
   equipamentos: 50     // linhas de tabela
 };
-function _rtPorPagina() {
-  try { return window.matchMedia('(max-width: 768px)').matches ? _RT_POR_PAGINA_CELULAR : _RT_POR_PAGINA; }
-  catch (e) { return _RT_POR_PAGINA; }
-}
 const _rtPaginas = {};   // { chave: numeroDaPagina }
 
 function rtPaginaAtual(chave) { return _rtPaginas[chave] || 1; }

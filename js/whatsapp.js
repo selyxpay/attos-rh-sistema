@@ -38,10 +38,6 @@ async function waSend(path, method, body) {
 
 // ── Helpers de UI ────────────────────────────────────────────────────────────
 function _waEsc(s) { return (typeof escapeHTML === 'function') ? escapeHTML(String(s == null ? '' : s)) : String(s == null ? '' : s); }
-function _waEmpty(nome) {
-  return `<div class="wa-empty"><i class="fa-solid fa-screwdriver-wrench"></i>
-    <p><b>${_waEsc(nome)}</b> — em desenvolvimento. Chega na próxima etapa. 🛠️</p></div>`;
-}
 function _waErro(msg) {
   return `<div class="wa-empty wa-err"><i class="fa-solid fa-triangle-exclamation"></i>
     <p>${_waEsc(msg)}</p></div>`;
