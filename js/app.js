@@ -742,6 +742,20 @@ function garantirEstruturasBase() {
   ['candidatos', 'bancoTalentos', 'vagas', 'empresas', 'funcionarios', 'recrutadores',
    'contratacoes', 'logs', 'equipamentos', 'examesMedicos', 'fluxosFinanceiros'].forEach(k => {
     if (!Array.isArray(state[k])) { state[k] = []; mudou = true; }
+
+    // ── LIXO NA LISTA DERRUBA A TELA INTEIRA ──────────────────────────────
+    // Um único null no meio de state.candidatos fazia c.status estourar dentro
+    // do filter, o render morria e a aba mostrava "Não consegui montar esta
+    // tela". Não era um registro com problema: era a PÁGINA TODA em branco —
+    // Dashboard, Banco de Talentos, Seleção, Depto. Pessoal e Relatórios de
+    // uma vez. Aqui o lixo sai na carga, e o servidor já não deixa mais entrar.
+    const limpa = state[k].filter(r => r && typeof r === 'object' && !Array.isArray(r));
+    if (limpa.length !== state[k].length) {
+      console.warn('[RT] Removi ' + (state[k].length - limpa.length) +
+        ' item(ns) inválido(s) da lista "' + k + '" — eles derrubavam a tela.');
+      state[k] = limpa;
+      mudou = true;
+    }
   });
   return mudou;
 }
@@ -1648,6 +1662,13 @@ function _rtDetalheErro(e) {
 // a pessoa presa numa página vazia, sem entender o que aconteceu.
 function renderCurrentAba() {
   try {
+    // Última barreira antes de desenhar QUALQUER tela: tira da frente item
+    // inválido (null no meio da lista, por exemplo). Um só derrubava cinco
+    // abas de uma vez — Dashboard, Banco de Talentos, Seleção, Depto. Pessoal
+    // e Relatórios — e o usuário via "Não consegui montar esta tela".
+    // Fica aqui, e não só na carga, porque a tela tem que aguentar o lixo
+    // venha ele de onde vier: importação, sincronização ou dado antigo.
+    try { garantirEstruturasBase(); } catch (_) {}
     _renderCurrentAbaInterno();
   } catch (e) {
     console.error('[RT] Falha ao montar a aba "' + activeAba + '":', e);
@@ -8079,14 +8100,19 @@ function renderBancoTalentosSimples() {
     return;
   }
 
+  // Pagina os cards: 7.584 talentos de uma vez geravam 524.000 pixels de rolagem.
+  // ATENÇÃO: esta linha PRECISA vir antes do headerHtml. Ela estava depois, e o
+  // header já usava pagT — com "const", usar antes de declarar não é undefined,
+  // é ERRO. Resultado: bastava existir UM talento na lista para a aba inteira
+  // do Banco de Talentos morrer e aparecer "Não consegui montar esta tela".
+  const pagT = rtPaginar(lista, 'talentos');
+
   // Contagem no topo
   const headerHtml = `<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;font-weight:600;">
     ${lista.length} talento${lista.length > 1 ? 's' : ''} encontrado${lista.length > 1 ? 's' : ''}
     <span style="font-weight:400;"> — clique em um nome para ver detalhes e puxar para processo</span>
   </div>` + rtControlesPagina(pagT, 'talentos');
 
-  // Pagina os cards: 7.584 talentos de uma vez geravam 524.000 pixels de rolagem.
-  const pagT = rtPaginar(lista, 'talentos');
   const cardsHtml = pagT.itens.map(t => {
     const initials = (t.nome || '?').split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase();
     const sexo     = t.sexo || detectarSexoPeloNome(t.nome);

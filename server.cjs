@@ -112,7 +112,7 @@ function mesclarEstado(servidor, local, upsertIds) {
   Object.keys(local || {}).forEach(function (k) {
     const lv = local[k];
     if (Array.isArray(lv)) {
-      if (!Array.isArray(out[k])) { out[k] = lv.slice(); return; }
+      if (!Array.isArray(out[k])) { out[k] = lv.filter(function (x) { return x !== null && x !== undefined; }); return; }
       const idx = {};
       out[k].forEach(function (it, i) { if (it && it.id != null) idx[it.id] = i; });
       // Itens SEM id (ex.: tiposPagamentoFluxo, que é uma lista de textos) não
@@ -122,6 +122,10 @@ function mesclarEstado(servidor, local, upsertIds) {
       // Agora esses itens só entram se ainda não existirem (comparação por valor).
       let jaExiste = null;
       lv.forEach(function (it) {
+        // null/undefined no meio de uma lista de registros e veneno: no
+        // navegador, um unico null faz o filter estourar e a aba inteira
+        // aparece em branco. Nao entra, e nao fica.
+        if (it === null || it === undefined) return;
         if (it && it.id != null) {
           if (idx[it.id] === undefined) out[k].push(it);      // novo -> adiciona
           else if (ups[it.id]) out[k][idx[it.id]] = it;       // upsert -> substitui
@@ -663,6 +667,20 @@ const OPENWA_SESSAO_PADRAO = 'rt-vagas';
 function _openwaNome(valor) {
   const limpo = String(valor || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
   return limpo.length >= 3 ? limpo : OPENWA_SESSAO_PADRAO;
+}
+
+// As rotas por sessão (/start, /qr, /logout, /messages) esperam o **id** da
+// sessão, que é um UUID — não o nome. Só a CRIAÇÃO usa o nome. Passar o nome
+// nessas rotas dá "Validation failed (uuid is expected)".
+// Aqui traduzimos nome -> id, consultando a lista.
+function _openwaResolverId(nome) {
+  return openwa.chamar('/api/sessions').then(function (r) {
+    if (!r.ok) return { ok: false, erro: _openwaDetalhe(r) };
+    const lista = Array.isArray(r.dados) ? r.dados : [];
+    const s = lista.find(function (x) { return x && (x.name === nome || x.id === nome); });
+    if (!s || !s.id) return { ok: false, erro: 'Não achei a conexão "' + nome + '" no OpenWA.' };
+    return { ok: true, id: String(s.id), sessao: s };
+  });
 }
 
 // "erro 400" não ajuda ninguém. O OpenWA manda o motivo no corpo da resposta
@@ -1518,12 +1536,19 @@ http.createServer(function (req, res) {
         let erroCriar = null;
         openwa.chamar('/api/sessions', { metodo: 'POST', corpo: { name: nome } })
           .then(function (c) {
-            // Já existir não é problema: seguimos para o start. Qualquer outro
+            // Já existir não é problema: seguimos assim mesmo. Qualquer outro
             // erro fica guardado, para explicar caso o start também falhe.
             if (!c.ok && c.status !== 409) erroCriar = _openwaDetalhe(c);
-            return openwa.chamar('/api/sessions/' + encodeURIComponent(nome) + '/start', { metodo: 'POST' });
+            // A criação já devolve o id; se não devolveu, procuramos na lista.
+            const idNovo = c.ok && c.dados && c.dados.id;
+            return idNovo ? { ok: true, id: String(idNovo) } : _openwaResolverId(nome);
+          })
+          .then(function (achou) {
+            if (!achou.ok) { responderJson(res, 200, { ok: false, sessao: nome, erro: erroCriar || achou.erro }); return null; }
+            return openwa.chamar('/api/sessions/' + encodeURIComponent(achou.id) + '/start', { metodo: 'POST' });
           })
           .then(function (r) {
+            if (!r) return;
             if (r.naoConfigurado) { responderJson(res, 200, { ok: false, erro: r.erro, naoConfigurado: true }); return; }
             if (!r.ok) {
               responderJson(res, 200, { ok: false, sessao: nome, erro: erroCriar || _openwaDetalhe(r) });
@@ -1540,8 +1565,15 @@ http.createServer(function (req, res) {
     if (urlPath.indexOf('/api/openwa/qr/') === 0 && req.method === 'GET') {
       const nome = _openwaNome(decodeURIComponent(urlPath.slice('/api/openwa/qr/'.length)));
       if (!nome) { responderJson(res, 400, { error: 'sessão inválida' }); return; }
-      openwa.chamar('/api/sessions/' + encodeURIComponent(nome) + '/qr')
-        .then(function (r) { responderJson(res, 200, { ok: r.ok, erro: r.erro || null, dados: r.dados || null }); })
+      _openwaResolverId(nome)
+        .then(function (achou) {
+          if (!achou.ok) { responderJson(res, 200, { ok: false, erro: achou.erro }); return null; }
+          return openwa.chamar('/api/sessions/' + encodeURIComponent(achou.id) + '/qr');
+        })
+        .then(function (r) {
+          if (!r) return;
+          responderJson(res, 200, { ok: r.ok, erro: r.ok ? null : _openwaDetalhe(r), dados: r.dados || null });
+        })
         .catch(function (e) { responderJson(res, 200, { ok: false, erro: String(e.message || e) }); });
       return;
     }
@@ -1551,10 +1583,15 @@ http.createServer(function (req, res) {
     if (urlPath === '/api/openwa/desconectar' && req.method === 'POST') {
       lerCorpo(req, function (err, body) {
         const nome = _openwaNome(body && body.sessao);
-        openwa.chamar('/api/sessions/' + encodeURIComponent(nome) + '/logout', { metodo: 'POST' })
+        _openwaResolverId(nome)
+          .then(function (achou) {
+            if (!achou.ok) { responderJson(res, 200, { ok: false, erro: achou.erro }); return null; }
+            return openwa.chamar('/api/sessions/' + encodeURIComponent(achou.id) + '/logout', { metodo: 'POST' });
+          })
           .then(function (r) {
+            if (!r) return;
             if (r.ok) console.log('[OpenWA] ' + ((_u && _u.login) || '?') + ' desconectou a sessão ' + nome);
-            responderJson(res, 200, { ok: r.ok, erro: r.erro || null });
+            responderJson(res, 200, { ok: r.ok, erro: r.ok ? null : _openwaDetalhe(r) });
           })
           .catch(function (e) { responderJson(res, 200, { ok: false, erro: String(e.message || e) }); });
       });
@@ -1565,18 +1602,23 @@ http.createServer(function (req, res) {
     if (urlPath === '/api/openwa/enviar' && req.method === 'POST') {
       lerCorpo(req, function (err, body) {
         if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
-        const nome = String((body && body.sessao) || 'rt').replace(/[^a-zA-Z0-9_-]/g, '');
+        const nome = _openwaNome(body && body.sessao);
         const paraDig = String((body && body.para) || '').replace(/\D/g, '');
         const texto = String((body && body.texto) || '').trim();
         if (paraDig.length < 10) { responderJson(res, 200, { ok: false, erro: 'Número inválido. Use DDD + número.' }); return; }
         if (!texto) { responderJson(res, 200, { ok: false, erro: 'Escreva a mensagem.' }); return; }
         // Brasil: se vier sem o 55 na frente, acrescenta
         const destino = paraDig.length <= 11 ? '55' + paraDig : paraDig;
-        openwa.chamar('/api/sessions/' + encodeURIComponent(nome) + '/messages/send-text',
-          { metodo: 'POST', corpo: { to: destino, text: texto } })
+        _openwaResolverId(nome)
+          .then(function (achou) {
+            if (!achou.ok) { responderJson(res, 200, { ok: false, erro: achou.erro, para: destino }); return null; }
+            return openwa.chamar('/api/sessions/' + encodeURIComponent(achou.id) + '/messages/send-text',
+              { metodo: 'POST', corpo: { to: destino, text: texto } });
+          })
           .then(function (r) {
+            if (!r) return;
             if (r.ok) console.log('[OpenWA] ' + ((_u && _u.login) || '?') + ' enviou mensagem para ' + destino);
-            responderJson(res, 200, { ok: r.ok, erro: r.erro || null, dados: r.dados || null, para: destino });
+            responderJson(res, 200, { ok: r.ok, erro: r.ok ? null : _openwaDetalhe(r), dados: r.dados || null, para: destino });
           })
           .catch(function (e) { responderJson(res, 200, { ok: false, erro: String(e.message || e) }); });
       });
