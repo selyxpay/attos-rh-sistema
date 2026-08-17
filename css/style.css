@@ -321,11 +321,13 @@ h1, h2, h3, h4, h5, h6 {
 
 .aba-content {
     display: none;
-    animation: fadeIn 0.4s ease-out;
 }
 
+/* A animação fica na aba ATIVA, não na classe base: antes ela rodava também
+   nas abas escondidas, gastando trabalho de desenho à toa em 23 seções. */
 .aba-content.active {
     display: block;
+    animation: fadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .p-0 {

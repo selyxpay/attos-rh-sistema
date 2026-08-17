@@ -682,3 +682,93 @@ textarea:focus {
 b, strong {
   font-weight: 600;
 }
+
+/* ==========================================================================
+   12. VIDA — o sistema é sóbrio, não sem graça
+   --------------------------------------------------------------------------
+   O guia prevê isso: "a personalidade vem de um pequeno vocabulário de acentos
+   coloridos". Então a cor volta EXATAMENTE onde ela informa — no ícone de cada
+   módulo — e em nenhum outro lugar. Fundo, borda e texto seguem monocromáticos.
+   ========================================================================== */
+
+/* Cada módulo tem a sua cor. Não é enfeite: é o que deixa a pessoa achar o
+   item pelo canto do olho, sem ler. Só os 4 acentos da paleta + cinza. */
+.sidebar-nav .nav-item[data-aba="dashboard"] a i,
+.sidebar-nav .nav-item[data-aba="selecao"] a i,
+.sidebar-nav .nav-item[data-aba="relatorios"] a i,
+.sidebar-nav .nav-item[data-aba="meu-painel"] a i,
+.sidebar-nav .nav-item[data-aba="cadastros-exata"] a i { color: #60A5FA !important; }
+
+.sidebar-nav .nav-item[data-aba="vagas"] a i,
+.sidebar-nav .nav-item[data-aba="equipamentos"] a i,
+.sidebar-nav .nav-item[data-aba="comissao"] a i,
+.sidebar-nav .nav-item[data-aba="site"] a i { color: #FB923C !important; }
+
+.sidebar-nav .nav-item[data-aba="depto-pessoal"] a i,
+.sidebar-nav .nav-item[data-aba="exame-medico"] a i,
+.sidebar-nav .nav-item[data-aba="fluxo-financeiro"] a i,
+.sidebar-nav .nav-item[data-aba="whatsapp"] a i,
+.sidebar-nav .nav-item[data-aba="whatsapp-qr"] a i { color: #4ADE80 !important; }
+
+.sidebar-nav .nav-item[data-aba="banco-talentos"] a i,
+.sidebar-nav .nav-item[data-aba="funcionarios"] a i,
+.sidebar-nav .nav-item[data-aba="controle-acesso"] a i,
+.sidebar-nav .nav-item[data-aba="fila"] a i { color: #C4B5FD !important; }
+
+.sidebar-nav .nav-item[data-aba="inaptos"] a i { color: #FCA5A5 !important; }
+
+/* No item ativo (fundo azul) e no hover, o ícone vira branco — a cor cederia
+   contraste ali. As regras da seção 4 já fazem isso; estas garantem que a cor
+   do módulo não vença por ser mais específica. */
+.sidebar-nav .nav-item.active a i,
+.sidebar-nav .nav-item:hover a i { color: #FFFFFF !important; }
+
+/* ── Movimento: curto e discreto ────────────────────────────────────────── */
+
+/* O item do menu desliza um fio ao passar o mouse. 1px é o suficiente para
+   dar resposta sem virar bagunça numa lista de 23 itens. */
+.sidebar-nav .nav-item a {
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease !important;
+}
+.sidebar-nav .nav-item:hover a { transform: translateX(2px) !important; }
+
+/* Cartões respondem ao mouse pela BORDA, não por sombra — coerente com o
+   sistema, que define contêiner por linha e não por elevação. */
+.kpi-card,
+.vaga-card,
+.dashboard-chart-card,
+.kanban-card,
+.banco-candidato-card {
+  transition: border-color 0.15s ease, transform 0.15s ease !important;
+}
+.kpi-card:hover,
+.vaga-card:hover,
+.dashboard-chart-card:hover,
+.kanban-card:hover,
+.banco-candidato-card:hover {
+  border-color: #D4D4D4 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Botões afundam de leve ao clicar: confirma o toque sem animação longa. */
+.btn:active,
+.mod-btn-primary:active,
+.mod-btn-secondary:active,
+.mod-btn-secondary-light:active {
+  transform: translateY(1px) !important;
+}
+
+/* Quem pediu menos movimento no sistema operacional recebe menos movimento.
+   Não é opcional: enjoo e vertigem são reações reais a interface que se mexe. */
+@media (prefers-reduced-motion: reduce) {
+  .aba-content.active { animation: none !important; }
+  .sidebar-nav .nav-item:hover a,
+  .kpi-card:hover,
+  .vaga-card:hover,
+  .dashboard-chart-card:hover,
+  .kanban-card:hover,
+  .banco-candidato-card:hover,
+  .btn:active,
+  .mod-btn-primary:active { transform: none !important; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
