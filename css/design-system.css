@@ -12,7 +12,13 @@
   --color-primary: #0A0A0A;
   --color-primary-dark: #171717;
 
-  /* ── Azul de destaque — links, item ativo do menu, foco. Só ele "fala". */
+  /* ── Vermelho da R&T — a cor da marca. É ela que marca onde você está:
+     item ativo do menu, foco de campo, detalhes de destaque. */
+  --color-rt-red: #D40203;
+  --color-rt-red-dark: #9F0102;
+
+  /* ── Azul — segue existindo para gráficos e chips informativos, mas não é
+     mais quem dá o destaque na navegação. */
   --color-accent-blue: #2563EB;
   --color-accent-blue-dark: #1E40AF;
   --color-blue-dark: #1E40AF;
@@ -54,7 +60,7 @@
   --primary-hover: var(--color-primary-dark);
   --primary-light: rgba(37, 99, 235, 0.08);
   --dark-sidebar: #0A0A0A;
-  --dark-sidebar-active: var(--color-accent-blue);
+  --dark-sidebar-active: var(--color-rt-red);
   --bg-main: transparent;
   --card-bg: var(--color-glass-bg);
   --border-color: var(--color-glass-border);
@@ -186,25 +192,30 @@ label,
   display: none !important;
 }
 
+/* O logo é a marca da empresa: precisa ser VISTO. Estava espremido numa caixa
+   de 64px com moldura, e saía do tamanho de um ícone qualquer. Agora a caixa
+   dá espaço (120px) e o desenho ocupa esse espaço de verdade. A moldura saiu:
+   o logo tem fundo próprio e a borda só competia com ele. */
 .sidebar-header {
-  background: rgba(255, 255, 255, 0.04) !important;
-  border-radius: var(--radius-md) !important;
-  padding: 8px 14px !important;
-  margin-bottom: 18px !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: transparent !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 10px 8px !important;
+  margin-bottom: 20px !important;
+  border: none !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  height: 64px !important;
+  height: auto !important;
+  min-height: 120px !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
   box-shadow: none !important;
-  transition: background 0.15s ease, border-color 0.15s ease !important;
+  transition: none !important;
 }
 
 .sidebar-header:hover {
-  background: rgba(255, 255, 255, 0.07) !important;
-  border-color: rgba(255, 255, 255, 0.14) !important;
+  background: transparent !important;
+  border-color: transparent !important;
 }
 
 .sidebar-header .logo-area {
@@ -215,8 +226,10 @@ label,
 }
 
 .sidebar-header .logo-area img {
-  height: 44px !important;
-  max-width: 100% !important;
+  height: auto !important;
+  width: 100% !important;
+  max-width: 190px !important;
+  max-height: 110px !important;
   object-fit: contain !important;
   filter: none !important;
   padding: 0 !important;
@@ -260,11 +273,15 @@ label,
   transform: none !important;
 }
 
+/* O item onde você está usa o VERMELHO DA MARCA. É o detalhe que identifica a
+   R&T dentro de um sistema que, de resto, é preto e branco de propósito. */
 .nav-item.active a {
-  background: var(--color-accent-blue) !important;
+  background: var(--color-rt-red) !important;
   color: #FFFFFF !important;
   font-weight: 500 !important;
   box-shadow: none !important;
+  border-left: none !important;
+  padding-left: 14px !important;
 }
 
 .nav-item.active a i {
@@ -691,31 +708,14 @@ b, strong {
    módulo — e em nenhum outro lugar. Fundo, borda e texto seguem monocromáticos.
    ========================================================================== */
 
-/* Cada módulo tem a sua cor. Não é enfeite: é o que deixa a pessoa achar o
-   item pelo canto do olho, sem ler. Só os 4 acentos da paleta + cinza. */
-.sidebar-nav .nav-item[data-aba="dashboard"] a i,
-.sidebar-nav .nav-item[data-aba="selecao"] a i,
-.sidebar-nav .nav-item[data-aba="relatorios"] a i,
-.sidebar-nav .nav-item[data-aba="meu-painel"] a i,
-.sidebar-nav .nav-item[data-aba="cadastros-exata"] a i { color: #60A5FA !important; }
-
-.sidebar-nav .nav-item[data-aba="vagas"] a i,
-.sidebar-nav .nav-item[data-aba="equipamentos"] a i,
-.sidebar-nav .nav-item[data-aba="comissao"] a i,
-.sidebar-nav .nav-item[data-aba="site"] a i { color: #FB923C !important; }
-
-.sidebar-nav .nav-item[data-aba="depto-pessoal"] a i,
-.sidebar-nav .nav-item[data-aba="exame-medico"] a i,
-.sidebar-nav .nav-item[data-aba="fluxo-financeiro"] a i,
-.sidebar-nav .nav-item[data-aba="whatsapp"] a i,
-.sidebar-nav .nav-item[data-aba="whatsapp-qr"] a i { color: #4ADE80 !important; }
-
-.sidebar-nav .nav-item[data-aba="banco-talentos"] a i,
-.sidebar-nav .nav-item[data-aba="funcionarios"] a i,
-.sidebar-nav .nav-item[data-aba="controle-acesso"] a i,
-.sidebar-nav .nav-item[data-aba="fila"] a i { color: #C4B5FD !important; }
-
-.sidebar-nav .nav-item[data-aba="inaptos"] a i { color: #FCA5A5 !important; }
+/* Ícones do menu: TODOS brancos. A cor por módulo foi testada e o dono do
+   sistema preferiu o menu limpo — um menu de 23 itens com 5 cores disputava
+   atenção com o conteúdo. O destaque agora é só o item ativo, em vermelho. */
+.sidebar-nav .nav-item a i {
+  color: #FFFFFF !important;
+  opacity: 0.75;
+  transition: opacity 0.15s ease !important;
+}
 
 /* No item ativo (fundo azul) e no hover, o ícone vira branco — a cor cederia
    contraste ali. As regras da seção 4 já fazem isso; estas garantem que a cor
