@@ -12347,10 +12347,17 @@ function _ffAnalisarTexto(texto) {
     if (mTC) { somaTotCliente += _ffParseValor(mTC[1]); temTotCliente = true; return; }
 
     // ── Cabeçalhos/rodapés dos DOIS modelos (repetidos em cada página) ──
+    // Estes são ancorados no INÍCIO da linha, então nunca pegam um nome de
+    // pessoa por engano.
     if (/^\s*(empresa|banco|per[íi]odo|ordem\s+pagamento|forma\s+pagamento|data\s+(emiss[ãa]o|pagamento)|fl\.?\s*c[óo]digo|p[áa]gina|nome\s+do?\s+funcion[áa]rio|total\s+da\s+(p[áa]gina|rela[çc][ãa]o)|tot\.?\s*cliente|ordem\s+de\s+c[óo]digos|relat[óo]rio|usu[áa]rio)/i.test(linha)) return;
-    if (/\bltda\b|\bs\/?a\b|\bcnpj\b|bradesco|banco\s+ita[uú]|\bpix\b\s*$/i.test(linha)) return;
 
     // ── Linha de colaborador ──
+    // ESTA CHECAGEM VEM ANTES do filtro de razão social lá embaixo, e isso é
+    // proposital. O filtro procura "S/A", "LTDA", "CNPJ" em QUALQUER lugar da
+    // linha — e "SA" é sobrenome comum no Brasil (Sá). Com o filtro na frente,
+    // "014438 MARIA DE FATIMA SA ... 137,00" era descartada antes de ser lida,
+    // e a conferência acusava divergência de exatamente R$ 137,00 contra o
+    // total impresso no PDF. Pessoa primeiro; razão social só depois.
     const m = rxLinha.exec(linha);
     if (m) {
       const nome = m[2].replace(/[^\p{L}\s'.-]/gu, ' ').replace(/\s+/g, ' ').trim();
@@ -12365,6 +12372,13 @@ function _ffAnalisarTexto(texto) {
       }, meio)));
       return;
     }
+
+    // ── Agora sim: linha de razão social / rodapé de banco ──
+    // Só chega aqui quem NÃO é linha de colaborador. Mesmo assim exigimos que
+    // a linha não tenha CPF: se tem CPF, é gente, e gente não se descarta por
+    // causa de um sobrenome que parece sigla de empresa.
+    const temCpf = /\d{3}[.\s]?\d{3}[.\s]?\d{3}[.,\s-]?\d{2}(?!\d)/.test(linha);
+    if (!temCpf && /\bltda\b|\bs\/?a\b|\bcnpj\b|bradesco|banco\s+ita[uú]|\bpix\b\s*$/i.test(linha)) return;
 
     // ── Fallback genérico (outros layouts) — exige CPF para confiar ──
     const cpfM = linha.match(/\d{3}[.\s]?\d{3}[.\s]?\d{3}[.,\s-]?\d{2}(?!\d)/);
