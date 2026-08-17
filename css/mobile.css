@@ -24,7 +24,7 @@
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
     pointer-events: auto !important;
-    box-shadow: 4px 0 24px rgba(0,0,0,.35);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   }
   body.menu-mobile-aberto .sidebar { transform: translateX(0) !important; }
 
@@ -219,7 +219,7 @@
   }
   .exame-table-row > span { display: block; width: 100%; margin-bottom: 8px; }
   .exame-table-row > span:last-child { margin-bottom: 0; }
-  .exame-col-nome { font-size: 15px; font-weight: 700; }
+  .exame-col-nome { font-size: 15px; font-weight: 600; }
   .exame-table-row .btn { width: 100%; justify-content: center; min-height: 44px; }
 
   /* Barras de filtro: um campo por linha, botão largura cheia */
@@ -313,7 +313,7 @@
     box-shadow: none !important;
   }
   body.menu-mobile-aberto .sidebar {
-    box-shadow: 4px 0 24px rgba(0, 0, 0, .45) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
   }
 
   /* ---- Cabeçalho: só a foto do usuário (o nome vira "quadradão" no celular) --

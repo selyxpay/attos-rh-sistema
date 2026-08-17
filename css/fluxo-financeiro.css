@@ -157,7 +157,7 @@
   align-items: center;
   gap: 10px;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.5px;
   text-transform: uppercase;
   color: #2563eb;
@@ -168,12 +168,12 @@
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
-  border-radius: 20px;
+  border-radius: 16px;
   background: #eff6ff;
   border: 1px solid #bfdbfe;
   color: #1d4ed8;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .ff-hero-amanha-main {
@@ -184,17 +184,17 @@
 }
 
 .ff-hero-amanha-bigval {
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  background: #F5F5F5;
   border: 1px solid var(--ff-border);
-  border-radius: 14px;
+  border-radius: 12px;
   padding: 20px;
   text-align: left;
 }
 
 .ff-hero-amanha-amount {
-  font-family: 'Outfit', 'Inter', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 28px;
-  font-weight: 900;
+  font-weight: 600;
   color: #0f172a;
   line-height: 1.1;
   letter-spacing: -0.5px;
@@ -234,13 +234,13 @@
 
 .ff-company-card:hover {
   border-color: #93c5fd;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   transform: translateY(-2px);
 }
 
 .ff-company-name {
   font-size: 12.5px;
-  font-weight: 800;
+  font-weight: 600;
   color: #1e293b;
   margin-bottom: 4px;
   white-space: nowrap;
@@ -256,7 +256,7 @@
 
 .ff-company-val {
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 600;
   color: #059669;
   margin-top: 6px;
 }
@@ -272,7 +272,7 @@
 .ff-kpi-card {
   background: #ffffff;
   border: 1px solid var(--ff-border);
-  border-radius: 14px;
+  border-radius: 12px;
   padding: 18px;
   display: flex;
   align-items: center;
@@ -298,16 +298,16 @@
 }
 
 .ff-kpi-val {
-  font-family: 'Outfit', 'Inter', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 24px;
-  font-weight: 900;
+  font-weight: 600;
   color: #0f172a;
   line-height: 1.1;
 }
 
 .ff-kpi-lbl {
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.4px;
@@ -348,7 +348,7 @@
   background: transparent;
   color: #64748b;
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
@@ -362,7 +362,7 @@
 .ff-tab-btn.active {
   background: #ffffff;
   color: #0f172a;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .ff-tab-btn .ff-tab-badge {
@@ -372,11 +372,11 @@
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #e2e8f0;
   color: #475569;
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
   transition: all 0.15s ease;
 }
 
@@ -406,7 +406,7 @@
 .ff-etapa-card:hover {
   background: #ffffff;
   border-color: #2563eb;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   transform: translateY(-2px);
 }
 
@@ -419,13 +419,13 @@
 
 .ff-etapa-card-num {
   font-size: 20px;
-  font-weight: 900;
+  font-weight: 600;
   color: #0f172a;
 }
 
 .ff-etapa-card-lbl {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: #64748b;
   margin-top: 4px;
   line-height: 1.2;
@@ -433,7 +433,7 @@
 
 .ff-etapa-card-val {
   font-size: 11.5px;
-  font-weight: 800;
+  font-weight: 600;
   color: #059669;
   margin-top: 6px;
 }
@@ -454,7 +454,7 @@
   gap: 8px;
   background: #ffffff;
   border: 1px solid var(--ff-border);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 6px 12px;
   min-width: 260px;
   box-shadow: var(--ff-shadow-sm);
@@ -476,7 +476,7 @@
 
 .ff-filter-select {
   border: 1px solid var(--ff-border);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 6px 12px;
   font-size: 12px;
   font-weight: 600;
@@ -495,7 +495,7 @@
   padding: 4px 10px;
   border-radius: 8px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.2px;
   white-space: nowrap;
 }
@@ -514,7 +514,7 @@
   align-items: center;
   gap: 4px;
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
   margin-top: 3px;
 }
 .ff-prazo-atrasado { color: #dc2626; }
@@ -531,7 +531,7 @@
   padding: 16px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  border-radius: 14px;
+  border-radius: 12px;
   margin-bottom: 20px;
   overflow-x: auto;
 }
@@ -564,7 +564,7 @@
 .ff-timeline-step.completed .ff-timeline-node {
   background: #10b981;
   color: #ffffff;
-  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .ff-timeline-step.active .ff-timeline-node {
@@ -576,7 +576,7 @@
 
 .ff-timeline-label {
   font-size: 11.5px;
-  font-weight: 800;
+  font-weight: 600;
   color: #1e293b;
   line-height: 1.2;
 }
@@ -603,7 +603,7 @@
 .ff-table-container {
   background: #ffffff;
   border: 1px solid var(--ff-border);
-  border-radius: 14px;
+  border-radius: 12px;
   overflow: hidden;
   box-shadow: var(--ff-shadow-sm);
 }
@@ -618,7 +618,7 @@
 .ff-table th {
   background: #f8fafc;
   color: #475569;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -649,7 +649,7 @@
 }
 
 .ff-val-destaque {
-  font-weight: 800;
+  font-weight: 600;
   color: #059669;
   font-size: 13.5px;
 }
@@ -679,7 +679,7 @@
 
 .ff-empty-title {
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 600;
   color: #1e293b;
   margin: 0 0 6px 0;
 }

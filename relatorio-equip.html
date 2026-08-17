@@ -36,25 +36,25 @@
     flex:1 1 170px; background:var(--papel); border:1px solid var(--linha);
     border-left:4px solid var(--azul); border-radius:12px; padding:13px 16px;
   }
-  .resumo span { display:block; font-size:11px; font-weight:800; text-transform:uppercase;
+  .resumo span { display:block; font-size:11px; font-weight:600; text-transform:uppercase;
                  letter-spacing:.06em; color:var(--cinza); }
   .resumo b { display:block; margin-top:4px; font-size:22px; font-variant-numeric:tabular-nums; }
 
   .barra { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
   .barra input {
     flex:1 1 260px; padding:11px 14px; font-size:15px; border:1px solid var(--linha);
-    border-radius:10px; background:var(--papel); font-family:inherit; min-height:44px;
+    border-radius:8px; background:var(--papel); font-family:inherit; min-height:44px;
   }
   .btn {
     display:inline-flex; align-items:center; justify-content:center; gap:8px;
-    padding:11px 18px; min-height:44px; border:0; border-radius:10px; cursor:pointer;
-    font-family:inherit; font-size:14px; font-weight:700; background:var(--azul); color:#fff;
+    padding:11px 18px; min-height:44px; border:0; border-radius:8px; cursor:pointer;
+    font-family:inherit; font-size:14px; font-weight:600; background:var(--azul); color:#fff;
   }
   .btn.sec { background:var(--papel); color:var(--tinta); border:1px solid var(--linha); }
   .btn:hover { filter:brightness(1.06); }
 
   .pessoa {
-    background:var(--papel); border:1px solid var(--linha); border-radius:14px;
+    background:var(--papel); border:1px solid var(--linha); border-radius:12px;
     margin-bottom:12px; overflow:hidden;
   }
   /* Recado da R&T para a empresa — classe própria, para não ser contado
@@ -71,12 +71,12 @@
   .avatar {
     width:42px; height:42px; flex:0 0 auto; border-radius:50%; background:var(--azul-claro);
     color:var(--azul); display:flex; align-items:center; justify-content:center;
-    font-weight:800; font-size:15px;
+    font-weight:600; font-size:15px;
   }
-  .pessoa-nome { font-size:16px; font-weight:700; }
+  .pessoa-nome { font-size:16px; font-weight:600; }
   .pessoa-sub { font-size:12.5px; color:var(--cinza); margin-top:2px; }
   .selo {
-    padding:4px 11px; border-radius:999px; font-size:11.5px; font-weight:800; white-space:nowrap;
+    padding:4px 11px; border-radius:9999px; font-size:11.5px; font-weight:600; white-space:nowrap;
   }
   .selo-entrega  { background:#EFF4FF; color:var(--azul); }
   .selo-devolucao{ background:#ECFDF5; color:var(--verde); }
@@ -84,7 +84,7 @@
   .qtd-fotos { font-size:12px; color:var(--cinza); }
   .ver-mais {
     background:none; border:1px solid var(--linha); border-radius:8px; padding:7px 13px;
-    font-family:inherit; font-size:13px; font-weight:700; color:var(--azul); cursor:pointer; min-height:38px;
+    font-family:inherit; font-size:13px; font-weight:600; color:var(--azul); cursor:pointer; min-height:38px;
   }
   .detalhe { display:none; padding:0 18px 18px; border-top:1px solid var(--linha); }
   .detalhe.aberto { display:block; }
@@ -92,19 +92,19 @@
     display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
     gap:10px 20px; margin:14px 0; font-size:13.5px; line-height:1.5;
   }
-  .campos b { display:block; font-size:11px; font-weight:800; text-transform:uppercase;
+  .campos b { display:block; font-size:11px; font-weight:600; text-transform:uppercase;
               letter-spacing:.05em; color:var(--cinza); margin-bottom:2px; }
   .fotos { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
-  .fotos a { display:block; border:1px solid var(--linha); border-radius:10px; overflow:hidden; background:#F8FAFC; }
+  .fotos a { display:block; border:1px solid var(--linha); border-radius:8px; overflow:hidden; background:#F8FAFC; }
   .fotos img { width:100%; height:130px; object-fit:cover; display:block; }
   .fotos .pdf {
     height:130px; display:flex; align-items:center; justify-content:center;
-    font-size:13px; font-weight:700; color:var(--ambar); text-align:center; padding:10px;
+    font-size:13px; font-weight:600; color:var(--ambar); text-align:center; padding:10px;
   }
   .foto-nome { font-size:11px; padding:6px 8px; color:var(--cinza); word-break:break-all; }
 
   .vazio, .erro {
-    background:var(--papel); border:1px solid var(--linha); border-radius:14px;
+    background:var(--papel); border:1px solid var(--linha); border-radius:12px;
     padding:40px 24px; text-align:center; color:var(--cinza);
   }
   .erro { border-color:#FECACA; color:#B91C1C; }
@@ -113,19 +113,19 @@
   /* ── Portaria: pede o nome antes de mostrar o relatório ─────────────── */
   .portaria {
     max-width:460px; margin:8vh auto; background:var(--papel); border:1px solid var(--linha);
-    border-radius:18px; padding:34px 30px; text-align:center;
+    border-radius:16px; padding:34px 30px; text-align:center;
     box-shadow:0 10px 34px rgba(15,23,42,.10);
   }
   .portaria-logo { height:54px; width:auto; margin-bottom:16px; }
   .portaria h1 { margin:0 0 8px; font-size:24px; letter-spacing:-.02em; }
   .portaria-txt { margin:0 0 22px; font-size:14.5px; line-height:1.6; color:var(--cinza); }
   .portaria-rot {
-    display:block; text-align:left; font-size:11.5px; font-weight:800; letter-spacing:.05em;
+    display:block; text-align:left; font-size:11.5px; font-weight:600; letter-spacing:.05em;
     text-transform:uppercase; color:var(--cinza); margin-bottom:6px;
   }
   .portaria input {
     width:100%; padding:13px 15px; font-size:16px; font-family:inherit;
-    border:1.5px solid var(--linha); border-radius:10px; margin-bottom:6px; min-height:48px;
+    border:1.5px solid var(--linha); border-radius:8px; margin-bottom:6px; min-height:48px;
   }
   .portaria input:focus { outline:2px solid var(--azul); outline-offset:1px; border-color:var(--azul); }
   .portaria .btn { width:100%; margin-top:10px; font-size:15px; min-height:48px; }
@@ -142,20 +142,20 @@
     border-radius:12px; padding:14px 18px; margin-bottom:16px;
   }
   .feito-conf.com-pendencia { background:#FFFBEB; border-color:#FDE68A; border-left-color:var(--ambar); }
-  .feito-titulo { font-weight:800; font-size:15px; color:var(--verde); margin-bottom:5px; }
+  .feito-titulo { font-weight:600; font-size:15px; color:var(--verde); margin-bottom:5px; }
   .feito-conf.com-pendencia .feito-titulo { color:var(--ambar); }
   .feito-txt { font-size:13.5px; line-height:1.6; color:var(--tinta); }
 
   .confere {
-    background:#F8FAFC; border:1px solid var(--linha); border-radius:10px;
+    background:#F8FAFC; border:1px solid var(--linha); border-radius:8px;
     padding:11px 13px; margin:14px 0;
   }
-  .confere-rot { font-size:12px; font-weight:800; color:var(--cinza); margin-bottom:8px;
+  .confere-rot { font-size:12px; font-weight:600; color:var(--cinza); margin-bottom:8px;
                  text-transform:uppercase; letter-spacing:.05em; }
   .confere-botoes { display:flex; gap:8px; flex-wrap:wrap; }
   .cf {
-    flex:1 1 130px; padding:10px 14px; min-height:44px; border-radius:9px; cursor:pointer;
-    font-family:inherit; font-size:14px; font-weight:700; background:var(--papel);
+    flex:1 1 130px; padding:10px 14px; min-height:44px; border-radius:8px; cursor:pointer;
+    font-family:inherit; font-size:14px; font-weight:600; background:var(--papel);
     border:1.5px solid var(--linha); color:var(--tinta);
   }
   .cf:disabled { opacity:.55; cursor:default; }
@@ -163,11 +163,11 @@
   .cf-nao.ativo { background:#DC2626; border-color:#DC2626; color:#fff; }
   .confere-motivo {
     width:100%; margin-top:9px; padding:10px 12px; font-size:14px; font-family:inherit;
-    border:1.5px solid #FCA5A5; border-radius:9px; min-height:44px;
+    border:1.5px solid #FCA5A5; border-radius:8px; min-height:44px;
   }
 
   .acao-conf {
-    background:var(--papel); border:2px solid var(--azul); border-radius:14px;
+    background:var(--papel); border:2px solid var(--azul); border-radius:12px;
     padding:18px; margin-top:18px; box-shadow:0 6px 20px rgba(30,64,175,.10);
   }
   .acao-conf-topo {
@@ -176,7 +176,7 @@
   }
   .acao-conf textarea {
     width:100%; min-height:74px; padding:11px 13px; font-size:14.5px; font-family:inherit;
-    border:1px solid var(--linha); border-radius:10px; resize:vertical; margin-bottom:12px;
+    border:1px solid var(--linha); border-radius:8px; resize:vertical; margin-bottom:12px;
   }
   .acao-conf .btn { width:100%; font-size:15.5px; min-height:50px; }
   .acao-conf-nota { margin:10px 0 0; font-size:12.5px; color:var(--cinza); text-align:center; }

@@ -379,7 +379,7 @@ function _waItemConversa(c) {
   const cor = WA_STATUS_COR[c.status] || '#94a3b8';
   const naoLidas = c.unread_count > 0 ? `<span class="wa-unread">${c.unread_count > 9 ? '9+' : c.unread_count}</span>` : '';
   return `<div class="wa-conv-item ${c.id === _waConvAberta ? 'active' : ''}" onclick="waAbrirConversa(${c.id})">
-    <span class="wa-avatar" style="background:linear-gradient(135deg,${cor},${cor}cc);">${_waEsc(_waInicial(nome))}</span>
+    <span class="wa-avatar" style="background:cor;">${_waEsc(_waInicial(nome))}</span>
     <div class="wa-conv-meio">
       <div class="wa-conv-topo"><b>${_waEsc(nome)}</b><span class="wa-conv-hora">${_waHora(c.last_message_at)}</span></div>
       <div class="wa-conv-baixo"><span class="wa-conv-prev">${_waEsc((c.last_message_text || '').slice(0, 42) || '—')}</span>${naoLidas}</div>
@@ -428,7 +428,7 @@ function _waRenderChat(conv, msgs) {
   chat.innerHTML =
     `<header class="wa-chat-head">
        <button class="wa-voltar" onclick="waVoltarLista()" title="Voltar"><i class="fa-solid fa-arrow-left"></i></button>
-       <span class="wa-avatar" style="background:linear-gradient(135deg,#059669,#10b981);">${_waEsc(_waInicial(nome))}</span>
+       <span class="wa-avatar" style="background:#059669;">${_waEsc(_waInicial(nome))}</span>
        <div class="wa-chat-head-info"><b>${_waEsc(nome)}</b><small>${_waEsc(_waFmtTelefone(conv.contact_phone))} · ${WA_STATUS_PT[conv.status] || conv.status}${(conv.account_name || conv.account_phone) ? ' · <span class="wa-via">via ' + _waEsc(conv.account_name || conv.account_phone) + '</span>' : ''}</small></div>
        <div class="wa-chat-head-acoes">
          ${conv.contact_id ? `<button class="wa-btn-mini wa-info-btn" title="Detalhes do contato" onclick="waVerContato(${conv.contact_id})"><i class="fa-solid fa-circle-info"></i></button>` : ''}

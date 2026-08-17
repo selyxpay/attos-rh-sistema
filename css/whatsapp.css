@@ -46,7 +46,7 @@
   gap: 14px;
   background: var(--card-bg, #fff);
   border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 14px;
+  border-radius: 12px;
   padding: 16px 18px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
 }
@@ -57,7 +57,7 @@
   font-size: 20px;
   flex-shrink: 0;
 }
-.wa-stat-val { font-size: 24px; font-weight: 800; color: var(--text-main, #0f172a); line-height: 1.1; }
+.wa-stat-val { font-size: 24px; font-weight: 600; color: var(--text-main, #0f172a); line-height: 1.1; }
 .wa-stat-lbl { font-size: 12px; color: var(--text-secondary, #64748b); margin-top: 2px; }
 
 .wa-mini-note {
@@ -66,7 +66,7 @@
   color: var(--text-secondary, #64748b);
   background: var(--surface-subtle, #f8fafc);
   border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 10px 14px;
 }
 .wa-mini-note i { color: #0891b2; margin-right: 4px; }
@@ -91,8 +91,8 @@
   margin-left: auto;
   background: #25D366;
   color: #fff;
-  font-size: 11px; font-weight: 800;
-  border-radius: 999px;
+  font-size: 11px; font-weight: 600;
+  border-radius: 9999px;
 }
 
 /* ── ETAPA 2: Contatos (toolbar, tabela, modal, formulário) ───────────────── */
@@ -101,7 +101,7 @@
 .wa-search i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 13px; }
 .wa-search input {
   width: 100%; padding: 10px 12px 10px 34px;
-  border: 1px solid var(--border-color, #e2e8f0); border-radius: 10px;
+  border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px;
   font-size: 13.5px; background: var(--card-bg, #fff); color: var(--text-main, #0f172a);
 }
 .wa-search input:focus { outline: none; border-color: #059669; box-shadow: 0 0 0 3px rgba(5,150,105,.12); }
@@ -111,7 +111,7 @@
 .wa-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 620px; }
 .wa-table th {
   text-align: left; padding: 10px 14px; background: var(--surface-subtle, #f8fafc);
-  color: var(--text-secondary, #64748b); font-weight: 700; font-size: 11.5px; text-transform: uppercase;
+  color: var(--text-secondary, #64748b); font-weight: 600; font-size: 11.5px; text-transform: uppercase;
   border-bottom: 1px solid var(--border-color, #e2e8f0); white-space: nowrap;
 }
 .wa-table td { padding: 10px 14px; border-bottom: 1px solid var(--border-color, #f1f5f9); color: var(--text-main, #0f172a); vertical-align: middle; }
@@ -120,9 +120,9 @@
 .wa-avatar, .wa-det-avatar {
   display: inline-flex; align-items: center; justify-content: center;
   width: 30px; height: 30px; border-radius: 50%; margin-right: 8px;
-  background: linear-gradient(135deg, #059669, #10b981); color: #fff; font-weight: 800; font-size: 13px; vertical-align: middle;
+  background: #16A34A; color: #fff; font-weight: 600; font-size: 13px; vertical-align: middle;
 }
-.wa-chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #e2e8f0; color: #475569; }
+.wa-chip { display: inline-block; padding: 2px 9px; border-radius: 9999px; font-size: 11px; font-weight: 600; background: #e2e8f0; color: #475569; }
 .wa-acoes { white-space: nowrap; text-align: right; }
 .wa-btn-mini {
   border: 1px solid var(--border-color, #e2e8f0); background: var(--card-bg, #fff); color: #475569;
@@ -137,18 +137,18 @@
 }
 .wa-modal {
   background: var(--card-bg, #fff); border-radius: 16px; width: 100%; max-width: 460px;
-  max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,.3); overflow: hidden;
+  max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 20px rgba(0, 0, 0, 0.09); overflow: hidden;
 }
 .wa-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--border-color, #e2e8f0); }
-.wa-modal-head h3 { margin: 0; font-size: 16px; font-weight: 800; color: var(--text-main, #0f172a); }
+.wa-modal-head h3 { margin: 0; font-size: 16px; font-weight: 600; color: var(--text-main, #0f172a); }
 .wa-modal-x { border: none; background: transparent; font-size: 18px; color: #94a3b8; cursor: pointer; }
 .wa-modal-x:hover { color: #dc2626; }
 .wa-modal-body { padding: 18px; overflow-y: auto; }
 .wa-modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--border-color, #e2e8f0); }
 
-.wa-form label { display: block; font-size: 12.5px; font-weight: 700; color: var(--text-secondary, #64748b); margin: 12px 0 4px; }
+.wa-form label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-secondary, #64748b); margin: 12px 0 4px; }
 .wa-form input, .wa-form textarea {
-  width: 100%; padding: 9px 11px; border: 1px solid var(--border-color, #e2e8f0); border-radius: 9px;
+  width: 100%; padding: 9px 11px; border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px;
   font-size: 13.5px; background: var(--card-bg, #fff); color: var(--text-main, #0f172a); font-family: inherit; box-sizing: border-box;
 }
 .wa-form input:focus, .wa-form textarea:focus { outline: none; border-color: #059669; box-shadow: 0 0 0 3px rgba(5,150,105,.12); }
@@ -164,7 +164,7 @@
 .wa-det-row span { color: var(--text-secondary, #64748b); font-size: 12.5px; }
 .wa-det-row b { color: var(--text-main, #0f172a); font-size: 13px; text-align: right; }
 .wa-det-notes { margin-top: 12px; text-align: left; }
-.wa-det-notes span { font-size: 11.5px; color: var(--text-secondary, #64748b); text-transform: uppercase; font-weight: 700; }
+.wa-det-notes span { font-size: 11.5px; color: var(--text-secondary, #64748b); text-transform: uppercase; font-weight: 600; }
 .wa-det-notes p { margin: 4px 0 0; font-size: 13px; color: var(--text-main, #0f172a); background: var(--surface-subtle, #f8fafc); padding: 8px 10px; border-radius: 8px; }
 
 /* ── ETAPA 3: Inbox / Central de atendimento ──────────────────────────────── */
@@ -174,7 +174,7 @@
   height: calc(100vh - 240px);
   min-height: 460px;
   border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 14px;
+  border-radius: 12px;
   overflow: hidden;
   background: var(--card-bg, #fff);
 }
@@ -182,7 +182,7 @@
 /* Coluna 1: lista de conversas */
 .wa-col-list { display: flex; flex-direction: column; border-right: 1px solid var(--border-color, #e2e8f0); min-height: 0; }
 .wa-conv-filtros { display: flex; gap: 5px; padding: 10px 10px 6px; flex-wrap: wrap; }
-.wa-fchip { border: 1px solid var(--border-color, #e2e8f0); background: transparent; color: var(--text-secondary, #64748b); font-size: 11.5px; font-weight: 600; padding: 5px 11px; border-radius: 999px; cursor: pointer; }
+.wa-fchip { border: 1px solid var(--border-color, #e2e8f0); background: transparent; color: var(--text-secondary, #64748b); font-size: 11.5px; font-weight: 600; padding: 5px 11px; border-radius: 9999px; cursor: pointer; }
 .wa-fchip.active { background: #059669; color: #fff; border-color: #059669; }
 .wa-search-conv { margin: 0 10px 8px; }
 .wa-conv-list { flex: 1; overflow-y: auto; min-height: 0; }
@@ -195,7 +195,7 @@
 .wa-conv-hora { font-size: 10.5px; color: var(--text-light, #94a3b8); white-space: nowrap; }
 .wa-conv-baixo { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin: 1px 0; }
 .wa-conv-prev { font-size: 12px; color: var(--text-secondary, #64748b); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wa-unread { background: #25D366; color: #fff; font-size: 10.5px; font-weight: 800; min-width: 18px; height: 18px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; padding: 0 5px; }
+.wa-unread { background: #25D366; color: #fff; font-size: 10.5px; font-weight: 600; min-width: 18px; height: 18px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; padding: 0 5px; }
 .wa-conv-status { font-size: 10.5px; font-weight: 600; }
 
 /* Coluna 2: chat */
@@ -215,11 +215,11 @@
 .wa-msg-in { justify-content: flex-start; }
 .wa-msg-out { justify-content: flex-end; }
 .wa-msg-nota { justify-content: center; }
-.wa-bolha { max-width: 74%; padding: 7px 11px 5px; border-radius: 10px; font-size: 13.5px; line-height: 1.4; color: #0f172a; box-shadow: 0 1px 1px rgba(0,0,0,.08); word-wrap: break-word; position: relative; }
+.wa-bolha { max-width: 74%; padding: 7px 11px 5px; border-radius: 8px; font-size: 13.5px; line-height: 1.4; color: #0f172a; box-shadow: 0 1px 1px rgba(0,0,0,.08); word-wrap: break-word; position: relative; }
 .wa-msg-in .wa-bolha { background: #fff; border-top-left-radius: 3px; }
 .wa-msg-out .wa-bolha { background: #d9fdd3; border-top-right-radius: 3px; }
 .wa-msg-nota .wa-bolha { background: #fef9c3; border: 1px solid #fde68a; max-width: 82%; }
-.wa-nota-tag { font-size: 10.5px; font-weight: 700; color: #b45309; margin-bottom: 2px; }
+.wa-nota-tag { font-size: 10.5px; font-weight: 600; color: #b45309; margin-bottom: 2px; }
 .wa-msg-hora { display: block; text-align: right; font-size: 10px; color: #64748b; margin-top: 2px; }
 .wa-msg-hora i { margin-left: 3px; }
 .wa-msg-img { max-width: 100%; border-radius: 8px; display: block; }
@@ -228,11 +228,11 @@
 /* Composer */
 .wa-composer { border-top: 1px solid var(--border-color, #e2e8f0); padding: 8px 12px; background: var(--card-bg, #fff); }
 .wa-composer-modo { display: flex; gap: 6px; margin-bottom: 7px; }
-.wa-modo-btn { border: 1px solid var(--border-color, #e2e8f0); background: transparent; color: var(--text-secondary, #64748b); font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px; cursor: pointer; }
+.wa-modo-btn { border: 1px solid var(--border-color, #e2e8f0); background: transparent; color: var(--text-secondary, #64748b); font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 9999px; cursor: pointer; }
 .wa-modo-btn.active { background: #059669; color: #fff; border-color: #059669; }
 .wa-modo-btn.wa-modo-nota.active { background: #d97706; border-color: #d97706; }
 .wa-composer-linha { display: flex; gap: 8px; align-items: flex-end; }
-.wa-composer-linha textarea { flex: 1; resize: none; max-height: 120px; padding: 9px 12px; border: 1px solid var(--border-color, #e2e8f0); border-radius: 20px; font-size: 13.5px; font-family: inherit; background: var(--card-bg, #fff); color: var(--text-main, #0f172a); }
+.wa-composer-linha textarea { flex: 1; resize: none; max-height: 120px; padding: 9px 12px; border: 1px solid var(--border-color, #e2e8f0); border-radius: 16px; font-size: 13.5px; font-family: inherit; background: var(--card-bg, #fff); color: var(--text-main, #0f172a); }
 .wa-composer-linha textarea:focus { outline: none; border-color: #059669; }
 .wa-anexo, .wa-enviar { width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer; flex-shrink: 0; font-size: 15px; }
 .wa-anexo { background: var(--surface-subtle, #f1f5f9); color: #475569; }
@@ -247,7 +247,7 @@
 .wa-info-card .wa-det-avatar { width: 60px; height: 60px; font-size: 24px; }
 
 /* Toast */
-.wa-toast { position: fixed; bottom: -60px; left: 50%; transform: translateX(-50%); background: #0f172a; color: #fff; padding: 11px 18px; border-radius: 10px; font-size: 13px; z-index: 5000; transition: bottom .25s; box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: 90vw; }
+.wa-toast { position: fixed; bottom: -60px; left: 50%; transform: translateX(-50%); background: #0f172a; color: #fff; padding: 11px 18px; border-radius: 8px; font-size: 13px; z-index: 5000; transition: bottom .25s; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); max-width: 90vw; }
 .wa-toast.show { bottom: 24px; }
 .wa-toast.wa-toast-err { background: #b91c1c; }
 
@@ -279,9 +279,9 @@
 }
 
 /* ── ETAPA 4: Templates ───────────────────────────────────────────────────── */
-.wa-tpl-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+.wa-tpl-badge { display: inline-block; padding: 2px 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; }
 .wa-tpl-pick { display: flex; flex-direction: column; gap: 8px; }
-.wa-tpl-opt { text-align: left; border: 1px solid var(--border-color, #e2e8f0); background: var(--card-bg, #fff); border-radius: 10px; padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; }
+.wa-tpl-opt { text-align: left; border: 1px solid var(--border-color, #e2e8f0); background: var(--card-bg, #fff); border-radius: 8px; padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; }
 .wa-tpl-opt:hover { border-color: #059669; background: rgba(5,150,105,.05); }
 .wa-tpl-opt b { font-size: 13.5px; color: var(--text-main, #0f172a); }
 .wa-tpl-opt small { font-size: 11.5px; color: var(--text-secondary, #64748b); }
@@ -289,21 +289,21 @@
 /* ── MULTI-CONTA: seletor de conta no Inbox + conexões ────────────────────── */
 .wa-conta-sel { padding: 10px 10px 0; }
 .wa-conta-sel select {
-  width: 100%; padding: 8px 10px; border: 1px solid var(--border-color, #e2e8f0); border-radius: 9px;
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px;
   font-size: 12.5px; font-weight: 600; background: var(--card-bg, #fff); color: var(--text-main, #0f172a);
 }
-.wa-conta-unica { font-size: 12px; font-weight: 700; color: #059669; padding: 4px 2px; }
+.wa-conta-unica { font-size: 12px; font-weight: 600; color: #059669; padding: 4px 2px; }
 .wa-conta-unica i { margin-right: 5px; }
 .wa-via { color: #059669; font-weight: 600; }
 
 .wa-conex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
-.wa-conex-card { border: 1px solid var(--border-color, #e2e8f0); border-radius: 14px; padding: 14px 16px; background: var(--card-bg, #fff); }
+.wa-conex-card { border: 1px solid var(--border-color, #e2e8f0); border-radius: 12px; padding: 14px 16px; background: var(--card-bg, #fff); }
 .wa-conex-card.wa-conex-off { opacity: .65; }
 .wa-conex-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
 .wa-conex-top b { font-size: 14.5px; color: var(--text-main, #0f172a); }
 .wa-conex-num { font-size: 12px; color: var(--text-secondary, #64748b); margin-top: 2px; }
 .wa-conex-num i { color: #25D366; }
-.wa-conex-status { font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 999px; text-transform: capitalize; white-space: nowrap; }
+.wa-conex-status { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 9999px; text-transform: capitalize; white-space: nowrap; }
 .wa-conex-linha { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px dashed var(--border-color, #f1f5f9); font-size: 12.5px; }
 .wa-conex-linha span { color: var(--text-secondary, #64748b); }
 .wa-conex-linha b { color: var(--text-main, #0f172a); }

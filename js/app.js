@@ -1345,7 +1345,7 @@ function renderControleAcesso() {
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
       <div>
         <div style="font-size:12px;color:var(--text-secondary);">Status atual</div>
-        <div style="font-weight:800;color:${statusCor};font-size:15px;">${statusTxt}</div>
+        <div style="font-weight:600;color:${statusCor};font-size:15px;">${statusTxt}</div>
         <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Hora confiável: <strong>${escapeHTML(agoraStr)}</strong> · Fuso: ${escapeHTML(cfg.fuso)} · fonte: ${_horaFonte}</div>
         <div style="font-size:12px;color:var(--text-secondary);">Seu acesso agora: <strong style="color:${res.permitido ? '#22c55e' : '#ef4444'}">${res.permitido ? 'permitido' : 'bloqueado'}</strong>${res.proximaLiberacao ? ' · próxima abertura: ' + escapeHTML(res.proximaLiberacao) : ''}</div>
       </div>
@@ -1357,7 +1357,7 @@ function renderControleAcesso() {
     <h4 style="margin:0 0 10px;font-size:14px;"><i class="fa-solid fa-lock"></i> Bloqueio e liberação manual</h4>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       ${cfg.bloqueioManual.ativo
-        ? `<span style="color:#ef4444;font-weight:700;">Bloqueado: ${escapeHTML(cfg.bloqueioManual.motivo || '—')}</span> <button class="btn btn-primary btn-sm" onclick="caCancelarBloqueio()">Liberar sistema</button>`
+        ? `<span style="color:#ef4444;font-weight:600;">Bloqueado: ${escapeHTML(cfg.bloqueioManual.motivo || '—')}</span> <button class="btn btn-primary btn-sm" onclick="caCancelarBloqueio()">Liberar sistema</button>`
         : `<button class="btn btn-danger btn-sm" onclick="caBloquearAgora()"><i class="fa-solid fa-ban"></i> Bloquear sistema interno agora</button>`}
     </div>
     <div style="margin-top:12px;">
@@ -1680,7 +1680,7 @@ function renderCurrentAba() {
                 || document.getElementById('aba-' + activeAba)
                 || document.querySelector('.aba-content');
       if (alvo) {
-        alvo.innerHTML = '<div style="max-width:520px;margin:60px auto;text-align:center;padding:28px;border:1px solid #E2E8F0;border-radius:14px;background:#fff;">' +
+        alvo.innerHTML = '<div style="max-width:520px;margin:60px auto;text-align:center;padding:28px;border:1px solid #E2E8F0;border-radius:12px;background:#fff;">' +
           '<div style="font-size:34px;">&#9888;&#65039;</div>' +
           '<h3 style="margin:12px 0 6px;color:#0F172A;">Não consegui montar esta tela</h3>' +
           '<p style="color:#64748B;font-size:14px;line-height:1.6;margin:0 0 14px;">Seus dados estão salvos — foi só a exibição que falhou. Recarregue para tentar de novo.</p>' +
@@ -1814,7 +1814,7 @@ function renderDocumentos() {
     const g = grupos[chave];
     const cards = g.itens.map(d => {
       const data = d.enviadoEm ? new Date(d.enviadoEm).toLocaleDateString('pt-BR') : '';
-      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:9px;margin-bottom:7px;">' +
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:7px;">' +
         '<span style="font-size:13px;font-weight:600;"><i class="fa-solid fa-file-lines" style="color:var(--primary);margin-right:6px;"></i>' + escapeHTML(rotuloDocumento(d.campo)) + '</span>' +
         '<span style="display:flex;align-items:center;gap:10px;">' +
           (data ? '<span style="font-size:11px;color:var(--text-secondary);white-space:nowrap;"><i class="fa-regular fa-calendar"></i> ' + data + '</span>' : '') +
@@ -1823,7 +1823,7 @@ function renderDocumentos() {
       '</div>';
     }).join('');
     return '<div style="margin-bottom:18px;">' +
-      '<div style="font-weight:700;font-size:14px;margin-bottom:8px;"><i class="fa-solid fa-user" style="color:var(--text-secondary);margin-right:6px;"></i>' + escapeHTML(g.pessoa) + ' <span style="font-weight:500;color:var(--text-secondary);font-size:12px;">(' + g.itens.length + ')</span></div>' +
+      '<div style="font-weight:600;font-size:14px;margin-bottom:8px;"><i class="fa-solid fa-user" style="color:var(--text-secondary);margin-right:6px;"></i>' + escapeHTML(g.pessoa) + ' <span style="font-weight:500;color:var(--text-secondary);font-size:12px;">(' + g.itens.length + ')</span></div>' +
       cards +
     '</div>';
   }).join('');
@@ -2705,7 +2705,7 @@ function createKanbanCardHtml(c) {
         <div class="card-info" style="flex: 1;">
           <span class="candidate-name" style="display: flex; align-items: center; justify-content: space-between; gap: 4px; width: 100%;">
             <span style="display:flex; align-items:center; gap:5px;">
-              ${c.numeroFila ? `<span style="background:rgba(190,18,60,0.15); color:var(--primary); font-size:9px; font-weight:700; padding:1px 5px; border-radius:10px;">#${Number(c.numeroFila)}</span>` : ''}
+              ${c.numeroFila ? `<span style="background:rgba(190,18,60,0.15); color:var(--primary); font-size:9px; font-weight:600; padding:1px 5px; border-radius:8px;">#${Number(c.numeroFila)}</span>` : ''}
               ${nomeSeguro}
             </span>
             ${c.devolvidoDP ? `<span class="tag-devolvida" style="animation: pulse 1.5s infinite; font-size: 8px; padding: 1.5px 4px;"><i class="fa-solid fa-circle-exclamation"></i> DEVOLVIDO</span>` : ''}
@@ -2954,7 +2954,7 @@ function renderCadastrosExata() {
       fichaopt: ['Ficha (opções)', '#1d4ed8', '#dbeafe']
     };
     const x = m[origem] || ['—', '#475569', '#e2e8f0'];
-    return `<span style="background:${x[2]};color:${x[1]};padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;white-space:nowrap;">${x[0]}</span>`;
+    return `<span style="background:${x[2]};color:${x[1]};padding:2px 8px;border-radius:9999px;font-size:10px;font-weight:600;white-space:nowrap;">${x[0]}</span>`;
   };
 
   // ── Exemplos de valor para pré-visualização ──
@@ -3028,8 +3028,8 @@ function renderCadastrosExata() {
       const opLinhas = opcoesAtual.length ? opcoesAtual.map((o, idx) =>
         `<div style="display:flex;align-items:center;gap:4px;margin-top:2px;">
           <span style="font-size:11px;flex:1;">${escapeHTML(o.de)}</span>
-          <span style="font-size:11px;font-weight:700;">→</span>
-          <span style="font-size:11px;font-weight:700;color:#6d28d9;">${escapeHTML(o.codigo)}</span>
+          <span style="font-size:11px;font-weight:600;">→</span>
+          <span style="font-size:11px;font-weight:600;color:#6d28d9;">${escapeHTML(o.codigo)}</span>
           <button class="btn btn-sm" style="font-size:9px;padding:1px 4px;background:#fff1f2;border:1px solid #fca5a5;color:#dc2626;" onclick="removerOpcaoTransfExata('${c.key}',${idx})" title="Remover"><i class="fa-solid fa-xmark"></i></button>
         </div>`
       ).join('') : '<span style="font-size:10px;color:var(--text-secondary);">Sem opções</span>';
@@ -3049,8 +3049,8 @@ function renderCadastrosExata() {
       const mudou = resultado !== exemploVal;
       previewHtml = `<div style="font-size:10px;margin-top:4px;padding:4px 8px;background:${mudou ? '#fef9c3' : '#f1f5f9'};border-radius:6px;border:1px solid ${mudou ? '#fde047' : '#e2e8f0'};">
         <span style="color:var(--text-secondary);">${escapeHTML(exemploVal)}</span>
-        <span style="font-weight:700;color:#6d28d9;"> → </span>
-        <span style="font-weight:700;color:${mudou ? '#15803d' : 'var(--text-secondary)'};">${escapeHTML(resultado)}</span>
+        <span style="font-weight:600;color:#6d28d9;"> → </span>
+        <span style="font-weight:600;color:${mudou ? '#15803d' : 'var(--text-secondary)'};">${escapeHTML(resultado)}</span>
       </div>`;
     }
 
@@ -3069,15 +3069,15 @@ function renderCadastrosExata() {
     const linhas = opts.length ? opts.map((o, idx) => `
       <tr style="${o.ativo === false ? 'opacity:.5;' : ''}">
         <td>${escapeHTML(o.de)}</td>
-        <td style="font-weight:700;">${escapeHTML(o.codigo || '—')}</td>
+        <td style="font-weight:600;">${escapeHTML(o.codigo || '—')}</td>
         <td style="display:flex;gap:5px;">
           <button class="btn btn-sm" title="${o.ativo === false ? 'Ativar' : 'Desativar'}" style="background:${o.ativo === false ? '#dcfce7' : '#fef9c3'};border:1px solid #e2e8f0;" onclick="toggleOpcaoFicha('${k}',${idx})"><i class="fa-solid fa-${o.ativo === false ? 'toggle-off' : 'toggle-on'}"></i></button>
           <button class="btn btn-sm" title="Editar" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;" onclick="editarOpcaoFicha('${k}',${idx})"><i class="fa-solid fa-pen"></i></button>
           ${soJoao ? `<button class="btn btn-sm" title="Excluir" style="background:#fff1f2;border:1px solid #fca5a5;color:#dc2626;" onclick="excluirOpcaoFicha('${k}',${idx})"><i class="fa-solid fa-trash"></i></button>` : ''}
         </td>
       </tr>`).join('') : '<tr><td colspan="3" style="color:var(--text-secondary);font-size:12px;">Sem opções.</td></tr>';
-    return `<details style="border:1px solid var(--border-color,#e2e8f0);border-radius:10px;padding:10px 12px;margin-bottom:10px;">
-      <summary style="cursor:pointer;font-weight:700;font-size:13px;">${titulo} <span style="font-weight:400;color:var(--text-secondary);font-size:11px;">(${opts.length})</span></summary>
+    return `<details style="border:1px solid var(--border-color,#e2e8f0);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+      <summary style="cursor:pointer;font-weight:600;font-size:13px;">${titulo} <span style="font-weight:400;color:var(--text-secondary);font-size:11px;">(${opts.length})</span></summary>
       <p style="font-size:11px;color:var(--text-secondary);margin:8px 0;">Opções que aparecem na ficha do candidato. À direita, o código que vai no Exata.</p>
       <div class="table-scroll-container"><table class="excel-table" style="width:100%;">
         <thead><tr><th>Opção (na ficha)</th><th>Código Exata</th><th></th></tr></thead>
@@ -3098,19 +3098,19 @@ function renderCadastrosExata() {
 
   cont.innerHTML = `
     <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
-      <label for="cad-exata-vaga" style="font-weight:700;font-size:13px;color:#6d28d9;display:block;margin-bottom:6px;"><i class="fa-solid fa-briefcase"></i> Selecionar vaga</label>
+      <label for="cad-exata-vaga" style="font-weight:600;font-size:13px;color:#6d28d9;display:block;margin-bottom:6px;"><i class="fa-solid fa-briefcase"></i> Selecionar vaga</label>
       <select id="cad-exata-vaga" class="form-control" onchange="aoSelecionarVagaExata()">${vagaOpts}</select>
       ${vagaSel ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:6px;">Configurando: <b>${escapeHTML(vagaSel.empresaNome || '')} — ${escapeHTML(vagaSel.cargo || '')}</b>. Os códigos abaixo ficam salvos NESTA vaga.</div>` : '<div style="font-size:11px;color:var(--text-secondary);margin-top:6px;">Escolha uma vaga para configurar os códigos enviados ao Exata.</div>'}
     </div>
 
-    <div style="background:linear-gradient(135deg,#ede9fe,#e0e7ff);border:1px solid #c4b5fd;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+    <div style="background:#ede9fe;border:1px solid #c4b5fd;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
         <div>
           <h4 style="margin:0;font-size:14px;color:#4c1d95;"><i class="fa-solid fa-wand-magic-sparkles"></i> Configurador de Integração</h4>
           <p style="font-size:12px;color:#6d28d9;margin:4px 0 0;">Defina o <b>tipo de envio</b> e <b>regras de transformação</b> para cada campo antes de enviar ao Exata.</p>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
-          <span style="background:#7c3aed;color:#fff;padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;">${totalConfigurados} campo${totalConfigurados !== 1 ? 's' : ''} configurado${totalConfigurados !== 1 ? 's' : ''}</span>
+          <span style="background:#7c3aed;color:#fff;padding:4px 12px;border-radius:9999px;font-size:11px;font-weight:600;">${totalConfigurados} campo${totalConfigurados !== 1 ? 's' : ''} configurado${totalConfigurados !== 1 ? 's' : ''}</span>
           <button class="btn btn-primary" onclick="salvarTransformacoesExata()" style="font-size:12px;padding:6px 14px;background:#7c3aed;border:none;"><i class="fa-solid fa-floppy-disk"></i> Salvar Transformações</button>
         </div>
       </div>
@@ -3125,7 +3125,7 @@ function renderCadastrosExata() {
         <tbody>${mapaLinhas}</tbody></table></div>
       <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;">
         ${vagaSel ? '<button class="btn btn-primary" onclick="salvarCamposExataVaga()"><i class="fa-solid fa-floppy-disk"></i> Salvar configuração da vaga</button>' : ''}
-        <button class="btn" onclick="salvarTransformacoesExata()" style="background:#7c3aed;color:#fff;border:none;font-weight:700;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;"><i class="fa-solid fa-wand-magic-sparkles"></i> Salvar Transformações (global)</button>
+        <button class="btn" onclick="salvarTransformacoesExata()" style="background:#7c3aed;color:#fff;border:none;font-weight:600;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;"><i class="fa-solid fa-wand-magic-sparkles"></i> Salvar Transformações (global)</button>
       </div>
     </div>
 
@@ -3422,21 +3422,21 @@ function renderVagasGrid() {
     const isQuente = !!v.vagaQuente;
     const benefitsHtml = (v.beneficios || []).map(b => `<span class="benefit-tag">${b}</span>`).join('');
     const btnExcluir = podeExcluir
-      ? `<button onclick="excluirVaga('${v.id}')" style="margin-top:10px;padding:7px 14px;border-radius:7px;border:1px solid #fca5a5;background:#fff1f2;color:#dc2626;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background 0.15s;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fff1f2'"><i class="fa-solid fa-trash-can"></i> Excluir Vaga</button>`
+      ? `<button onclick="excluirVaga('${v.id}')" style="margin-top:10px;padding:7px 14px;border-radius:8px;border:1px solid #fca5a5;background:#fff1f2;color:#dc2626;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background 0.15s;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fff1f2'"><i class="fa-solid fa-trash-can"></i> Excluir Vaga</button>`
       : '';
 
     const btnQuente = podeExcluir
-      ? `<button onclick="toggleVagaQuente('${v.id}')" style="margin-top:10px;padding:7px 14px;border-radius:7px;border:1px solid ${isQuente ? '#fdba74' : '#cbd5e1'};background:${isQuente ? '#fff7ed' : '#f8fafc'};color:${isQuente ? '#ea580c' : '#475569'};font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background 0.15s;" onmouseover="this.style.background='${isQuente ? '#ffedd5' : '#e2e8f0'}'" onmouseout="this.style.background='${isQuente ? '#fff7ed' : '#f8fafc'}'"><i class="fa-solid fa-fire"></i> ${isQuente ? 'Destaque Quente' : 'Destacar 🔥'}</button>`
+      ? `<button onclick="toggleVagaQuente('${v.id}')" style="margin-top:10px;padding:7px 14px;border-radius:8px;border:1px solid ${isQuente ? '#fdba74' : '#cbd5e1'};background:${isQuente ? '#fff7ed' : '#f8fafc'};color:${isQuente ? '#ea580c' : '#475569'};font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background 0.15s;" onmouseover="this.style.background='${isQuente ? '#ffedd5' : '#e2e8f0'}'" onmouseout="this.style.background='${isQuente ? '#fff7ed' : '#f8fafc'}'"><i class="fa-solid fa-fire"></i> ${isQuente ? 'Destaque Quente' : 'Destacar 🔥'}</button>`
       : '';
 
-    const badgeQuente = isQuente ? `<span style="background:#ffedd5; color:#ea580c; border:1px solid #fed7aa; font-size:9px; font-weight:700; padding:2px 8px; border-radius:12px; display:inline-flex; align-items:center; gap:4px; margin-left:auto;"><i class="fa-solid fa-fire"></i> QUENTE</span>` : '';
+    const badgeQuente = isQuente ? `<span style="background:#ffedd5; color:#ea580c; border:1px solid #fed7aa; font-size:9px; font-weight:600; padding:2px 8px; border-radius:12px; display:inline-flex; align-items:center; gap:4px; margin-left:auto;"><i class="fa-solid fa-fire"></i> QUENTE</span>` : '';
 
     const btnEditar = podeEditarVaga
-      ? `<button onclick="editarVaga('${v.id}')" style="margin-top:10px;padding:7px 14px;border-radius:7px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background 0.15s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'"><i class="fa-solid fa-pen-to-square"></i> Editar Vaga</button>`
+      ? `<button onclick="editarVaga('${v.id}')" style="margin-top:10px;padding:7px 14px;border-radius:8px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background 0.15s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'"><i class="fa-solid fa-pen-to-square"></i> Editar Vaga</button>`
       : '';
 
     const btnConfigExata = podeEditarVaga
-      ? `<button onclick="abrirConfigExata('${v.id}')" style="margin-top:10px;padding:7px 14px;border-radius:7px;border:1px solid #c4b5fd;background:#f5f3ff;color:#6d28d9;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background 0.15s;" onmouseover="this.style.background='#ede9fe'" onmouseout="this.style.background='#f5f3ff'"><i class="fa-solid fa-file-invoice"></i> Configurar Exata</button>`
+      ? `<button onclick="abrirConfigExata('${v.id}')" style="margin-top:10px;padding:7px 14px;border-radius:8px;border:1px solid #c4b5fd;background:#f5f3ff;color:#6d28d9;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background 0.15s;" onmouseover="this.style.background='#ede9fe'" onmouseout="this.style.background='#f5f3ff'"><i class="fa-solid fa-file-invoice"></i> Configurar Exata</button>`
       : '';
 
     return `
@@ -3662,10 +3662,10 @@ function renderSelecaoGrid() {
     const statusTexto = statusLabels[c.status] || esc(c.status);
 
     const origemBadge = c.origemCadastro === 'presencial'
-      ? `<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:10px;background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.4);flex-shrink:0;letter-spacing:.3px;"><i class="fa-solid fa-building"></i> FICHA PRESENCIAL</span>`
+      ? `<span style="font-size:9px;font-weight:600;padding:3px 8px;border-radius:8px;background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.4);flex-shrink:0;letter-spacing:.3px;"><i class="fa-solid fa-building"></i> FICHA PRESENCIAL</span>`
       : c.origemCadastro === 'banco_talentos'
-      ? `<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:10px;background:rgba(168,85,247,0.15);color:#a855f7;border:1px solid rgba(168,85,247,0.4);flex-shrink:0;letter-spacing:.3px;"><i class="fa-solid fa-users"></i> BANCO DE TALENTOS</span>`
-      : `<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:10px;background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.4);flex-shrink:0;letter-spacing:.3px;"><i class="fa-solid fa-globe"></i> FICHA ONLINE</span>`;
+      ? `<span style="font-size:9px;font-weight:600;padding:3px 8px;border-radius:8px;background:rgba(168,85,247,0.15);color:#a855f7;border:1px solid rgba(168,85,247,0.4);flex-shrink:0;letter-spacing:.3px;"><i class="fa-solid fa-users"></i> BANCO DE TALENTOS</span>`
+      : `<span style="font-size:9px;font-weight:600;padding:3px 8px;border-radius:8px;background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.4);flex-shrink:0;letter-spacing:.3px;"><i class="fa-solid fa-globe"></i> FICHA ONLINE</span>`;
 
     const inaptoBadge = isInapto
       ? `<span class="tag-inapto"><i class="fa-solid fa-circle-xmark"></i> INAPTO</span>`
@@ -3724,9 +3724,9 @@ function renderDeptoPessoal() {
   if (contratadosHoje.length > 0) {
     secaoFinalizados.innerHTML = `
       <div style="margin-bottom: 24px;">
-        <h3 style="font-size: 14px; font-weight: 700; color: #10b981; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+        <h3 style="font-size: 14px; font-weight:600; color: #10b981; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
           <i class="fa-solid fa-circle-check"></i> Contratos Finalizados Hoje (${hoje})
-          <span style="background:#10b98120; color:#10b981; padding:2px 10px; border-radius:20px; font-size:12px;">${contratadosHoje.length}</span>
+          <span style="background:#10b98120; color:#10b981; padding:2px 10px; border-radius:16px; font-size:12px;">${contratadosHoje.length}</span>
         </h3>
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px;">
           ${contratadosHoje.map(c => {
@@ -3734,9 +3734,9 @@ function renderDeptoPessoal() {
             const recFinDia = state.recrutadores.find(r => r.id === c.recrutadorId);
             const vagaFinDia = state.vagas.find(v => v.id === c.vagaId);
             return `
-              <div style="background: rgba(16,185,129,0.07); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 14px; display: flex; align-items: center; gap: 12px; cursor: pointer;"
+              <div style="background: rgba(16,185,129,0.07); border: 1px solid rgba(16,185,129,0.25); border-radius:8px; padding: 14px; display: flex; align-items: center; gap: 12px; cursor: pointer;"
                 onclick="abrirDrawerDetalhes('${c.id}')">
-                <div style="width:40px; height:40px; border-radius:50%; background:#10b981; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; flex-shrink:0;">${initials}</div>
+                <div style="width:40px; height:40px; border-radius:50%; background:#10b981; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:14px; flex-shrink:0;">${initials}</div>
                 <div style="min-width:0;">
                   <div style="font-weight:600; color:var(--text-primary); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.nome}</div>
                   <div style="font-size:11px; color:var(--text-secondary);">${vagaFinDia ? vagaFinDia.cargo : 'Vaga não definida'}</div>
@@ -3785,13 +3785,13 @@ function renderDeptoPessoal() {
         ${isLocked ? `
           <div style="padding:6px 16px 0;display:flex;align-items:center;gap:6px;">
             <i class="fa-solid fa-lock" style="color:#3b82f6;font-size:10px;"></i>
-            <span style="font-size:10px;font-weight:700;color:#3b82f6;">${esc(dpLock.userName)} está editando${lockHora ? ' desde ' + lockHora : ''}</span>
+            <span style="font-size:10px;font-weight:600;color:#3b82f6;">${esc(dpLock.userName)} está editando${lockHora ? ' desde ' + lockHora : ''}</span>
           </div>` : ''}
         <div class="dp-card-header" onclick="abrirDrawerDetalhes('${esc(c.id)}')" style="cursor: pointer;">
           <div class="dp-avatar" style="${isLocked ? 'background:#3b82f6;' : ''}">${initials}</div>
           <div class="dp-title-info">
             <span class="dp-cand-name" style="display:flex; align-items:center; gap:6px;">
-              ${c.numeroFila ? `<span style="background:rgba(190,18,60,0.15); color:var(--primary); font-size:9px; font-weight:700; padding:1px 5px; border-radius:10px; white-space:nowrap;">#${Number(c.numeroFila)}</span>` : ''}
+              ${c.numeroFila ? `<span style="background:rgba(190,18,60,0.15); color:var(--primary); font-size:9px; font-weight:600; padding:1px 5px; border-radius:8px; white-space:nowrap;">#${Number(c.numeroFila)}</span>` : ''}
               ${nomeSeguro}
             </span>
             <span class="dp-cand-company">${vagaSegura}</span>
@@ -3801,8 +3801,8 @@ function renderDeptoPessoal() {
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <span style="font-weight: 600; color: var(--text-secondary);">Origem:</span>
             ${c.origemCadastro === 'presencial'
-              ? `<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:10px;background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.4);letter-spacing:.3px;"><i class="fa-solid fa-building"></i> FICHA PRESENCIAL</span>`
-              : `<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:10px;background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.4);letter-spacing:.3px;"><i class="fa-solid fa-globe"></i> FICHA ONLINE</span>`}
+              ? `<span style="font-size:9px;font-weight:600;padding:3px 8px;border-radius:8px;background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.4);letter-spacing:.3px;"><i class="fa-solid fa-building"></i> FICHA PRESENCIAL</span>`
+              : `<span style="font-size:9px;font-weight:600;padding:3px 8px;border-radius:8px;background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.4);letter-spacing:.3px;"><i class="fa-solid fa-globe"></i> FICHA ONLINE</span>`}
           </div>
           <div style="display: flex; justify-content: space-between;">
             <span style="font-weight: 600; color: var(--text-secondary);">Turno:</span>
@@ -4048,7 +4048,7 @@ function renderComissaoSheet() {
         <td style="font-weight: 600;">${c.candidatoNome}</td>
         <td>${c.empresaNome}</td>
         <td>${c.data}</td>
-        <td style="font-weight: 700; color: var(--color-green);">R$ 150,00</td>
+        <td style="font-weight:600; color: var(--color-green);">R$ 150,00</td>
       </tr>
     `;
   }).join('');
@@ -4110,7 +4110,7 @@ function renderPortalLinks() {
   const agenciaLink = base + 'candidato.html?rec=agencia';
   let html = `
     <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:rgba(190,18,60,0.08);border:1px solid rgba(190,18,60,0.2);border-radius:8px;flex-wrap:wrap;">
-      <div style="width:32px;height:32px;border-radius:50%;background:#be123c;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;flex-shrink:0;">R</div>
+      <div style="width:32px;height:32px;border-radius:50%;background:#be123c;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;color:#fff;flex-shrink:0;">R</div>
       <div style="flex:1;min-width:200px;">
         <div style="font-weight:600;font-size:13px;color:var(--text-primary);">Agência R&amp;T (Link Oficial)</div>
         <div style="font-size:11px;color:var(--text-secondary);word-break:break-all;">${agenciaLink}</div>
@@ -4132,11 +4132,11 @@ function renderPortalLinks() {
       : '';
 
     html += `
-      <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:10px;padding:14px 16px;margin-bottom:8px;">
+      <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:8px;padding:14px 16px;margin-bottom:8px;">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-          <div style="width:36px;height:36px;border-radius:50%;background:${rec.corHex};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;flex-shrink:0;">${rec.nome[0]}</div>
+          <div style="width:36px;height:36px;border-radius:50%;background:${rec.corHex};display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;color:#fff;flex-shrink:0;">${rec.nome[0]}</div>
           <div style="flex:1;min-width:160px;">
-            <div style="font-weight:700;font-size:13px;color:var(--text-primary);">${rec.nome}</div>
+            <div style="font-weight:600;font-size:13px;color:var(--text-primary);">${rec.nome}</div>
             <div style="font-size:10px;color:var(--text-secondary);">Ficha completa: <span style="word-break:break-all;">${recLink}</span></div>
             <div style="font-size:10px;color:var(--text-secondary);">Banco de Talentos: <span style="word-break:break-all;">${btLink}</span></div>
           </div>
@@ -4151,7 +4151,7 @@ function renderPortalLinks() {
         <div class="recruiter-whatsapp-field" style="margin-top:10px;display:flex;gap:8px;align-items:center;">
           <i class="fa-brands fa-whatsapp" style="color:#25d366;font-size:16px;"></i>
           <input type="text" id="whatsapp-rec-${rec.id}" value="${rec.whatsapp || ''}" placeholder="DDD + número WhatsApp (ex: 11999990000)"
-            style="flex:1;padding:7px 12px;border-radius:7px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-primary);font-size:12px;"
+            style="flex:1;padding:7px 12px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-primary);font-size:12px;"
             oninput="salvarWhatsappRecrutadora('${rec.id}', this.value)">
         </div>
         ${alertaBt}
@@ -4226,13 +4226,13 @@ function abrirDrawerDetalhes(candidatoId) {
   if (origemEl) {
     if (cand.origemCadastro === 'presencial') {
       origemEl.innerHTML = '<i class="fa-solid fa-building"></i> FICHA PRESENCIAL';
-      origemEl.style.cssText = 'display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.4);margin-left:8px;letter-spacing:.3px;';
+      origemEl.style.cssText = 'display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;padding:3px 10px;border-radius:12px;background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.4);margin-left:8px;letter-spacing:.3px;';
     } else if (cand.origemCadastro === 'banco_talentos') {
       origemEl.innerHTML = '<i class="fa-solid fa-users"></i> BANCO DE TALENTOS';
-      origemEl.style.cssText = 'display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;background:rgba(168,85,247,0.15);color:#a855f7;border:1px solid rgba(168,85,247,0.4);margin-left:8px;letter-spacing:.3px;';
+      origemEl.style.cssText = 'display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;padding:3px 10px;border-radius:12px;background:rgba(168,85,247,0.15);color:#a855f7;border:1px solid rgba(168,85,247,0.4);margin-left:8px;letter-spacing:.3px;';
     } else {
       origemEl.innerHTML = '<i class="fa-solid fa-globe"></i> FICHA ONLINE';
-      origemEl.style.cssText = 'display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.4);margin-left:8px;letter-spacing:.3px;';
+      origemEl.style.cssText = 'display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;padding:3px 10px;border-radius:12px;background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.4);margin-left:8px;letter-spacing:.3px;';
     }
   }
 
@@ -4564,10 +4564,10 @@ function abrirDrawerDetalhes(candidatoId) {
       const rec = (state.recrutadores || []).find(r => r.id === cand.recrutadorId);
       const recNome = rec ? rec.nome : (cand.recrutadorId || '—');
       dpLockBanner.innerHTML = `
-        <div style="background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.3);border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div style="background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
           <i class="fa-solid fa-lock" style="color:#3b82f6;font-size:15px;flex-shrink:0;"></i>
           <div style="flex:1;min-width:200px;">
-            <div style="font-size:12px;color:#3b82f6;font-weight:700;margin-bottom:3px;">
+            <div style="font-size:12px;color:#3b82f6;font-weight:600;margin-bottom:3px;">
               <i class="fa-solid fa-user-tie" style="margin-right:4px;font-size:10px;"></i>${_esc(lock.userName)} (DP) está com essa ficha${hora ? ' — desde ' + hora : ''}
             </div>
             <div style="font-size:11px;color:var(--text-secondary);">
@@ -4575,7 +4575,7 @@ function abrirDrawerDetalhes(candidatoId) {
             </div>
           </div>
           ${euBloqueei ? `
-          <button onclick="liberarFichaDP('${_esc(cand.id)}')" style="padding:5px 14px;border-radius:8px;border:1px solid rgba(59,130,246,0.4);background:rgba(59,130,246,0.1);color:#3b82f6;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit;white-space:nowrap;flex-shrink:0;">
+          <button onclick="liberarFichaDP('${_esc(cand.id)}')" style="padding:5px 14px;border-radius:8px;border:1px solid rgba(59,130,246,0.4);background:rgba(59,130,246,0.1);color:#3b82f6;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;white-space:nowrap;flex-shrink:0;">
             <i class="fa-solid fa-unlock"></i> Liberar Ficha
           </button>` : ''}
         </div>`;
@@ -4725,7 +4725,7 @@ function abrirDrawerDetalhes(candidatoId) {
   // Botão no header
   const inaptoBtnHeader = document.getElementById('det-inapto-action-btn');
   if (inaptoBtnHeader) {
-    const BASE_BTN = 'cursor:pointer;border:none;display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:.3px;font-family:inherit;';
+    const BASE_BTN = 'cursor:pointer;border:none;display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;padding:3px 10px;border-radius:12px;letter-spacing:.3px;font-family:inherit;';
     // Ocultar o botão de header se já há painel de CPF ativo (evita duplicação)
     const aguardandoCpf = cand.origemCadastro === 'presencial' && cand.status === 'aguardando_consulta_cpf';
     if (aguardandoCpf) {
@@ -5139,10 +5139,10 @@ function renderInaptos() {
         <div class="inapto-list-item">
           <div class="inapto-avatar">${i.nome.split(' ').map(n=>n[0]).slice(0,2).join('').toUpperCase()}</div>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:700;color:var(--text-primary);">${i.nome}</div>
+            <div style="font-size:13px;font-weight:600;color:var(--text-primary);">${i.nome}</div>
             <div style="font-size:11px;color:var(--text-secondary);">CPF: ${i.cpf} · ${i.data}</div>
             <div style="font-size:11px;color:#fca5a5;margin-top:2px;"><i class="fa-solid fa-circle-xmark"></i> ${i.motivo}</div>
-            ${i.aprovadoMesmoInapto ? '<span style="font-size:9px;background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);padding:2px 6px;border-radius:6px;font-weight:700;">APROVADO MANUALMENTE</span>' : ''}
+            ${i.aprovadoMesmoInapto ? '<span style="font-size:9px;background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);padding:2px 6px;border-radius:6px;font-weight:600;">APROVADO MANUALMENTE</span>' : ''}
           </div>
           <div style="font-size:10px;color:var(--text-secondary);text-align:right;flex-shrink:0;">
             <div>${i.vagaNome || '—'}</div>
@@ -5499,7 +5499,7 @@ function renderFuncionarios() {
         <tr>
           <td style="font-weight:600; color:var(--text-primary);">${escapeHTML(f.nome)}<div style="font-size:11px;color:var(--text-secondary);font-weight:400;">${escapeHTML(f.telefone || 'sem telefone')} · ${escapeHTML(deptoLabelSimples(f.departamentoSolicitado || f.departamento))}${f.instituicao ? ' · <strong>' + escapeHTML(f.instituicao) + '</strong>' : ''}${f.dataSolicitacao ? ' · ' + escapeHTML(f.dataSolicitacao) : ''}</div></td>
           <td>${escapeHTML(f.login)}</td>
-          <td><span class="badge" style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">Aguardando Aprovação</span></td>
+          <td><span class="badge" style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600;">Aguardando Aprovação</span></td>
           <td>
             <button class="btn btn-primary btn-sm" onclick="abrirModalGerenciarFuncionario('${f.id}')"
               style="padding:2px 8px; font-size:11px; background:var(--primary); border:none;">
@@ -5601,8 +5601,8 @@ function renderFuncionarios() {
             <button class="btn btn-secondary btn-sm" style="padding:1px 7px;font-size:10px;" onclick="verSenhaFuncionario('${f.id}')"><i class="fa-solid fa-eye"></i> Ver senha</button>
             <button class="btn btn-secondary btn-sm" style="padding:1px 7px;font-size:10px;" onclick="resetarSenhaFuncionario('${f.id}')"><i class="fa-solid fa-key"></i> Redefinir</button>
             ${f.senhaConhecida === false
-              ? '<span title="Senha antiga (embaralhada). Aparece aqui assim que a pessoa fizer o próximo login — ela não precisa trocar de senha." style="font-size:9.5px;font-weight:700;color:#D97706;background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.3);padding:1px 6px;border-radius:8px;"><i class="fa-solid fa-hourglass-half"></i> aguardando login</span>'
-              : '<span title="A senha desta conta pode ser consultada." style="font-size:9.5px;font-weight:700;color:#059669;background:rgba(5,150,105,.12);border:1px solid rgba(5,150,105,.3);padding:1px 6px;border-radius:8px;"><i class="fa-solid fa-check"></i> disponível</span>'}
+              ? '<span title="Senha antiga (embaralhada). Aparece aqui assim que a pessoa fizer o próximo login — ela não precisa trocar de senha." style="font-size:9.5px;font-weight:600;color:#D97706;background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.3);padding:1px 6px;border-radius:8px;"><i class="fa-solid fa-hourglass-half"></i> aguardando login</span>'
+              : '<span title="A senha desta conta pode ser consultada." style="font-size:9.5px;font-weight:600;color:#059669;background:rgba(5,150,105,.12);border:1px solid rgba(5,150,105,.3);padding:1px 6px;border-radius:8px;"><i class="fa-solid fa-check"></i> disponível</span>'}
           </div>` : ''}
         </td>
         <td>
@@ -6655,9 +6655,9 @@ function renderLixeira() {
     return;
   }
   cont.innerHTML = itens.map(c => `
-    <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div style="border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
       <div style="min-width:220px;">
-        <div style="font-weight:700;font-size:14px;">${escapeHTML(c.nome || '(sem nome)')}</div>
+        <div style="font-weight:600;font-size:14px;">${escapeHTML(c.nome || '(sem nome)')}</div>
         <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;">${escapeHTML(_AREA_LABEL_EXC[c.areaExclusao] || c.areaExclusao || '—')} · ${escapeHTML(c.excluidoEm || '')}</div>
         <div style="font-size:12px;color:var(--text-secondary);">Por: ${escapeHTML(c.excluidoPor || '—')}${c.motivoExclusao ? ' · Motivo: ' + escapeHTML(c.motivoExclusao) : ''}</div>
       </div>
@@ -7115,19 +7115,19 @@ function renderVagasDemandasTable() {
         <td style="font-weight:600;">${v.empresaNome}</td>
         <td>${v.cargo} <span style="font-size:10px;color:var(--text-secondary);">(${v.codigo})</span></td>
         <td style="text-align:center;">${solicitadas}</td>
-        <td style="text-align:center; color:#22c55e; font-weight:700;">${disponiveis}</td>
+        <td style="text-align:center; color:#22c55e; font-weight:600;">${disponiveis}</td>
         <td style="text-align:center; color:#3b82f6;">${preenchidas}</td>
         <td style="text-align:center; color:#f97316;">${canceladas}</td>
         <td style="text-align:center; color:#a855f7;">${reabertas}</td>
         <td style="text-align:center;">
           <div style="display:flex; align-items:center; gap:6px;">
-            <div style="flex:1; height:6px; background:#e2e8f0; border-radius:3px;">
-              <div style="width:${aproveito}%; height:100%; background:var(--primary); border-radius:3px;"></div>
+            <div style="flex:1; height:6px; background:#e2e8f0; border-radius:6px;">
+              <div style="width:${aproveito}%; height:100%; background:var(--primary); border-radius:6px;"></div>
             </div>
             <span style="font-size:11px; font-weight:600;">${aproveito}%</span>
           </div>
         </td>
-        <td><span style="background:${statusCor[status]}22; color:${statusCor[status]}; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">${statusNome[status]}</span></td>
+        <td><span style="background:${statusCor[status]}22; color:${statusCor[status]}; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600;">${statusNome[status]}</span></td>
         <td>
           <button class="btn btn-secondary btn-sm" onclick="abrirModalAjustarVagas('${v.id}')" style="font-size:11px; padding:2px 8px; white-space:nowrap;">
             <i class="fa-solid fa-sliders"></i> Ajustar
@@ -7224,12 +7224,12 @@ function renderTabelaContratacoes() {
 
     return `
       <tr>
-        <td><span style="background:${recColor}22; color:${recColor}; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">${recNome}</span></td>
+        <td><span style="background:${recColor}22; color:${recColor}; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600;">${recNome}</span></td>
         <td style="font-weight:600;">${c.candidatoNome}</td>
         <td>${c.empresaNome}</td>
         <td style="font-size:11px;">${vagaLabel}</td>
         <td style="font-size:11px; white-space:nowrap;">${c.data || '—'}</td>
-        <td><span style="background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; font-size:11px;">${turno}</span></td>
+        <td><span style="background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:6px; font-size:11px;">${turno}</span></td>
         <td style="font-size:11px; color:var(--text-secondary);">${dpConf}</td>
       </tr>
     `;
@@ -7950,7 +7950,7 @@ async function validarEExibirQualidade(input, boxEl) {
     if (!errEl) {
       errEl = document.createElement('div');
       errEl.className = 'upload-quality-error';
-      errEl.style.cssText = 'color:#ef4444; font-size:10px; text-align:center; padding:4px 6px; background:#fee2e2; border-radius:4px; margin-top:4px; line-height:1.3;';
+      errEl.style.cssText = 'color:#ef4444; font-size:10px; text-align:center; padding:4px 6px; background:#fee2e2; border-radius:6px; margin-top:4px; line-height:1.3;';
       boxEl.appendChild(errEl);
     }
     errEl.textContent = resultado.mensagem;
@@ -8042,22 +8042,22 @@ function renderBTPendentes() {
     const wa = 'https://wa.me/' + (c.telefone || '').replace(/\D/g,'') + '?text=' +
       encodeURIComponent(`Olá, ${(c.nome || '').split(' ')[0]}! Clique no link para completar seu cadastro na R&T Empregos: ${link}`);
     return `
-      <div style="background:var(--card-bg); border:1px solid rgba(168,85,247,0.3); border-radius:10px; padding:14px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-        <div style="width:38px;height:38px;border-radius:50%;background:rgba(168,85,247,0.2);color:#a855f7;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;">
+      <div style="background:var(--card-bg); border:1px solid rgba(168,85,247,0.3); border-radius:8px; padding:14px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div style="width:38px;height:38px;border-radius:50%;background:rgba(168,85,247,0.2);color:#a855f7;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex-shrink:0;">
           ${(c.nome||'?').split(' ').map(n=>n[0]).slice(0,2).join('').toUpperCase()}
         </div>
         <div style="flex:1;min-width:0;">
-          <div style="font-weight:700;font-size:13px;color:var(--text-primary);">${c.nome || '—'}</div>
+          <div style="font-weight:600;font-size:13px;color:var(--text-primary);">${c.nome || '—'}</div>
           <div style="font-size:11px;color:var(--text-secondary);">${c.telefone || '—'} · ${c.cidade || '—'}</div>
           <div style="font-size:10px;color:#a855f7;margin-top:2px;">Ficha aguardando preenchimento</div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0;">
           <button onclick="navigator.clipboard.writeText('${link}').then(()=>{this.innerHTML='<i class=\\'fa-solid fa-check\\'></i> Copiado!';setTimeout(()=>{this.innerHTML='<i class=\\'fa-solid fa-copy\\'></i> Copiar link';},2000)})"
-            style="padding:6px 12px;border-radius:7px;border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.1);color:#a855f7;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
+            style="padding:6px 12px;border-radius:8px;border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.1);color:#a855f7;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;">
             <i class="fa-solid fa-copy"></i> Copiar link
           </button>
           <a href="${wa}" target="_blank"
-            style="padding:6px 12px;border-radius:7px;border:none;background:#25d366;color:#fff;font-size:11px;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:5px;">
+            style="padding:6px 12px;border-radius:8px;border:none;background:#25d366;color:#fff;font-size:11px;font-weight:600;text-decoration:none;display:flex;align-items:center;gap:5px;">
             <i class="fa-brands fa-whatsapp"></i> WhatsApp
           </a>
         </div>
@@ -8129,7 +8129,7 @@ function renderBancoTalentosSimples() {
       ? (() => {
           const e = filtradas[0];
           const perto = e.distKm <= 15;
-          return `<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap;` +
+          return `<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:600;white-space:nowrap;` +
             `background:${perto ? 'rgba(34,197,94,0.12)' : 'rgba(148,163,184,0.08)'};` +
             `color:${perto ? '#16a34a' : '#64748b'};` +
             `border:1px solid ${perto ? 'rgba(34,197,94,0.35)' : 'rgba(148,163,184,0.2)'};">` +
@@ -8138,11 +8138,11 @@ function renderBancoTalentosSimples() {
         })()
       : '';
 
-    return `<div onclick="abrirDetalheBT('${t.id}')" style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:box-shadow 0.15s,border-color 0.15s;" onmouseover="this.style.boxShadow='0 2px 10px rgba(0,0,0,0.1)';this.style.borderColor='var(--primary)'" onmouseout="this.style.boxShadow='';this.style.borderColor='var(--border-color)'">
-      <div style="width:34px;height:34px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">${initials}</div>
+    return `<div onclick="abrirDetalheBT('${t.id}')" style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:box-shadow 0.15s,border-color 0.15s;" onmouseover="this.style.boxShadow='0 2px 10px rgba(0,0,0,0.1)';this.style.borderColor='var(--primary)'" onmouseout="this.style.boxShadow='';this.style.borderColor='var(--border-color)'">
+      <div style="width:34px;height:34px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px;flex-shrink:0;">${initials}</div>
       <div style="flex:1;min-width:0;">
         <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
-          <span style="font-weight:700;color:var(--text-primary);font-size:13px;">${t.nome || 'Sem nome'}</span>
+          <span style="font-weight:600;color:var(--text-primary);font-size:13px;">${t.nome || 'Sem nome'}</span>
           ${sexoBadge}
         </div>
         <div style="font-size:11px;color:var(--text-secondary);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
@@ -8196,7 +8196,7 @@ window.abrirDetalheBT = function(btId) {
       '<div style="display:flex;flex-wrap:wrap;gap:5px;">' +
       proximas.slice(0,5).map(e => {
         const perto = e.distKm <= 15;
-        return `<span style="display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:600;
+        return `<span style="display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:8px;font-size:11px;font-weight:600;
           background:${perto ? 'rgba(34,197,94,0.12)' : 'rgba(148,163,184,0.08)'};
           color:${perto ? '#16a34a' : '#64748b'};
           border:1px solid ${perto ? 'rgba(34,197,94,0.35)' : 'rgba(148,163,184,0.2)'};">
@@ -9132,11 +9132,11 @@ function _imprimirTicket(senha) {
   body { font-family:'Segoe UI',sans-serif; background:#fff; display:flex; align-items:center; justify-content:center; min-height:100vh; }
   .ticket { width:280px; border:2px solid #e2e8f0; border-radius:16px; overflow:hidden; }
   .ticket-header { background:${cor}; padding:18px; text-align:center; color:#fff; }
-  .ticket-header .empresa { font-size:13px; font-weight:800; letter-spacing:2px; opacity:.9; }
+  .ticket-header .empresa { font-size:13px; font-weight:600; letter-spacing:2px; opacity:.9; }
   .ticket-header .dept { font-size:11px; margin-top:4px; opacity:.75; }
   .ticket-body { padding:24px 20px; text-align:center; }
   .ticket-label { font-size:11px; color:#94a3b8; letter-spacing:2px; font-weight:600; text-transform:uppercase; margin-bottom:8px; }
-  .ticket-num { font-size:72px; font-weight:900; color:${cor}; line-height:1; }
+  .ticket-num { font-size:72px; font-weight:600; color:${cor}; line-height:1; }
   .ticket-footer { border-top:1px dashed #e2e8f0; padding:14px 20px; text-align:center; }
   .ticket-footer p { font-size:11px; color:#64748b; margin-bottom:4px; }
   .ticket-footer .data { font-size:10px; color:#94a3b8; }
@@ -9197,18 +9197,18 @@ function renderFila() {
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
       ${podeChamar ? `
-      <label style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:10px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);font-size:12px;font-weight:700;color:#10b981;">
+      <label style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);font-size:12px;font-weight:600;color:#10b981;">
         <i class="fa-solid fa-location-dot"></i> Minha baia:
         <input type="text" value="${_esc2(_minhaBaia())}" maxlength="12" placeholder="ex: 2"
           oninput="salvarMinhaBaia(this.value)"
-          style="width:64px;padding:4px 8px;border-radius:7px;border:1px solid rgba(16,185,129,0.4);background:var(--bg-main);color:var(--text-primary);font-size:13px;font-weight:700;text-align:center;font-family:inherit;">
+          style="width:64px;padding:4px 8px;border-radius:8px;border:1px solid rgba(16,185,129,0.4);background:var(--bg-main);color:var(--text-primary);font-size:13px;font-weight:600;text-align:center;font-family:inherit;">
       </label>` : ''}
       <a href="fila-display.html" target="_blank"
-        style="padding:8px 16px;border-radius:10px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);color:#6366f1;text-decoration:none;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;">
+        style="padding:8px 16px;border-radius:8px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);color:#6366f1;text-decoration:none;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;">
         <i class="fa-solid fa-tv"></i> Abrir Painel (TV ou Celular)
       </a>
       <button onclick="limparFilaCompleta()"
-        style="padding:8px 14px;border-radius:10px;border:1px solid var(--border-color);background:transparent;color:var(--text-secondary);cursor:pointer;font-size:12px;font-family:inherit;">
+        style="padding:8px 14px;border-radius:8px;border:1px solid var(--border-color);background:transparent;color:var(--text-secondary);cursor:pointer;font-size:12px;font-family:inherit;">
         <i class="fa-solid fa-rotate"></i> Limpar Fila
       </button>
     </div>
@@ -9227,8 +9227,8 @@ function renderFila() {
         <div style="height:5px;background:${cor};"></div>
         <div style="padding:20px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-            <div style="font-size:14px;font-weight:700;color:var(--text-primary);">${label}</div>
-            <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;background:${cor}22;color:${cor};border:1px solid ${cor}44;">
+            <div style="font-size:14px;font-weight:600;color:var(--text-primary);">${label}</div>
+            <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:12px;background:${cor}22;color:${cor};border:1px solid ${cor}44;">
               ${qtd} aguardando
             </span>
           </div>
@@ -9239,12 +9239,12 @@ function renderFila() {
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             ${podeGerar ? `
             <button onclick="gerarSenhaFila('${tipo}')"
-              style="flex:1;padding:9px 12px;border-radius:9px;border:none;background:${cor};color:#fff;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;">
+              style="flex:1;padding:9px 12px;border-radius:8px;border:none;background:${cor};color:#fff;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;">
               <i class="fa-solid fa-plus"></i> Gerar Senha
             </button>` : ''}
             ${podeChamar ? `
             <button onclick="chamarProximaSenha('${tipo}')"
-              style="flex:1;padding:9px 12px;border-radius:9px;border:1px solid ${cor}55;background:${cor}18;color:${cor};cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;">
+              style="flex:1;padding:9px 12px;border-radius:8px;border:1px solid ${cor}55;background:${cor}18;color:${cor};cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;">
               <i class="fa-solid fa-bell"></i> Chamar Próxima
             </button>` : ''}
           </div>
@@ -9257,8 +9257,8 @@ function renderFila() {
   <div style="display:grid;grid-template-columns:1fr 360px;gap:18px;align-items:start;">
 
     <!-- Fila aguardando -->
-    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:14px;padding:20px;">
-      <div style="font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:20px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <i class="fa-solid fa-hourglass-half" style="color:#f59e0b;"></i> Fila de Espera
         <span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(245,158,11,0.12);color:#f59e0b;">${aguardando.length} na fila</span>
       </div>
@@ -9266,27 +9266,27 @@ function renderFila() {
         `<div style="display:flex;flex-direction:column;gap:6px;">
           ${aguardando.map(s => {
             const cor = FILA_TIPO_COR[s.tipo] || '#6366f1';
-            return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--bg-main);border:1px solid var(--border-color);">
-              <div style="font-size:16px;font-weight:800;color:${cor};min-width:54px;">${_esc2(s.numero)}</div>
+            return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:var(--bg-main);border:1px solid var(--border-color);">
+              <div style="font-size:16px;font-weight:600;color:${cor};min-width:54px;">${_esc2(s.numero)}</div>
               <div style="flex:1;min-width:0;">
                 <div style="font-size:11px;font-weight:600;color:var(--text-secondary);">${FILA_TIPO_LABEL[s.tipo] || s.tipo}${s.nome ? ` · <span style="color:var(--text-primary);">${_esc2(s.nome)}</span>` : ''}</div>
                 <div style="font-size:10px;color:var(--text-secondary);opacity:.6;">${new Date(s.geradaEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
               </div>
               <div style="display:flex;gap:5px;">
                 ${podeChamar ? `<button onclick="definirNomeSenha('${s.id}')" title="${s.nome ? 'Editar o nome do candidato' : 'Colocar o nome do candidato (o painel chama o nome junto)'}"
-                  style="padding:5px 9px;border-radius:7px;border:1px solid var(--border-color);background:${s.nome ? 'rgba(16,185,129,0.1)' : 'transparent'};color:${s.nome ? '#10b981' : 'var(--text-secondary)'};cursor:pointer;font-size:11px;font-family:inherit;">
+                  style="padding:5px 9px;border-radius:8px;border:1px solid var(--border-color);background:${s.nome ? 'rgba(16,185,129,0.1)' : 'transparent'};color:${s.nome ? '#10b981' : 'var(--text-secondary)'};cursor:pointer;font-size:11px;font-family:inherit;">
                   <i class="fa-solid fa-user-pen"></i>
                 </button>` : ''}
                 ${podeChamar ? `<button onclick="chamarSenhaEspecifica('${s.id}')" title="Chamar agora"
-                  style="padding:5px 9px;border-radius:7px;border:none;background:${cor};color:#fff;cursor:pointer;font-size:11px;font-family:inherit;">
+                  style="padding:5px 9px;border-radius:8px;border:none;background:${cor};color:#fff;cursor:pointer;font-size:11px;font-family:inherit;">
                   <i class="fa-solid fa-bell"></i>
                 </button>` : ''}
                 <button onclick="imprimirSenhaNovamente('${s.id}')" title="Reimprimir"
-                  style="padding:5px 9px;border-radius:7px;border:1px solid var(--border-color);background:transparent;color:var(--text-secondary);cursor:pointer;font-size:11px;font-family:inherit;">
+                  style="padding:5px 9px;border-radius:8px;border:1px solid var(--border-color);background:transparent;color:var(--text-secondary);cursor:pointer;font-size:11px;font-family:inherit;">
                   <i class="fa-solid fa-print"></i>
                 </button>
                 <button onclick="cancelarSenha('${s.id}')" title="Cancelar"
-                  style="padding:5px 9px;border-radius:7px;border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.08);color:#ef4444;cursor:pointer;font-size:11px;font-family:inherit;">
+                  style="padding:5px 9px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.08);color:#ef4444;cursor:pointer;font-size:11px;font-family:inherit;">
                   <i class="fa-solid fa-xmark"></i>
                 </button>
               </div>
@@ -9296,8 +9296,8 @@ function renderFila() {
     </div>
 
     <!-- Histórico de chamadas -->
-    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:14px;padding:20px;">
-      <div style="font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;">
+    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:20px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px;">
         <i class="fa-solid fa-clock-rotate-left" style="color:#6366f1;"></i> Chamadas Recentes
       </div>
       ${historico.length === 0 ? `<p style="font-size:12px;color:var(--text-secondary);text-align:center;padding:16px 0;">Nenhuma chamada ainda</p>` :
@@ -9305,7 +9305,7 @@ function renderFila() {
           const cor = FILA_TIPO_COR[s.tipo] || '#6366f1';
           const hora = s.chamadaEm ? new Date(s.chamadaEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '—';
           return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-color);">
-            <div style="font-size:14px;font-weight:800;color:${cor};min-width:50px;">${_esc2(s.numero)}</div>
+            <div style="font-size:14px;font-weight:600;color:${cor};min-width:50px;">${_esc2(s.numero)}</div>
             <div style="flex:1;">
               <div style="font-size:10px;font-weight:600;color:var(--text-secondary);">${FILA_TIPO_LABEL[s.tipo] || s.tipo}</div>
             </div>
@@ -9360,7 +9360,7 @@ function renderMeuPainel() {
       _renderPainelCompleto(container, rec);
     }
   } catch(e) {
-    container.innerHTML = `<div style="padding:20px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:10px;color:#ef4444;font-size:12px;">
+    container.innerHTML = `<div style="padding:20px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#ef4444;font-size:12px;">
       <strong>Erro ao carregar o Meu Painel:</strong> ${_esc(e.message)}<br>
       <span style="opacity:.7;">Recarregue a página (F5) para tentar novamente.</span>
     </div>`;
@@ -9374,7 +9374,7 @@ function _renderVinculacaoMeuPainel(container) {
       <div style="width:64px;height:64px;border-radius:50%;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:28px;color:#f59e0b;">
         <i class="fa-solid fa-id-card-clip"></i>
       </div>
-      <h2 style="font-size:18px;font-weight:700;margin-bottom:8px;color:var(--text-primary);">Painel ainda não vinculado</h2>
+      <h2 style="font-size:18px;font-weight:600;margin-bottom:8px;color:var(--text-primary);">Painel ainda não vinculado</h2>
       <p style="font-size:13px;color:var(--text-secondary);line-height:1.6;">Seu usuário ainda não está vinculado a um perfil de recrutadora. Por segurança, esse vínculo é feito pelo administrador.</p>
       <p style="font-size:12px;color:var(--text-secondary);margin-top:14px;">Peça ao administrador para vincular o seu login (<strong>${_esc(loggedUser ? loggedUser.login : '')}</strong>) ao seu perfil em <em>Funcionários → Permissões</em>.</p>
     </div>`;
@@ -9399,7 +9399,7 @@ function _renderPainelCompleto(container, rec) {
         const dt = c.dataCadastro ? new Date(c.dataCadastro).toLocaleDateString('pt-BR') : '—';
         return `<tr style="border-bottom:1px solid var(--border-color);cursor:pointer;" onclick="abrirDrawerDetalhes('${c.id}')">
           <td style="padding:8px 12px;font-size:12px;font-weight:600;color:var(--text-primary);">${_esc(c.nome)}</td>
-          <td style="padding:8px 12px;"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${sc}22;color:${sc};border:1px solid ${sc}44;">${sl}</span></td>
+          <td style="padding:8px 12px;"><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:${sc}22;color:${sc};border:1px solid ${sc}44;">${sl}</span></td>
           <td style="padding:8px 12px;font-size:11px;color:var(--text-secondary);">${_esc(c.codigoVaga || '—')}</td>
           <td style="padding:8px 12px;font-size:11px;color:var(--text-secondary);">${dt}</td>
         </tr>`;
@@ -9418,9 +9418,9 @@ function _renderPainelCompleto(container, rec) {
   container.innerHTML = `
     <!-- HEADER -->
     <div style="display:flex;align-items:center;gap:18px;background:var(--bg-card);border:1px solid var(--border-color);border-radius:16px;padding:20px 24px;margin-bottom:20px;flex-wrap:wrap;">
-      <div style="width:56px;height:56px;border-radius:50%;background:${rec.corHex};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px;color:#fff;flex-shrink:0;">${rec.nome[0]}</div>
+      <div style="width:56px;height:56px;border-radius:50%;background:${rec.corHex};display:flex;align-items:center;justify-content:center;font-weight:600;font-size:22px;color:#fff;flex-shrink:0;">${rec.nome[0]}</div>
       <div style="flex:1;min-width:160px;">
-        <div style="font-size:18px;font-weight:800;color:var(--text-primary);">${_esc(rec.nome)}</div>
+        <div style="font-size:18px;font-weight:600;color:var(--text-primary);">${_esc(rec.nome)}</div>
         <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${_esc(loggedUser.cargo || loggedUser.departamento)} · Meu Painel Pessoal</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
@@ -9433,24 +9433,24 @@ function _renderPainelCompleto(container, rec) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;">
 
       <!-- MEUS LINKS -->
-      <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:14px;padding:20px;">
-        <div style="font-size:13px;font-weight:700;margin-bottom:16px;color:var(--text-primary);display:flex;align-items:center;gap:8px;">
+      <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:20px;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:16px;color:var(--text-primary);display:flex;align-items:center;gap:8px;">
           <i class="fa-solid fa-link" style="color:#3b82f6;"></i> Meus Links
         </div>
         <!-- BT -->
-        <div style="background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.2);border-radius:10px;padding:14px;margin-bottom:12px;">
-          <div style="font-size:11px;font-weight:700;color:#a855f7;margin-bottom:10px;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-users"></i> Banco de Talentos</div>
+        <div style="background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.2);border-radius:8px;padding:14px;margin-bottom:12px;">
+          <div style="font-size:11px;font-weight:600;color:#a855f7;margin-bottom:10px;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-users"></i> Banco de Talentos</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
             <button onclick="navigator.clipboard.writeText('${linkBT}').then(()=>{this.textContent='✓ Copiado!';setTimeout(()=>{this.innerHTML='<i class=\\'fa-solid fa-copy\\'></i> Copiar'},1800)})"
-              style="padding:5px 10px;border-radius:7px;border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.1);color:#a855f7;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
+              style="padding:5px 10px;border-radius:8px;border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.1);color:#a855f7;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
               <i class="fa-solid fa-copy"></i> Copiar</button>
-            <a href="${linkBT}" target="_blank" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-secondary);cursor:pointer;font-size:11px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
+            <a href="${linkBT}" target="_blank" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-secondary);cursor:pointer;font-size:11px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
               <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir</a>
             <button onclick="toggleQrMeuPainel('qr-bt-img')"
-              style="padding:5px 10px;border-radius:7px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-secondary);cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
+              style="padding:5px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-secondary);cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
               <i class="fa-solid fa-qrcode"></i> QR</button>
             <button onclick="navigator.clipboard.writeText(${JSON.stringify(msgBT)}).then(()=>{this.textContent='✓ Copiado!';setTimeout(()=>{this.innerHTML='<i class=\\'fa-solid fa-message\\'></i> Divulgar'},1800)})"
-              style="padding:5px 10px;border-radius:7px;border:1px solid rgba(16,185,129,0.4);background:rgba(16,185,129,0.08);color:#10b981;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
+              style="padding:5px 10px;border-radius:8px;border:1px solid rgba(16,185,129,0.4);background:rgba(16,185,129,0.08);color:#10b981;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
               <i class="fa-solid fa-message"></i> Divulgar</button>
           </div>
           <div id="qr-bt-img" style="display:none;text-align:center;padding-top:6px;">
@@ -9458,19 +9458,19 @@ function _renderPainelCompleto(container, rec) {
           </div>
         </div>
         <!-- Ficha -->
-        <div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-radius:10px;padding:14px;">
-          <div style="font-size:11px;font-weight:700;color:#3b82f6;margin-bottom:10px;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-file-pen"></i> Ficha de Candidatura</div>
+        <div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-radius:8px;padding:14px;">
+          <div style="font-size:11px;font-weight:600;color:#3b82f6;margin-bottom:10px;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-file-pen"></i> Ficha de Candidatura</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
             <button onclick="navigator.clipboard.writeText('${linkFicha}').then(()=>{this.textContent='✓ Copiado!';setTimeout(()=>{this.innerHTML='<i class=\\'fa-solid fa-copy\\'></i> Copiar'},1800)})"
-              style="padding:5px 10px;border-radius:7px;border:1px solid rgba(59,130,246,0.4);background:rgba(59,130,246,0.1);color:#3b82f6;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
+              style="padding:5px 10px;border-radius:8px;border:1px solid rgba(59,130,246,0.4);background:rgba(59,130,246,0.1);color:#3b82f6;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
               <i class="fa-solid fa-copy"></i> Copiar</button>
-            <a href="${linkFicha}" target="_blank" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-secondary);cursor:pointer;font-size:11px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
+            <a href="${linkFicha}" target="_blank" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-secondary);cursor:pointer;font-size:11px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
               <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir</a>
             <button onclick="toggleQrMeuPainel('qr-ficha-img')"
-              style="padding:5px 10px;border-radius:7px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-secondary);cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
+              style="padding:5px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-secondary);cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
               <i class="fa-solid fa-qrcode"></i> QR</button>
             <button onclick="navigator.clipboard.writeText(${JSON.stringify(msgFicha)}).then(()=>{this.textContent='✓ Copiado!';setTimeout(()=>{this.innerHTML='<i class=\\'fa-solid fa-message\\'></i> Divulgar'},1800)})"
-              style="padding:5px 10px;border-radius:7px;border:1px solid rgba(16,185,129,0.4);background:rgba(16,185,129,0.08);color:#10b981;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
+              style="padding:5px 10px;border-radius:8px;border:1px solid rgba(16,185,129,0.4);background:rgba(16,185,129,0.08);color:#10b981;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:5px;font-family:inherit;">
               <i class="fa-solid fa-message"></i> Divulgar</button>
           </div>
           <div id="qr-ficha-img" style="display:none;text-align:center;padding-top:6px;">
@@ -9480,8 +9480,8 @@ function _renderPainelCompleto(container, rec) {
       </div>
 
       <!-- MEU WHATSAPP -->
-      <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:14px;padding:20px;">
-        <div style="font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;">
+      <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:20px;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px;">
           <i class="fa-brands fa-whatsapp" style="color:#25d366;font-size:16px;"></i> Meu WhatsApp
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
@@ -9493,7 +9493,7 @@ function _renderPainelCompleto(container, rec) {
         <p style="font-size:10px;color:var(--text-secondary);margin-top:6px;">Número salvo automaticamente ao digitar. Aparece como botão de contato no final dos formulários de candidatura.</p>
 
         <div style="margin-top:14px;">
-          <div style="font-size:11px;font-weight:700;color:var(--text-primary);margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+          <div style="font-size:11px;font-weight:600;color:var(--text-primary);margin-bottom:6px;display:flex;align-items:center;gap:6px;">
             <i class="fa-solid fa-message" style="color:#25d366;"></i> Mensagem que o candidato vai te enviar
           </div>
           <textarea id="meu-painel-wa-msg" rows="3" class="form-control" style="width:100%;resize:vertical;font-size:12.5px;"
@@ -9509,8 +9509,8 @@ function _renderPainelCompleto(container, rec) {
     </div>
 
     <!-- MEUS CANDIDATOS -->
-    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:14px;padding:20px;">
-      <div style="font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:20px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <i class="fa-solid fa-users" style="color:#10b981;"></i> Meus Candidatos
         <span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(16,185,129,0.12);color:#10b981;">${meusCands.length} total</span>
         <span style="font-size:11px;color:var(--text-secondary);font-weight:400;">· clique em uma linha para abrir a ficha</span>
@@ -9519,10 +9519,10 @@ function _renderPainelCompleto(container, rec) {
         <table style="width:100%;border-collapse:collapse;">
           <thead>
             <tr style="border-bottom:2px solid var(--border-color);">
-              <th style="padding:6px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Nome</th>
-              <th style="padding:6px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Status</th>
-              <th style="padding:6px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Vaga</th>
-              <th style="padding:6px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Cadastro</th>
+              <th style="padding:6px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Nome</th>
+              <th style="padding:6px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Status</th>
+              <th style="padding:6px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Vaga</th>
+              <th style="padding:6px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Cadastro</th>
             </tr>
           </thead>
           <tbody>${linhasCands}</tbody>
@@ -9575,11 +9575,11 @@ function renderConfiguracoes() {
       return `
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:center; padding:10px 14px; background:var(--bg-main); border:1px solid var(--border-color); border-radius:8px;">
           <div>
-            <div style="font-size:11px; font-weight:700; color:var(--text-secondary); margin-bottom:2px; text-transform:uppercase; letter-spacing:.5px;">Nome Padrão</div>
+            <div style="font-size:11px; font-weight:600; color:var(--text-secondary); margin-bottom:2px; text-transform:uppercase; letter-spacing:.5px;">Nome Padrão</div>
             <div style="font-size:13px; color:var(--text-primary); font-weight:500;">${campo.label} ${campo.obrigatorio ? '<span style="color:#ef4444;">*</span>' : ''}</div>
           </div>
           <div>
-            <div style="font-size:11px; font-weight:700; color:var(--text-secondary); margin-bottom:4px; text-transform:uppercase; letter-spacing:.5px;">Nome Personalizado</div>
+            <div style="font-size:11px; font-weight:600; color:var(--text-secondary); margin-bottom:4px; text-transform:uppercase; letter-spacing:.5px;">Nome Personalizado</div>
             <input type="text" id="renome-campo-${campo.id}" class="form-control" value="${valorAtual}" placeholder="${campo.label}" style="font-size:13px;">
           </div>
         </div>`;
@@ -9720,9 +9720,9 @@ function renderListaCamposExtras() {
   lista.innerHTML = cfg.camposExtras.map((campo, idx) => `
     <div style="display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; padding:12px 14px; background:var(--bg-main); border:1px solid var(--border-color); border-radius:8px; margin-bottom:8px;">
       <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
-        <div style="width:28px; height:28px; border-radius:8px; background:rgba(59,130,246,0.12); color:#3b82f6; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">${idx + 1}</div>
+        <div style="width:28px; height:28px; border-radius:8px; background:rgba(59,130,246,0.12); color:#3b82f6; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; flex-shrink:0;">${idx + 1}</div>
         <div>
-          <div style="font-size:13px; font-weight:700; color:var(--text-primary);">${campo.label} ${campo.obrigatorio ? '<span style="color:#ef4444; font-size:11px;">*Obrigatório</span>' : '<span style="color:var(--text-secondary); font-size:11px;">Opcional</span>'}</div>
+          <div style="font-size:13px; font-weight:600; color:var(--text-primary);">${campo.label} ${campo.obrigatorio ? '<span style="color:#ef4444; font-size:11px;">*Obrigatório</span>' : '<span style="color:var(--text-secondary); font-size:11px;">Opcional</span>'}</div>
           <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">
             Tipo: <strong>${tipoLabels[campo.tipo] || campo.tipo}</strong>
             ${campo.opcoes && campo.opcoes.length ? ` · ${campo.opcoes.length} opção(ões)` : ''}
@@ -9730,7 +9730,7 @@ function renderListaCamposExtras() {
         </div>
       </div>
       <button onclick="removerCampoVaga('${campo.id}')"
-        style="padding:6px 12px; border-radius:7px; border:1px solid rgba(239,68,68,0.3); background:rgba(239,68,68,0.08); color:#ef4444; font-size:12px; cursor:pointer; white-space:nowrap; font-family:inherit; display:flex; align-items:center; gap:5px;">
+        style="padding:6px 12px; border-radius:8px; border:1px solid rgba(239,68,68,0.3); background:rgba(239,68,68,0.08); color:#ef4444; font-size:12px; cursor:pointer; white-space:nowrap; font-family:inherit; display:flex; align-items:center; gap:5px;">
         <i class="fa-solid fa-trash-can"></i> Remover
       </button>
     </div>
@@ -9783,7 +9783,7 @@ function injetarCamposExtrasNoForm() {
 
     wrapper.innerHTML = `
       <label for="vaga-extra-${campo.id}" style="display:flex;align-items:center;gap:6px;">
-        <span style="background:rgba(59,130,246,0.1);color:#3b82f6;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:700;">EXTRA</span>
+        <span style="background:rgba(59,130,246,0.1);color:#3b82f6;font-size:10px;padding:1px 6px;border-radius:6px;font-weight:600;">EXTRA</span>
         ${campo.label}${obrigStr}
       </label>
       ${inputHtml}`;
@@ -9954,8 +9954,8 @@ function _renderPainelExameSelecao(cand) {
       const ok = jaEnviado.status === 'concluido';
       const cor = ok ? '#059669' : '#D97706';
       boxJa.innerHTML = `
-        <div style="padding:12px;border-radius:10px;background:${cor}14;border:1px solid ${cor}40;">
-          <div style="font-size:12px;font-weight:700;color:${cor};margin-bottom:6px;">
+        <div style="padding:12px;border-radius:8px;background:${cor}14;border:1px solid ${cor}40;">
+          <div style="font-size:12px;font-weight:600;color:${cor};margin-bottom:6px;">
             <i class="fa-solid ${ok ? 'fa-circle-check' : 'fa-clock'}"></i>
             ${ok ? 'Exame concluído' : 'Enviado — aguardando o laudo'}
           </div>
@@ -10135,7 +10135,7 @@ function _equipBadgeTipo(tipo) {
 function _equipBadgeEstado(estado) {
   const cores = { bom: '#059669', regular: '#0284C7', ruim: '#D97706', danificado: '#DC2626' };
   const cor = cores[estado] || '#64748B';
-  return `<span style="display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;
+  return `<span style="display:inline-block;padding:2px 9px;border-radius:8px;font-size:11px;font-weight:600;
     color:${cor};background:${cor}1A;border:1px solid ${cor}33;">${EQUIP_ESTADOS[estado] || estado || '—'}</span>`;
 }
 
@@ -10636,7 +10636,7 @@ function _renderHistoricoRelatorios() {
             '<b>' + escapeHTML(a.reg.nome || '—') + '</b> — ' + escapeHTML(a.rel.titulo || 'Relatório') +
             (a.rel.empresaDestino ? ' <span class="rel-emp">→ ' + escapeHTML(a.rel.empresaDestino) + '</span>' : '') +
             '<div class="rel-achou-meta">Enviado em ' + _ffDataHora(a.rel.criadoEm) +
-              ' &middot; <span style="color:' + s.cor + ';font-weight:700;">' + s.txt + '</span></div>' +
+              ' &middot; <span style="color:' + s.cor + ';font-weight:600;">' + s.txt + '</span></div>' +
           '</div>';
         }).join('') +
       '</div>'
@@ -11614,7 +11614,7 @@ function _impPreVisualizar() {
             <td style="font-weight:600;">${escapeHTML(a.nome)}</td>
             <td>${escapeHTML(a.cpf)}</td><td>${a.tipo}</td>
             <td>${escapeHTML(a.itens)}</td><td>${a.estado}</td><td>${a.data}</td>
-            <td>${a.fotos ? `<span style="color:#059669;font-weight:700;">${a.fotos}</span>` : '<span style="color:#D97706;">0</span>'}</td>
+            <td>${a.fotos ? `<span style="color:#059669;font-weight:600;">${a.fotos}</span>` : '<span style="color:#D97706;">0</span>'}</td>
           </tr>`).join('')}
         </tbody>
       </table>
@@ -12684,7 +12684,7 @@ function _ffRenderPainel(cont) {
         </div>
 
         <div>
-          <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
+          <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
             <i class="fa-solid fa-building"></i> Divisão por Empresa
           </div>
           ${listaEmpresasAmanha.length ? `
@@ -12698,7 +12698,7 @@ function _ffRenderPainel(cont) {
               `).join('')}
             </div>
           ` : `
-            <div style="font-size:12.5px;color:#94a3b8;padding:12px;background:#f8fafc;border-radius:10px;border:1px dashed #e2e8f0;">
+            <div style="font-size:12.5px;color:#94a3b8;padding:12px;background:#f8fafc;border-radius:8px;border:1px dashed #e2e8f0;">
               Nenhum pagamento agendado especificamente para amanhã.
             </div>
           `}
@@ -12710,7 +12710,7 @@ function _ffRenderPainel(cont) {
     <div class="exame-detalhe-laudo" style="margin-top:20px;background:#ffffff;border-radius:16px;border:1px solid #e2e8f0;padding:20px;">
       <h4 style="display:flex;align-items:center;justify-content:space-between;margin:0 0 14px 0;">
         <span><i class="fa-solid fa-diagram-project" style="color:#0284c7;"></i> Status dos Processos do Fluxo</span>
-        <span style="font-size:12px;font-weight:700;color:#059669;background:rgba(5,150,105,0.08);padding:4px 12px;border-radius:20px;">
+        <span style="font-size:12px;font-weight:600;color:#059669;background:rgba(5,150,105,0.08);padding:4px 12px;border-radius:16px;">
           ${_ffMoedaBR(totalAberto)} em aberto
         </span>
       </h4>
@@ -12722,15 +12722,15 @@ function _ffRenderPainel(cont) {
         ${etapaCard('pago', 'Falta comprovante')}
         ${etapaCard('finalizado', 'Finalizados')}
       </div>
-      ${porEtapa.reprovado.length ? `<div style="margin-top:12px;font-size:12px;color:#DC2626;font-weight:700;"><i class="fa-solid fa-circle-xmark"></i> ${porEtapa.reprovado.length} reprovado(s) — <a href="#" onclick="trocarSubAbaFF('problemas');return false;" style="color:#DC2626;text-decoration:underline;">ver problemas</a></div>` : ''}
-      ${semCompr.length ? `<div style="margin-top:6px;font-size:12px;color:#D97706;font-weight:700;"><i class="fa-solid fa-receipt"></i> ${semCompr.length} pago(s) aguardando envio de comprovante</div>` : ''}
+      ${porEtapa.reprovado.length ? `<div style="margin-top:12px;font-size:12px;color:#DC2626;font-weight:600;"><i class="fa-solid fa-circle-xmark"></i> ${porEtapa.reprovado.length} reprovado(s) — <a href="#" onclick="trocarSubAbaFF('problemas');return false;" style="color:#DC2626;text-decoration:underline;">ver problemas</a></div>` : ''}
+      ${semCompr.length ? `<div style="margin-top:6px;font-size:12px;color:#D97706;font-weight:600;"><i class="fa-solid fa-receipt"></i> ${semCompr.length} pago(s) aguardando envio de comprovante</div>` : ''}
     </div>
 
     <!-- PRÓXIMOS PAGAMENTOS E ÚLTIMOS MOVIMENTOS -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px;" class="ff-p-2col">
       <!-- Próximos pagamentos -->
       <div class="ff-table-container" style="padding:18px;">
-        <h4 style="margin:0 0 14px 0;font-size:14px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px;">
+        <h4 style="margin:0 0 14px 0;font-size:14px;font-weight:600;color:#0f172a;display:flex;align-items:center;gap:8px;">
           <i class="fa-solid fa-calendar-check" style="color:#2563eb;"></i> Próximos Pagamentos
         </h4>
         ${proximos.length ? `
@@ -12742,7 +12742,7 @@ function _ffRenderPainel(cont) {
                   const pz = _ffPrazo(f); const st = FF_STATUS[f.status] || FF_STATUS.rascunho;
                   return `<tr onclick="abrirDetalheFluxo('${f.id}')" style="cursor:pointer;">
                     <td style="white-space:nowrap;font-weight:600;">${_formatarDataBR(f.dataPagamento)}${pz && pz.nivel !== 'ok' ? `<div class="ff-prazo-tag ff-prazo-${pz.nivel}">${pz.rotulo}</div>` : ''}</td>
-                    <td style="font-weight:700;">${escapeHTML(f.empresaNome)}</td>
+                    <td style="font-weight:600;">${escapeHTML(f.empresaNome)}</td>
                     <td>${escapeHTML(f.tipo)}</td>
                     <td style="text-align:right;" class="ff-val-destaque">${_ffMoedaBR(_ffTotal(f))}</td>
                     <td><span class="ff-badge ff-badge-${f.status}" style="color:${st.cor};">${st.rotulo}</span></td>
@@ -12756,7 +12756,7 @@ function _ffRenderPainel(cont) {
 
       <!-- Últimos movimentos -->
       <div class="ff-table-container" style="padding:18px;">
-        <h4 style="margin:0 0 14px 0;font-size:14px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px;">
+        <h4 style="margin:0 0 14px 0;font-size:14px;font-weight:600;color:#0f172a;display:flex;align-items:center;gap:8px;">
           <i class="fa-solid fa-clock-rotate-left" style="color:#7c3aed;"></i> Últimas Atividades
         </h4>
         ${movimentos.length ? `
@@ -12839,13 +12839,13 @@ function _ffRenderConfig(cont) {
     </div>` : '';
     return `<div style="border:1px solid var(--border-color);border-radius:12px;padding:14px;background:var(--card-bg,#fff);">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-        <span style="width:26px;height:26px;border-radius:50%;background:#0284c7;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">${e.n}</span>
+        <span style="width:26px;height:26px;border-radius:50%;background:#0284c7;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;">${e.n}</span>
         <div>
-          <div style="font-weight:800;font-size:14px;color:#0f172a;">${escapeHTML(e.titulo)}</div>
+          <div style="font-weight:600;font-size:14px;color:#0f172a;">${escapeHTML(e.titulo)}</div>
           <div style="font-size:11px;color:#64748b;">Setor: ${escapeHTML(cfg.setor || '—')} · Função: ${escapeHTML(cfg.funcao || '—')}</div>
         </div>
       </div>
-      <div style="font-size:11px;font-weight:700;color:${resp.length ? '#0284c7' : '#D97706'};margin:6px 0;">
+      <div style="font-size:11px;font-weight:600;color:${resp.length ? '#0284c7' : '#D97706'};margin:6px 0;">
         ${resp.length ? `<i class="fa-solid fa-user-check"></i> ${resp.length} responsável(is) definido(s)` : '<i class="fa-solid fa-triangle-exclamation"></i> Sem responsável — usando o padrão por departamento'}
       </div>
       <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border-color);border-radius:8px;padding:4px;">${listaPessoas || '<div style="padding:10px;color:#94a3b8;font-size:12px;">Nenhum funcionário ativo.</div>'}</div>
@@ -12854,7 +12854,7 @@ function _ffRenderConfig(cont) {
   };
   cont.innerHTML = `
     <div style="margin-bottom:14px;">
-      <h3 style="margin:0 0 4px;font-size:16px;font-weight:800;color:#0f172a;"><i class="fa-solid fa-sliders" style="color:#0284c7;"></i> Configuração do Fluxo de Aprovação</h3>
+      <h3 style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;"><i class="fa-solid fa-sliders" style="color:#0284c7;"></i> Configuração do Fluxo de Aprovação</h3>
       <p style="margin:0;font-size:12.5px;color:#64748b;">Defina QUEM é o responsável de cada etapa. Se alguém sair da empresa, é só trocar aqui — o fluxo continua funcionando, sem mexer no sistema. As alterações são salvas na hora.</p>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;">
@@ -12908,18 +12908,18 @@ function _ffRenderMonitor(cont) {
     const alerta = parado > 86400000 ? '#DC2626' : (parado > 14400000 ? '#D97706' : '#059669');   // >24h vermelho, >4h laranja
     return `<tr>
       <td>${_ffQuemSubiu(f)}</td>
-      <td style="font-weight:800;color:#0284c7;">#${escapeHTML(f.numero)}</td>
-      <td style="font-weight:700;">${escapeHTML(f.empresaNome || '—')}</td>
+      <td style="font-weight:600;color:#0284c7;">#${escapeHTML(f.numero)}</td>
+      <td style="font-weight:600;">${escapeHTML(f.empresaNome || '—')}</td>
       <td class="ff-val-destaque">${_ffMoedaBR(_ffTotal(f))}</td>
       <td><span class="ff-badge" style="color:${st.cor};">${st.rotulo}</span><div style="font-size:10px;color:#64748b;">${escapeHTML(cfg.setor || '')}</div></td>
       <td>${nomes.length ? escapeHTML(nomes.join(', ')) : `<span style="color:#94a3b8;">padrão (${escapeHTML(cfg.funcao || '')})</span>`}</td>
       <td>${_formatarDataHoraBR(desde)}</td>
-      <td style="font-weight:800;color:${alerta};">${_ffTempoDesde(desde)}</td>
+      <td style="font-weight:600;color:${alerta};">${_ffTempoDesde(desde)}</td>
     </tr>`;
   };
   cont.innerHTML = `
     <div style="margin-bottom:14px;">
-      <h3 style="margin:0 0 4px;font-size:16px;font-weight:800;color:#0f172a;"><i class="fa-solid fa-tower-broadcast" style="color:#0284c7;"></i> Monitoramento do Workflow</h3>
+      <h3 style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0f172a;"><i class="fa-solid fa-tower-broadcast" style="color:#0284c7;"></i> Monitoramento do Workflow</h3>
       <p style="margin:0;font-size:12.5px;color:#64748b;">Todo processo em andamento, com quem está parado e há quanto tempo. 🟢 no prazo · 🟡 mais de 4h · 🔴 mais de 24h.</p>
     </div>
     ${emAndamento.length ? `<div class="ff-table-container"><table class="ff-table">
@@ -13685,7 +13685,7 @@ function _ffRenderAPagar(cont) {
       '<td data-label="Relação" class="ff-col-relacao">' + _ffSeloRelacao(f) + '</td>' +
       '<td data-label="Enviado ao financeiro">' + (_formatarDataBR(_ffSoData(_ffDataEnvioFinanceiro(f))) || '—') + '</td>' +
       '<td data-label="Colaboradores" style="text-align:center;font-variant-numeric:tabular-nums;">' + _ffQtdColaboradores(f) + '</td>' +
-      '<td data-label="Valor" style="font-weight:700;font-variant-numeric:tabular-nums;">' + _ffMoedaBR(_ffTotal(f)) + '</td>' +
+      '<td data-label="Valor" style="font-weight:600;font-variant-numeric:tabular-nums;">' + _ffMoedaBR(_ffTotal(f)) + '</td>' +
       '<td data-label="Status">' + _ffSelo(f) + '</td>' +
       '<td data-label="Ação"><button class="btn btn-secondary btn-sm" onclick="abrirDetalheFluxo(\'' + f.id + '\')">' +
         '<i class="fa-solid fa-eye"></i> Abrir</button></td>' +
@@ -13946,7 +13946,7 @@ function _ffRenderFinalizados(cont) {
       '<td data-label="Relação" class="ff-col-relacao">' + _ffSeloRelacao(f) + '</td>' +
       '<td data-label="Enviado ao financeiro">' + (_formatarDataBR(_ffSoData(_ffDataEnvioFinanceiro(f))) || '—') + '</td>' +
       '<td data-label="Colaboradores" style="text-align:center;font-variant-numeric:tabular-nums;">' + _ffQtdColaboradores(f) + '</td>' +
-      '<td data-label="Valor" style="font-weight:700;font-variant-numeric:tabular-nums;">' + _ffMoedaBR(_ffTotal(f)) + '</td>' +
+      '<td data-label="Valor" style="font-weight:600;font-variant-numeric:tabular-nums;">' + _ffMoedaBR(_ffTotal(f)) + '</td>' +
       '<td data-label="Status">' + _ffSelo(f) + '</td>' +
       '<td data-label="Ação"><button class="btn btn-secondary btn-sm" onclick="abrirDetalheFluxo(\'' + f.id + '\')">' +
         '<i class="fa-solid fa-eye"></i> Abrir</button></td>' +
@@ -13994,12 +13994,12 @@ function _ffRenderLista() {
     if (!_ffVeTudo()) { cont.innerHTML = ''; return; }
     const todos = [...state.fluxosFinanceiros].sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')));
     const cel = (quem, quando) => quem
-      ? `<div style="font-weight:700;color:#0f172a;">${escapeHTML(quem)}</div><div style="font-size:10px;color:#64748b;">${_formatarDataHoraBR(quando)}</div>`
+      ? `<div style="font-weight:600;color:#0f172a;">${escapeHTML(quem)}</div><div style="font-size:10px;color:#64748b;">${_formatarDataHoraBR(quando)}</div>`
       : '<span style="color:#cbd5e1;">—</span>';
     cont.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <h3 style="margin:0;font-size:16px;font-weight:800;color:#0f172a;"><i class="fa-solid fa-table-cells" style="color:#0284c7;"></i> Visão Gerencial do Fluxo</h3>
-        <button class="btn btn-sm btn-outline" style="border-color:#059669;color:#059669;font-weight:700;" onclick="exportarGerencialExcel()">
+        <h3 style="margin:0;font-size:16px;font-weight:600;color:#0f172a;"><i class="fa-solid fa-table-cells" style="color:#0284c7;"></i> Visão Gerencial do Fluxo</h3>
+        <button class="btn btn-sm btn-outline" style="border-color:#059669;color:#059669;font-weight:600;" onclick="exportarGerencialExcel()">
           <i class="fa-solid fa-file-excel"></i> Exportar planilha gerencial (.xlsx)</button>
       </div>
       <div class="ff-table-container">
@@ -14010,8 +14010,8 @@ function _ffRenderLista() {
               const st = FF_STATUS[f.status] || FF_STATUS.rascunho;
               const prazo = _ffPrazo(f);
               return `<tr>
-                <td style="font-weight:800;color:#0284c7;">#${escapeHTML(f.numero)}</td>
-                <td style="font-weight:700;color:#0f172a;">${escapeHTML(f.empresaNome || '—')}</td>
+                <td style="font-weight:600;color:#0284c7;">#${escapeHTML(f.numero)}</td>
+                <td style="font-weight:600;color:#0f172a;">${escapeHTML(f.empresaNome || '—')}</td>
                 <td>${escapeHTML(f.tipo || '—')}</td>
                 <td>${f.dataPagamento ? _formatarDataBR(f.dataPagamento) : '—'}
                   ${prazo && prazo.nivel !== 'ok' ? `<div class="ff-prazo-tag ff-prazo-${prazo.nivel}">${prazo.rotulo}</div>` : ''}</td>
@@ -14100,9 +14100,9 @@ function _ffRenderLista() {
   // Callout de pendências: só na aba "Minhas Pendências", quando há algo aguardando VOCÊ
   const minhasPend = lista.filter(f => _ffEhMinhaVez(f));
   const calloutHtml = (_ffSubAba === 'minha-vez' && minhasPend.length) ? `
-    <div style="display:flex;align-items:center;gap:12px;background:linear-gradient(90deg,rgba(217,119,6,.12),rgba(217,119,6,.02));border:1px solid rgba(217,119,6,.35);border-left:5px solid #D97706;border-radius:12px;padding:12px 16px;margin-bottom:14px;">
+    <div style="display:flex;align-items:center;gap:12px;background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.35);border-left:5px solid #D97706;border-radius:12px;padding:12px 16px;margin-bottom:14px;">
       <i class="fa-solid fa-bell" style="font-size:22px;color:#D97706;"></i>
-      <div><div style="font-weight:800;color:#0f172a;font-size:14px;">Você tem ${minhasPend.length} pendência(s) aguardando sua ação</div>
+      <div><div style="font-weight:600;color:#0f172a;font-size:14px;">Você tem ${minhasPend.length} pendência(s) aguardando sua ação</div>
         <div style="font-size:12px;color:#64748b;">Analise cada processo e aprove, devolva ou reprove.</div></div>
     </div>` : '';
 
@@ -14116,8 +14116,8 @@ function _ffRenderLista() {
             const minha = _ffEhMinhaVez(f);
             return `<tr class="${minha ? 'ff-row-highlight' : ''}">
               <td data-label="Enviado por">${_ffQuemSubiu(f)}</td>
-              <td style="font-weight:800;color:#0284c7;">#${escapeHTML(f.numero)}</td>
-              <td style="font-weight:700;color:#0f172a;">${escapeHTML(f.empresaNome || '—')}</td>
+              <td style="font-weight:600;color:#0284c7;">#${escapeHTML(f.numero)}</td>
+              <td style="font-weight:600;color:#0f172a;">${escapeHTML(f.empresaNome || '—')}</td>
               <td>${escapeHTML(f.tipo || '—')}</td>
               <td>${f.dataPagamento ? _formatarDataBR(f.dataPagamento) : '—'}</td>
               <td>${escapeHTML(_ffCompetenciaBR(f.competencia))}</td>
@@ -14127,7 +14127,7 @@ function _ffRenderLista() {
                 <span class="ff-badge ff-badge-${f.status}" style="color:${st.cor};">
                   <i class="fa-solid ${st.icone}"></i> ${st.rotulo}
                 </span>
-                ${minha ? '<div style="font-size:10px;font-weight:800;color:#D97706;margin-top:3px;"><i class="fa-solid fa-hand-point-right"></i> Sua vez</div>' : ''}
+                ${minha ? '<div style="font-size:10px;font-weight:600;color:#D97706;margin-top:3px;"><i class="fa-solid fa-hand-point-right"></i> Sua vez</div>' : ''}
                 ${(() => { const pz = _ffPrazo(f); return pz && pz.nivel !== 'ok'
                   ? `<div class="ff-prazo-tag ff-prazo-${pz.nivel}"><i class="fa-solid fa-clock"></i> ${pz.rotulo}</div>` : ''; })()}
               </td>
@@ -14945,9 +14945,9 @@ function _ffRenderDetalhe() {
   if (cont) {
     cont.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
-        <span style="display:inline-flex;align-items:center;gap:7px;padding:6px 14px;border-radius:12px;font-size:13px;font-weight:800;color:${st.cor};background:${st.cor}18;border:1px solid ${st.cor}40;">
+        <span style="display:inline-flex;align-items:center;gap:7px;padding:6px 14px;border-radius:12px;font-size:13px;font-weight:600;color:${st.cor};background:${st.cor}18;border:1px solid ${st.cor}40;">
           <i class="fa-solid ${st.icone}"></i> ${st.rotulo}</span>
-        ${pendencias && f.status === 'rascunho' ? `<span style="font-size:11px;font-weight:700;color:#D97706;"><i class="fa-solid fa-triangle-exclamation"></i> ${pendencias} registro(s) precisam de conferência</span>` : ''}
+        ${pendencias && f.status === 'rascunho' ? `<span style="font-size:11px;font-weight:600;color:#D97706;"><i class="fa-solid fa-triangle-exclamation"></i> ${pendencias} registro(s) precisam de conferência</span>` : ''}
       </div>
 
       <div class="ff-faixa-relacao">
@@ -14965,9 +14965,9 @@ function _ffRenderDetalhe() {
         const cfg = _ffCfg(etId);
         const desde = _ffAguardandoDesde(f);
         if (_ffEhMinhaVez(f)) {
-          return `<div style="display:flex;align-items:center;gap:12px;background:linear-gradient(90deg,rgba(217,119,6,.14),rgba(217,119,6,.02));border:1px solid rgba(217,119,6,.4);border-left:5px solid #D97706;border-radius:12px;padding:12px 16px;margin-bottom:14px;">
+          return `<div style="display:flex;align-items:center;gap:12px;background:rgba(217,119,6,.14);border:1px solid rgba(217,119,6,.4);border-left:5px solid #D97706;border-radius:12px;padding:12px 16px;margin-bottom:14px;">
             <i class="fa-solid fa-bell" style="font-size:22px;color:#D97706;"></i>
-            <div><div style="font-weight:800;color:#0f172a;font-size:14px;">AGUARDANDO SUA APROVAÇÃO</div>
+            <div><div style="font-weight:600;color:#0f172a;font-size:14px;">AGUARDANDO SUA APROVAÇÃO</div>
             <div style="font-size:12px;color:#64748b;">Setor: ${escapeHTML(cfg.setor || '')} · Aguardando ${_ffTempoDesde(desde)}</div></div>
           </div>`;
         }
@@ -15011,8 +15011,8 @@ function _ffRenderDetalhe() {
 
       ${(() => { const tp = _ffTemposPorEtapa(f); return tp.length ? `
         <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <span style="font-size:10.5px;font-weight:800;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;"><i class="fa-solid fa-stopwatch"></i> Tempo em cada etapa:</span>
-          ${tp.map(m => `<span style="font-size:11px;padding:3px 10px;border-radius:10px;background:var(--surface-2,#F1F5F9);border:1px solid var(--color-glass-border,#E2E8F0);">
+          <span style="font-size:10.5px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;"><i class="fa-solid fa-stopwatch"></i> Tempo em cada etapa:</span>
+          ${tp.map(m => `<span style="font-size:11px;padding:3px 10px;border-radius:8px;background:var(--surface-2,#F1F5F9);border:1px solid var(--color-glass-border,#E2E8F0);">
             ${m.rot}: <strong>${m.dur}</strong></span>`).join('')}
         </div>` : ''; })()}
 
@@ -15031,7 +15031,7 @@ function _ffRenderDetalhe() {
         <div class="exame-detalhe-grupo">
           <h4><i class="fa-solid fa-sack-dollar"></i> Totais</h4>
           <div class="exame-detalhe-campos">
-            <div class="exame-campo"><span class="exame-campo-label">Valor total</span><span class="exame-campo-valor" style="font-size:20px;font-weight:900;color:#059669;">${_ffMoedaBR(_ffTotal(f))}</span></div>
+            <div class="exame-campo"><span class="exame-campo-label">Valor total</span><span class="exame-campo-valor" style="font-size:20px;font-weight:600;color:#059669;">${_ffMoedaBR(_ffTotal(f))}</span></div>
             <div class="exame-campo"><span class="exame-campo-label">Colaboradores</span><span class="exame-campo-valor">${(f.linhas || []).length}</span></div>
             <div class="exame-campo"><span class="exame-campo-label">Arquivos</span><span class="exame-campo-valor">${(f.arquivos || []).length}</span></div>
           </div>
@@ -15046,7 +15046,7 @@ function _ffRenderDetalhe() {
         const tudoOk = !cheque.some(c => c.bate === false) && !dups.cpf.length && !dups.codigo.length && !dups.nome.length && !pend;
         const linhaVal = (ok, textoOk, textoErro) => ok
           ? `<div style="font-size:12px;padding:3px 0;color:#059669;font-weight:600;">🟢 ${textoOk}</div>`
-          : `<div style="font-size:12px;padding:3px 0;color:#DC2626;font-weight:700;">🔴 ${textoErro}</div>`;
+          : `<div style="font-size:12px;padding:3px 0;color:#DC2626;font-weight:600;">🔴 ${textoErro}</div>`;
         return `
       <div class="exame-detalhe-laudo" style="margin-top:16px;${tudoOk ? 'border-color:#059669;' : ''}">
         <h4><i class="fa-solid fa-scale-balanced"></i> Validação do relatório</h4>
@@ -15086,7 +15086,7 @@ function _ffRenderDetalhe() {
           const t = _ffChequesTecnicos(f);
           const aviso = txt => `<div style="font-size:12px;padding:3px 0;color:#B45309;font-weight:600;">🟡 ${txt}</div>`;
           const okl   = txt => `<div style="font-size:12px;padding:3px 0;color:#059669;font-weight:600;">🟢 ${txt}</div>`;
-          const err   = txt => `<div style="font-size:12px;padding:3px 0;color:#DC2626;font-weight:700;">🔴 ${txt}</div>`;
+          const err   = txt => `<div style="font-size:12px;padding:3px 0;color:#DC2626;font-weight:600;">🔴 ${txt}</div>`;
           const partes = [];
 
           // valores zerados = erro de verdade
@@ -15127,10 +15127,10 @@ function _ffRenderDetalhe() {
             Valores: menor <strong>${_ffMoedaBR(t.stats.menor)}</strong> · média <strong>${_ffMoedaBR(t.stats.media)}</strong> · maior <strong>${_ffMoedaBR(t.stats.maior)}</strong> · mais comum <strong>${_ffMoedaBR(t.stats.maisComum)}</strong> (${t.stats.vezes}×)</div>`);
 
           return `<div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border-color);">
-            <div style="font-size:10.5px;font-weight:800;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Cheques técnicos</div>
+            <div style="font-size:10.5px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Cheques técnicos</div>
             ${partes.join('')}</div>`;
         })()}
-        ${tudoOk ? `<div style="margin-top:10px;padding:10px 14px;border-radius:10px;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.35);color:#059669;font-weight:800;font-size:13px;text-align:center;">
+        ${tudoOk ? `<div style="margin-top:10px;padding:10px 14px;border-radius:8px;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.35);color:#059669;font-weight:600;font-size:13px;text-align:center;">
           ✅ RELATÓRIO VALIDADO COM SUCESSO</div>` : ''}
       </div>`;
       })()}
@@ -15250,7 +15250,7 @@ function _ffRenderDetalhe() {
     }
     if (f.status === 'aguardando_financeiro' && _ffEhFinanceiro()) {
       if (f.divergencia) {
-        b.push(`<span style="font-size:11px;color:#DC2626;font-weight:800;align-self:center;"><i class="fa-solid fa-hand"></i> Pagamento bloqueado pela divergência.</span>`);
+        b.push(`<span style="font-size:11px;color:#DC2626;font-weight:600;align-self:center;"><i class="fa-solid fa-hand"></i> Pagamento bloqueado pela divergência.</span>`);
       } else {
         if (_ffAcaoPermitida('financeiro', 'pagar')) b.push(`<button class="btn btn-success" onclick="ffMarcarPago()"><i class="fa-solid fa-money-check-dollar"></i> Pagamento Realizado</button>`);
         b.push(`<button class="btn btn-outline" style="border-color:#DC2626;color:#DC2626;" onclick="ffSinalizarDivergencia()"><i class="fa-solid fa-hand"></i> Sinalizar Divergência</button>`);
@@ -16842,7 +16842,7 @@ function _renderExameRow(ex, isClinica) {
         <strong>${ex.empresa || '—'}</strong><br>
         <small>${_formatarTurno(ex.turno)}</small>
         ${ex.clinica ? `<br><small style="color:var(--text-secondary);"><i class="fa-solid fa-hospital"></i> ${escapeHTML(ex.clinica)}</small>` : ''}
-        ${ex.modalidade ? `<br><small style="font-weight:700;color:${ex.modalidade === 'presencial' ? '#7C3AED' : '#2563EB'};">
+        ${ex.modalidade ? `<br><small style="font-weight:600;color:${ex.modalidade === 'presencial' ? '#7C3AED' : '#2563EB'};">
             <i class="fa-solid ${ex.modalidade === 'presencial' ? 'fa-person-walking' : 'fa-cloud-arrow-up'}"></i>
             ${ex.modalidade === 'presencial' ? 'Presencial (DP anexa)' : 'Online (clínica anexa)'}
           </small>` : ''}
@@ -16995,8 +16995,8 @@ function abrirModalDetalheExame(exameId) {
     let obsSelecaoHtml = '';
     if (ex.observacaoSelecao) {
       obsSelecaoHtml = `
-        <div style="margin-top:16px;background:rgba(37, 99, 235, 0.05);border:1px solid rgba(37, 99, 235, 0.2);padding:14px;border-radius:10px;">
-          <h5 style="margin:0 0 6px;font-size:12px;font-weight:700;color:#2563EB;display:flex;align-items:center;gap:6px;">
+        <div style="margin-top:16px;background:rgba(37, 99, 235, 0.05);border:1px solid rgba(37, 99, 235, 0.2);padding:14px;border-radius:8px;">
+          <h5 style="margin:0 0 6px;font-size:12px;font-weight:600;color:#2563EB;display:flex;align-items:center;gap:6px;">
             <i class="fa-solid fa-clipboard-list"></i> Observação da Seleção (para a Clínica)
           </h5>
           <p style="margin:0;font-size:13px;color:#1E293B;white-space:pre-wrap;font-weight:500;">${escapeHTML(ex.observacaoSelecao)}</p>
@@ -17008,13 +17008,13 @@ function abrirModalDetalheExame(exameId) {
     if (podeEnviarLaudo && ex.status === 'aguardando') {
       obsHtml = `
         <div style="margin-top:16px;">
-          <label style="display:block;font-size:12px;font-weight:700;color:var(--color-text-title);margin-bottom:6px;">Observação / Anotação da Clínica (Opcional):</label>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--color-text-title);margin-bottom:6px;">Observação / Anotação da Clínica (Opcional):</label>
           <textarea id="detalhe-exame-obs-input" class="form-control" rows="3" style="width:100%;resize:vertical;font-size:13px;" placeholder="Ex: Apto com restrições, observações médicas..."></textarea>
         </div>`;
     } else if (ex.observacao) {
       obsHtml = `
-        <div style="margin-top:16px;background:rgba(217, 119, 6, 0.05);border:1px solid rgba(217, 119, 6, 0.2);padding:14px;border-radius:10px;">
-          <h5 style="margin:0 0 6px;font-size:12px;font-weight:700;color:#D97706;display:flex;align-items:center;gap:6px;">
+        <div style="margin-top:16px;background:rgba(217, 119, 6, 0.05);border:1px solid rgba(217, 119, 6, 0.2);padding:14px;border-radius:8px;">
+          <h5 style="margin:0 0 6px;font-size:12px;font-weight:600;color:#D97706;display:flex;align-items:center;gap:6px;">
             <i class="fa-solid fa-bell"></i> Observação da Clínica
           </h5>
           <p style="margin:0;font-size:13px;color:#1E293B;white-space:pre-wrap;font-weight:500;">${escapeHTML(ex.observacao)}</p>
@@ -17050,7 +17050,7 @@ function abrirModalDetalheExame(exameId) {
             <div class="exame-campo"><span class="exame-campo-label">Clínica</span><span class="exame-campo-valor">${escapeHTML(ex.clinica || '—')}</span></div>
             <div class="exame-campo">
               <span class="exame-campo-label">Como será feito</span>
-              <span class="exame-campo-valor" style="font-weight:700;color:${ex.modalidade === 'presencial' ? '#7C3AED' : '#2563EB'};">
+              <span class="exame-campo-valor" style="font-weight:600;color:${ex.modalidade === 'presencial' ? '#7C3AED' : '#2563EB'};">
                 ${ex.modalidade === 'presencial'
                   ? 'Presencial — o Depto. Pessoal anexa a foto da ficha'
                   : (ex.modalidade === 'online' ? 'Online — a clínica anexa o laudo' : '—')}

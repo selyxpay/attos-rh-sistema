@@ -34,27 +34,27 @@
     .pub-logo {
       width: 36px; height: 36px; border-radius: 50%;
       background: var(--color-primary); display: flex; align-items: center;
-      justify-content: center; font-weight: 800; font-size: 14px;
+      justify-content: center; font-weight:600; font-size: 14px;
       color: #fff; letter-spacing: -1px; flex-shrink: 0;
     }
-    .pub-brand-name { font-weight: 700; font-size: 16px; color: #fff; }
+    .pub-brand-name { font-weight:600; font-size: 16px; color: #fff; }
     .pub-brand-sub   { font-size: 11px; color: rgba(255,255,255,0.6); margin-top: 1px; }
     .pub-body {
       max-width: 860px; margin: 0 auto;
       padding: 32px 24px 80px;
     }
-    .pub-title { font-size: 22px; font-weight: 700; color: var(--color-text-main) !important; margin-bottom: 4px; }
+    .pub-title { font-size: 22px; font-weight:600; color: var(--color-text-main) !important; margin-bottom: 4px; }
     .pub-subtitle { font-size: 14px; color: var(--color-text-muted) !important; margin-bottom: 28px; }
     .recruiter-banner {
-      background: linear-gradient(135deg,#be123c,#9f1239);
-      color: #fff; padding: 14px 20px; border-radius: 10px;
+      background: #be123c;
+      color: #fff; padding: 14px 20px; border-radius:8px;
       margin-bottom: 24px; display: flex; align-items: center; gap: 12px;
       font-size: 13px; font-weight: 500;
     }
     .recruiter-avatar {
       width: 36px; height: 36px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 15px; flex-shrink: 0;
+      font-weight:600; font-size: 15px; flex-shrink: 0;
     }
     .success-screen {
       text-align: center; padding: 60px 24px;
@@ -74,7 +74,7 @@
     .form-row.col-1 { grid-template-columns: 1fr; }
     .form-group { display: flex; flex-direction: column; gap: 6px; }
     .section-title {
-      font-size: 11px; font-weight: 700; color: #0B1F3A !important;
+      font-size: 11px; font-weight:600; color: #0B1F3A !important;
       text-transform: uppercase; letter-spacing: 1px;
       padding: 12px 0 8px; border-top: 1px solid var(--color-glass-border);
       margin-top: 8px;
@@ -86,7 +86,7 @@
       gap: 12px; margin-top: 8px;
     }
     .doc-box {
-      border: 2px dashed rgba(0, 0, 0, 0.15); border-radius: 10px;
+      border: 2px dashed rgba(0, 0, 0, 0.15); border-radius:8px;
       padding: 16px 12px; text-align: center; cursor: pointer;
       position: relative; transition: all 0.2s;
     }
@@ -109,7 +109,7 @@
     /* Badge presencial no header do form */
     .modo-badge {
       display: inline-flex; align-items: center; gap: 6px;
-      padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700;
+      padding: 4px 12px; border-radius:16px; font-size: 11px; font-weight:600;
       text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;
     }
     .modo-badge.presencial { background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); }
@@ -118,7 +118,7 @@
     .como-soube-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
     .cs-chip {
       display: inline-flex; align-items: center; gap: 6px;
-      padding: 7px 14px; border-radius: 20px; cursor: pointer;
+      padding: 7px 14px; border-radius:16px; cursor: pointer;
       border: 1.5px solid var(--color-glass-border);
       background: rgba(255,255,255,0.6);
       font-size: 12px; font-weight: 600; color: var(--color-text-muted);
@@ -133,13 +133,13 @@
       margin: 18px 0 16px;
       padding: 16px;
       border: 1px solid rgba(15, 23, 42, 0.12);
-      border-radius: 10px;
+      border-radius:8px;
       background: rgba(248, 250, 252, 0.88);
     }
     .privacy-consent summary {
       cursor: pointer;
       font-size: 13px;
-      font-weight: 700;
+      font-weight:600;
       color: var(--color-text-main);
       list-style-position: inside;
     }
@@ -529,7 +529,7 @@
         <div class="parabens-sub" id="parabens-sub">Você finalizou sua ficha com sucesso.</div>
         <div id="parabens-senha-box" style="display:none;margin:16px 0;">
           <div style="font-size:12px;color:#94a3b8;letter-spacing:2px;font-weight:600;margin-bottom:6px;">SUA SENHA DE ATENDIMENTO</div>
-          <div id="parabens-senha-num" style="font-size:52px;font-weight:900;color:#6366f1;line-height:1;"></div>
+          <div id="parabens-senha-num" style="font-size:52px;font-weight:600;color:#6366f1;line-height:1;"></div>
           <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Aguarde ser chamado(a) no painel de senhas</div>
         </div>
         <a id="btn-whatsapp-candidato" href="#" target="_blank" class="btn-whatsapp" style="margin-top:8px;text-decoration:none;">
@@ -1051,7 +1051,7 @@ document.getElementById('form-candidato').addEventListener('submit', function(e)
           <div style="font-size:48px;color:#22c55e;margin-bottom:12px;"><i class="fa-solid fa-circle-check"></i></div>
           <h2 style="color:#22c55e;font-size:22px;margin-bottom:8px;">Cadastro realizado!</h2>
           <p style="color:#64748b;font-size:15px;margin-bottom:24px;">Aguarde ser chamado(a) pelo número:</p>
-          <div style="display:inline-block;background:#6366f1;color:#fff;font-size:56px;font-weight:900;padding:16px 40px;border-radius:16px;letter-spacing:2px;margin-bottom:16px;">${_numSenha}</div>
+          <div style="display:inline-block;background:#6366f1;color:#fff;font-size:56px;font-weight:600;padding:16px 40px;border-radius:16px;letter-spacing:2px;margin-bottom:16px;">${_numSenha}</div>
           <p style="color:#64748b;font-size:13px;">Acompanhe o painel de senhas na recepção</p>
         </div>`;
       ssEl.style.display = 'block';

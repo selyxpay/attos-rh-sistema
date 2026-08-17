@@ -7,7 +7,7 @@
    ========================================================================== */
 
 :root {
-  --ux-focus-ring: 0 0 0 3px rgba(212, 2, 3, 0.35);
+  --ux-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.35);
   --ux-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -170,7 +170,7 @@ html {
 
 /* Seleção de texto na cor da marca */
 ::selection {
-  background-color: rgba(212, 2, 3, 0.18);
+  background-color: rgba(37, 99, 235, 0.18);
   color: var(--color-text-title);
 }
 

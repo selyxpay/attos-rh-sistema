@@ -3,8 +3,8 @@
    paper" — bordas finas em vez de sombra, tipografia densa, um único azul
    de destaque, cantos em três tamanhos: pílula / botão-cartão / cartão grande)
 
-   As fontes (Inter/Outfit) já são carregadas pelo <link> do index.html — não
-   duplicamos o @import aqui.
+   A fonte Inter já é carregada pelo <link> do index.html — não duplicamos o
+   @import aqui. Inter faz tudo: de rótulo de 11px a título de 20px.
    ========================================================================== */
 
 :root {
@@ -672,4 +672,13 @@ textarea:focus {
   text-align: center !important;
   margin-right: 8px !important;
   font-size: 14px !important;
+}
+
+/* ==========================================================================
+   12. ÊNFASE — o navegador põe <b> e <strong> em 700 por conta própria, e a
+   escala do sistema para em 600. Sem esta regra o negrito destoa de todo o
+   resto e o texto fica com dois pesos diferentes na mesma linha.
+   ========================================================================== */
+b, strong {
+  font-weight: 600;
 }
