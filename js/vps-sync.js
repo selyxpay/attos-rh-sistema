@@ -17,7 +17,7 @@ window.RTCloud = (function () {
 
   let onRemote = null;
   let onSessaoPerdida = null;
-  let pending = null, pendingMerge = false, pendingUpsert = [];
+  let pending = null, pendingMerge = false, pendingUpsert = [], pendingSomenteAlvos = false;
   let saveTimer = null, pollTimer = null;
   let lastVersion = 0;
   let flushing = false;
@@ -27,13 +27,26 @@ window.RTCloud = (function () {
     if (!r.ok) throw new Error('GET ' + path + ' -> ' + r.status);
     return r.json();
   }
-  async function apiPost(path, body) {
-    const r = await fetch(API + path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify(body)
-    });
+  // Rede de celular oscila: um cochilo de 4G derrubava o save inteiro e a
+  // pessoa via "Load failed" depois de preencher a ficha toda. Falha de REDE
+  // (o fetch nem chegou ao servidor) agora é tentada de novo, com uma pausa
+  // maior a cada vez. Erro de verdade do servidor (400, 403, 500) NÃO é
+  // repetido — insistir não conserta, e esconderia o problema real.
+  async function apiPost(path, body, tentativa) {
+    const vez = tentativa || 1;
+    let r;
+    try {
+      r = await fetch(API + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(body)
+      });
+    } catch (e) {
+      if (vez >= 3) throw e;
+      await new Promise(function (ok) { setTimeout(ok, vez * 1500); });
+      return apiPost(path, body, vez + 1);
+    }
     if (!r.ok) throw new Error('POST ' + path + ' -> ' + r.status);
     return r.json();
   }
@@ -94,11 +107,80 @@ window.RTCloud = (function () {
     return s.dados || null;
   }
 
+  // ── SÓ O QUE MUDOU VAI PELA REDE ──────────────────────────────────────────
+  // Antes, TODO save subia o banco inteiro: milhares de candidatos, todos os
+  // equipamentos, todas as fichas. No computador isso passava; no celular em
+  // 4G a requisição não terminava e o Safari cortava com "Load failed" — a
+  // pessoa preenchia a ficha com foto e perdia o registro.
+  //
+  // Quando o save é de merge com upsertIds, o servidor SÓ acrescenta ou troca
+  // os registros daqueles ids. Então mandar o resto é desperdício puro: mandar
+  // menos é mais rápido E mais seguro (nada que não foi enviado corre risco).
+  function _apenasOsAlvos(state, ids) {
+    const querido = {};
+    ids.forEach(function (id) { querido[String(id)] = true; });
+    const saida = {};
+    const urlsUsadas = {};
+
+    Object.keys(state || {}).forEach(function (chave) {
+      if (chave === '_docsMeta') return;                 // tratado no fim
+      const valor = state[chave];
+      if (Array.isArray(valor)) {
+        const escolhidos = valor.filter(function (r) {
+          return r && r.id != null && querido[String(r.id)];
+        });
+        if (escolhidos.length) {
+          saida[chave] = escolhidos;
+          // guarda os links de arquivo destes registros, para levar só o
+          // pedaço do _docsMeta que diz respeito a eles
+          JSON.stringify(escolhidos).replace(/"(\/uploads\/[^"]+)"/g, function (_, u) {
+            urlsUsadas[u] = true; return _;
+          });
+        }
+      } else {
+        // chaves que não são lista (contadores, configurações) são pequenas:
+        // vão junto para nunca ficarem para trás
+        saida[chave] = valor;
+      }
+    });
+
+    if (state && state._docsMeta) {
+      const meta = {};
+      Object.keys(urlsUsadas).forEach(function (u) {
+        if (state._docsMeta[u]) meta[u] = state._docsMeta[u];
+      });
+      if (Object.keys(meta).length) saida._docsMeta = meta;
+    }
+    return saida;
+  }
+
+  // Decide o que mandar: o recorte SÓ quando quem chamou pediu.
+  //
+  // Por que não é automático: o recorte deixa de fora tudo que não está nos
+  // upsertIds. Se a tela mexeu em outra coisa do estado e ainda não salvou,
+  // essa mudança some sem aviso — o mesmo tipo de perda silenciosa que já nos
+  // custou caro. Quem chama é quem sabe se a alteração é de um registro só;
+  // por isso pede explicitamente com { somenteAlvos: true }.
+  function _corpoDoSave(state, merge, upsertIds, somenteAlvos) {
+    if (!somenteAlvos || !merge || !upsertIds || !upsertIds.length) return state;
+    const recorte = _apenasOsAlvos(state, upsertIds);
+    // só vale a pena se realmente achou os registros pedidos
+    const achou = upsertIds.some(function (id) {
+      return Object.keys(recorte).some(function (k) {
+        return Array.isArray(recorte[k]) && recorte[k].some(function (r) {
+          return r && String(r.id) === String(id);
+        });
+      });
+    });
+    return achou ? recorte : state;
+  }
+
   // -- Salva (com debounce). merge=true p/ páginas públicas ------------------
   function saveState(state, options) {
     pending = state;
     pendingMerge = !!(options && options.merge);
     pendingUpsert = (options && options.upsertIds) ? options.upsertIds.slice() : [];
+    pendingSomenteAlvos = !!(options && options.somenteAlvos);
     clearTimeout(saveTimer);
     saveTimer = setTimeout(flush, SAVE_DEBOUNCE_MS);
   }
@@ -114,7 +196,7 @@ window.RTCloud = (function () {
   // que está no upsert) e NUNCA apaga o que outra pessoa acabou de cadastrar.
   async function salvarAgora(state, options) {
     clearTimeout(saveTimer);
-    pending = null; pendingMerge = false; pendingUpsert = [];
+    pending = null; pendingMerge = false; pendingUpsert = []; pendingSomenteAlvos = false;
     flushing = true;
     try {
       await processarDocumentos(state);   // sobe as fotos e troca o base64 por link
@@ -122,7 +204,8 @@ window.RTCloud = (function () {
       const upsertIds = (options && options.upsertIds) ? options.upsertIds.slice() : [];
       // baseVersion = versão em que este cliente se baseou. O servidor usa isso
       // para NÃO deixar um save desatualizado apagar o que outra pessoa gravou.
-      const res = await apiPost('/state', { dados: state, merge: merge, upsertIds: upsertIds, baseVersion: lastVersion });
+      const corpo = _corpoDoSave(state, merge, upsertIds, !!(options && options.somenteAlvos));
+      const res = await apiPost('/state', { dados: corpo, merge: merge, upsertIds: upsertIds, baseVersion: lastVersion });
       if (res && res.version) lastVersion = res.version;
       return res;
     } finally {
@@ -140,7 +223,8 @@ window.RTCloud = (function () {
     flushing = true;
     try {
       await processarDocumentos(state);   // sobe base64 -> /uploads e troca por link
-      const res = await apiPost('/state', { dados: state, merge: merge, upsertIds: upsert, baseVersion: lastVersion });
+      const corpo = _corpoDoSave(state, merge, upsert, pendingSomenteAlvos);
+      const res = await apiPost('/state', { dados: corpo, merge: merge, upsertIds: upsert, baseVersion: lastVersion });
       if (res && res.version) lastVersion = res.version; // evita "eco" do nosso próprio save
     } catch (e) {
       console.error('[RT VPS] Falha ao salvar (tentaremos de novo):', e);

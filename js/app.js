@@ -11232,7 +11232,18 @@ async function salvarEquipamento() {
       // MERGE + UPSERT: só adiciona/atualiza ESTE registro no servidor. Assim,
       // quando duas pessoas cadastram equipamento ao mesmo tempo, uma não apaga
       // o registro que a outra acabou de salvar (bug de "cadastra e some").
-      await RTCloud.salvarAgora(state, { merge: true, upsertIds: [_equipEditandoId || _idNovo] });
+      //
+      // somenteAlvos: manda pela rede SÓ esta ficha, em vez do banco inteiro.
+      // Aqui é seguro porque esta tela mexe num registro e salva na hora — não
+      // há outra alteração pendente no estado para ficar de fora. Era isto que
+      // derrubava o cadastro no celular: a ficha com foto subia junto com
+      // milhares de candidatos, o 4G não dava conta e o Safari cortava com
+      // "Load failed" depois de tudo preenchido.
+      await RTCloud.salvarAgora(state, {
+        merge: true,
+        upsertIds: [_equipEditandoId || _idNovo],
+        somenteAlvos: true
+      });
     } else {
       saveState();   // sem nuvem: só o cache local
     }
