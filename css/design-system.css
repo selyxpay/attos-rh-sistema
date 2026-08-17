@@ -1,54 +1,60 @@
 /* ==========================================================================
-   R&T DESIGN SYSTEM - VERSÃO 5.0 (SOBRIEDADE, MÁXIMO PROFISSIONALISMO)
+   R&T DESIGN SYSTEM — v6.0 (referência: "frosted link dashboard on rice
+   paper" — bordas finas em vez de sombra, tipografia densa, um único azul
+   de destaque, cantos em três tamanhos: pílula / botão-cartão / cartão grande)
+
+   As fontes (Inter/Outfit) já são carregadas pelo <link> do index.html — não
+   duplicamos o @import aqui.
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap');
-
 :root {
-  /* Identidade R&T */
-  --color-primary: #D40203;
-  --color-primary-dark: #9F0102;
-  --color-blue-dark: #0B1F3A;
+  /* ── Cor de ação (botões) — preto quase puro, "ação comprometida" ────── */
+  --color-primary: #0A0A0A;
+  --color-primary-dark: #171717;
+
+  /* ── Azul de destaque — links, item ativo do menu, foco. Só ele "fala". */
+  --color-accent-blue: #2563EB;
+  --color-accent-blue-dark: #1E40AF;
+  --color-blue-dark: #1E40AF;
   --color-blue: #2563EB;
-  
-  /* Superfícies Sólidas e Seguras */
-  --color-bg-gradient-start: #F8FAFC;
-  --color-bg-gradient-end: #E2E8F0;
+
+  /* ── Superfícies: papel, não vidro ─────────────────────────────────── */
   --color-white: #FFFFFF;
   --color-glass-bg: #FFFFFF;
-  --color-glass-border: #E2E8F0;
-  
-  /* Textos Escuros Ajustados (Suaves e Profissionais, sem Preto Duro) */
-  --color-text-main: #1E293B;   /* Slate-800 para texto principal */
-  --color-text-title: #0F172A;  /* Slate-900 apenas para headings */
-  --color-text-muted: #64748B;  /* Slate-500 para textos secundários */
-  
-  /* Status */
-  --status-pending: #D97706;
+  --color-glass-border: #E5E5E5;   /* "Ash" — a linha que segura o sistema inteiro */
+  --color-paper-mist: #F5F5F5;     /* superfície alternativa (linhas hover, painéis aninhados) */
+
+  /* ── Texto ────────────────────────────────────────────────────────── */
+  --color-text-main: #262626;      /* Graphite — corpo */
+  --color-text-title: #171717;     /* Charcoal — títulos */
+  --color-text-muted: #737373;     /* Fog — texto secundário, placeholder */
+
+  /* ── Status (mantém o significado operacional, tom Dub) ─────────────── */
+  --status-pending: #EA580C;
   --status-analysis: #2563EB;
   --status-interview: #7C3AED;
-  --status-approved: #059669;
-  --status-hired: #059669;
+  --status-approved: #16A34A;
+  --status-hired: #16A34A;
   --status-unfit: #DC2626;
-  
-  /* Sombras */
-  --shadow-premium:  0 10px 30px rgba(15, 23, 42, 0.04);
-  --shadow-floating: 0 20px 50px rgba(15, 23, 42, 0.12);
-  
-  /* Raios */
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
-  --radius-2xl: 20px;
-  --radius-pill: 22px;
 
-  /* Remapeamento */
+  /* ── Sombra: quase ausente. As bordas é que definem o contêiner ─────── */
+  --shadow-premium: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-floating: 0 20px 20px rgba(0, 0, 0, 0.09);
+
+  /* ── Raios: vocabulário fechado — pílula / cartão / cartão grande ────── */
+  --radius-sm: 6px;     /* inputs */
+  --radius-md: 8px;     /* botões */
+  --radius-lg: 12px;    /* cartões */
+  --radius-xl: 16px;    /* cartões grandes */
+  --radius-2xl: 16px;
+  --radius-pill: 9999px;
+
+  /* ── Remapeamento (mesmos nomes usados em style.css/mobile.css/etc.) ── */
   --primary: var(--color-primary);
   --primary-hover: var(--color-primary-dark);
-  --primary-light: rgba(212, 2, 3, 0.06);
-  --dark-sidebar: #090B11;
-  --dark-sidebar-active: var(--color-primary);
+  --primary-light: rgba(37, 99, 235, 0.08);
+  --dark-sidebar: #0A0A0A;
+  --dark-sidebar-active: var(--color-accent-blue);
   --bg-main: transparent;
   --card-bg: var(--color-glass-bg);
   --border-color: var(--color-glass-border);
@@ -59,30 +65,16 @@
   --shadow-lg: var(--shadow-floating);
 }
 
-/* 1. FUNDO E TEXTURA GRANULADA */
+/* 1. FUNDO — TELA BRANCA, SEM GRADIENTE NEM TEXTURA DE RUÍDO */
 body {
-  background: linear-gradient(135deg, var(--color-bg-gradient-start), var(--color-bg-gradient-end)) !important;
-  background-attachment: fixed !important;
+  background: var(--color-white) !important;
   min-height: 100vh;
   font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
   color: var(--color-text-main) !important;
   position: relative;
 }
 
-body::before {
-  content: "" !important;
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  opacity: 0.012 !important;
-  pointer-events: none !important;
-  z-index: 9999 !important;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E") !important;
-}
-
-/* 2. CARDS E BANNER (CORPORATIVO EQUILIBRADO E ONDA CINTILANTE) */
+/* 2. CARTÕES — BRANCO, BORDA DE 1PX, QUASE SEM SOMBRA */
 .card-glass,
 .kpi-card,
 .vaga-card,
@@ -102,15 +94,15 @@ body::before {
   overflow: hidden !important;
 }
 
-/* Tipografia Corporativa nos cards (Sem forçar preto absoluto desnecessário no geral) */
 .card-glass h1, .card-glass h2, .card-glass h3, .card-glass h4,
 .kpi-card h1, .kpi-card h2, .kpi-card h3,
 .vaga-card h1, .vaga-card h2, .vaga-card h3,
 .dashboard-chart-card h3,
 .dashboard-greeting-banner h2 {
   color: var(--color-text-title) !important;
-  font-family: 'Outfit', sans-serif !important;
-  font-weight: 700 !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.02em !important;
 }
 
 .card-glass p, .card-glass span,
@@ -123,44 +115,11 @@ body::before {
 
 .kpi-number {
   color: var(--color-text-title) !important;
-  font-family: 'Outfit', sans-serif !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 500 !important;
 }
 
-/* Animação da onda de brilho cintilante lenta e premium */
-@keyframes shimmer-wave {
-  0% { transform: translateX(-150%) skewX(-25deg); }
-  25% { transform: translateX(150%) skewX(-25deg); }
-  100% { transform: translateX(150%) skewX(-25deg); }
-}
-
-/* Shimmer aplicado apenas nos cards maiores (não em kanban-card pois há centenas) */
-.card-glass::after,
-.kpi-card::after,
-.vaga-card::after,
-.card-form::after,
-.dashboard-chart-card::after,
-.dashboard-greeting-banner::after,
-.table-box::after,
-.filter-box::after,
-.destaque-semana-box::after {
-  content: "" !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 50% !important;
-  height: 100% !important;
-  background: linear-gradient(90deg, 
-    transparent 0%, 
-    rgba(255, 255, 255, 0.3) 50%, 
-    transparent 100%) !important;
-  animation: shimmer-wave 7s infinite ease-in-out !important;
-  pointer-events: none !important;
-  z-index: 10 !important;
-  /* Promove a animação para a GPU (compositor thread) */
-  will-change: transform !important;
-}
-
-/* 3. DETALHES DO CANDIDATO E MODAIS (FUNDO SÓLIDO TOTAL CONTRASTE E PRESERVAÇÃO DE CORES) */
+/* 3. DETALHES DO CANDIDATO E MODAIS — mesma regra: borda fina, sombra discreta */
 .detail-drawer,
 .custom-modal-content,
 .drawer-content-container,
@@ -171,62 +130,53 @@ body::before {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
   box-shadow: var(--shadow-floating) !important;
-  border: 1px solid #CBD5E1 !important;
+  border: 1px solid var(--color-glass-border) !important;
 }
 
 .detail-drawer h1, .detail-drawer h2, .detail-drawer h3,
 .custom-modal h1, .custom-modal h2 {
   color: var(--color-text-title) !important;
-  font-family: 'Outfit', sans-serif !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 500 !important;
 }
 
 .detail-drawer p, .detail-drawer span {
   color: var(--color-text-main) !important;
 }
 
-/* Legibilidade máxima dos inputs e labels nos drawers */
 label,
 .form-group label,
 .detail-drawer label,
 .custom-modal label {
   color: var(--color-text-title) !important;
-  font-weight: 700 !important;
+  font-weight: 600 !important;
   font-size: 13px !important;
   margin-bottom: 6px !important;
 }
 
-/* 4. SIDEBAR PRETA DE DIAMANTES COMPACTA (100% ANCORADA) */
+/* 4. SIDEBAR — PRETO SÓLIDO E CHATO, SEM PADRÃO DE DIAMANTES */
 .app-container {
   display: flex !important;
   height: 100vh !important;
-  height: 100dvh !important;   /* iOS Safari: 100vh inclui a barra de endereço */
+  height: 100dvh !important;
   overflow: hidden !important;
 }
 
 .sidebar,
 .sidebar-modern {
-  background-color: #090B11 !important;
-  background-image: 
-    linear-gradient(135deg, rgba(255, 255, 255, 0.015) 25%, transparent 25%), 
-    linear-gradient(225deg, rgba(255, 255, 255, 0.015) 25%, transparent 25%), 
-    linear-gradient(45deg, rgba(255, 255, 255, 0.015) 25%, transparent 25%), 
-    linear-gradient(315deg, rgba(255, 255, 255, 0.015) 25%, #090B11 25%) !important;
-  background-position: 8px 0, 8px 0, 0 0, 0 0 !important;
-  background-size: 16px 16px !important;
-  
+  background: #0A0A0A !important;
   border-radius: var(--radius-lg) !important;
-  box-shadow: var(--shadow-floating) !important;
+  box-shadow: none !important;
   margin: 16px !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  
-  /* ÂNCORA */
+
   position: sticky !important;
   top: 16px !important;
   height: calc(100vh - 32px) !important;
   height: calc(100dvh - 32px) !important;
   width: 230px !important;
   flex-shrink: 0 !important;
-  
+
   padding: 16px 6px !important;
   z-index: 1000 !important;
   overflow-y: auto !important;
@@ -236,10 +186,9 @@ label,
   display: none !important;
 }
 
-/* Logo da empresa com container glassmorphism integrado */
 .sidebar-header {
   background: rgba(255, 255, 255, 0.04) !important;
-  border-radius: 12px !important;
+  border-radius: var(--radius-md) !important;
   padding: 8px 14px !important;
   margin-bottom: 18px !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
@@ -247,10 +196,10 @@ label,
   align-items: center !important;
   justify-content: center !important;
   height: 64px !important;
-  -webkit-backdrop-filter: blur(8px) !important;   /* Safari */
-  backdrop-filter: blur(8px) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-  transition: all 0.2s ease !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  transition: background 0.15s ease, border-color 0.15s ease !important;
 }
 
 .sidebar-header:hover {
@@ -269,11 +218,10 @@ label,
   height: 44px !important;
   max-width: 100% !important;
   object-fit: contain !important;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)) !important;
+  filter: none !important;
   padding: 0 !important;
 }
 
-/* Menu de navegação da sidebar */
 .sidebar-nav {
   padding: 0 !important;
 }
@@ -283,41 +231,40 @@ label,
 }
 
 .nav-item a {
-  border-radius: var(--radius-md) !important;
-  color: #E2E8F0 !important; /* Branco mais suave para as escritas padrão */
+  border-radius: var(--radius-pill) !important;
+  color: #A3A3A3 !important;
   font-weight: 500 !important;
   font-family: 'Inter', sans-serif !important;
-  transition: all 0.2s ease !important;
+  transition: background 0.15s ease, color 0.15s ease !important;
   display: flex !important;
   align-items: center !important;
   gap: 10px !important;
-  padding: 9px 12px !important;
+  padding: 9px 14px !important;
   font-size: 13px !important;
   border-left: none !important;
 }
 
-/* ÍCONES PROFISSIONAIS, LEVES E INTEGRADOS (SEM NEON BAGUNÇADO) */
 .sidebar-nav .nav-item a i {
-  color: #64748B !important; /* Cor cinza/prata corporativa uniforme */
-  font-size: 16px !important;
-  transition: all 0.2s ease !important;
+  color: #737373 !important;
+  font-size: 15px !important;
+  transition: color 0.15s ease !important;
 }
 
 .nav-item:hover a {
-  background: rgba(255, 255, 255, 0.05) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
   color: #FFFFFF !important;
 }
 
 .nav-item:hover a i {
   color: #FFFFFF !important;
-  transform: scale(1.1) !important;
+  transform: none !important;
 }
 
 .nav-item.active a {
-  background: var(--color-primary) !important;
+  background: var(--color-accent-blue) !important;
   color: #FFFFFF !important;
-  font-weight: 600 !important;
-  box-shadow: 0 4px 12px rgba(212, 2, 3, 0.25) !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
 }
 
 .nav-item.active a i {
@@ -328,17 +275,16 @@ label,
   display: none !important;
 }
 
-/* 5. MAIN LAYOUT & VIEWPORT CONTROLANDO ROLAGEM */
+/* 5. MAIN LAYOUT & VIEWPORT */
 .main-layout {
   flex-grow: 1 !important;
   height: 100vh !important;
-  height: 100dvh !important;   /* idem: sem isto o rodapé some atrás da barra do Safari */
+  height: 100dvh !important;
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
 }
 
-/* Topbar corporativa */
 .app-header,
 .topbar-glass {
   background: var(--color-white) !important;
@@ -361,13 +307,13 @@ label,
   height: calc(100dvh - 100px) !important;
 }
 
-/* 6. BOTÕES MODERNOS E LEGÍVEIS */
+/* 6. BOTÕES — preenchimento preto plano (ação comprometida), sem gradiente */
 .btn,
 .btn-login-submit,
 .btn-submit {
   border-radius: var(--radius-md) !important;
   padding: 10px 20px !important;
-  font-weight: 600 !important;
+  font-weight: 500 !important;
   font-size: 13.5px !important;
 }
 
@@ -377,7 +323,7 @@ label,
   background: var(--color-primary) !important;
   color: var(--color-white) !important;
   border: none !important;
-  box-shadow: 0 4px 12px rgba(212, 2, 3, 0.15) !important;
+  box-shadow: var(--shadow-premium) !important;
 }
 
 .btn-primary:hover,
@@ -387,16 +333,16 @@ label,
 }
 
 .btn-secondary {
-  background: #F1F5F9 !important;
+  background: var(--color-white) !important;
   color: var(--color-text-main) !important;
-  border: 1px solid #E2E8F0 !important;
+  border: 1px solid var(--color-glass-border) !important;
 }
 
 .btn-secondary:hover {
-  background: #E2E8F0 !important;
+  background: var(--color-paper-mist) !important;
 }
 
-/* 7. INPUTS COM CONTRASTE EXTREMO */
+/* 7. INPUTS — borda quase preta (assinatura Dub: campo parece importante, não opcional) */
 .form-control,
 .form-control-login,
 .input-modern,
@@ -407,11 +353,11 @@ input[type="date"],
 select,
 textarea {
   background: var(--color-white) !important;
-  border: 1px solid #CBD5E1 !important;
+  border: 1px solid #171717 !important;
   border-radius: var(--radius-sm) !important;
   padding: 10px 14px !important;
   font-size: 13.5px !important;
-  color: #0F172A !important;
+  color: #171717 !important;
 }
 
 .form-control:focus,
@@ -420,11 +366,11 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: var(--color-primary) !important;
-  box-shadow: 0 0 0 3px rgba(212, 2, 3, 0.10) !important;
+  border-color: var(--color-accent-blue) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
 }
 
-/* 8. BADGES DE STATUS */
+/* 8. BADGES DE STATUS — pílula, fundo tonal, sem caixa-alta pesada */
 .badge-status,
 .column-count,
 .status-badge,
@@ -435,19 +381,19 @@ textarea:focus {
 .badge-green,
 .badge-red {
   padding: 4px 10px !important;
-  border-radius: 6px !important;
+  border-radius: var(--radius-pill) !important;
   font-size: 11px !important;
-  font-weight: 700 !important;
+  font-weight: 600 !important;
   text-transform: uppercase !important;
 }
 
-.badge-yellow, .st-pending { background: #FEF3C7 !important; color: #D97706 !important; }
+.badge-yellow, .st-pending { background: #FFEDD5 !important; color: #EA580C !important; }
 .badge-blue, .st-analysis { background: #DBEAFE !important; color: #2563EB !important; }
-.badge-purple, .st-interview { background: #F3E8FF !important; color: #7C3AED !important; }
-.badge-green, .st-approved, .st-hired { background: #D1FAE5 !important; color: #059669 !important; }
+.badge-purple, .st-interview { background: #EDE9FE !important; color: #7C3AED !important; }
+.badge-green, .st-approved, .st-hired { background: #DCFCE7 !important; color: #16A34A !important; }
 .badge-red, .st-unfit { background: #FEE2E2 !important; color: #DC2626 !important; }
 
-/* 9. TABELAS LIMPAS E CORPORATIVAS */
+/* 9. TABELAS — linhas com borda fina, sem faixa colorida no cabeçalho */
 .table-modern,
 .excel-table {
   width: 100% !important;
@@ -457,10 +403,11 @@ textarea:focus {
 .table-modern th,
 .excel-table th {
   color: var(--color-text-muted) !important;
-  font-weight: 700 !important;
+  font-weight: 600 !important;
   padding: 12px 16px !important;
-  font-size: 11.5px !important;
-  border-bottom: 2px solid #E2E8F0 !important;
+  font-size: 11px !important;
+  letter-spacing: 0.02em !important;
+  border-bottom: 1px solid var(--color-glass-border) !important;
   background: transparent !important;
 }
 
@@ -468,54 +415,52 @@ textarea:focus {
 .excel-table td {
   background: var(--color-white) !important;
   padding: 12px 16px !important;
-  border-bottom: 1px solid #F1F5F9 !important;
+  border-bottom: 1px solid var(--color-glass-border) !important;
   color: var(--color-text-main) !important;
   font-size: 13px !important;
 }
 
 .table-modern tr:hover td,
 .excel-table tr:hover td {
-  background: #F8FAFC !important;
+  background: var(--color-paper-mist) !important;
 }
 
-/* Kanban column styling */
 .kanban-column {
-  background: #F1F5F9 !important;
-  border: 1px solid #E2E8F0 !important;
+  background: var(--color-paper-mist) !important;
+  border: 1px solid var(--color-glass-border) !important;
   border-radius: var(--radius-md) !important;
   padding: 12px !important;
 }
 
 .kanban-card {
   border-radius: var(--radius-sm) !important;
-  border: 1px solid #E2E8F0 !important;
+  border: 1px solid var(--color-glass-border) !important;
   background: var(--color-white) !important;
-  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.02) !important;
+  box-shadow: none !important;
 }
 
-/* Document upload boxes in public forms */
 .doc-box {
   background: var(--color-white) !important;
-  border: 2px dashed #CBD5E1 !important;
+  border: 2px dashed var(--color-glass-border) !important;
   border-radius: var(--radius-sm) !important;
 }
 
 .doc-box:hover {
-  border-color: var(--color-primary) !important;
-  background: rgba(212, 2, 3, 0.02) !important;
+  border-color: var(--color-accent-blue) !important;
+  background: rgba(37, 99, 235, 0.03) !important;
 }
 
 .doc-box.uploaded {
-  border-color: #059669 !important;
-  background: rgba(5, 150, 105, 0.02) !important;
+  border-color: #16A34A !important;
+  background: rgba(22, 163, 74, 0.03) !important;
 }
 
-/* 10. TIPOGRAFIA DO CABEÇALHO CORRIGIDA E SEM BUGS (INTER SANS) */
+/* 10. TIPOGRAFIA DO CABEÇALHO */
 .header-app-name {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-  font-weight: 700 !important;
+  font-weight: 600 !important;
   font-size: 14.5px !important;
-  letter-spacing: 0.5px !important;
+  letter-spacing: -0.01em !important;
   color: var(--color-text-title) !important;
 }
 
@@ -525,7 +470,7 @@ textarea:focus {
 }
 
 /* ==========================================================================
-   11. PADRONIZAÇÃO VISUAL DOS MÓDULOS (FAIXAS / HEADERS & BOTÕES SAAS)
+   11. FAIXAS DE CABEÇALHO DOS MÓDULOS — cartão claro com borda, ícone chapado
    ========================================================================== */
 
 .mod-header-banner {
@@ -533,15 +478,15 @@ textarea:focus {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 22px 28px;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
-  border-radius: 16px !important;
-  color: #ffffff !important;
+  padding: 20px 24px;
+  background: var(--color-white) !important;
+  border: 1px solid var(--color-glass-border) !important;
+  border-radius: var(--radius-lg) !important;
+  color: var(--color-text-title) !important;
   margin-bottom: 24px;
-  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.15) !important;
+  box-shadow: var(--shadow-premium) !important;
   position: relative !important;
   overflow: hidden !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 .mod-header-banner::after {
@@ -551,95 +496,68 @@ textarea:focus {
 .mod-header-left {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 16px;
   z-index: 1;
 }
 
 .mod-header-icon-badge {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-blue);
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
-  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);
+  font-size: 20px;
+  box-shadow: none;
   flex-shrink: 0;
 }
 
-/* Temas de cores para ícones de cabeçalho */
-.mod-header-icon-badge.badge-blue {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);
-}
-
-.mod-header-icon-badge.badge-emerald {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  box-shadow: 0 8px 16px rgba(5, 150, 105, 0.3);
-}
-
-.mod-header-icon-badge.badge-red {
-  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
-  box-shadow: 0 8px 16px rgba(220, 38, 38, 0.3);
-}
-
-.mod-header-icon-badge.badge-purple {
-  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
-  box-shadow: 0 8px 16px rgba(124, 58, 237, 0.3);
-}
-
-.mod-header-icon-badge.badge-amber {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  box-shadow: 0 8px 16px rgba(217, 119, 6, 0.3);
-}
-
-.mod-header-icon-badge.badge-teal {
-  background: linear-gradient(135deg, #14b8a6 0%, #0f766e 100%);
-  box-shadow: 0 8px 16px rgba(20, 184, 166, 0.3);
-}
-
-.mod-header-icon-badge.badge-indigo {
-  background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
-  box-shadow: 0 8px 16px rgba(99, 102, 241, 0.3);
-}
+.mod-header-icon-badge.badge-blue    { background: var(--color-accent-blue) !important; }
+.mod-header-icon-badge.badge-emerald { background: #16A34A !important; }
+.mod-header-icon-badge.badge-red     { background: #DC2626 !important; }
+.mod-header-icon-badge.badge-purple  { background: #7C3AED !important; }
+.mod-header-icon-badge.badge-amber   { background: #EA580C !important; }
+.mod-header-icon-badge.badge-teal    { background: #0F766E !important; }
+.mod-header-icon-badge.badge-indigo  { background: #4338CA !important; }
 
 /* Correção de colisão: badge-blue/red/purple/green/yellow também são CHIPS DE
    STATUS (regras acima com !important, fundo pastel e font-size 11px). No
-   cabeçalho o ícone precisa ficar grande, arredondado e com gradiente vivo —
-   estas regras vencem por especificidade (0,2,0) + !important, sem mexer nos
-   chips de status usados no resto do sistema. */
+   cabeçalho o ícone precisa ficar grande e chapado — estas regras vencem por
+   especificidade (0,2,0) + !important, sem mexer nos chips de status usados
+   no resto do sistema. */
 .mod-header-icon-badge.badge-blue,
 .mod-header-icon-badge.badge-red,
 .mod-header-icon-badge.badge-purple,
 .mod-header-icon-badge.badge-green,
 .mod-header-icon-badge.badge-yellow {
   padding: 0 !important;
-  border-radius: 14px !important;
-  font-size: 22px !important;
+  border-radius: var(--radius-md) !important;
+  font-size: 20px !important;
   text-transform: none !important;
   color: #ffffff !important;
+  box-shadow: none !important;
 }
-.mod-header-icon-badge.badge-blue   { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important; box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3) !important; }
-.mod-header-icon-badge.badge-red    { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%) !important; box-shadow: 0 8px 16px rgba(220, 38, 38, 0.3) !important; }
-.mod-header-icon-badge.badge-purple { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%) !important; box-shadow: 0 8px 16px rgba(124, 58, 237, 0.3) !important; }
-.mod-header-icon-badge.badge-green  { background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important; box-shadow: 0 8px 16px rgba(5, 150, 105, 0.3) !important; }
-.mod-header-icon-badge.badge-yellow { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important; box-shadow: 0 8px 16px rgba(217, 119, 6, 0.3) !important; }
+.mod-header-icon-badge.badge-blue   { background: var(--color-accent-blue) !important; }
+.mod-header-icon-badge.badge-red    { background: #DC2626 !important; }
+.mod-header-icon-badge.badge-purple { background: #7C3AED !important; }
+.mod-header-icon-badge.badge-green  { background: #16A34A !important; }
+.mod-header-icon-badge.badge-yellow { background: #EA580C !important; }
 
 .mod-header-title {
   margin: 0 !important;
-  font-family: 'Outfit', 'Inter', sans-serif !important;
-  font-size: 22px !important;
-  font-weight: 800 !important;
-  color: #ffffff !important;
-  letter-spacing: -0.5px !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 20px !important;
+  font-weight: 500 !important;
+  color: var(--color-text-title) !important;
+  letter-spacing: -0.02em !important;
 }
 
 .mod-header-subtitle {
   margin: 4px 0 0 0 !important;
   font-size: 13.5px !important;
-  color: #94a3b8 !important;
+  color: var(--color-text-muted) !important;
   font-weight: 400 !important;
   line-height: 1.4 !important;
   font-family: 'Inter', sans-serif !important;
@@ -653,30 +571,29 @@ textarea:focus {
   flex-wrap: wrap;
 }
 
-/* Botões Padronizados dos Módulos */
+/* Botões padronizados dos módulos */
 .mod-btn-primary,
 .btn-primary-red {
   display: inline-flex !important;
   align-items: center !important;
   gap: 8px !important;
-  padding: 11px 20px !important;
-  border-radius: 10px !important;
-  background: linear-gradient(135deg, #d40203 0%, #9f0102 100%) !important;
+  padding: 10px 18px !important;
+  border-radius: var(--radius-md) !important;
+  background: var(--color-primary) !important;
   color: #ffffff !important;
-  font-weight: 700 !important;
+  font-weight: 500 !important;
   font-size: 13px !important;
   border: none !important;
   cursor: pointer !important;
-  box-shadow: 0 4px 14px rgba(212, 2, 3, 0.35) !important;
-  transition: all 0.2s ease !important;
+  box-shadow: var(--shadow-premium) !important;
+  transition: background 0.15s ease !important;
   text-decoration: none !important;
 }
 
 .mod-btn-primary:hover,
 .btn-primary-red:hover {
-  transform: translateY(-2px) !important;
-  box-shadow: 0 6px 18px rgba(212, 2, 3, 0.45) !important;
-  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%) !important;
+  transform: none !important;
+  background: var(--color-primary-dark) !important;
   color: #ffffff !important;
 }
 
@@ -684,25 +601,25 @@ textarea:focus {
   display: inline-flex !important;
   align-items: center !important;
   gap: 8px !important;
-  padding: 10px 18px !important;
-  border-radius: 10px !important;
-  background: rgba(255, 255, 255, 0.12) !important;
-  color: #ffffff !important;
-  font-weight: 600 !important;
+  padding: 9px 16px !important;
+  border-radius: var(--radius-md) !important;
+  background: transparent !important;
+  color: var(--color-text-title) !important;
+  font-weight: 500 !important;
   font-size: 13px !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border: 1px solid var(--color-glass-border) !important;
   cursor: pointer !important;
-  transition: all 0.2s ease !important;
+  transition: background 0.15s ease, border-color 0.15s ease !important;
   text-decoration: none !important;
-  -webkit-backdrop-filter: blur(4px) !important;
-  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 .mod-btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.22) !important;
-  border-color: rgba(255, 255, 255, 0.4) !important;
-  transform: translateY(-1px) !important;
-  color: #ffffff !important;
+  background: var(--color-paper-mist) !important;
+  border-color: #D4D4D4 !important;
+  transform: none !important;
+  color: var(--color-text-title) !important;
 }
 
 .mod-btn-secondary-light {
@@ -710,32 +627,32 @@ textarea:focus {
   align-items: center !important;
   gap: 8px !important;
   padding: 9px 16px !important;
-  border-radius: 10px !important;
+  border-radius: var(--radius-md) !important;
   background: #ffffff !important;
-  color: #334155 !important;
-  font-weight: 600 !important;
+  color: var(--color-text-main) !important;
+  font-weight: 500 !important;
   font-size: 13px !important;
-  border: 1px solid #cbd5e1 !important;
+  border: 1px solid var(--color-glass-border) !important;
   cursor: pointer !important;
-  transition: all 0.2s ease !important;
-  box-shadow: 0 1px 3px rgba(15,23,42,0.05) !important;
+  transition: background 0.15s ease, border-color 0.15s ease !important;
+  box-shadow: none !important;
 }
 
 .mod-btn-secondary-light:hover {
-  background: #f8fafc !important;
-  border-color: #94a3b8 !important;
-  color: #0f172a !important;
-  transform: translateY(-1px) !important;
+  background: var(--color-paper-mist) !important;
+  border-color: #D4D4D4 !important;
+  color: var(--color-text-title) !important;
+  transform: none !important;
 }
 
-/* Categorias do Menu Lateral */
+/* Categorias do menu lateral */
 .sidebar-category-title {
   font-size: 10px !important;
-  font-weight: 800 !important;
+  font-weight: 600 !important;
   text-transform: uppercase !important;
-  letter-spacing: 1px !important;
-  color: #64748b !important;
-  padding: 16px 16px 6px 16px !important;
+  letter-spacing: 0.06em !important;
+  color: #737373 !important;
+  padding: 16px 14px 6px 14px !important;
   border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
   margin-top: 8px !important;
 }
@@ -747,7 +664,7 @@ textarea:focus {
 }
 
 .sidebar-nav ul li.nav-item a {
-  transition: all 0.2s ease !important;
+  transition: background 0.15s ease, color 0.15s ease !important;
 }
 
 .sidebar-nav ul li.nav-item a i {
@@ -756,4 +673,3 @@ textarea:focus {
   margin-right: 8px !important;
   font-size: 14px !important;
 }
-
