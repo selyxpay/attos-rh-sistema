@@ -12245,6 +12245,16 @@ let _ffOcrCarregando = null;
 
 function _ffTemOcr() { return typeof Tesseract !== 'undefined' && Tesseract && Tesseract.createWorker; }
 
+// NADA aqui pode esperar para sempre. Sem prazo, um download travado deixa a
+// tela em "Processando..." sem fim, e a pessoa não sabe se espera ou desiste.
+function _ffComPrazo(promessa, ms, mensagem) {
+  let relogio;
+  return Promise.race([
+    promessa,
+    new Promise((_, rejeita) => { relogio = setTimeout(() => rejeita(new Error(mensagem)), ms); })
+  ]).finally(() => clearTimeout(relogio));
+}
+
 function _ffCarregarOcr() {
   if (_ffTemOcr()) return Promise.resolve(true);
   if (_ffOcrCarregando) return _ffOcrCarregando;
@@ -12257,7 +12267,10 @@ function _ffCarregarOcr() {
     s.onerror = () => { _ffOcrCarregando = null; resolve(false); };
     document.head.appendChild(s);
   });
-  return _ffOcrCarregando;
+  // 40s para o script chegar. Se a internet estiver ruim, é melhor avisar do
+  // que deixar a tela parada.
+  return _ffComPrazo(_ffOcrCarregando, 40000, 'O leitor de imagem demorou demais para carregar.')
+    .catch(() => { _ffOcrCarregando = null; return false; });
 }
 
 // Lê as letras das imagens das páginas. `aviso` recebe o texto de andamento.
@@ -12271,7 +12284,12 @@ async function _ffLerPdfPorImagem(file, aviso) {
   const paginas = doc.numPages;
 
   // 'por' = português. O dicionário desce uma vez e fica no cache do navegador.
-  const worker = await Tesseract.createWorker('por');
+  // Na PRIMEIRA vez são alguns MB: por isso o prazo aqui é mais folgado.
+  if (aviso) aviso('Preparando o leitor de imagem (só na primeira vez, pode levar 1 minuto)...');
+  const worker = await _ffComPrazo(
+    Tesseract.createWorker('por'), 120000,
+    'O dicionário do leitor de imagem demorou demais para baixar. Tente de novo com uma internet melhor.');
+
   let texto = '';
   try {
     for (let p = 1; p <= paginas; p++) {
@@ -12284,7 +12302,10 @@ async function _ffLerPdfPorImagem(file, aviso) {
       canvas.width = Math.floor(viewport.width);
       canvas.height = Math.floor(viewport.height);
       await pagina.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-      const r = await worker.recognize(canvas);
+      // 90s por página. Página de bancária leva 10 a 20s num computador comum;
+      // se passar disso, alguma coisa travou e é melhor dizer do que esperar.
+      const r = await _ffComPrazo(worker.recognize(canvas), 90000,
+        `A leitura da página ${p} passou de 90 segundos e foi interrompida.`);
       texto += ((r && r.data && r.data.text) || '') + '\n';
       canvas.width = canvas.height = 0;   // devolve a memória na hora
     }
@@ -14934,8 +14955,14 @@ async function criarFluxoFinanceiro() {
       let lidoPorImagem = false;
 
       // Não achou ninguém? Antes de desistir, verifica se o PDF tem texto.
-      // Se não tem, é digitalizado — aí lê pela imagem, com as MESMAS regras.
-      if (!analise.linhas.length && letras < 200) {
+      // Se não tem, é digitalizado — aí dá para ler pela imagem, com as MESMAS
+      // regras. Mas isso é LENTO (segundos por página) e por isso NÃO acontece
+      // sozinho: quem está esperando decide se vale a pena. Assim o caminho
+      // normal — que é a esmagadora maioria — continua tão rápido quanto era.
+      if (!analise.linhas.length && letras < 200 &&
+          confirm(`"${f.name}" é um PDF digitalizado (imagem), por isso não tem texto para ler.\n\n` +
+                  `Posso tentar ler as letras da imagem. É mais devagar: alguns segundos por página, ` +
+                  `e na primeira vez baixa o leitor.\n\nQuer que eu tente?`)) {
         try {
           const porImagem = await _ffLerPdfPorImagem(f, msg => { if (txt) txt.textContent = msg; });
           const analiseImg = _ffAnalisarTexto(porImagem.texto);
@@ -14950,15 +14977,18 @@ async function criarFluxoFinanceiro() {
       // Continua sem ninguém: diz POR QUE, em vez de criar uma ficha vazia.
       if (!analise.linhas.length) {
         const motivo = letras < 200
-          ? `"${f.name}" é um PDF digitalizado (imagem) e não consegui ler as letras dele.\n\n` +
-            `O que costuma resolver:\n` +
-            `• peça o arquivo original do sistema de folha, em vez do escaneado;\n` +
-            `• se for escaneado mesmo, escaneie em preto e branco e com boa nitidez.`
+          ? `"${f.name}" é um PDF digitalizado (imagem), sem texto dentro.\n\n` +
+            `O que resolve de vez:\n` +
+            `• peça o arquivo ORIGINAL do sistema de folha, em vez do escaneado —\n` +
+            `  ele lê na hora e sem erro;\n` +
+            `• se só existir escaneado, escaneie em preto e branco e nítido, e\n` +
+            `  aceite a leitura por imagem quando o sistema perguntar.`
           : `"${f.name}" tem texto, mas não reconheci o formato da relação.\n\n` +
             `Primeiras linhas que li:\n` +
             texto.split('\n').filter(l => l.trim()).slice(0, 6).join('\n');
-        alert('NÃO consegui ler este arquivo.\n\n' + motivo);
-        throw new Error('Arquivo sem linhas reconhecidas: ' + f.name);
+        // Um erro só, com o motivo. A ficha NÃO é criada de propósito: melhor
+        // não criar do que criar faltando gente — isso aqui é pagamento.
+        throw new Error(motivo);
       }
 
       paginasTotal += paginas;
@@ -15017,6 +15047,11 @@ async function criarFluxoFinanceiro() {
 
     if (txt) txt.textContent = 'Salvando no servidor...';
     if (barra) barra.style.width = '95%';
+    // Esta é a etapa mais demorada: os PDFs sobem para o servidor e o estado é
+    // gravado. Sem aviso, a tela parece travada justamente aqui — e a pessoa
+    // fecha no meio achando que deu errado.
+    if (txt) txt.textContent = 'Enviando os arquivos e salvando no servidor... (não feche esta janela)';
+    if (barra) barra.style.width = '90%';
     if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
       await RTCloud.salvarAgora(state);
     } else { saveState(); }
@@ -15057,7 +15092,8 @@ async function criarFluxoFinanceiro() {
       `\n\nVALIDAÇÃO DOS TOTAIS:\n${resumoCheque}` +
       `\n\nConfira a tabela e clique em "Enviar para Aprovação".`);
   } catch (e) {
-    alert('Não foi possível processar os PDFs.\n\nMotivo: ' + (e.message || e));
+    console.error('[FF] falha ao criar o fluxo:', e);
+    alert('NÃO consegui criar o fluxo — nada foi salvo.\n\n' + (e.message || e));
   } finally {
     if (btn) btn.disabled = false;
     if (proc) proc.style.display = 'none';
