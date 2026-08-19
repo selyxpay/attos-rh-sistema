@@ -94,10 +94,13 @@ const SECURITY_HEADERS = {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
     "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com",
     "img-src 'self' data: blob: https://images.unsplash.com https://ui-avatars.com https://api.qrserver.com",
-    // O OCR (Tesseract) baixa o motor e o dicionário de português do CDN e roda
-    // num worker criado a partir de um blob. Sem estas duas linhas o navegador
-    // bloqueia, e a leitura de bancária digitalizada não acontece.
-    "connect-src 'self' https://viacep.com.br https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
+    // O OCR (Tesseract) baixa TRÊS coisas de fora, e todas precisam estar aqui:
+    //   • o motor e o núcleo (wasm) .......... cdn.jsdelivr.net
+    //   • o DICIONÁRIO de português .......... tessdata.projectnaptha.com
+    // Faltava o terceiro. Sem ele o navegador bloqueava calado e a leitura de
+    // PDF digitalizado simplesmente não acontecia — parecia que o OCR estava
+    // desligado, quando na verdade ele nunca conseguia carregar o idioma.
+    "connect-src 'self' https://viacep.com.br https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://tessdata.projectnaptha.com https://unpkg.com",
     "worker-src 'self' blob:",
     "frame-ancestors 'none'",
     "base-uri 'self'",

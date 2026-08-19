@@ -235,11 +235,46 @@ window.RTCloud = (function () {
   }
 
   // -- Documentos: sobe cada base64 grande pro /uploads e troca pelo link -----
+  // SUBIR OS ARQUIVOS EM PARALELO.
+  // Antes cada foto/PDF subia sozinho, um esperando o outro terminar. Com uma
+  // ficha de vários anexos isso somava: 6 arquivos de 3 segundos viravam 18
+  // segundos de tela parada. Agora primeiro varremos o estado anotando TUDO que
+  // precisa subir, e depois subimos de 4 em 4.
+  //
+  // Quatro por vez, não todos: o navegador do celular engasga com dezenas de
+  // envios grandes ao mesmo tempo, e aí fica mais lento, não mais rápido.
+  const ENVIOS_JUNTOS = 4;
+
   async function processarDocumentos(state) {
     state._docsMeta = state._docsMeta || {};
-    await percorrer(state, state._docsMeta, null);
+    const tarefas = [];
+    juntarPendentes(state, null, tarefas);
+    if (!tarefas.length) return;
+
+    let proxima = 0;
+    async function trabalhar() {
+      while (proxima < tarefas.length) {
+        const t = tarefas[proxima++];
+        const url = await subirBase64(t.valor, t.campo);
+        if (url) {
+          t.dono[t.campo] = url;
+          state._docsMeta[url] = {
+            campo: t.campo,
+            pessoa: t.contexto ? t.contexto.nome : '—',
+            pessoaId: t.contexto ? t.contexto.id : null,
+            enviadoEm: Date.now()
+          };
+        }
+      }
+    }
+    const equipe = [];
+    for (let i = 0; i < Math.min(ENVIOS_JUNTOS, tarefas.length); i++) equipe.push(trabalhar());
+    await Promise.all(equipe);
   }
-  async function percorrer(obj, meta, contexto) {
+
+  // Varre o estado SEM subir nada — só anota o que precisa subir. É rápido
+  // porque não espera rede nenhuma.
+  function juntarPendentes(obj, contexto, tarefas) {
     if (obj == null || typeof obj !== 'object') return;
     if (!Array.isArray(obj)) {
       if (obj.id != null && (obj.nome || obj.nomeCompleto)) {
@@ -247,7 +282,7 @@ window.RTCloud = (function () {
       }
     }
     if (Array.isArray(obj)) {
-      for (let i = 0; i < obj.length; i++) await percorrer(obj[i], meta, contexto);
+      for (let i = 0; i < obj.length; i++) juntarPendentes(obj[i], contexto, tarefas);
       return;
     }
     const chaves = Object.keys(obj);
@@ -256,13 +291,9 @@ window.RTCloud = (function () {
       if (k === '_docsMeta') continue;
       const v = obj[k];
       if (typeof v === 'string' && v.indexOf('data:') === 0 && v.indexOf(';base64,') > 0 && v.length > 4000) {
-        const url = await subirBase64(v, k);
-        if (url) {
-          obj[k] = url;
-          meta[url] = { campo: k, pessoa: contexto ? contexto.nome : '—', pessoaId: contexto ? contexto.id : null, enviadoEm: Date.now() };
-        }
+        tarefas.push({ dono: obj, campo: k, valor: v, contexto: contexto });
       } else if (v && typeof v === 'object') {
-        await percorrer(v, meta, contexto);
+        juntarPendentes(v, contexto, tarefas);
       }
     }
   }
@@ -305,6 +336,8 @@ window.RTCloud = (function () {
     salvarAgora: salvarAgora,
     flush: flush,
     listarDocumentos: listarDocumentos,
-    horaServidor: horaServidor
+    horaServidor: horaServidor,
+    // exposta para a bateria conseguir medir o envio em paralelo
+    processarDocumentos: processarDocumentos
   };
 })();

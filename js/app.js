@@ -12456,9 +12456,14 @@ async function _ffLerPdfPorImagem(file, aviso) {
     for (let p = 1; p <= paginas; p++) {
       if (aviso) aviso(`Lendo a imagem da página ${p} de ${paginas}... (é mais devagar que PDF comum)`);
       const pagina = await doc.getPage(p);
-      // Escala 2,5: tabela bancária tem número pequeno, e em escala 1 o OCR
-      // troca 8 por 3, 0 por O. Acima disso a memória do celular sofre.
-      const viewport = pagina.getViewport({ scale: 2.5 });
+      // A escala decide TUDO no tempo do OCR: dobrar a escala quadruplica os
+      // pixels a analisar. Miramos numa largura de ~1700px, que é o suficiente
+      // para o OCR não trocar 8 por 3 numa tabela bancária, sem processar pixel
+      // à toa. Escala fixa de 2,5 fazia uma página A3 virar 4 vezes mais
+      // trabalho que uma A4 — e a espera era essa.
+      const base = pagina.getViewport({ scale: 1 });
+      const escala = Math.max(1.5, Math.min(3, 1700 / (base.width || 600)));
+      const viewport = pagina.getViewport({ scale: escala });
       const canvas = document.createElement('canvas');
       canvas.width = Math.floor(viewport.width);
       canvas.height = Math.floor(viewport.height);
