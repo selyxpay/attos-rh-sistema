@@ -12206,18 +12206,51 @@ async function _ffLerPdf(file) {
   const doc = await pdfjsLib.getDocument({ data: buf }).promise;
   const paginas = doc.numPages;      // TODAS as páginas, sempre — 1, 2 ou dezenas
   let texto = '';
+  const linhasComPosicao = [];       // para a leitura por coluna (ver abaixo)
   for (let p = 1; p <= paginas; p++) {
     const pagina = await doc.getPage(p);
     const conteudo = await pagina.getTextContent();
-    const porLinha = new Map();  // y arredondado -> [{x, str}]
-    conteudo.items.forEach(it => {
-      const y = Math.round(it.transform[5]);
-      if (!porLinha.has(y)) porLinha.set(y, []);
-      porLinha.get(y).push({ x: it.transform[4], str: it.str });
+
+    // AGRUPAR POR PROXIMIDADE, NÃO POR ALTURA ARREDONDADA.
+    // Antes era Math.round(y): dois pedaços da MESMA linha impressos a 700,4 e
+    // 700,6 viravam 700 e 701 — a linha se partia em duas e nenhuma das metades
+    // batia com o formato esperado. A pessoa simplesmente não aparecia, e o
+    // arquivo "não era lido". Isso acontece quando o gerador desenha o modelo
+    // do formulário e os dados em passadas diferentes, com um fio de diferença.
+    //
+    // Agora pedaços a menos de meia altura de letra um do outro são a mesma
+    // linha — que é como o olho humano lê a tabela.
+    const itens = conteudo.items
+      .filter(it => it && String(it.str || '').trim())
+      .map(it => ({
+        x: it.transform[4],
+        y: it.transform[5],
+        alt: Math.abs(it.height || it.transform[3] || 8),
+        str: it.str
+      }))
+      .sort((a, b) => (b.y - a.y) || (a.x - b.x));
+
+    const grupos = [];
+    itens.forEach(it => {
+      const ultimo = grupos[grupos.length - 1];
+      // Tolerância pela altura da própria letra (mínimo 2pt): fonte grande
+      // aceita mais desalinho, fonte miúda aceita menos.
+      const folga = Math.max(2, it.alt * 0.6);
+      if (ultimo && Math.abs(ultimo.y - it.y) <= folga) {
+        ultimo.pedacos.push(it);
+        // a linha fica na média das alturas, para não escorregar aos poucos
+        ultimo.y = (ultimo.y * (ultimo.pedacos.length - 1) + it.y) / ultimo.pedacos.length;
+      } else {
+        grupos.push({ y: it.y, pedacos: [it] });
+      }
     });
-    [...porLinha.keys()].sort((a, b) => b - a).forEach(y => {
-      const linha = porLinha.get(y).sort((a, b) => a.x - b.x).map(i => i.str).join(' ');
-      texto += linha + '\n';
+
+    grupos.forEach(g => {
+      const pedacos = g.pedacos.sort((a, b) => a.x - b.x);
+      texto += pedacos.map(i => i.str).join(' ') + '\n';
+      // Guarda ONDE cada pedaço estava. É isto que permite ler por coluna em
+      // vez de contar espaços — ver _ffLerPorColuna.
+      linhasComPosicao.push({ pagina: p, y: g.y, pedacos });
     });
   }
   try { doc.destroy(); } catch (e) {}
@@ -12225,7 +12258,135 @@ async function _ffLerPdf(file) {
   // impresso e fotografado) devolve praticamente nada aqui: o conteúdo dele é
   // imagem, não texto. É esse número que decide se vale acionar o OCR.
   const letras = texto.replace(/\s/g, '').length;
-  return { texto, paginas, letras };
+  return { texto, paginas, letras, linhasComPosicao };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// LEITURA POR COLUNA — o jeito certo de ler uma tabela de PDF
+// --------------------------------------------------------------------------
+// A leitura por texto corrido junta a linha inteira e depois tenta adivinhar
+// onde termina o nome e começa o CPF contando espaços. Isso quebra sozinho:
+// bastou um sobrenome "Sá" para uma pessoa sumir de uma relação de pagamento.
+//
+// Só que o PDF JÁ SABE onde cada coluna está — cada pedaço de texto vem com a
+// sua posição horizontal. Então lemos o cabeçalho uma vez ("C.P.F.", "Lote",
+// "Conta bancária", "Valor líquido"...), anotamos a posição de cada coluna, e
+// depois é só encaixar cada pedaço na coluna mais próxima.
+//
+// Assim o nome está na COLUNA DO NOME, e nenhum sobrenome, acento ou espaço a
+// mais consegue confundir o sistema.
+//
+// Quando o cabeçalho não é encontrado, devolve null — e o caminho antigo
+// assume. Nada deixa de funcionar por causa disto.
+// ══════════════════════════════════════════════════════════════════════════
+
+// Cada coluna que interessa e como reconhecê-la no cabeçalho impresso.
+const FF_COLUNAS = [
+  { campo: 'codigo',  rx: /^fl\.?\s*c[óo]digo|^c[óo]digo/i },
+  { campo: 'nome',    rx: /nome\s+do?\s+funcion/i },
+  { campo: 'cpf',     rx: /^c\.?\s*p\.?\s*f\.?/i },
+  { campo: 'demissao',rx: /demiss/i },
+  { campo: 'comp',    rx: /^comp/i },
+  { campo: 'banco',   rx: /^bco|^banco$/i },
+  { campo: 'lote',    rx: /^lote/i },
+  { campo: 'tc',      rx: /^tcta|^t\.?\s*cta/i },
+  { campo: 'agencia', rx: /^age/i },
+  { campo: 'conta',   rx: /conta\s+banc/i },
+  { campo: 'valor',   rx: /valor\s+l[íi]quido|^valor$/i },
+  { campo: 'origem',  rx: /^orig/i }
+];
+
+// Acha a linha de cabeçalho e devolve { campo: xInicial }. Sem cabeçalho
+// reconhecível, devolve null.
+function _ffMapaDeColunas(linhas) {
+  for (const linha of linhas) {
+    const juntou = linha.pedacos.map(p => p.str).join(' ');
+    // O cabeçalho da relação sempre tem estas três coisas juntas
+    if (!/nome\s+do?\s+funcion/i.test(juntou)) continue;
+    if (!/c\.?\s*p\.?\s*f\.?/i.test(juntou)) continue;
+
+    const mapa = {};
+    linha.pedacos.forEach(p => {
+      const txt = String(p.str || '').trim();
+      if (!txt) return;
+      const achou = FF_COLUNAS.find(c => c.rx.test(txt));
+      if (achou && mapa[achou.campo] === undefined) mapa[achou.campo] = p.x;
+    });
+    // Precisa ao menos de nome, CPF e valor para valer a pena
+    if (mapa.nome !== undefined && mapa.cpf !== undefined && mapa.valor !== undefined) {
+      return { mapa, y: linha.y, pagina: linha.pagina };
+    }
+  }
+  return null;
+}
+
+// Distribui os pedaços de uma linha nas colunas do mapa.
+function _ffEncaixarNasColunas(pedacos, mapa) {
+  const campos = Object.keys(mapa).sort((a, b) => mapa[a] - mapa[b]);
+  const saida = {};
+  campos.forEach(c => { saida[c] = []; });
+  pedacos.forEach(p => {
+    const txt = String(p.str || '').trim();
+    if (!txt) return;
+    // A coluna deste pedaço é a última cujo início fica à esquerda dele.
+    // Uma folga de 6pt cobre número que imprime encostado no título da coluna.
+    let alvo = campos[0];
+    for (const c of campos) { if (p.x >= mapa[c] - 6) alvo = c; else break; }
+    saida[alvo].push(txt);
+  });
+  const texto = {};
+  campos.forEach(c => { texto[c] = saida[c].join(' ').trim(); });
+  return texto;
+}
+
+// Lê a relação inteira pelas colunas. Devolve as linhas no MESMO formato que
+// o leitor antigo, para o resto do sistema não notar diferença nenhuma.
+function _ffLerPorColuna(linhasComPosicao) {
+  if (!Array.isArray(linhasComPosicao) || !linhasComPosicao.length) return null;
+  const cab = _ffMapaDeColunas(linhasComPosicao);
+  if (!cab) return null;
+
+  const out = [];
+  linhasComPosicao.forEach(linha => {
+    const col = _ffEncaixarNasColunas(linha.pedacos, cab.mapa);
+
+    // Uma pessoa tem CPF na coluna do CPF. Total, cabeçalho e rodapé não têm —
+    // e é só isso que precisamos verificar. Nada de adivinhar por palavra.
+    const cpfBruto = String(col.cpf || '').replace(/\s/g, '');
+    if (!/^\d{3}[.,\-]?\d{3}[.,\-]?\d{3}[.,\-]?\d{2}$/.test(cpfBruto)) return;
+
+    const nome = String(col.nome || '').replace(/[^\p{L}\s'.-]/gu, ' ').replace(/\s+/g, ' ').trim();
+    if (nome.length < 3) return;
+
+    // O valor é o último número no formato dinheiro dentro da coluna do valor.
+    const achados = [...String(col.valor || '').matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})/g)];
+    const semValor = !achados.length;
+    const valor = semValor ? 0 : _ffParseValor(achados[achados.length - 1][1]);
+
+    // Conta e agência: reaproveita a mesma leitura já usada e testada.
+    const meio = _ffParseMeioExata([col.demissao, col.comp, col.banco, col.lote,
+                                    col.tc, col.agencia, col.conta].filter(Boolean).join(' '));
+
+    out.push({
+      id: 'ffl-' + Date.now() + '-' + out.length + '-' + Math.random().toString(36).slice(2, 5),
+      codigo: String(col.codigo || '').replace(/\D/g, ''),
+      nome,
+      cpf: _ffNormalizarCpf(cpfBruto),
+      valor,
+      origem: String(col.origem || '').trim(),
+      semValorNoPdf: semValor,
+      lidoPorColuna: true,
+      status: 'ok',
+      demissao: meio.demissao, competencia: meio.competencia,
+      banco: meio.banco || String(col.banco || '').replace(/\D/g, ''),
+      lote: meio.lote || String(col.lote || '').replace(/\D/g, ''),
+      tc: meio.tc || String(col.tc || '').trim(),
+      agencia: meio.agencia, agenciaDg: meio.agenciaDg,
+      conta: meio.conta, contaDg: meio.contaDg
+    });
+  });
+
+  return out.length ? out : null;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -14950,9 +15111,34 @@ async function criarFluxoFinanceiro() {
       const f = _ffPdfsTemp[i];
       if (txt) txt.textContent = `Lendo ${f.name} (${i + 1} de ${_ffPdfsTemp.length})...`;
       if (barra) barra.style.width = Math.round((i / _ffPdfsTemp.length) * 70) + '%';
-      let { texto, paginas, letras } = await _ffLerPdf(f);
+      let { texto, paginas, letras, linhasComPosicao } = await _ffLerPdf(f);
       let analise = _ffAnalisarTexto(texto);
       let lidoPorImagem = false;
+      let lidoPorColuna = false;
+
+      // LEITURA POR COLUNA: usa a posição real de cada coluna no PDF em vez de
+      // contar espaços. É instantânea (a informação já veio junto com o texto)
+      // e não se confunde com sobrenome, acento ou espaçamento diferente.
+      //
+      // Só entra quando encontra MAIS gente que a leitura antiga. Se achar
+      // menos, alguma coisa não bateu e o caminho testado continua valendo —
+      // melhoria que piora não é melhoria.
+      try {
+        const porColuna = _ffLerPorColuna(linhasComPosicao);
+        if (porColuna && porColuna.length >= (analise.linhas || []).length) {
+          const somaCol = porColuna.reduce((s, l) => s + Number(l.valor || 0), 0);
+          const somaTxt = (analise.linhas || []).reduce((s, l) => s + Number(l.valor || 0), 0);
+          // Se o PDF traz o total impresso, ele é o juiz: fica quem chega mais
+          // perto dele. Sem total impresso, fica quem achou mais gente.
+          const alvo = analise.totalGeral || analise.subTotal || null;
+          const melhor = alvo
+            ? Math.abs(somaCol - alvo) <= Math.abs(somaTxt - alvo)
+            : porColuna.length > (analise.linhas || []).length || somaCol >= somaTxt;
+          if (melhor) { analise = Object.assign({}, analise, { linhas: porColuna }); lidoPorColuna = true; }
+        }
+      } catch (e) {
+        console.error('[FF] leitura por coluna falhou, seguindo pelo texto:', e);
+      }
 
       // Não achou ninguém? Antes de desistir, verifica se o PDF tem texto.
       // Se não tem, é digitalizado — aí dá para ler pela imagem, com as MESMAS
@@ -15005,8 +15191,10 @@ async function criarFluxoFinanceiro() {
         nome: f.name, arquivo: base64, paginas,
         subTotal: analise.subTotal, totalGeral: analise.totalGeral,
         dataPagamentoPdf: analise.dataPagamentoPdf, relacaoNumero: analise.relacaoNumero,
-        modelo: (analise.modelo || 'Genérico') + (lidoPorImagem ? ' · lido por imagem' : ''),
-        lidoPorImagem: lidoPorImagem
+        modelo: (analise.modelo || 'Genérico') +
+                (lidoPorColuna ? ' · por coluna' : '') +
+                (lidoPorImagem ? ' · lido por imagem' : ''),
+        lidoPorImagem: lidoPorImagem, lidoPorColuna: lidoPorColuna
       });
     }
 
