@@ -12221,7 +12221,110 @@ async function _ffLerPdf(file) {
     });
   }
   try { doc.destroy(); } catch (e) {}
-  return { texto, paginas };
+  // Quantos caracteres "de verdade" saíram. PDF digitalizado (escaneado, ou
+  // impresso e fotografado) devolve praticamente nada aqui: o conteúdo dele é
+  // imagem, não texto. É esse número que decide se vale acionar o OCR.
+  const letras = texto.replace(/\s/g, '').length;
+  return { texto, paginas, letras };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// LEITURA POR IMAGEM (OCR) — só para PDF que não tem texto dentro
+// --------------------------------------------------------------------------
+// Bancária impressa e escaneada, ou print de tela salvo como PDF, não tem
+// camada de texto: o pdf.js não acha nada porque não há nada para achar. Aqui
+// desenhamos cada página numa tela e lemos as letras da imagem.
+//
+// REGRA: isto NUNCA substitui a leitura normal. Só roda quando a leitura
+// normal voltou vazia. O que funciona hoje segue exatamente igual — e o texto
+// que sai do OCR passa pelo MESMO _ffAnalisarTexto, com as mesmas regras de
+// validação, para não existir "dois jeitos de ler" que divergem entre si.
+// ══════════════════════════════════════════════════════════════════════════
+const FF_OCR_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+let _ffOcrCarregando = null;
+
+function _ffTemOcr() { return typeof Tesseract !== 'undefined' && Tesseract && Tesseract.createWorker; }
+
+function _ffCarregarOcr() {
+  if (_ffTemOcr()) return Promise.resolve(true);
+  if (_ffOcrCarregando) return _ffOcrCarregando;
+  _ffOcrCarregando = new Promise(resolve => {
+    const s = document.createElement('script');
+    s.src = FF_OCR_URL;
+    s.crossOrigin = 'anonymous';
+    s.referrerPolicy = 'no-referrer';
+    s.onload = () => resolve(_ffTemOcr());
+    s.onerror = () => { _ffOcrCarregando = null; resolve(false); };
+    document.head.appendChild(s);
+  });
+  return _ffOcrCarregando;
+}
+
+// Lê as letras das imagens das páginas. `aviso` recebe o texto de andamento.
+async function _ffLerPdfPorImagem(file, aviso) {
+  if (aviso) aviso('Este PDF é uma imagem. Carregando o leitor de imagem...');
+  const temOcr = await _ffCarregarOcr();
+  if (!temOcr) throw new Error('Não consegui carregar o leitor de imagem. Confira a internet e tente de novo.');
+
+  const buf = await file.arrayBuffer();
+  const doc = await pdfjsLib.getDocument({ data: buf }).promise;
+  const paginas = doc.numPages;
+
+  // 'por' = português. O dicionário desce uma vez e fica no cache do navegador.
+  const worker = await Tesseract.createWorker('por');
+  let texto = '';
+  try {
+    for (let p = 1; p <= paginas; p++) {
+      if (aviso) aviso(`Lendo a imagem da página ${p} de ${paginas}... (é mais devagar que PDF comum)`);
+      const pagina = await doc.getPage(p);
+      // Escala 2,5: tabela bancária tem número pequeno, e em escala 1 o OCR
+      // troca 8 por 3, 0 por O. Acima disso a memória do celular sofre.
+      const viewport = pagina.getViewport({ scale: 2.5 });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      await pagina.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      const r = await worker.recognize(canvas);
+      texto += ((r && r.data && r.data.text) || '') + '\n';
+      canvas.width = canvas.height = 0;   // devolve a memória na hora
+    }
+  } finally {
+    try { await worker.terminate(); } catch (e) {}
+    try { doc.destroy(); } catch (e) {}
+  }
+  return { texto: _ffArrumarTextoOcr(texto), paginas, letras: texto.replace(/\s/g, '').length };
+}
+
+// O OCR erra de um jeito previsível em tabela bancária. Estas trocas são só
+// as SEGURAS — as que não podem mudar o sentido de um número:
+//   • "l" e "I" no meio de dígitos é 1;  "O" e "o" entre dígitos é 0.
+//   • ponto que virou espaço no valor ("1 234,56") volta a juntar.
+// Nada de adivinhar dígito por semelhança: se ficou ilegível, é melhor a
+// conferência contra o total do PDF acusar do que o sistema inventar valor.
+function _ffArrumarTextoOcr(t) {
+  return String(t || '')
+    .split('\n')
+    .map(l => l
+      // Bloco de 4+ caracteres feito de dígitos e das letras que o OCR troca
+      // por dígito (O/o por 0, l/I por 1). Só corrige quando a MAIORIA já é
+      // dígito — assim "CC", "PX" e nomes ficam intactos, e "1244Ol" vira
+      // "1244 01" mesmo com os dois erros colados, que a troca letra a letra
+      // não pegava (ela exigia dígito dos dois lados).
+      .replace(/[\dOolI]{4,}/g, bloco => {
+        const digitos = (bloco.match(/\d/g) || []).length;
+        if (digitos < bloco.length / 2) return bloco;
+        return bloco.replace(/[Oo]/g, '0').replace(/[lI]/g, '1');
+      })
+      // NÃO tentamos recuperar o ponto do milhar ("1 234,56" -> "1.234,56").
+      // Parece inofensivo e não é: na relação bancária o dígito da conta fica
+      // logo antes do valor, então "...124401 9 112,00" virava "9.112,00" e o
+      // sistema INVENTAVA R$ 9.112,00 no lugar de R$ 112,00. Valor errado para
+      // mais é o pior defeito possível aqui. Se o milhar se perder, a conferência
+      // contra o Total Geral do PDF acusa — e alguém confere. Melhor assim.
+      .replace(/[ \t]+/g, ' ')
+      .trim())
+    .filter(l => l)
+    .join('\n');
 }
 
 // CPF em qualquer formato ("578.533.588.30", "578.533.588-30", "57853358830")
@@ -14826,17 +14929,54 @@ async function criarFluxoFinanceiro() {
       const f = _ffPdfsTemp[i];
       if (txt) txt.textContent = `Lendo ${f.name} (${i + 1} de ${_ffPdfsTemp.length})...`;
       if (barra) barra.style.width = Math.round((i / _ffPdfsTemp.length) * 70) + '%';
-      const { texto, paginas } = await _ffLerPdf(f);
+      let { texto, paginas, letras } = await _ffLerPdf(f);
+      let analise = _ffAnalisarTexto(texto);
+      let lidoPorImagem = false;
+
+      // Não achou ninguém? Antes de desistir, verifica se o PDF tem texto.
+      // Se não tem, é digitalizado — aí lê pela imagem, com as MESMAS regras.
+      if (!analise.linhas.length && letras < 200) {
+        try {
+          const porImagem = await _ffLerPdfPorImagem(f, msg => { if (txt) txt.textContent = msg; });
+          const analiseImg = _ffAnalisarTexto(porImagem.texto);
+          if (analiseImg.linhas.length) {
+            texto = porImagem.texto; analise = analiseImg; lidoPorImagem = true;
+          }
+        } catch (e) {
+          console.error('[FF] leitura por imagem falhou:', e);
+        }
+      }
+
+      // Continua sem ninguém: diz POR QUE, em vez de criar uma ficha vazia.
+      if (!analise.linhas.length) {
+        const motivo = letras < 200
+          ? `"${f.name}" é um PDF digitalizado (imagem) e não consegui ler as letras dele.\n\n` +
+            `O que costuma resolver:\n` +
+            `• peça o arquivo original do sistema de folha, em vez do escaneado;\n` +
+            `• se for escaneado mesmo, escaneie em preto e branco e com boa nitidez.`
+          : `"${f.name}" tem texto, mas não reconheci o formato da relação.\n\n` +
+            `Primeiras linhas que li:\n` +
+            texto.split('\n').filter(l => l.trim()).slice(0, 6).join('\n');
+        alert('NÃO consegui ler este arquivo.\n\n' + motivo);
+        throw new Error('Arquivo sem linhas reconhecidas: ' + f.name);
+      }
+
       paginasTotal += paginas;
-      const analise = _ffAnalisarTexto(texto);
-      analise.linhas.forEach(l => { l.arquivo = f.name; linhas.push(l); });
+      analise.linhas.forEach(l => {
+        l.arquivo = f.name;
+        // Marca de onde veio: linha lida por imagem merece um olhar humano,
+        // porque OCR erra de vez em quando e a conferência precisa saber disso.
+        if (lidoPorImagem) { l.lidoPorImagem = true; l.status = 'conferir'; }
+        linhas.push(l);
+      });
       // guarda o PDF (vira link /uploads/.. na sincronização) + os totais impressos nele
       const base64 = await fileToBase64(f);
       arquivos.push({
         nome: f.name, arquivo: base64, paginas,
         subTotal: analise.subTotal, totalGeral: analise.totalGeral,
         dataPagamentoPdf: analise.dataPagamentoPdf, relacaoNumero: analise.relacaoNumero,
-        modelo: analise.modelo || 'Genérico'
+        modelo: (analise.modelo || 'Genérico') + (lidoPorImagem ? ' · lido por imagem' : ''),
+        lidoPorImagem: lidoPorImagem
       });
     }
 
