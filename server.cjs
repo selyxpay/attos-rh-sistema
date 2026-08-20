@@ -2130,7 +2130,10 @@ http.createServer(function (req, res) {
   // Sem login, o visitante recebe SÓ a página de login — o "esqueleto" do app e as
   // senhas-semente do data.js NEM chegam ao navegador (inspecionar/Ctrl+U não revela nada).
   if (rel === '/index.html' && !autenticado) rel = '/login.html';
-  if ((rel === '/js/app.js' || rel === '/js/data.js' || rel === '/js/whatsapp.js') && !autenticado) {
+  // A tabela de precos (custo pago a clinica x repasse cobrado do cliente) e
+  // informacao comercial da empresa: so vai para quem tem sessao valida.
+  if ((rel === '/js/app.js' || rel === '/js/data.js' || rel === '/js/whatsapp.js' ||
+       rel === '/precificacao-base.json') && !autenticado) {
     res.writeHead(404, Object.assign({ 'Content-Type': 'text/plain' }, SECURITY_HEADERS));
     res.end('404 Not Found');
     return;

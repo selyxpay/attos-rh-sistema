@@ -269,6 +269,11 @@ function isAbaAutorizada(abaId) {
   if (abaId === 'whatsapp-qr') return ehMestre(loggedUser.login)
     || loggedUser.departamento === 'administracao'
     || hasPermission('whatsapp', 'aprovar');
+  // Margem (custo × repasse): é preço de venda e custo de fornecedor. Fica com
+  // quem decide dinheiro — administração, financeiro e a diretoria.
+  if (abaId === 'margem') return ehMestre(loggedUser.login)
+    || ['administracao', 'financeiro', 'gestao'].includes(loggedUser.departamento)
+    || hasPermission('comissao', 'visualizar');
   // Exame Médico: clínica (anexa o laudo online), seleção (envia o candidato),
   // DP (anexa a foto da ficha nos exames presenciais) e administração.
   // Também vale a permissão granular marcada no cadastro do funcionário.
@@ -740,7 +745,8 @@ function garantirEstruturasBase() {
   if (!state) return false;
   let mudou = false;
   ['candidatos', 'bancoTalentos', 'vagas', 'empresas', 'funcionarios', 'recrutadores',
-   'contratacoes', 'logs', 'equipamentos', 'examesMedicos', 'fluxosFinanceiros'].forEach(k => {
+   'contratacoes', 'logs', 'equipamentos', 'examesMedicos', 'fluxosFinanceiros',
+   'precificacao'].forEach(k => {
     if (!Array.isArray(state[k])) { state[k] = []; mudou = true; }
 
     // ── LIXO NA LISTA DERRUBA A TELA INTEIRA ──────────────────────────────
@@ -1765,6 +1771,9 @@ function _renderCurrentAbaInterno() {
       break;
     case 'whatsapp-qr':
       if (typeof renderWhatsappQr === 'function') renderWhatsappQr();
+      break;
+    case 'margem':
+      if (typeof renderMargem === 'function') renderMargem();
       break;
   }
 }
@@ -17632,6 +17641,863 @@ window.visualizarDocumentoExame = visualizarDocumentoExame;
 
 
 
+// ══════════════════════════════════════════════════════════════════════════
+// MARGEM — o que se paga à clínica × o que se repassa ao cliente
+// --------------------------------------------------------------------------
+// Substitui a planilha "CUSTO X REPASSE ASO". Cada linha é um exame (ou um
+// pacote fechado) para um cliente numa clínica, com o custo e o repasse.
+// A margem NUNCA é guardada: é sempre calculada na hora, para não existir
+// número gravado que discorde da conta.
+//
+// O que o painel vigia sozinho, porque é onde se perde dinheiro sem perceber:
+//   • repasse MENOR que o custo  -> prejuízo em cada exame feito
+//   • repasse IGUAL ao custo     -> trabalho sem ganho
+//   • repasse não definido       -> está atendendo sem preço combinado
+// ══════════════════════════════════════════════════════════════════════════
 
 
+// Escapa texto que vai para dentro do HTML. O nome de um cliente pode ter
+// & ou aspas, e sem isto a tabela quebra na primeira empresa "J & M".
+function _mgEsc(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+let _mgFiltro = { busca: '', bloco: '', situacao: '' };
+let _mgEditando = null;
+
+function _mgLista() {
+  if (!Array.isArray(state.precificacao)) state.precificacao = [];
+  return state.precificacao;
+}
+function _mgNum(v) { const n = Number(v); return isFinite(n) ? n : 0; }
+function _mgMargem(i) { return _mgNum(i && i.repasse) - _mgNum(i && i.pago); }
+function _mgPerc(i) {
+  const p = _mgNum(i && i.pago);
+  if (!p) return null;                       // sem custo não há percentual
+  return (_mgMargem(i) / p) * 100;
+}
+function _mgMoeda(v) {
+  return 'R$ ' + _mgNum(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Situação de um item — é isto que pinta a linha e alimenta os cartões.
+function _mgSituacao(i) {
+  if (!_mgNum(i.repasse)) return { chave: 'sem-repasse', txt: 'Sem repasse', cor: '#737373' };
+  // Cobra do cliente mas nao registrou o que paga a clinica. A conta trata isso
+  // como margem CHEIA e o total fica melhor do que a realidade — por isso a
+  // linha e marcada, em vez de passar por 'com margem'.
+  if (!_mgNum(i.pago)) return { chave: 'sem-custo', txt: 'Sem custo', cor: '#CA8A04' };
+  const m = _mgMargem(i);
+  if (m < 0) return { chave: 'prejuizo', txt: 'Prejuízo', cor: '#DC2626' };
+  if (m === 0) return { chave: 'zero', txt: 'Margem zero', cor: '#EA580C' };
+  return { chave: 'ok', txt: 'Com margem', cor: '#16A34A' };
+}
+
+function _mgBlocos() {
+  return [...new Set(_mgLista().map(i => i.bloco).filter(Boolean))].sort();
+}
+
+function _mgFiltrados() {
+  const b = String(_mgFiltro.busca || '').trim().toLowerCase();
+  return _mgLista().filter(i => {
+    if (!i) return false;
+    if (_mgFiltro.bloco && i.bloco !== _mgFiltro.bloco) return false;
+    if (_mgFiltro.situacao) {
+      const s = _mgSituacao(i).chave;
+      if (_mgFiltro.situacao === 'validado' && i.situacao !== 'validado') return false;
+      if (_mgFiltro.situacao === 'aguardando' && i.situacao !== 'aguardando') return false;
+      if (['prejuizo', 'zero', 'sem-custo', 'sem-repasse', 'ok'].includes(_mgFiltro.situacao) && s !== _mgFiltro.situacao) return false;
+    }
+    if (!b) return true;
+    return [i.cliente, i.clinica, i.exame, i.bloco, i.obs]
+      .map(x => String(x || '').toLowerCase()).join(' ').includes(b);
+  });
+}
+
+function _mgTotais(lista) {
+  const t = { n: lista.length, pago: 0, repasse: 0, prejuizo: 0, zero: 0, semCusto: 0, semRepasse: 0, perdaTotal: 0 };
+  lista.forEach(i => {
+    t.pago += _mgNum(i.pago);
+    t.repasse += _mgNum(i.repasse);
+    const s = _mgSituacao(i).chave;
+    if (s === 'prejuizo') { t.prejuizo++; t.perdaTotal += _mgMargem(i); }
+    else if (s === 'zero') t.zero++;
+    else if (s === 'sem-custo') t.semCusto++;
+    else if (s === 'sem-repasse') t.semRepasse++;
+  });
+  t.margem = t.repasse - t.pago;
+  t.perc = t.pago ? (t.margem / t.pago) * 100 : 0;
+  return t;
+}
+
+function renderMargem() {
+  const cont = document.getElementById('mg-conteudo');
+  if (!cont) return;
+  const lista = _mgFiltrados();
+  const t = _mgTotais(lista);
+  const todos = _mgTotais(_mgLista());
+
+  if (!_mgLista().length) {
+    cont.innerHTML =
+      '<div class="mg-vazio">' +
+        '<i class="fa-solid fa-scale-balanced"></i>' +
+        '<h3>Nenhum preço cadastrado ainda</h3>' +
+        '<p>Traga a tabela da planilha CUSTO × REPASSE de uma vez, e depois vá ajustando por aqui.</p>' +
+        '<button class="btn btn-primary" onclick="mgImportarBase()">' +
+          '<i class="fa-solid fa-file-import"></i> Trazer a tabela da planilha</button>' +
+        '<button class="btn btn-secondary" onclick="mgEscolherArquivo()" style="margin-left:8px;">' +
+          '<i class="fa-solid fa-file-excel"></i> Importar outro Excel</button>' +
+        '<button class="btn btn-secondary" onclick="mgNovoItem()" style="margin-left:8px;">' +
+          '<i class="fa-solid fa-plus"></i> Cadastrar do zero</button>' +
+      '</div>';
+    return;
+  }
+
+  const cartao = (rotulo, valor, cor, aviso, filtro) =>
+    '<div class="mg-kpi' + (filtro ? ' mg-kpi-click' : '') + '"' +
+      (filtro ? ' onclick="mgFiltrarPor(&quot;' + filtro + '&quot;)"' : '') + '>' +
+      '<div class="mg-kpi-val" style="color:' + cor + '">' + valor + '</div>' +
+      '<div class="mg-kpi-lbl">' + rotulo + '</div>' +
+      (aviso ? '<div class="mg-kpi-sub">' + aviso + '</div>' : '') +
+    '</div>';
+
+  const rotSit = { '': 'Todas as situações', ok: 'Com margem', prejuizo: 'Em prejuízo',
+    zero: 'Margem zero', 'sem-custo': 'Sem custo informado', 'sem-repasse': 'Sem repasse',
+    validado: 'Validado com o cliente', aguardando: 'Aguardando validação' };
+
+  cont.innerHTML =
+    '<div class="mg-kpis">' +
+      cartao('Custo total', _mgMoeda(t.pago), '#171717', t.n + ' item(ns)', '') +
+      cartao('Repasse total', _mgMoeda(t.repasse), '#171717', '', '') +
+      cartao('Margem', _mgMoeda(t.margem), t.margem >= 0 ? '#16A34A' : '#DC2626',
+             (t.perc >= 0 ? '+' : '') + t.perc.toFixed(1) + '% sobre o custo', '') +
+      cartao('Em prejuízo', String(todos.prejuizo), todos.prejuizo ? '#DC2626' : '#A3A3A3',
+             todos.prejuizo ? _mgMoeda(todos.perdaTotal) + ' por rodada' : 'nenhum', 'prejuizo') +
+      cartao('Margem zero', String(todos.zero), todos.zero ? '#EA580C' : '#A3A3A3',
+             todos.zero ? 'trabalho sem ganho' : 'nenhum', 'zero') +
+      cartao('Sem custo', String(todos.semCusto), todos.semCusto ? '#CA8A04' : '#A3A3A3',
+             todos.semCusto ? 'a margem parece maior' : 'nenhum', 'sem-custo') +
+      cartao('Sem repasse', String(todos.semRepasse), todos.semRepasse ? '#737373' : '#A3A3A3',
+             todos.semRepasse ? 'preço não combinado' : 'nenhum', 'sem-repasse') +
+    '</div>' +
+
+    '<div class="mg-filtros">' +
+      '<input type="text" id="mg-busca" class="form-control" placeholder="Buscar cliente, exame ou clínica..." ' +
+        'value="' + _mgEsc(_mgFiltro.busca) + '" oninput="mgBuscar(this.value)">' +
+      '<select id="mg-bloco" class="form-control" onchange="mgTrocarBloco(this.value)">' +
+        '<option value="">Todas as tabelas</option>' +
+        _mgBlocos().map(b => '<option value="' + _mgEsc(b) + '"' +
+          (b === _mgFiltro.bloco ? ' selected' : '') + '>' + _mgEsc(b) + '</option>').join('') +
+      '</select>' +
+      '<select id="mg-situacao" class="form-control" onchange="mgTrocarSituacao(this.value)">' +
+        ['', 'ok', 'prejuizo', 'zero', 'sem-custo', 'sem-repasse', 'validado', 'aguardando'].map(v =>
+          '<option value="' + v + '"' + (v === _mgFiltro.situacao ? ' selected' : '') + '>' +
+          rotSit[v] + '</option>').join('') +
+      '</select>' +
+      (_mgFiltro.busca || _mgFiltro.bloco || _mgFiltro.situacao
+        ? '<button class="btn btn-secondary" onclick="mgLimparFiltros()">Limpar</button>' : '') +
+      '<button class="btn btn-secondary" onclick="mgEscolherArquivo()" title="Escolha um Excel do seu computador. Atualiza os preços e inclui o que faltar — não apaga nada.">' +
+        '<i class="fa-solid fa-file-import"></i> Importar Excel</button>' +
+    '</div>' +
+
+    (lista.length ? _mgTabela(lista) :
+      '<div class="mg-vazio-busca">Nada encontrado com esses filtros.</div>') +
+
+    _mgAnalises();
+}
+window.renderMargem = renderMargem;
+
+function _mgTabela(lista) {
+  const linhas = lista.map(i => {
+    const s = _mgSituacao(i);
+    const m = _mgMargem(i);
+    const p = _mgPerc(i);
+    return '<tr class="mg-linha mg-' + s.chave + '">' +
+      '<td class="mg-td-bloco">' + _mgEsc(i.bloco || '—') + '</td>' +
+      '<td>' + _mgEsc(i.cliente || '—') + '</td>' +
+      '<td>' + _mgEsc(i.clinica || '—') + '</td>' +
+      '<td>' + _mgEsc(i.exame || '—') + '</td>' +
+      '<td class="mg-num">' + _mgMoeda(i.pago) + '</td>' +
+      '<td class="mg-num">' + (_mgNum(i.repasse) ? _mgMoeda(i.repasse) : '—') + '</td>' +
+      '<td class="mg-num" style="color:' + s.cor + ';font-weight:600;">' +
+        (_mgNum(i.repasse) ? _mgMoeda(m) : '—') + '</td>' +
+      '<td class="mg-num">' + (p === null || !_mgNum(i.repasse) ? '—' :
+        (p >= 0 ? '+' : '') + p.toFixed(0) + '%') + '</td>' +
+      '<td><span class="mg-selo" style="color:' + s.cor + ';border-color:' + s.cor + '33;background:' + s.cor + '14;">' +
+        s.txt + '</span>' +
+        (i.situacao === 'validado' ? '<span class="mg-selo mg-selo-val">validado</span>' : '') +
+        (i.situacao === 'aguardando' ? '<span class="mg-selo mg-selo-agu">aguardando</span>' : '') +
+        (i.obs ? '<div class="mg-obs">' + _mgEsc(i.obs) + '</div>' : '') +
+      '</td>' +
+      '<td class="mg-acoes">' +
+        '<button class="mg-btn-icone" onclick="mgEditarItem(&quot;' + i.id + '&quot;)" title="Editar">' +
+          '<i class="fa-solid fa-pen"></i></button>' +
+        '<button class="mg-btn-icone mg-btn-excluir" onclick="mgExcluirItem(&quot;' + i.id + '&quot;)" title="Excluir">' +
+          '<i class="fa-solid fa-trash"></i></button>' +
+      '</td></tr>';
+  }).join('');
+
+  const t = _mgTotais(lista);
+  return '<div class="mg-tabela-box"><table class="mg-tabela"><thead><tr>' +
+      '<th>Tabela</th><th>Cliente</th><th>Clínica</th><th>Exame</th>' +
+      '<th class="mg-num">Custo</th><th class="mg-num">Repasse</th>' +
+      '<th class="mg-num">Margem</th><th class="mg-num">%</th><th>Situação</th><th></th>' +
+    '</tr></thead><tbody>' + linhas + '</tbody>' +
+    '<tfoot><tr>' +
+      '<td colspan="4"><b>' + lista.length + ' item(ns)</b></td>' +
+      '<td class="mg-num"><b>' + _mgMoeda(t.pago) + '</b></td>' +
+      '<td class="mg-num"><b>' + _mgMoeda(t.repasse) + '</b></td>' +
+      '<td class="mg-num"><b style="color:' + (t.margem >= 0 ? '#16A34A' : '#DC2626') + '">' +
+        _mgMoeda(t.margem) + '</b></td>' +
+      '<td class="mg-num"><b>' + (t.perc >= 0 ? '+' : '') + t.perc.toFixed(0) + '%</b></td>' +
+      '<td colspan="2"></td>' +
+    '</tr></tfoot></table></div>';
+}
+
+// ── As análises: onde está o dinheiro, e onde ele está escapando ──────────
+function _mgAnalises() {
+  const lista = _mgFiltrados();
+  if (!lista.length) return '';
+
+  const porChave = (campo) => {
+    const m = new Map();
+    lista.forEach(i => {
+      const k = String(i[campo] || '').trim() || '(não informado)';
+      if (!m.has(k)) m.set(k, { n: 0, pago: 0, repasse: 0 });
+      const g = m.get(k);
+      g.n++; g.pago += _mgNum(i.pago); g.repasse += _mgNum(i.repasse);
+    });
+    return [...m.entries()].map(([k, g]) => ({
+      nome: k, n: g.n, pago: g.pago, repasse: g.repasse, margem: g.repasse - g.pago
+    })).sort((a, b) => b.margem - a.margem);
+  };
+
+  const quadro = (titulo, dados, dica) => {
+    if (!dados.length) return '';
+    const maior = Math.max.apply(null, dados.map(d => Math.abs(d.margem)).concat([1]));
+    return '<div class="mg-analise">' +
+      '<h3>' + titulo + '</h3>' +
+      (dica ? '<p class="mg-analise-dica">' + dica + '</p>' : '') +
+      '<div class="mg-barras">' + dados.slice(0, 12).map(d =>
+        '<div class="mg-barra-linha">' +
+          '<div class="mg-barra-nome" title="' + _mgEsc(d.nome) + '">' + _mgEsc(d.nome) + '</div>' +
+          '<div class="mg-barra-trilho">' +
+            '<div class="mg-barra-fill" style="width:' + Math.round(Math.abs(d.margem) / maior * 100) + '%;' +
+              'background:' + (d.margem >= 0 ? '#16A34A' : '#DC2626') + ';"></div>' +
+          '</div>' +
+          '<div class="mg-barra-val" style="color:' + (d.margem >= 0 ? '#16A34A' : '#DC2626') + '">' +
+            _mgMoeda(d.margem) + '</div>' +
+        '</div>').join('') +
+      '</div></div>';
+  };
+
+  const clientes = porChave('cliente').filter(d => d.nome !== '(não informado)');
+  const clinicas = porChave('clinica').filter(d => d.nome !== '(não informado)');
+  const perdendo = porChave('cliente').filter(d => d.margem < 0);
+
+  return '<div class="mg-analises">' +
+    (perdendo.length ? quadro('⚠ Onde você está perdendo dinheiro', perdendo,
+      'Nestes o repasse é menor que o custo — cada exame feito sai do seu bolso.') : '') +
+    quadro('Maiores margens por cliente', clientes, 'Quanto sobra em cada cliente.') +
+    quadro('Margem por clínica', clinicas,
+      'Compare quanto cada clínica deixa. Clínica cara sem repasse maior come a margem.') +
+  '</div>';
+}
+
+// ── Filtros ───────────────────────────────────────────────────────────────
+window.mgBuscar = function (v) { _mgFiltro.busca = v; _rtComFoco(renderMargem); };
+window.mgTrocarBloco = function (v) { _mgFiltro.bloco = v; renderMargem(); };
+window.mgTrocarSituacao = function (v) { _mgFiltro.situacao = v; renderMargem(); };
+window.mgFiltrarPor = function (s) {
+  _mgFiltro.situacao = (_mgFiltro.situacao === s ? '' : s);
+  renderMargem();
+};
+window.mgLimparFiltros = function () {
+  _mgFiltro = { busca: '', bloco: '', situacao: '' };
+  renderMargem();
+};
+
+// ── Cadastro: novo item e edição ──────────────────────────────────────────
+// Um só modal serve para os dois. _mgEditando guarda o id quando é edição.
+
+function _mgCampoNum(id) {
+  const el = document.getElementById(id);
+  if (!el) return 0;
+  // Aceita "65", "65,00", "65.00" e "R$ 65,00" — o pessoal digita de todo jeito.
+  let v = String(el.value || '').replace(/[^\d,.-]/g, '').trim();
+  if (!v) return 0;
+  if (v.indexOf(',') >= 0) v = v.replace(/\./g, '').replace(',', '.');
+  const n = Number(v);
+  return isFinite(n) ? n : 0;
+}
+function _mgCampoTxt(id) {
+  const el = document.getElementById(id);
+  return el ? String(el.value || '').trim() : '';
+}
+
+function mgNovoItem() { _mgAbrirModal(null); }
+window.mgNovoItem = mgNovoItem;
+
+function mgEditarItem(id) {
+  const i = _mgLista().find(x => x && x.id === id);
+  if (!i) { alert('Item não encontrado.'); return; }
+  _mgAbrirModal(i);
+}
+window.mgEditarItem = mgEditarItem;
+
+function _mgAbrirModal(item) {
+  _mgEditando = item ? item.id : null;
+  const v = c => _mgEsc(item ? (item[c] == null ? '' : String(item[c])) : '');
+  const blocos = _mgBlocos();
+
+  const html =
+  '<div class="mg-modal-fundo" id="mg-modal" onclick="if(event.target===this)mgFecharModal()">' +
+    '<div class="mg-modal">' +
+      '<div class="mg-modal-topo">' +
+        '<h2>' + (item ? 'Editar preço' : 'Novo preço') + '</h2>' +
+        '<button class="mg-modal-x" onclick="mgFecharModal()">&times;</button>' +
+      '</div>' +
+      '<div class="mg-modal-corpo">' +
+        '<div class="mg-form-linha">' +
+          '<div class="mg-form-campo mg-col2">' +
+            '<label>Tabela / grupo</label>' +
+            '<input list="mg-datalist-blocos" id="mg-f-bloco" class="form-control" ' +
+              'placeholder="Ex.: Complementares AGIMED" value="' + v('bloco') + '">' +
+            '<datalist id="mg-datalist-blocos">' +
+              blocos.map(b => '<option value="' + _mgEsc(b) + '"></option>').join('') +
+            '</datalist>' +
+          '</div>' +
+        '</div>' +
+        '<div class="mg-form-linha">' +
+          '<div class="mg-form-campo"><label>Cliente</label>' +
+            '<input id="mg-f-cliente" class="form-control" placeholder="Ex.: MART CAJAMAR" value="' + v('cliente') + '"></div>' +
+          '<div class="mg-form-campo"><label>Clínica</label>' +
+            '<input id="mg-f-clinica" class="form-control" placeholder="Ex.: AGIMED" value="' + v('clinica') + '"></div>' +
+        '</div>' +
+        '<div class="mg-form-linha">' +
+          '<div class="mg-form-campo mg-col2"><label>Exame <span class="mg-obrig">*</span></label>' +
+            '<input id="mg-f-exame" class="form-control" placeholder="Ex.: ASO + Audiometria" value="' + v('exame') + '"></div>' +
+        '</div>' +
+        '<div class="mg-form-linha">' +
+          '<div class="mg-form-campo"><label>Custo — o que você paga à clínica</label>' +
+            '<input id="mg-f-pago" class="form-control mg-input-dinheiro" placeholder="0,00" ' +
+              'value="' + (item && item.pago ? String(item.pago).replace('.', ',') : '') + '" ' +
+              'oninput="mgPreverMargem()"></div>' +
+          '<div class="mg-form-campo"><label>Repasse — o que o cliente paga</label>' +
+            '<input id="mg-f-repasse" class="form-control mg-input-dinheiro" placeholder="0,00" ' +
+              'value="' + (item && item.repasse ? String(item.repasse).replace('.', ',') : '') + '" ' +
+              'oninput="mgPreverMargem()"></div>' +
+        '</div>' +
+        '<div class="mg-previa" id="mg-previa"></div>' +
+        '<div class="mg-form-linha">' +
+          '<div class="mg-form-campo"><label>Situação com o cliente</label>' +
+            '<select id="mg-f-situacao" class="form-control">' +
+              ['', 'validado', 'aguardando'].map(o => '<option value="' + o + '"' +
+                (item && item.situacao === o ? ' selected' : '') + '>' +
+                ({ '': '— não informado —', validado: 'Validado com o cliente',
+                   aguardando: 'Aguardando validação' })[o] + '</option>').join('') +
+            '</select></div>' +
+          '<div class="mg-form-campo"><label>Observação</label>' +
+            '<input id="mg-f-obs" class="form-control" placeholder="Ex.: pacote fechado" value="' + v('obs') + '"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="mg-modal-pe">' +
+        (item ? '<button class="btn btn-secondary mg-btn-excluir-modal" onclick="mgExcluirItem(&quot;' + item.id + '&quot;)">' +
+          '<i class="fa-solid fa-trash"></i> Excluir</button>' : '<span></span>') +
+        '<div>' +
+          '<button class="btn btn-secondary" onclick="mgFecharModal()">Cancelar</button> ' +
+          '<button class="btn btn-primary" onclick="mgSalvarItem()">' +
+            '<i class="fa-solid fa-check"></i> Salvar</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+
+  const antigo = document.getElementById('mg-modal');
+  if (antigo) antigo.remove();
+  document.body.insertAdjacentHTML('beforeend', html);
+  mgPreverMargem();
+  const foco = document.getElementById('mg-f-exame');
+  if (foco) foco.focus();
+}
+
+// Mostra a margem enquanto a pessoa digita: o erro aparece ANTES de salvar.
+function mgPreverMargem() {
+  const alvo = document.getElementById('mg-previa');
+  if (!alvo) return;
+  const pago = _mgCampoNum('mg-f-pago');
+  const repasse = _mgCampoNum('mg-f-repasse');
+  if (!pago && !repasse) { alvo.innerHTML = ''; return; }
+  const s = _mgSituacao({ pago: pago, repasse: repasse });
+  const m = repasse - pago;
+  const perc = pago ? (m / pago) * 100 : 0;
+  alvo.innerHTML =
+    '<div class="mg-previa-caixa" style="border-color:' + s.cor + '33;background:' + s.cor + '0F;">' +
+      '<div><span class="mg-previa-lbl">Margem</span>' +
+        '<span class="mg-previa-val" style="color:' + s.cor + '">' +
+        (repasse ? _mgMoeda(m) : '—') + '</span></div>' +
+      '<div><span class="mg-previa-lbl">Sobre o custo</span>' +
+        '<span class="mg-previa-val" style="color:' + s.cor + '">' +
+        (pago && repasse ? (perc >= 0 ? '+' : '') + perc.toFixed(0) + '%' : '—') + '</span></div>' +
+      '<div class="mg-previa-txt" style="color:' + s.cor + '">' +
+        (s.chave === 'prejuizo' ? 'Atenção: o repasse está abaixo do custo.' :
+         s.chave === 'zero' ? 'Repasse igual ao custo — nenhum ganho.' :
+         s.chave === 'sem-custo' ? 'Falta o custo — a margem aparece maior do que é.' :
+         s.chave === 'sem-repasse' ? 'Falta definir o repasse.' : 'Preço saudável.') +
+      '</div>' +
+    '</div>';
+}
+window.mgPreverMargem = mgPreverMargem;
+
+function mgFecharModal() {
+  const m = document.getElementById('mg-modal');
+  if (m) m.remove();
+  _mgEditando = null;
+}
+window.mgFecharModal = mgFecharModal;
+
+async function mgSalvarItem() {
+  const exame = _mgCampoTxt('mg-f-exame');
+  if (!exame) { alert('Informe pelo menos o nome do exame.'); return; }
+
+  const dados = {
+    bloco: _mgCampoTxt('mg-f-bloco') || 'Cadastrados no sistema',
+    cliente: _mgCampoTxt('mg-f-cliente'),
+    clinica: _mgCampoTxt('mg-f-clinica'),
+    exame: exame,
+    pago: _mgCampoNum('mg-f-pago'),
+    repasse: _mgCampoNum('mg-f-repasse'),
+    situacao: _mgCampoTxt('mg-f-situacao'),
+    obs: _mgCampoTxt('mg-f-obs')
+  };
+
+  const lista = _mgLista();
+  let alvo;
+  if (_mgEditando) {
+    alvo = lista.find(x => x && x.id === _mgEditando);
+    if (!alvo) { alert('Item não encontrado — talvez tenha sido excluído.'); mgFecharModal(); return; }
+    Object.assign(alvo, dados);
+    alvo.atualizadoEm = new Date().toISOString();
+    alvo.atualizadoPor = loggedUser ? loggedUser.nome : '';
+  } else {
+    alvo = Object.assign({
+      id: 'pre-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+      criadoEm: new Date().toISOString(),
+      criadoPor: loggedUser ? loggedUser.nome : ''
+    }, dados);
+    lista.push(alvo);
+  }
+
+  mgFecharModal();
+  renderMargem();
+  saveState();
+  // merge + upsertIds: grava SÓ este item. Se alguém estiver mexendo em outra
+  // aba ao mesmo tempo, o trabalho dessa pessoa não é sobrescrito.
+  if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
+    try { await RTCloud.salvarAgora(state, { merge: true, upsertIds: [alvo.id] }); }
+    catch (e) { alert('Salvei aqui, mas não consegui gravar no servidor: ' + e.message); }
+  }
+}
+window.mgSalvarItem = mgSalvarItem;
+
+async function mgExcluirItem(id) {
+  const i = _mgLista().find(x => x && x.id === id);
+  if (!i) return;
+  if (!confirm('Excluir "' + (i.exame || 'este item') + '"' +
+      (i.cliente ? ' de ' + i.cliente : '') + '?')) return;
+
+  state.precificacao = _mgLista().filter(x => x && x.id !== id);
+  mgFecharModal();
+  renderMargem();
+  saveState();
+  // Exclusão NÃO pode ir com merge: o merge junta listas e o item voltaria.
+  if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
+    try { await RTCloud.salvarAgora(state); }
+    catch (e) { alert('Excluí aqui, mas não consegui gravar no servidor: ' + e.message); }
+  }
+}
+window.mgExcluirItem = mgExcluirItem;
+
+// ── Importar a planilha CUSTO × REPASSE ───────────────────────────────────
+// Traz o arquivo precificacao-base.json (a planilha convertida). NÃO apaga
+// nada: o que já existe com o mesmo cliente+clínica+exame é ATUALIZADO no
+// preço, e o resto entra como item novo. Rodar duas vezes não duplica.
+function _mgChave(i) {
+  return [i.cliente, i.clinica, i.exame].map(x =>
+    String(x || '').trim().toUpperCase().replace(/\s+/g, ' ')).join('|');
+}
+
+async function mgImportarBase() {
+  let base;
+  try {
+    const r = await fetch('precificacao-base.json', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    base = await r.json();
+  } catch (e) {
+    alert('Não consegui ler a planilha base (precificacao-base.json): ' + e.message);
+    return;
+  }
+  if (!base || !Array.isArray(base.blocos)) { alert('O arquivo da planilha veio vazio.'); return; }
+
+  // Achata os blocos em itens. Cada linha é [cliente, exame, pago, repasse,
+  // obs, situacao, clinicaDaLinha?] — o 7º campo, quando existe, manda na
+  // clínica (é o caso dos "Repasses ASO", onde cada linha é de uma clínica).
+  const novos = [];
+  base.blocos.forEach(b => {
+    (b.itens || []).forEach(l => {
+      if (!Array.isArray(l)) return;
+      const exame = String(l[1] || '').trim();
+      if (!exame) return;
+      novos.push({
+        bloco: b.nome || 'Planilha',
+        cliente: String(l[0] || '').trim(),
+        clinica: String(l[6] || b.clinica || '').trim(),
+        exame: exame,
+        pago: _mgNum(l[2]),
+        repasse: _mgNum(l[3]),
+        obs: String(l[4] || '').trim(),
+        situacao: String(l[5] || '').trim()
+      });
+    });
+  });
+  if (!novos.length) { alert('A planilha não trouxe nenhuma linha.'); return; }
+
+  const r = await _mgMesclar(novos, base.origem || 'planilha');
+  if (!r) return;
+  alert('Planilha importada.\n\n' + r.incluidos + ' item(ns) novo(s)\n' +
+        r.atualizados + ' com preço atualizado\n' + r.iguais + ' já estavam iguais\n\n' +
+        'Nada foi apagado.');
+}
+window.mgImportarBase = mgImportarBase;
+
+// Junta uma remessa de linhas com o que já existe. É o coração das duas
+// importações (a base do sistema e o Excel que a pessoa escolhe na hora):
+// atualiza o preço do que já está cadastrado e inclui só o que falta.
+// Devolve a contagem, ou null quando não havia nada para mudar.
+async function _mgMesclar(novos, origem) {
+  const lista = _mgLista();
+  // ── A PLANILHA REPETE LINHA ─────────────────────────────────────────────
+  // BINAR aparece DUAS VEZES em "Complementares por cliente", com o mesmo
+  // exame e repasses iguais (uma delas sem o custo preenchido). Com a chave
+  // simples cliente+clínica+exame, a segunda linha engolia a primeira e o
+  // total do sistema ficava R$ 271,00 abaixo do total da planilha.
+  // Por isso cada chave guarda uma FILA: a 1ª linha casa com o 1º registro,
+  // a 2ª com o 2º. Nada se perde, e reimportar continua sem duplicar.
+  const filas = new Map();
+  lista.forEach(i => {
+    if (!i) return;
+    const k = _mgChave(i);
+    if (!filas.has(k)) filas.set(k, []);
+    filas.get(k).push(i);
+  });
+
+  let incluidos = 0, atualizados = 0, iguais = 0;
+  const tocados = [];
+  novos.forEach(n => {
+    const fila = filas.get(_mgChave(n));
+    const antigo = (fila && fila.length) ? fila.shift() : null;
+    if (antigo) {
+      if (_mgNum(antigo.pago) === n.pago && _mgNum(antigo.repasse) === n.repasse) { iguais++; return; }
+      antigo.pago = n.pago;
+      antigo.repasse = n.repasse;
+      if (n.obs && !antigo.obs) antigo.obs = n.obs;
+      if (n.situacao && !antigo.situacao) antigo.situacao = n.situacao;
+      antigo.atualizadoEm = new Date().toISOString();
+      antigo.origem = origem;
+      atualizados++;
+      tocados.push(antigo.id);
+    } else {
+      const item = Object.assign({
+        id: 'pre-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9),
+        criadoEm: new Date().toISOString(),
+        origem: origem
+      }, n);
+      lista.push(item);
+      incluidos++;
+      tocados.push(item.id);
+    }
+  });
+
+  if (!incluidos && !atualizados) {
+    alert('Tudo já estava em dia — nenhum dos ' + iguais + ' itens da planilha mudou.');
+    return null;
+  }
+
+  renderMargem();
+  saveState();
+  if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
+    try { await RTCloud.salvarAgora(state, { merge: true, upsertIds: tocados }); }
+    catch (e) { alert('Importei aqui, mas não consegui gravar no servidor: ' + e.message); }
+  }
+  return { incluidos: incluidos, atualizados: atualizados, iguais: iguais };
+}
+
+// ── Importar uma planilha de Excel escolhida na hora ──────────────────────
+// A base que veio no sistema é a foto da planilha no dia da implantação. Preço
+// muda: a pessoa exporta o Excel daqui, ajusta no Excel e traz de volta por
+// aqui — sem depender de nova publicação do sistema.
+// Aceita as MESMAS colunas que a exportação gera, e também os nomes curtos
+// ("custo", "pago", "repasse"), porque planilha antiga costuma usar esses.
+
+function _mgNormalizar(txt) {
+  return String(txt == null ? '' : txt).trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')   // tira acento
+    .replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+// Descobre em qual coluna está cada campo, pelo nome do cabeçalho.
+const MG_COLUNAS = {
+  bloco:    ['tabela', 'grupo', 'bloco'],
+  cliente:  ['cliente', 'empresa', 'tomador'],
+  clinica:  ['clinica', 'laboratorio', 'local'],
+  exame:    ['exame', 'exames', 'procedimento', 'descricao'],
+  pago:     ['custo pago a clinica', 'custo', 'pago', 'valor pago', 'custo clinica'],
+  repasse:  ['repasse cobrado do cliente', 'repasse', 'valor repassado', 'valor repasse', 'cobrado'],
+  situacao: ['validacao', 'situacao com o cliente', 'status'],
+  obs:      ['observacao', 'observacoes', 'obs']
+};
+
+function _mgAcharColunas(cabecalho) {
+  const mapa = {};
+  const cols = cabecalho.map(_mgNormalizar);
+  Object.keys(MG_COLUNAS).forEach(campo => {
+    // Primeiro o nome exato; só depois aceita "contém", para "custo" não roubar
+    // a coluna de "custo pago à clínica" quando as duas existem.
+    for (const nome of MG_COLUNAS[campo]) {
+      const i = cols.indexOf(nome);
+      if (i >= 0) { mapa[campo] = i; return; }
+    }
+    for (const nome of MG_COLUNAS[campo]) {
+      const i = cols.findIndex(c => c && c.indexOf(nome) >= 0);
+      if (i >= 0) { mapa[campo] = i; return; }
+    }
+  });
+  return mapa;
+}
+
+// A célula pode vir como número (1234.56) ou como texto ("R$ 1.234,56").
+function _mgValorCelula(v) {
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  let t = String(v == null ? '' : v).replace(/[^\d,.-]/g, '').trim();
+  if (!t) return 0;
+  if (t.indexOf(',') >= 0) t = t.replace(/\./g, '').replace(',', '.');
+  const n = Number(t);
+  return isFinite(n) ? n : 0;
+}
+
+function mgEscolherArquivo() {
+  if (typeof XLSX === 'undefined') { alert('A biblioteca de planilha não carregou. Recarregue a página.'); return; }
+  let inp = document.getElementById('mg-arquivo');
+  if (!inp) {
+    inp = document.createElement('input');
+    inp.type = 'file';
+    inp.id = 'mg-arquivo';
+    inp.accept = '.xlsx,.xls,.csv';
+    inp.style.display = 'none';
+    inp.addEventListener('change', function () {
+      const f = this.files && this.files[0];
+      this.value = '';                       // permite escolher o mesmo arquivo de novo
+      if (f) mgImportarArquivo(f);
+    });
+    document.body.appendChild(inp);
+  }
+  inp.click();
+}
+window.mgEscolherArquivo = mgEscolherArquivo;
+
+async function mgImportarArquivo(arquivo) {
+  let linhas;
+  try {
+    const buf = await arquivo.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if (!ws) throw new Error('a planilha está vazia');
+    linhas = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' });
+  } catch (e) {
+    alert('Não consegui ler "' + arquivo.name + '": ' + e.message);
+    return;
+  }
+  if (!linhas || linhas.length < 2) { alert('A planilha não tem linhas de dados.'); return; }
+
+  // O cabeçalho nem sempre é a 1ª linha (costuma ter título em cima). Procura,
+  // nas 10 primeiras, a linha que traz pelo menos exame e um dos dois valores.
+  let iCab = -1, mapa = null;
+  for (let i = 0; i < Math.min(10, linhas.length); i++) {
+    const m = _mgAcharColunas(linhas[i] || []);
+    if (m.exame != null && (m.pago != null || m.repasse != null)) { iCab = i; mapa = m; break; }
+  }
+  if (iCab < 0) {
+    alert('Não reconheci as colunas dessa planilha.\n\n' +
+          'Ela precisa ter uma linha de cabeçalho com, pelo menos, uma coluna "Exame" ' +
+          'e uma de "Custo" ou "Repasse".\n\n' +
+          'Dica: exporte o Excel por aqui, ajuste os valores nele e traga de volta — ' +
+          'aí as colunas já vêm no formato certo.');
+    return;
+  }
+
+  const pega = (l, campo) => mapa[campo] == null ? '' : String(l[mapa[campo]] == null ? '' : l[mapa[campo]]).trim();
+  const novos = [];
+  let ignoradas = 0;
+  for (let i = iCab + 1; i < linhas.length; i++) {
+    const l = linhas[i] || [];
+    const exame = pega(l, 'exame');
+    // Linha de total ("TOTAL (309 itens)") e linhas em branco não entram.
+    if (!exame || /^total\b/i.test(_mgNormalizar(exame))) { if (l.join('').trim()) ignoradas++; continue; }
+    const sit = _mgNormalizar(pega(l, 'situacao'));
+    novos.push({
+      bloco: pega(l, 'bloco') || 'Importado do Excel',
+      cliente: pega(l, 'cliente'),
+      clinica: pega(l, 'clinica'),
+      exame: exame,
+      pago: mapa.pago == null ? 0 : _mgValorCelula(l[mapa.pago]),
+      repasse: mapa.repasse == null ? 0 : _mgValorCelula(l[mapa.repasse]),
+      obs: pega(l, 'obs'),
+      situacao: sit === 'validado' ? 'validado' : (sit === 'aguardando' ? 'aguardando' : '')
+    });
+  }
+  if (!novos.length) { alert('Não achei nenhuma linha de exame nessa planilha.'); return; }
+
+  const r = await _mgMesclar(novos, arquivo.name);
+  alert('Planilha "' + arquivo.name + '" importada.\n\n' +
+        r.incluidos + ' item(ns) novo(s)\n' +
+        r.atualizados + ' com preço atualizado\n' +
+        r.iguais + ' já estavam iguais\n' +
+        (ignoradas ? ignoradas + ' linha(s) sem exame foram ignoradas\n' : '') +
+        '\nNada foi apagado.');
+}
+window.mgImportarArquivo = mgImportarArquivo;
+
+// ── Exportar em Excel ─────────────────────────────────────────────────────
+// Sai o que está na tela (com os filtros aplicados), na mesma ordem, com a
+// margem já calculada — para conferir de volta na planilha se quiser.
+function mgExportarExcel() {
+  if (typeof XLSX === 'undefined') { alert('A biblioteca de planilha não carregou. Recarregue a página.'); return; }
+  const lista = _mgFiltrados();
+  if (!lista.length) { alert('Não há nada para exportar com os filtros atuais.'); return; }
+
+  const linhas = lista.map(i => ({
+    'Tabela': i.bloco || '',
+    'Cliente': i.cliente || '',
+    'Clínica': i.clinica || '',
+    'Exame': i.exame || '',
+    'Custo (pago à clínica)': _mgNum(i.pago),
+    'Repasse (cobrado do cliente)': _mgNum(i.repasse),
+    'Margem': _mgNum(i.repasse) ? _mgMargem(i) : '',
+    '% sobre o custo': (_mgNum(i.pago) && _mgNum(i.repasse)) ? Number(_mgPerc(i).toFixed(1)) : '',
+    'Situação': _mgSituacao(i).txt,
+    'Validação': i.situacao || '',
+    'Observação': i.obs || ''
+  }));
+
+  const t = _mgTotais(lista);
+  linhas.push({});
+  linhas.push({
+    'Tabela': 'TOTAL (' + lista.length + ' itens)',
+    'Custo (pago à clínica)': Number(t.pago.toFixed(2)),
+    'Repasse (cobrado do cliente)': Number(t.repasse.toFixed(2)),
+    'Margem': Number(t.margem.toFixed(2)),
+    '% sobre o custo': Number(t.perc.toFixed(1))
+  });
+
+  const ws = XLSX.utils.json_to_sheet(linhas);
+  ws['!cols'] = [{ wch: 32 }, { wch: 26 }, { wch: 18 }, { wch: 34 }, { wch: 20 },
+                 { wch: 24 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 20 }, { wch: 28 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Custo x Repasse');
+  XLSX.writeFile(wb, 'Margem - custo x repasse - ' + _mgHoje() + '.xlsx');
+}
+window.mgExportarExcel = mgExportarExcel;
+
+function _mgHoje() {
+  const d = new Date();
+  const z = n => String(n).padStart(2, '0');
+  return z(d.getDate()) + '-' + z(d.getMonth() + 1) + '-' + d.getFullYear();
+}
+
+// ── Exportar em PDF ───────────────────────────────────────────────────────
+// Folha própria de impressão numa janela nova. Vai por aí em vez de gerar o
+// arquivo na marra porque o PDF do navegador já sai com a numeração de página
+// e o cabeçalho repetido — e a pessoa escolhe "Salvar como PDF" na hora.
+function mgExportarPdf() {
+  const lista = _mgFiltrados();
+  if (!lista.length) { alert('Não há nada para exportar com os filtros atuais.'); return; }
+  const t = _mgTotais(lista);
+
+  const filtroTxt = [
+    _mgFiltro.bloco ? 'Tabela: ' + _mgFiltro.bloco : '',
+    _mgFiltro.situacao ? 'Situação: ' + _mgFiltro.situacao : '',
+    _mgFiltro.busca ? 'Busca: "' + _mgFiltro.busca + '"' : ''
+  ].filter(Boolean).join('  •  ') || 'Todos os itens';
+
+  const linhas = lista.map(i => {
+    const s = _mgSituacao(i);
+    const p = _mgPerc(i);
+    return '<tr>' +
+      '<td>' + _mgEsc(i.cliente || '—') + '</td>' +
+      '<td>' + _mgEsc(i.clinica || '—') + '</td>' +
+      '<td>' + _mgEsc(i.exame || '—') + '</td>' +
+      '<td class="n">' + _mgMoeda(i.pago) + '</td>' +
+      '<td class="n">' + (_mgNum(i.repasse) ? _mgMoeda(i.repasse) : '—') + '</td>' +
+      '<td class="n" style="color:' + s.cor + ';font-weight:700">' +
+        (_mgNum(i.repasse) ? _mgMoeda(_mgMargem(i)) : '—') + '</td>' +
+      '<td class="n">' + (p === null || !_mgNum(i.repasse) ? '—' :
+        (p >= 0 ? '+' : '') + p.toFixed(0) + '%') + '</td>' +
+    '</tr>';
+  }).join('');
+
+  const html =
+'<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">' +
+'<title>Margem - custo x repasse</title><style>' +
+'*{box-sizing:border-box}' +
+'body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#171717;margin:24px;font-size:11px}' +
+'h1{font-size:19px;margin:0 0 2px}' +
+'.sub{color:#737373;font-size:11px;margin-bottom:14px}' +
+'.resumo{display:flex;gap:10px;margin:0 0 16px;flex-wrap:wrap}' +
+'.bx{border:1px solid #E5E5E5;border-radius:8px;padding:8px 14px;min-width:120px}' +
+'.bx .l{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#737373}' +
+'.bx .v{font-size:15px;font-weight:700;margin-top:2px}' +
+'table{width:100%;border-collapse:collapse}' +
+'th{background:#FAFAFA;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.4px;' +
+'color:#525252;padding:6px 7px;border-bottom:1.5px solid #D4D4D4}' +
+'td{padding:5px 7px;border-bottom:1px solid #F0F0F0}' +
+'.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}' +
+'tfoot td{border-top:1.5px solid #171717;font-weight:700;padding-top:7px}' +
+'thead{display:table-header-group}tr{page-break-inside:avoid}' +
+'@page{size:A4 landscape;margin:12mm}' +
+'</style></head><body>' +
+'<h1>Margem — custo × repasse</h1>' +
+'<div class="sub">' + _mgEsc(filtroTxt) + '  •  Emitido em ' + new Date().toLocaleDateString('pt-BR') +
+  (loggedUser && loggedUser.nome ? ' por ' + _mgEsc(loggedUser.nome) : '') + '</div>' +
+'<div class="resumo">' +
+  '<div class="bx"><div class="l">Itens</div><div class="v">' + lista.length + '</div></div>' +
+  '<div class="bx"><div class="l">Custo total</div><div class="v">' + _mgMoeda(t.pago) + '</div></div>' +
+  '<div class="bx"><div class="l">Repasse total</div><div class="v">' + _mgMoeda(t.repasse) + '</div></div>' +
+  '<div class="bx"><div class="l">Margem</div><div class="v" style="color:' +
+    (t.margem >= 0 ? '#16A34A' : '#DC2626') + '">' + _mgMoeda(t.margem) + '</div></div>' +
+  '<div class="bx"><div class="l">% sobre o custo</div><div class="v">' +
+    (t.perc >= 0 ? '+' : '') + t.perc.toFixed(1) + '%</div></div>' +
+  (t.prejuizo ? '<div class="bx"><div class="l">Em prejuízo</div><div class="v" style="color:#DC2626">' +
+    t.prejuizo + '</div></div>' : '') +
+'</div>' +
+'<table><thead><tr><th>Cliente</th><th>Clínica</th><th>Exame</th>' +
+'<th class="n">Custo</th><th class="n">Repasse</th><th class="n">Margem</th><th class="n">%</th>' +
+'</tr></thead><tbody>' + linhas + '</tbody><tfoot><tr>' +
+'<td colspan="3">TOTAL — ' + lista.length + ' item(ns)</td>' +
+'<td class="n">' + _mgMoeda(t.pago) + '</td>' +
+'<td class="n">' + _mgMoeda(t.repasse) + '</td>' +
+'<td class="n" style="color:' + (t.margem >= 0 ? '#16A34A' : '#DC2626') + '">' + _mgMoeda(t.margem) + '</td>' +
+'<td class="n">' + (t.perc >= 0 ? '+' : '') + t.perc.toFixed(0) + '%</td>' +
+'</tr></tfoot></table></body></html>';
+
+  const j = window.open('', '_blank');
+  if (!j) { alert('Habilite os pop-ups para este site para gerar o PDF.'); return; }
+  j.document.write(html);
+  j.document.close();
+  // Espera o navegador montar a folha antes de chamar a impressão, senão em
+  // alguns casos a janela imprime em branco.
+  setTimeout(function () { try { j.focus(); j.print(); } catch (e) { /* a pessoa imprime pelo menu */ } }, 350);
+}
+window.mgExportarPdf = mgExportarPdf;
 

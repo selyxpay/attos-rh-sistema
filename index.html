@@ -39,16 +39,18 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260819b">
+    <link rel="stylesheet" href="css/style.css?v=20260820a">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260819b">
+    <link rel="stylesheet" href="css/design-system.css?v=20260820a">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260819b">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260820a">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260819b">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260819b">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260820a">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260820a">
+    <!-- Margem — custo do exame na clinica x valor repassado ao cliente -->
+    <link rel="stylesheet" href="css/margem.css?v=20260820a">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260819b">
+    <link rel="stylesheet" href="css/mobile.css?v=20260820a">
 </head>
 <body class="app-shell">
 
@@ -202,6 +204,10 @@
                     </li>
                     <li class="nav-item" data-aba="comissao">
                         <a href="#"><i class="fa-solid fa-sack-dollar"></i> <span>Comissão</span></a>
+                    </li>
+                    <!-- Margem: custo do exame na clínica × valor repassado ao cliente -->
+                    <li class="nav-item" data-aba="margem" id="nav-item-margem" style="display:none;">
+                        <a href="#"><i class="fa-solid fa-scale-balanced"></i> <span>Margem</span></a>
                     </li>
                     <li class="nav-item" data-aba="whatsapp" id="nav-item-whatsapp" style="display:none;">
                         <a href="#"><i class="fa-brands fa-whatsapp"></i> <span>WhatsApp Oficial</span> <span class="wa-nav-badge" id="wa-nav-badge" style="display:none;"></span></a>
@@ -787,6 +793,25 @@
                     </div>
                 </section>
                 
+                <!-- ABA: MARGEM — o que se paga à clínica × o que se repassa ao cliente -->
+                <section id="aba-margem" class="aba-content">
+                    <div class="mod-header-banner">
+                        <div class="mod-header-left">
+                            <div class="mod-header-icon-badge badge-emerald"><i class="fa-solid fa-scale-balanced"></i></div>
+                            <div>
+                                <h1 class="mod-header-title">Margem</h1>
+                                <p class="mod-header-subtitle">Custo do exame na clínica × valor repassado ao cliente.</p>
+                            </div>
+                        </div>
+                        <div class="mod-header-actions">
+                            <button class="mod-btn-secondary" onclick="mgExportarExcel()"><i class="fa-solid fa-file-excel"></i> Excel</button>
+                            <button class="mod-btn-secondary" onclick="mgExportarPdf()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                            <button class="mod-btn-primary" onclick="mgNovoItem()"><i class="fa-solid fa-plus"></i> Novo item</button>
+                        </div>
+                    </div>
+                    <div id="mg-conteudo"><!-- Gerado por JS --></div>
+                </section>
+
                 <!-- 7. ABA: COMISSÃO (EXCEL STYLE) -->
                 <section id="aba-comissao" class="aba-content">
                     <div class="mod-header-banner">
@@ -3971,11 +3996,11 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260819b"></script>
-    <script src="js/vps-sync.js?v=20260819b"></script>
-    <script src="js/exata-catalogo.js?v=20260819b"></script>
-    <script src="js/data.js?v=20260819b"></script>
-    <script src="js/app.js?v=20260819b"></script>
-    <script src="js/whatsapp.js?v=20260819b"></script>
+    <script src="js/security.js?v=20260820a"></script>
+    <script src="js/vps-sync.js?v=20260820a"></script>
+    <script src="js/exata-catalogo.js?v=20260820a"></script>
+    <script src="js/data.js?v=20260820a"></script>
+    <script src="js/app.js?v=20260820a"></script>
+    <script src="js/whatsapp.js?v=20260820a"></script>
 </body>
 </html>
