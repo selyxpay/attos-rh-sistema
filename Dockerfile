@@ -37,6 +37,9 @@ COPY openwa.cjs ./
 
 # --- Frontend --------------------------------------------------------------
 COPY index.html login.html candidato.html talento.html fila-display.html relatorio-equip.html ./
+# Politica de privacidade — PUBLICA de proposito: a Meta exige que ela abra
+# sem login para aprovar o app do WhatsApp Business.
+COPY privacidade.html ./
 COPY robots.txt sitemap.xml ./
 COPY css ./css
 COPY js  ./js
