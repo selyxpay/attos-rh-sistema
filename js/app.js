@@ -18406,7 +18406,7 @@ function mgExportarExcel() {
                  { wch: 24 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 20 }, { wch: 28 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Custo x Repasse');
-  XLSX.writeFile(wb, 'Margem - custo x repasse - ' + _mgHoje() + '.xlsx');
+  XLSX.writeFile(wb, 'Controle ASO Repasse - ' + _mgHoje() + '.xlsx');
 }
 window.mgExportarExcel = mgExportarExcel;
 
@@ -18449,7 +18449,7 @@ function mgExportarPdf() {
 
   const html =
 '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">' +
-'<title>Margem - custo x repasse</title><style>' +
+'<title>Controle ASO Repasse</title><style>' +
 '*{box-sizing:border-box}' +
 'body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#171717;margin:24px;font-size:11px}' +
 'h1{font-size:19px;margin:0 0 2px}' +
@@ -18467,7 +18467,7 @@ function mgExportarPdf() {
 'thead{display:table-header-group}tr{page-break-inside:avoid}' +
 '@page{size:A4 landscape;margin:12mm}' +
 '</style></head><body>' +
-'<h1>Margem — custo × repasse</h1>' +
+'<h1>Controle ASO Repasse</h1>' +
 '<div class="sub">' + _mgEsc(filtroTxt) + '  •  Emitido em ' + new Date().toLocaleDateString('pt-BR') +
   (loggedUser && loggedUser.nome ? ' por ' + _mgEsc(loggedUser.nome) : '') + '</div>' +
 '<div class="resumo">' +
