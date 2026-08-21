@@ -74,6 +74,15 @@ const MIME = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.pdf': 'application/pdf',
+  // Audio do WhatsApp: a Meta busca o arquivo pelo link e confere o tipo.
+  '.ogg': 'audio/ogg',
+  '.opus': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.mp3': 'audio/mpeg',
+  '.aac': 'audio/aac',
+  '.amr': 'audio/amr',
+  '.mp4': 'video/mp4',
+  '.3gp': 'video/3gpp',
   '.txt': 'text/plain; charset=utf-8',
   '.xml': 'application/xml; charset=utf-8',
 };
@@ -86,7 +95,11 @@ const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
   // Câmera e localização liberadas para o próprio site (candidato tira foto por 'capture')
-  'Permissions-Policy': 'camera=(self), microphone=(), geolocation=(self), payment=()',
+  // microphone=(self): o proprio site pode pedir o microfone (audio do
+  // WhatsApp); site de fora embutido, nao. Era microphone=() — proibido para
+  // todos — e o getUserMedia morria com "Permission denied" MESMO com a pessoa
+  // clicando em Permitir. O teste com microfone falso pegou isso antes do ar.
+  'Permissions-Policy': 'camera=(self), microphone=(self), geolocation=(self), payment=()',
   // Dados e fotos agora são do PRÓPRIO servidor ('self'); mantém só os CDNs usados
   'Content-Security-Policy': [
     "default-src 'self'",
@@ -2019,7 +2032,20 @@ http.createServer(function (req, res) {
         if (body.type === 'template') {
           sendPromise = waApi.sendTemplateMessage(account.phone_number_id, toPhone, body.template_name, body.template_language, body.template_components, account.access_token_enc);
         } else if (body.type === 'image' || body.type === 'document' || body.type === 'video' || body.type === 'audio') {
-          sendPromise = waApi.sendMediaMessage(account.phone_number_id, toPhone, body.type, { link: body.media_url, id: body.media_id, filename: body.filename }, body.caption, account.access_token_enc);
+          // A Meta BUSCA a midia pelo link — e busca la do datacenter dela, entao
+          // '/uploads/x.ogg' relativo nao serve. Vira endereco completo aqui:
+          // APP_URL quando definida; senao, o proprio dominio desta requisicao.
+          var linkMidia = body.media_url || '';
+          if (linkMidia && linkMidia.charAt(0) === '/') {
+            var baseMidia = (process.env.APP_URL || '').replace(/\/+$/, '');
+            if (!baseMidia) {
+              var protoMidia = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
+              var hostMidia = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+              if (hostMidia) baseMidia = protoMidia + '://' + hostMidia;
+            }
+            if (baseMidia) linkMidia = baseMidia + linkMidia;
+          }
+          sendPromise = waApi.sendMediaMessage(account.phone_number_id, toPhone, body.type, { link: linkMidia, id: body.media_id, filename: body.filename }, body.caption, account.access_token_enc);
         } else {
           if (!body.content || !body.content.trim()) { responderJson(res, 400, { ok: false, error: 'Mensagem vazia.' }); return; }
           sendPromise = waApi.sendTextMessage(account.phone_number_id, toPhone, body.content, account.access_token_enc);
@@ -2179,7 +2205,11 @@ http.createServer(function (req, res) {
         var buf;
         try { buf = Buffer.from(m[2], 'base64'); } catch (e) { responderJson(res, 400, { ok: false, error: 'Base64 inválido.' }); return; }
         if (buf.length > 20 * 1024 * 1024) { responderJson(res, 400, { ok: false, error: 'Arquivo acima de 20 MB.' }); return; }
-        var ext = (mimeType.split('/')[1] || 'bin').split('+')[0].split(';')[0].replace(/[^a-z0-9]/gi, '');
+        // audio/mp4 NAO pode virar '.mp4': seria servido como video/mp4 e a
+        // Meta rejeita audio com Content-Type de video. Cada tipo de audio tem
+        // a extensao que devolve o MESMO tipo na hora de servir.
+        var EXT_AUDIO = { 'audio/ogg': 'ogg', 'audio/opus': 'ogg', 'audio/mp4': 'm4a', 'audio/mpeg': 'mp3', 'audio/aac': 'aac', 'audio/amr': 'amr' };
+        var ext = EXT_AUDIO[mimeType] || (mimeType.split('/')[1] || 'bin').split('+')[0].split(';')[0].replace(/[^a-z0-9]/gi, '');
         if (!ext || ext.length > 5) ext = 'bin';
         var nome = 'wa_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + ext;
         try {

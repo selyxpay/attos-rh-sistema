@@ -137,6 +137,15 @@ function _waFmtTelefone(phone) {
   return phone || '—';
 }
 function _waInicial(nome) { return (String(nome || '?').trim().charAt(0) || '?').toUpperCase(); }
+// Cada pessoa com a sua cor, estavel (o hash do nome escolhe na paleta).
+// Antes disso a lista tinha um bug literal — style="background:cor;" sem o
+// ${} — e TODOS os avatares ficavam transparentes.
+const _WA_CORES_AVATAR = ['#00a884','#53bdeb','#e542a3','#fda43c','#7f66ff','#ff5c5c','#26c4dc','#a791f5','#f2b36e','#43c96b'];
+function _waCorAvatar(nome) {
+  let h = 0; const t = String(nome || '?');
+  for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0;
+  return _WA_CORES_AVATAR[h % _WA_CORES_AVATAR.length];
+}
 
 function _waRenderContatos(cont) {
   const podeCriar = _waPode('criar');
@@ -379,7 +388,7 @@ function _waItemConversa(c) {
   const cor = WA_STATUS_COR[c.status] || '#94a3b8';
   const naoLidas = c.unread_count > 0 ? `<span class="wa-unread">${c.unread_count > 9 ? '9+' : c.unread_count}</span>` : '';
   return `<div class="wa-conv-item ${c.id === _waConvAberta ? 'active' : ''}" onclick="waAbrirConversa(${c.id})">
-    <span class="wa-avatar" style="background:cor;">${_waEsc(_waInicial(nome))}</span>
+    <span class="wa-avatar" style="background:${_waCorAvatar(nome)};">${_waEsc(_waInicial(nome))}</span>
     <div class="wa-conv-meio">
       <div class="wa-conv-topo"><b>${_waEsc(nome)}</b><span class="wa-conv-hora">${_waHora(c.last_message_at)}</span></div>
       <div class="wa-conv-baixo"><span class="wa-conv-prev">${_waEsc((c.last_message_text || '').slice(0, 42) || '—')}</span>${naoLidas}</div>
@@ -428,7 +437,7 @@ function _waRenderChat(conv, msgs) {
   chat.innerHTML =
     `<header class="wa-chat-head">
        <button class="wa-voltar" onclick="waVoltarLista()" title="Voltar"><i class="fa-solid fa-arrow-left"></i></button>
-       <span class="wa-avatar" style="background:#059669;">${_waEsc(_waInicial(nome))}</span>
+       <span class="wa-avatar" style="background:${_waCorAvatar(nome)};">${_waEsc(_waInicial(nome))}</span>
        <div class="wa-chat-head-info"><b>${_waEsc(nome)}</b><small>${_waEsc(_waFmtTelefone(conv.contact_phone))} · ${WA_STATUS_PT[conv.status] || conv.status}${(conv.account_name || conv.account_phone) ? ' · <span class="wa-via">via ' + _waEsc(conv.account_name || conv.account_phone) + '</span>' : ''}</small></div>
        <div class="wa-chat-head-acoes">
          ${conv.contact_id ? `<button class="wa-btn-mini wa-info-btn" title="Detalhes do contato" onclick="waVerContato(${conv.contact_id})"><i class="fa-solid fa-circle-info"></i></button>` : ''}
@@ -448,8 +457,9 @@ function _waRenderChat(conv, msgs) {
            <button class="wa-anexo" title="Anexar mídia" onclick="document.getElementById('wa-file').click()" ${_waModoNota ? 'disabled' : ''}><i class="fa-solid fa-paperclip"></i></button>
            <button class="wa-anexo" title="Enviar template aprovado" onclick="waAbrirTemplatePicker()" ${_waModoNota ? 'disabled' : ''}><i class="fa-regular fa-file-lines"></i></button>
            <input type="file" id="wa-file" style="display:none" accept="image/*,application/pdf,video/*,audio/*" onchange="waAnexarMidia(this)">
-           <textarea id="wa-msg-input" rows="1" placeholder="${_waModoNota ? 'Escreva uma nota interna (NÃO vai para o cliente)…' : 'Digite uma mensagem…'}" onkeydown="waComposerKey(event)"></textarea>
-           <button class="wa-enviar ${_waModoNota ? 'wa-enviar-nota' : ''}" onclick="waEnviarMensagem()"><i class="fa-solid fa-paper-plane"></i></button>
+           <textarea id="wa-msg-input" rows="1" placeholder="${_waModoNota ? 'Escreva uma nota interna (NÃO vai para o cliente)…' : 'Digite uma mensagem…'}" onkeydown="waComposerKey(event)" oninput="waComposerDigitou(this)"></textarea>
+           <button class="wa-mic" id="wa-mic" onclick="waGravarAudio()" title="Gravar áudio (com anti-ruído)" ${_waModoNota ? 'disabled' : ''}><i class="fa-solid fa-microphone"></i></button>
+           <button class="wa-enviar ${_waModoNota ? 'wa-enviar-nota' : ''}" id="wa-enviar" onclick="waEnviarMensagem()" style="display:${_waModoNota ? '' : 'none'};"><i class="fa-solid fa-paper-plane"></i></button>
          </div>
          ${_waModoNota ? '<div class="wa-nota-aviso"><i class="fa-solid fa-lock"></i> Nota interna: só a equipe vê, o cliente NUNCA recebe.</div>' : ''}
        ` : '<div class="wa-composer-somente">Você não tem permissão para enviar mensagens.</div>'}
@@ -464,7 +474,8 @@ function _waBolha(m) {
   const saida = m.direction === 'outgoing';
   let corpo = '';
   if (m.type === 'image' && m.media_url) corpo = `<img class="wa-msg-img" src="${_waEsc(m.media_url)}" alt="imagem">${m.content ? '<div>' + _waEsc(m.content) + '</div>' : ''}`;
-  else if ((m.type === 'document' || m.type === 'video' || m.type === 'audio') && m.media_url) corpo = `<a class="wa-msg-doc" href="${_waEsc(m.media_url)}" target="_blank"><i class="fa-solid fa-file-arrow-down"></i> ${_waEsc(m.media_filename || m.type)}</a>${m.content ? '<div>' + _waEsc(m.content) + '</div>' : ''}`;
+  else if (m.type === 'audio' && m.media_url) corpo = _waPlayerAudio(m);
+  else if ((m.type === 'document' || m.type === 'video') && m.media_url) corpo = `<a class="wa-msg-doc" href="${_waEsc(m.media_url)}" target="_blank"><i class="fa-solid fa-file-arrow-down"></i> ${_waEsc(m.media_filename || m.type)}</a>${m.content ? '<div>' + _waEsc(m.content) + '</div>' : ''}`;
   else corpo = _waEsc(m.content || '');
   return `<div class="wa-msg ${saida ? 'wa-msg-out' : 'wa-msg-in'}">
     <div class="wa-bolha">${corpo}<span class="wa-msg-hora">${_waHora(m.created_at)} ${saida ? _waTick(m.status) : ''}</span></div>
@@ -482,6 +493,18 @@ function _waScrollFim() { const m = document.getElementById('wa-msgs'); if (m) m
 window.waVoltarLista = function () { const i = document.getElementById('wa-inbox'); if (i) i.classList.remove('wa-chat-aberto'); _waConvAberta = null; };
 window.waSetModo = function (nota) { _waModoNota = !!nota; if (_waConvAbertaObj) _waRenderChat(_waConvAbertaObj, _waMsgsCache || []); };
 window.waComposerKey = function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); waEnviarMensagem(); } };
+// Como no WhatsApp: campo vazio oferece o microfone; começou a digitar, vira
+// o botão de enviar. (No modo nota o áudio fica desligado — nota é texto
+// interno, áudio iria para o cliente.)
+window.waComposerDigitou = function (inp) {
+  const mic = document.getElementById('wa-mic');
+  const env = document.getElementById('wa-enviar');
+  if (!mic || !env) return;
+  const temTexto = !!(inp.value || '').trim();
+  if (_waModoNota) { mic.style.display = 'none'; env.style.display = ''; return; }
+  mic.style.display = temTexto ? 'none' : '';
+  env.style.display = temTexto ? '' : 'none';
+};
 
 window.waEnviarMensagem = async function () {
   if (!_waConvAberta || !_waPode('criar')) return;
@@ -903,3 +926,225 @@ window.waTestarConexaoCard = async function (id) {
 };
 // Atalho usado pela sincronização de templates quando não há conta configurada.
 window.waConfigurarConexao = function () { waTrocarSubAba('conexoes'); setTimeout(waNovaConexao, 150); };
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// ÁUDIO — gravar e ouvir mensagens de voz, como no WhatsApp Web
+// --------------------------------------------------------------------------
+// GRAVAÇÃO: microfone com o anti-ruído do próprio Chrome ligado
+// (noiseSuppression + echoCancellation + autoGainControl). É o mesmo filtro
+// que o Meet usa: segura ventilador, teclado e eco, e deixa a voz passar.
+//
+// FORMATO: a Meta só aceita alguns tipos de áudio. O navegador grava no
+// melhor que ele tiver, nesta ordem:
+//   1. audio/ogg (opus)  — o formato nativo de voz do WhatsApp (Firefox)
+//   2. audio/mp4 (AAC)   — Chrome e Safari
+// Se o navegador não tiver nenhum dos dois, o botão explica em vez de gravar
+// um formato que a Meta recusaria depois.
+// ══════════════════════════════════════════════════════════════════════════
+
+let _waGravador = null;        // MediaRecorder ativo
+let _waGravStream = null;      // stream do microfone (para desligar a luzinha)
+let _waGravPedacos = [];
+let _waGravTimer = null;
+let _waGravInicio = 0;
+let _waGravCancelado = false;
+
+function _waMimeGravacao() {
+  if (typeof MediaRecorder === 'undefined') return null;
+  const tipos = ['audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm;codecs=opus'];
+  for (const t of tipos) { if (MediaRecorder.isTypeSupported(t)) return t; }
+  return null;
+}
+
+// webm gravaria, mas a Meta recusa. Só aceitamos o que chega do outro lado.
+function _waMimeAceitoPelaMeta(mime) {
+  return /^audio\/(ogg|mp4)/.test(String(mime || ''));
+}
+
+window.waGravarAudio = async function () {
+  if (!_waConvAberta || !_waPode('criar') || _waModoNota) return;
+  const mime = _waMimeGravacao();
+  if (!mime || !_waMimeAceitoPelaMeta(mime)) {
+    _waToast('Este navegador não grava num formato que o WhatsApp aceite. Use o Chrome atualizado.', true);
+    return;
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        // O anti-ruído: foca na voz e corta o resto. É filtro do navegador,
+        // roda na hora, sem mandar o áudio para lugar nenhum.
+        noiseSuppression: true,
+        echoCancellation: true,
+        autoGainControl: true,
+        channelCount: 1          // voz é mono; a Meta prefere assim
+      }
+    });
+  } catch (e) {
+    _waToast(e && e.name === 'NotAllowedError'
+      ? 'Libere o microfone para este site (cadeado na barra de endereço).'
+      : 'Não achei microfone: ' + (e.message || e.name), true);
+    return;
+  }
+
+  _waGravStream = stream;
+  _waGravPedacos = [];
+  _waGravCancelado = false;
+  try {
+    _waGravador = new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 32000 });
+  } catch (e) {
+    _waGravador = new MediaRecorder(stream);   // deixa o navegador escolher o bitrate
+  }
+  _waGravador.ondataavailable = ev => { if (ev.data && ev.data.size) _waGravPedacos.push(ev.data); };
+  _waGravador.onstop = _waGravouTerminou;
+  _waGravador.start(250);
+  _waGravInicio = Date.now();
+
+  // A linha do composer vira o painel de gravação
+  const linha = document.querySelector('.wa-composer-linha');
+  if (linha) linha.style.display = 'none';
+  const composer = document.getElementById('wa-composer');
+  if (composer) composer.insertAdjacentHTML('beforeend',
+    `<div class="wa-gravando" id="wa-gravando">
+       <button class="wa-grav-cancelar" onclick="waCancelarAudio()" title="Descartar"><i class="fa-solid fa-trash"></i></button>
+       <span class="wa-grav-ponto"></span>
+       <span class="wa-grav-tempo" id="wa-grav-tempo">0:00</span>
+       <span class="wa-grav-dica">Gravando… o anti-ruído está ligado</span>
+       <button class="wa-grav-enviar" onclick="waPararAudio()" title="Parar e enviar"><i class="fa-solid fa-paper-plane"></i></button>
+     </div>`);
+  _waGravTimer = setInterval(() => {
+    const el = document.getElementById('wa-grav-tempo');
+    if (!el) return;
+    const s = Math.floor((Date.now() - _waGravInicio) / 1000);
+    el.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    // Trava de segurança: a Meta recusa áudio acima de 16 MB. 5 minutos de voz
+    // em opus ficam muito abaixo disso; paramos bem antes do risco.
+    if (s >= 300) waPararAudio();
+  }, 250);
+};
+
+function _waFecharPainelGravacao() {
+  clearInterval(_waGravTimer); _waGravTimer = null;
+  const g = document.getElementById('wa-gravando');
+  if (g) g.remove();
+  const linha = document.querySelector('.wa-composer-linha');
+  if (linha) linha.style.display = '';
+  if (_waGravStream) { _waGravStream.getTracks().forEach(t => t.stop()); _waGravStream = null; }
+}
+
+window.waCancelarAudio = function () {
+  _waGravCancelado = true;
+  if (_waGravador && _waGravador.state !== 'inactive') _waGravador.stop();
+  else _waFecharPainelGravacao();
+};
+
+window.waPararAudio = function () {
+  if (!_waGravador || _waGravador.state === 'inactive') return;
+  // Menos de meio segundo é clique acidental, não mensagem.
+  if (Date.now() - _waGravInicio < 500) { waCancelarAudio(); return; }
+  _waGravador.stop();
+};
+
+async function _waGravouTerminou() {
+  const mime = (_waGravador && _waGravador.mimeType) || 'audio/ogg';
+  const duracaoSeg = Math.max(1, Math.round((Date.now() - _waGravInicio) / 1000));
+  _waFecharPainelGravacao();
+  if (_waGravCancelado) { _waGravPedacos = []; return; }
+
+  const blob = new Blob(_waGravPedacos, { type: mime.split(';')[0] });
+  _waGravPedacos = [];
+  if (!blob.size) { _waToast('A gravação saiu vazia. Tente de novo.', true); return; }
+
+  _waToast('Enviando áudio…');
+  const dataUrl = await new Promise((res, rej) => {
+    const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob);
+  });
+  const up = await waSend('/media/upload', 'POST', { dataUrl });
+  if (!up || !up.ok) { _waToast((up && up.error) || 'Falha no upload do áudio.', true); return; }
+
+  const r = await waSend('/messages/send', 'POST', {
+    conversation_id: _waConvAberta, type: 'audio',
+    media_url: up.url, media_mime_type: up.mime_type, filename: up.filename
+  });
+  if (r && r.ok) {
+    const nova = { direction: 'outgoing', type: 'audio', media_url: up.url,
+      media_filename: up.filename, content: '', status: 'sent',
+      created_at: new Date().toISOString(), _duracao: duracaoSeg };
+    _waMsgsCache.push(nova); _waAppendBolha(nova); _waCarregarConversas();
+  } else {
+    _waToast((r && r.error) || 'Falha ao enviar o áudio. Número conectado?', true);
+  }
+}
+
+// ── O player das mensagens de voz ─────────────────────────────────────────
+// Cada bolha de áudio ganha play/pausa, barra de progresso, tempo e o botão
+// de velocidade (1x → 1,5x → 2x) — quem ouve áudio o dia inteiro usa muito.
+let _waPlayerContador = 0;
+let _waPlayerTocando = null;   // pausa o anterior quando outro começa
+
+function _waPlayerAudio(m) {
+  const id = 'wap-' + (++_waPlayerContador);
+  const dur = m._duracao ? _waFmtSeg(m._duracao) : '';
+  return `<div class="wa-audio" id="${id}">
+    <audio preload="metadata" src="${_waEsc(m.media_url)}"></audio>
+    <button class="wa-audio-play" onclick="waAudioTocar('${id}')" title="Ouvir"><i class="fa-solid fa-play"></i></button>
+    <div class="wa-audio-meio">
+      <input type="range" class="wa-audio-barra" min="0" max="100" value="0"
+             oninput="waAudioPular('${id}', this.value)">
+      <span class="wa-audio-tempo" data-dur="${dur}">${dur || '0:00'}</span>
+    </div>
+    <button class="wa-audio-vel" onclick="waAudioVelocidade('${id}')" title="Velocidade">1x</button>
+  </div>`;
+}
+function _waFmtSeg(s) { s = Math.max(0, Math.round(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+
+window.waAudioTocar = function (id) {
+  const box = document.getElementById(id);
+  if (!box) return;
+  const audio = box.querySelector('audio');
+  const btn = box.querySelector('.wa-audio-play i');
+  if (audio.paused) {
+    // um áudio por vez, como no WhatsApp
+    if (_waPlayerTocando && _waPlayerTocando !== audio) {
+      _waPlayerTocando.pause();
+    }
+    _waPlayerTocando = audio;
+    audio.play().catch(() => _waToast('Não consegui tocar este áudio.', true));
+    btn.className = 'fa-solid fa-pause';
+    if (!audio._waLigado) {
+      audio._waLigado = true;
+      audio.addEventListener('timeupdate', () => {
+        const barra = box.querySelector('.wa-audio-barra');
+        const tempo = box.querySelector('.wa-audio-tempo');
+        // duration de gravação webm/ogg pode vir Infinity até o fim carregar
+        const d = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+        if (barra && d) barra.value = Math.round(audio.currentTime / d * 100);
+        if (tempo) tempo.textContent = _waFmtSeg(audio.currentTime) + (d ? ' / ' + _waFmtSeg(d) : '');
+      });
+      audio.addEventListener('ended', () => {
+        btn.className = 'fa-solid fa-play';
+        const barra = box.querySelector('.wa-audio-barra'); if (barra) barra.value = 0;
+        const tempo = box.querySelector('.wa-audio-tempo');
+        if (tempo) tempo.textContent = tempo.getAttribute('data-dur') || _waFmtSeg(audio.duration || 0);
+      });
+      audio.addEventListener('pause', () => { btn.className = 'fa-solid fa-play'; });
+    }
+  } else {
+    audio.pause();
+    btn.className = 'fa-solid fa-play';
+  }
+};
+window.waAudioPular = function (id, pct) {
+  const box = document.getElementById(id); if (!box) return;
+  const audio = box.querySelector('audio');
+  if (isFinite(audio.duration) && audio.duration > 0) audio.currentTime = audio.duration * (pct / 100);
+};
+window.waAudioVelocidade = function (id) {
+  const box = document.getElementById(id); if (!box) return;
+  const audio = box.querySelector('audio');
+  const btn = box.querySelector('.wa-audio-vel');
+  const prox = { 1: 1.5, 1.5: 2, 2: 1 }[audio.playbackRate] || 1;
+  audio.playbackRate = prox;
+  btn.textContent = String(prox).replace('.', ',') + 'x';
+};

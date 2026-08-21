@@ -16,7 +16,9 @@ const fs    = require('fs');
 const path  = require('path');
 
 const META_API_VERSION = 'v21.0';
-const META_API_BASE    = 'https://graph.facebook.com/' + META_API_VERSION;
+// Em producao e SEMPRE a Meta. A variavel existe para o teste automatizado
+// apontar para um servidor falso e conferir o que o sistema envia.
+const META_API_BASE    = process.env.META_API_BASE || ('https://graph.facebook.com/' + META_API_VERSION);
 
 // ==========================================================================
 // UTILIDADES HTTP

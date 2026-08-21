@@ -398,3 +398,178 @@ body.wa-tela-cheia { overflow: hidden; }
 }
 
 @media print { .wa-btn-tela-cheia, .wa-sair-tela-cheia { display: none !important; } }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   VISUAL v2 — a cara do WhatsApp Web
+   --------------------------------------------------------------------------
+   O pessoal vai passar o dia aqui dentro. Quanto mais parecido com o
+   WhatsApp que eles já usam, menos tem o que aprender: mesmo verde, mesmas
+   bolhas com rabinho, mesma barra de escrever, microfone no mesmo lugar.
+   Esta camada vem DEPOIS das regras antigas de propósito: só muda aparência,
+   sem mexer na estrutura (grid, colunas, mobile).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --wa-verde: #00a884;          /* o verde do WhatsApp de hoje */
+  --wa-verde-escuro: #008069;
+  --wa-cinza-painel: #f0f2f5;   /* cabeçalhos e composer do WhatsApp Web */
+  --wa-fundo-chat: #efeae2;
+}
+
+/* ── Sub-abas e controles ganham o verde do WhatsApp ─────────────────────── */
+.wa-tab:hover { color: var(--wa-verde); background: rgba(0, 168, 132, .07); }
+.wa-tab.active { color: var(--wa-verde-escuro); border-bottom-color: var(--wa-verde); }
+.wa-fchip.active { background: var(--wa-verde); border-color: var(--wa-verde); }
+.wa-modo-btn.active { background: var(--wa-verde); border-color: var(--wa-verde); }
+.wa-enviar { background: var(--wa-verde); }
+.wa-enviar:hover { background: var(--wa-verde-escuro); }
+.wa-search input:focus { border-color: var(--wa-verde); box-shadow: 0 0 0 3px rgba(0,168,132,.12); }
+.wa-btn-mini:hover { border-color: var(--wa-verde); color: var(--wa-verde-escuro); }
+.wa-conta-unica { color: var(--wa-verde-escuro); }
+.wa-via { color: var(--wa-verde-escuro); }
+.wa-tpl-opt:hover { border-color: var(--wa-verde); background: rgba(0,168,132,.05); }
+.wa-loading i { color: var(--wa-verde); }
+
+/* ── Lista de conversas: linhas altas, avatar grande, tudo respirando ────── */
+.wa-col-list { background: #fff; }
+.wa-conv-item { padding: 12px 14px; align-items: center; gap: 12px; border-bottom-color: #f0f2f5; }
+.wa-conv-item:hover { background: #f5f6f6; }
+.wa-conv-item.active { background: var(--wa-cinza-painel); }
+.wa-conv-item .wa-avatar {
+  width: 44px; height: 44px; font-size: 17px; margin-right: 0;
+  flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,.04);
+}
+.wa-conv-topo b { font-size: 14.5px; font-weight: 600; }
+.wa-conv-prev { font-size: 12.5px; }
+.wa-unread { background: #25d366; font-weight: 700; }
+.wa-conv-status { font-size: 10px; opacity: .85; }
+.wa-search-conv input { background: var(--wa-cinza-painel); border-color: transparent; border-radius: 9999px; }
+.wa-search-conv input:focus { background: #fff; border-color: var(--wa-verde); }
+
+/* ── O chat: cabeçalho cinza WhatsApp e papel de parede ──────────────────── */
+.wa-chat-head { background: var(--wa-cinza-painel); border-bottom: none; padding: 10px 16px; }
+.wa-chat-head .wa-avatar { width: 38px; height: 38px; font-size: 15px; }
+.wa-msgs {
+  background:
+    repeating-linear-gradient(45deg, rgba(0,0,0,.012) 0 6px, transparent 6px 12px),
+    var(--wa-fundo-chat);
+  padding: 18px 7%;
+}
+.wa-chat-vazio i { color: #d1d7db; }
+
+/* Bolhas com o rabinho do WhatsApp */
+.wa-bolha { border-radius: 8px; box-shadow: 0 1px .5px rgba(11,20,26,.13); font-size: 14px; }
+.wa-msg-in .wa-bolha, .wa-msg-out .wa-bolha { position: relative; }
+.wa-msg-in .wa-bolha::before, .wa-msg-out .wa-bolha::before {
+  content: ''; position: absolute; top: 0; width: 0; height: 0;
+  border-style: solid;
+}
+.wa-msg-in .wa-bolha { border-top-left-radius: 0; }
+.wa-msg-in .wa-bolha::before {
+  left: -8px;
+  border-width: 0 8px 10px 0;
+  border-color: transparent #fff transparent transparent;
+}
+.wa-msg-out .wa-bolha { border-top-right-radius: 0; }
+.wa-msg-out .wa-bolha::before {
+  right: -8px;
+  border-width: 0 0 10px 8px;
+  border-color: transparent transparent transparent #d9fdd3;
+}
+/* nota interna não tem rabinho — ela é um post-it, não uma mensagem */
+.wa-msg-nota .wa-bolha::before { display: none; }
+.wa-msg-hora { font-size: 10.5px; color: rgba(17,27,33,.5); }
+
+/* ── Composer: a barra cinza com a pílula branca ─────────────────────────── */
+.wa-composer { background: var(--wa-cinza-painel); border-top: none; padding: 10px 14px; }
+.wa-composer-linha textarea {
+  background: #fff; border: none; border-radius: 9999px; padding: 11px 16px;
+  box-shadow: 0 1px 1px rgba(11,20,26,.06);
+}
+.wa-composer-linha textarea:focus { box-shadow: 0 0 0 2px rgba(0,168,132,.25); }
+.wa-anexo { background: transparent; color: #54656f; font-size: 17px; }
+.wa-anexo:hover { color: var(--wa-verde-escuro); }
+
+/* Microfone: verde, redondo, no lugar do enviar quando não há texto */
+.wa-mic {
+  width: 42px; height: 42px; border-radius: 50%; border: none; cursor: pointer;
+  flex-shrink: 0; font-size: 16px;
+  background: var(--wa-verde); color: #fff;
+  transition: background .15s, transform .1s;
+}
+.wa-mic:hover { background: var(--wa-verde-escuro); }
+.wa-mic:active { transform: scale(.94); }
+.wa-mic:disabled { opacity: .35; cursor: not-allowed; }
+.wa-enviar { width: 42px; height: 42px; }
+
+/* ── Painel de gravação ──────────────────────────────────────────────────── */
+.wa-gravando {
+  display: flex; align-items: center; gap: 12px;
+  padding: 6px 4px;
+}
+.wa-grav-ponto {
+  width: 12px; height: 12px; border-radius: 50%; background: #ef4444;
+  animation: waGravPulso 1.1s ease-in-out infinite;
+}
+@keyframes waGravPulso {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .35; transform: scale(.8); }
+}
+.wa-grav-tempo {
+  font-size: 15px; font-weight: 700; color: #111b21;
+  font-variant-numeric: tabular-nums; min-width: 44px;
+}
+.wa-grav-dica { flex: 1; font-size: 12px; color: #54656f; }
+.wa-grav-cancelar {
+  width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+  background: transparent; color: #54656f; font-size: 16px;
+}
+.wa-grav-cancelar:hover { color: #ef4444; background: rgba(239,68,68,.08); }
+.wa-grav-enviar {
+  width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--wa-verde); color: #fff; font-size: 16px;
+}
+.wa-grav-enviar:hover { background: var(--wa-verde-escuro); }
+
+/* ── Player de áudio nas bolhas ──────────────────────────────────────────── */
+.wa-audio { display: flex; align-items: center; gap: 10px; min-width: 230px; padding: 3px 0 1px; }
+.wa-audio audio { display: none; }
+.wa-audio-play {
+  width: 36px; height: 36px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--wa-verde); color: #fff; font-size: 13px; flex-shrink: 0;
+}
+.wa-audio-play:hover { background: var(--wa-verde-escuro); }
+.wa-audio-meio { flex: 1; min-width: 0; }
+.wa-audio-barra {
+  width: 100%; -webkit-appearance: none; appearance: none; height: 4px;
+  border-radius: 9999px; background: rgba(17,27,33,.18); outline: none; cursor: pointer;
+}
+.wa-audio-barra::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--wa-verde); border: none; cursor: pointer;
+}
+.wa-audio-barra::-moz-range-thumb {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--wa-verde); border: none; cursor: pointer;
+}
+.wa-audio-tempo { display: block; font-size: 10.5px; color: rgba(17,27,33,.55); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.wa-audio-vel {
+  border: none; border-radius: 9999px; cursor: pointer;
+  background: rgba(17,27,33,.08); color: #54656f;
+  font-size: 11px; font-weight: 700; padding: 5px 9px; flex-shrink: 0;
+}
+.wa-audio-vel:hover { background: rgba(17,27,33,.14); }
+
+/* ── Coluna de informações e barras de rolagem finas ─────────────────────── */
+.wa-col-info { background: #fff; }
+.wa-conv-list::-webkit-scrollbar, .wa-msgs::-webkit-scrollbar, .wa-col-info::-webkit-scrollbar { width: 6px; }
+.wa-conv-list::-webkit-scrollbar-thumb, .wa-msgs::-webkit-scrollbar-thumb, .wa-col-info::-webkit-scrollbar-thumb {
+  background: rgba(17,27,33,.18); border-radius: 9999px;
+}
+
+/* No celular o papel de parede fica com menos margem */
+@media (max-width: 860px) {
+  .wa-msgs { padding: 14px 12px; }
+  .wa-audio { min-width: 180px; }
+}
