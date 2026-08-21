@@ -83,6 +83,32 @@
         </div>
     </div>
 
+    <!-- TROCA OBRIGATORIA — quem entrou com senha que esta publica no GitHub -->
+    <!-- Nao da para pular: a senha e conhecida por qualquer um que leia o repositorio. -->
+    <div id="troca-obrigatoria-screen" class="login-overlay-full" style="display:none;">
+        <div class="login-glass-box">
+            <div class="login-logo-area"><img src="img/logo-rt.png" class="logo-img" alt="R&amp;T Empregos"></div>
+            <h2 style="color:#f1f5f9;font-size:19px;margin-bottom:6px;">Troque sua senha para continuar</h2>
+            <p style="color:#94a3b8;font-size:12.5px;margin-bottom:18px;line-height:1.6;">
+                A senha que você usou é uma das que ficaram <strong style="color:#fca5a5;">públicas no código do sistema</strong>.
+                Qualquer pessoa que tenha visto o repositório consegue entrar com ela.
+                Escolha uma senha nova agora — leva 10 segundos.
+            </p>
+            <form id="troca-form">
+                <div class="form-group" style="width:100%;display:flex;flex-direction:column;text-align:left;margin-bottom:14px;">
+                    <label for="troca-nova" style="color:#cbd5e1;font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-lock"></i> Nova senha</label>
+                    <input type="password" id="troca-nova" required minlength="6" placeholder="Pelo menos 6 caracteres" class="form-control-login" autocomplete="new-password">
+                </div>
+                <div class="form-group" style="width:100%;display:flex;flex-direction:column;text-align:left;margin-bottom:8px;">
+                    <label for="troca-conf" style="color:#cbd5e1;font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-lock"></i> Repita a nova senha</label>
+                    <input type="password" id="troca-conf" required minlength="6" placeholder="Digite de novo" class="form-control-login" autocomplete="new-password">
+                </div>
+                <div id="troca-erro" class="login-error-alert" style="display:none;"><i class="fa-solid fa-circle-exclamation"></i> <span></span></div>
+                <button type="submit" class="btn-login-submit"><span>Salvar e entrar</span> <i class="fa-solid fa-arrow-right"></i></button>
+            </form>
+        </div>
+    </div>
+
     <!-- ESQUECI A SENHA — 3 etapas na mesma tela: pedir → aguardar aprovação → definir -->
     <div id="esqueci-senha-screen" class="login-overlay-full" style="display:none;">
         <div class="login-glass-box">
@@ -229,6 +255,40 @@
         document.getElementById('link-voltar-login').addEventListener('click', function (e) { e.preventDefault(); mostrarLogin(); });
 
         // LOGIN
+        // ── TROCA OBRIGATORIA DE SENHA ──────────────────────────────────────
+        // Guardamos a senha digitada so na memoria desta pagina, porque
+        // /api/trocar-senha exige a senha atual. Nada vai para o disco.
+        var _senhaAtualNaMemoria = '';
+        function mostrarTrocaObrigatoria(senhaUsada) {
+          _senhaAtualNaMemoria = senhaUsada;
+          document.getElementById('login-screen').style.display = 'none';
+          document.getElementById('troca-obrigatoria-screen').style.display = 'flex';
+          var n = document.getElementById('troca-nova'); if (n) n.focus();
+        }
+        var trocaForm = document.getElementById('troca-form');
+        if (trocaForm) trocaForm.addEventListener('submit', async function (e) {
+          e.preventDefault();
+          var nova = document.getElementById('troca-nova').value;
+          var conf = document.getElementById('troca-conf').value;
+          var err  = document.getElementById('troca-erro');
+          var diz = function (t) { err.querySelector('span').textContent = t; err.style.display = 'flex'; };
+          err.style.display = 'none';
+          if (nova.length < 6) { diz('A senha nova precisa ter pelo menos 6 caracteres.'); return; }
+          if (nova !== conf)   { diz('As duas senhas nao sao iguais.'); return; }
+          if (nova === _senhaAtualNaMemoria) { diz('Escolha uma senha DIFERENTE da atual — a atual e publica.'); return; }
+          var btn = trocaForm.querySelector('button[type=submit]'); btn.disabled = true;
+          try {
+            var r = await fetch('/api/trocar-senha', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+              body: JSON.stringify({ senhaAtual: _senhaAtualNaMemoria, senhaNova: nova })
+            });
+            var d = await r.json().catch(function () { return {}; });
+            if (r.status === 200 && d.ok) { _senhaAtualNaMemoria = ''; window.location.href = '/'; return; }
+            diz(d.motivo === 'dados' ? 'Senha invalida. Use pelo menos 6 caracteres.' : 'Nao consegui trocar a senha. Tente de novo.');
+          } catch (e2) { diz('Erro de conexao. Tente de novo.'); }
+          finally { btn.disabled = false; }
+        });
+
         var form = document.getElementById('login-form');
         form.addEventListener('submit', async function (e) {
           e.preventDefault();
@@ -240,7 +300,12 @@
           try {
             var r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ login: login, senha: senha }) });
             var d = await r.json().catch(function () { return {}; });
-            if (r.status === 200 && d.ok) { window.location.href = '/'; return; }
+            if (r.status === 200 && d.ok) {
+              // Senha publica: a sessao ja vale (senao nem daria para trocar),
+              // mas o sistema so abre depois da troca.
+              if (d.trocaObrigatoria) { mostrarTrocaObrigatoria(senha); return; }
+              window.location.href = '/'; return;
+            }
             var msg = 'Usuário ou senha incorretos!';
             if (r.status === 403 && d.motivo === 'aprovacao') msg = 'Seu cadastro ainda aguarda aprovação do administrador.';
             else if (r.status === 403) msg = 'Conta inativa ou bloqueada. Procure um administrador.';

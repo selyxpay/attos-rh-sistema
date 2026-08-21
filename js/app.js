@@ -11,7 +11,9 @@ function ehMestre(login) { return login === 'joaobalaf' || login === 'admin'; }
 // a senha do admin depois, ela NÃO é sobrescrita. Retorna true se mudou algo.
 function garantirAdminMestre() {
   if (!state || !Array.isArray(state.funcionarios)) return false;
-  const SENHA_ADMIN_MESTRE = '6101ed3e13dcdc5ea80901f4c5e1c9152d55b33b077b9f0b6ec30e72bf082e08'; // gruport07072026
+  // Hash da senha antiga do admin. NAO escreva a senha em texto aqui: este
+  // arquivo vai para o GitHub, e foi assim que ela vazou.
+  const SENHA_ADMIN_MESTRE = '6101ed3e13dcdc5ea80901f4c5e1c9152d55b33b077b9f0b6ec30e72bf082e08';
   const HASH_ADMIN_PADRAO = '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918'; // 'admin'
   let mudou = false;
   let contaAdmin = state.funcionarios.find(f => f.login === 'admin');
@@ -859,7 +861,7 @@ function initLocalStorage() {
         nome: 'João Balaf (Admin)',
         email: 'joaobalaf@rtempregos.com',
         login: 'joaobalaf',
-        senha: '.jJ970262405',
+        senha: '',   // sem senha aqui: este arquivo vai para o GitHub
         departamento: 'administracao',
         nivelAcesso: 'administrador',
         status: 'ativo'
@@ -18501,3 +18503,52 @@ function mgExportarPdf() {
 }
 window.mgExportarPdf = mgExportarPdf;
 
+
+
+// ── TELA CHEIA DO WHATSAPP ────────────────────────────────────────────────
+// Atender é a única coisa que se faz aqui por horas seguidas, e a tela ficava
+// pequena no meio do sistema. Neste modo some tudo que não é a conversa: a
+// barra lateral, o cabeçalho e o banner do módulo. Sai pelo botão ou com Esc.
+function waTelaCheia(ligar) {
+  const b = document.body;
+  const estava = b.classList.contains('wa-tela-cheia');
+  const querLigar = (ligar === undefined) ? !estava : !!ligar;
+
+  // Só faz sentido dentro da aba do WhatsApp. Se alguém chamar de outra tela,
+  // leva para lá primeiro — senão o sistema some e não aparece nada no lugar.
+  if (querLigar) {
+    const sec = document.getElementById('aba-whatsapp');
+    if (!sec || !sec.classList.contains('active')) {
+      if (typeof switchAba === 'function') switchAba('whatsapp');
+    }
+  }
+
+  b.classList.toggle('wa-tela-cheia', querLigar);
+  try { localStorage.setItem('rt_wa_tela_cheia', querLigar ? '1' : '0'); } catch (e) {}
+
+  // A lista de mensagens tem altura calculada. Depois de mudar o tamanho da
+  // caixa, ela precisa voltar para a última mensagem — senão fica no meio.
+  setTimeout(function () {
+    const m = document.querySelector('.wa-msgs');
+    if (m) m.scrollTop = m.scrollHeight;
+  }, 60);
+}
+window.waTelaCheia = waTelaCheia;
+
+// Esc sai da tela cheia. É o que a pessoa tenta por instinto.
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && document.body.classList.contains('wa-tela-cheia')) waTelaCheia(false);
+});
+
+// Trocar de aba tem que sair da tela cheia, senão o sistema fica invisível.
+(function () {
+  const original = window.switchAba;
+  if (typeof original !== 'function') return;
+  window.switchAba = function (abaId) {
+    if (abaId !== 'whatsapp' && document.body.classList.contains('wa-tela-cheia')) {
+      document.body.classList.remove('wa-tela-cheia');
+      try { localStorage.setItem('rt_wa_tela_cheia', '0'); } catch (e) {}
+    }
+    return original.apply(this, arguments);
+  };
+})();

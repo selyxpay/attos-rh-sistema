@@ -39,18 +39,18 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260820b">
+    <link rel="stylesheet" href="css/style.css?v=20260820c">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260820b">
+    <link rel="stylesheet" href="css/design-system.css?v=20260820c">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260820b">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260820c">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260820b">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260820b">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260820c">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260820c">
     <!-- Margem — custo do exame na clinica x valor repassado ao cliente -->
-    <link rel="stylesheet" href="css/margem.css?v=20260820b">
+    <link rel="stylesheet" href="css/margem.css?v=20260820c">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260820b">
+    <link rel="stylesheet" href="css/mobile.css?v=20260820c">
 </head>
 <body class="app-shell">
 
@@ -2262,7 +2262,12 @@
                                     <p class="mod-header-subtitle">Atendimento e gestão de conversas pela API oficial do WhatsApp Business.</p>
                                 </div>
                             </div>
-                            <div class="mod-header-actions" id="wa-header-actions"><!-- botões por JS conforme permissão --></div>
+                            <div class="mod-header-actions">
+                                <button class="wa-btn-tela-cheia" onclick="waTelaCheia(true)" title="Ocupar a tela toda, como no WhatsApp Web">
+                                    <i class="fa-solid fa-expand"></i> Tela cheia
+                                </button>
+                                <span id="wa-header-actions"><!-- botões por JS conforme permissão --></span>
+                            </div>
                         </div>
                         <div class="wa-subtabs" id="wa-subtabs"><!-- sub-abas geradas por JS --></div>
                         <div id="wa-content"><!-- conteúdo gerado por js/whatsapp.js --></div>
@@ -3996,11 +4001,16 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260820b"></script>
-    <script src="js/vps-sync.js?v=20260820b"></script>
-    <script src="js/exata-catalogo.js?v=20260820b"></script>
-    <script src="js/data.js?v=20260820b"></script>
-    <script src="js/app.js?v=20260820b"></script>
-    <script src="js/whatsapp.js?v=20260820b"></script>
+    <script src="js/security.js?v=20260820c"></script>
+    <script src="js/vps-sync.js?v=20260820c"></script>
+    <script src="js/exata-catalogo.js?v=20260820c"></script>
+    <script src="js/data.js?v=20260820c"></script>
+    <script src="js/app.js?v=20260820c"></script>
+    <script src="js/whatsapp.js?v=20260820c"></script>
+    <!-- Sair da tela cheia do WhatsApp. Fica fora da aba porque o cabecalho
+         que tinha o outro botao some nesse modo. -->
+    <button class="wa-sair-tela-cheia" onclick="waTelaCheia(false)" title="Sair da tela cheia (Esc)">
+        <i class="fa-solid fa-compress"></i> Sair da tela cheia
+    </button>
 </body>
 </html>

@@ -293,8 +293,32 @@ function reqAutenticada(req) { return !!sessaoValida(tokenDaReq(req)); }
 // Senha: SHA-256 padrão (mesmo do cliente); aceita texto puro legado
 function hashSenhaServer(senha) { return crypto.createHash('sha256').update(String(senha), 'utf8').digest('hex'); }
 function senhaConfere(digitada, armazenada) {
-  if (!armazenada || String(armazenada).length !== 64) return String(digitada) === String(armazenada);
+  // Conta SEM senha nao entra, nunca. Antes caia no String(digitada) ===
+  // String(undefined) la embaixo: quem digitasse a palavra "undefined" entrava.
+  if (armazenada === undefined || armazenada === null || armazenada === '') return false;
+  if (String(armazenada).length !== 64) return String(digitada) === String(armazenada);
   return hashSenhaServer(digitada) === String(armazenada);
+}
+
+// ── SENHAS QUE ESTAO PUBLICAS ──────────────────────────────────────────────
+// Estas senhas ja estiveram escritas em js/data.js, num repositorio no GitHub.
+// Tirar do arquivo agora nao resolve: elas continuam no historico do git, e
+// quem ja copiou continua com elas. Entao o sistema passa a EXIGIR a troca no
+// proximo login de quem ainda usa uma delas.
+const HASH_SENHAS_PUBLICAS = [
+  'a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3', // 3 digitos
+  '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4', // 4 digitos
+  '5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5', // 5 digitos
+  '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', // 6 digitos
+  'b7e94be513e96e8c45cd23d162275e5a12ebde9100a425c4ebcdd7fa4dcd897c', // a palavra obvia
+  '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', // o proprio login
+  '6fddde9bdad0d3b51946fdc5b8febda9f6772a518a235b5158a9367a20522bfe', // conta da clinica
+  'c41e5bf3be87c0241522a54ae9d0deb82e69ac9793ec47e7d61240bba46b3ab5', // administrador
+  '6101ed3e13dcdc5ea80901f4c5e1c9152d55b33b077b9f0b6ec30e72bf082e08'  // admin de fabrica
+];
+function senhaEhPublica(texto) {
+  if (!texto) return false;
+  return HASH_SENHAS_PUBLICAS.indexOf(hashSenhaServer(String(texto))) >= 0;
 }
 
 // Anti-brute-force por login (memória): 5 falhas -> 60s de espera
@@ -547,7 +571,20 @@ function garantirAdminServidor() {
                 return (f.login || '').toLowerCase() === (fInit.login || '').toLowerCase();
               });
               if (!existe) {
-                d.funcionarios.push(JSON.parse(JSON.stringify(fInit)));
+                const nova = JSON.parse(JSON.stringify(fInit));
+                // O data.js nao guarda mais senha (ele vai para o GitHub). A do
+                // admin vem de ADMIN_SENHA. Sem a variavel, cai na senha antiga
+                // — que e publica, e o sistema exige trocar no primeiro login.
+                if ((nova.login || '').toLowerCase() === 'admin' && !nova.senha) {
+                  nova.senha = process.env.ADMIN_SENHA
+                    ? hashSenhaServer(String(process.env.ADMIN_SENHA))
+                    : '6101ed3e13dcdc5ea80901f4c5e1c9152d55b33b077b9f0b6ec30e72bf082e08';
+                  if (!process.env.ADMIN_SENHA) {
+                    console.warn('[RT] ADMIN_SENHA nao definida — admin nasceu com a senha PUBLICA.');
+                    console.warn('[RT] Defina ADMIN_SENHA no Coolify, ou troque no primeiro login.');
+                  }
+                }
+                d.funcionarios.push(nova);
                 mudou = true;
                 console.log('[RT] Conta importada para o servidor:', fInit.login);
               }
@@ -561,13 +598,44 @@ function garantirAdminServidor() {
 
     const existeAdmin = d.funcionarios.some(function (f) { return (f.login || '').toLowerCase() === 'admin'; });
     if (!existeAdmin) {
+      // A senha do admin sai de ADMIN_SENHA. Antes era um hash fixo com a senha
+      // em texto no comentario ao lado — publicada no GitHub junto com o codigo.
+      // Sem a variavel, cai no padrao antigo, que o sistema trata como publica e
+      // exige trocar no primeiro login.
       d.funcionarios.push({
         id: 'func-admin', nome: 'Administrador', login: 'admin',
-        senha: '6101ed3e13dcdc5ea80901f4c5e1c9152d55b33b077b9f0b6ec30e72bf082e08', // gruport07072026
+        senha: process.env.ADMIN_SENHA
+          ? hashSenhaServer(String(process.env.ADMIN_SENHA))
+          : '6101ed3e13dcdc5ea80901f4c5e1c9152d55b33b077b9f0b6ec30e72bf082e08',
         departamento: 'administracao', status: 'ativo', permissoes: {}
       });
+      if (!process.env.ADMIN_SENHA) {
+        console.warn('[RT] ADMIN_SENHA nao definida — a conta admin nasceu com a senha PUBLICA.');
+        console.warn('[RT] Defina ADMIN_SENHA no Coolify, ou troque a senha no primeiro login.');
+      }
       mudou = true;
       console.log('[RT] Conta admin criada.');
+    }
+
+    // ── SENHA DO ADMIN, DEPOIS DE TODO O SEED ────────────────────────────
+    // O data.js nao guarda mais senha nenhuma (ele vai para o GitHub), e ha
+    // TRES caminhos que criam a conta admin: a copia em bloco dos mocks, o
+    // laco de sincronizacao e o bloco acima. Tratar em cada um deixava buraco
+    // — a copia em bloco roda primeiro e passava por cima. Entao a definicao
+    // fica aqui, no fim, valendo para todos.
+    // So preenche quando esta VAZIA: senha de producao nunca e sobrescrita.
+    {
+      const adm = d.funcionarios.find(function (f) { return (f.login || '').toLowerCase() === 'admin'; });
+      if (adm && !adm.senha) {
+        adm.senha = process.env.ADMIN_SENHA
+          ? hashSenhaServer(String(process.env.ADMIN_SENHA))
+          : '6101ed3e13dcdc5ea80901f4c5e1c9152d55b33b077b9f0b6ec30e72bf082e08';
+        mudou = true;
+        if (!process.env.ADMIN_SENHA) {
+          console.warn('[RT] ADMIN_SENHA nao definida — admin nasceu com a senha PUBLICA.');
+          console.warn('[RT] Defina ADMIN_SENHA no Coolify, ou troque no primeiro login.');
+        }
+      }
     }
 
     if (mudou) {
@@ -856,8 +924,13 @@ http.createServer(function (req, res) {
       const seguro = String(req.headers['x-forwarded-proto'] || '').indexOf('https') >= 0;
       const cookie = 'rt_session=' + token + '; HttpOnly; Path=/; Max-Age=' + (SESSION_TTL / 1000) + '; SameSite=Lax' + (seguro ? '; Secure' : '');
       const semSenha = Object.assign({}, u); delete semSenha.senha;
+      // Entrou com uma senha que esta publica no GitHub: a sessao vale (senao a
+      // pessoa nem conseguiria trocar), mas a tela vai exigir a troca antes de
+      // liberar o sistema.
+      const trocaObrigatoria = senhaEhPublica(senha);
+      if (trocaObrigatoria) console.warn('[RT] ' + u.login + ' entrou com senha publica — troca exigida.');
       res.writeHead(200, Object.assign({ 'Content-Type': 'application/json; charset=utf-8', 'Set-Cookie': cookie }, SECURITY_HEADERS));
-      res.end(JSON.stringify({ ok: true, user: semSenha }));
+      res.end(JSON.stringify({ ok: true, user: semSenha, trocaObrigatoria: trocaObrigatoria }));
     });
     return;
   }
@@ -2215,17 +2288,17 @@ function resumoDosDados() {
     console.warn('  *** Rode:  node limpar-fotos-embutidas.cjs --aplicar');
   }
 
-  // Senhas fracas: as contas de exemplo do js/data.js ('123', 'clinica123'...)
+  // Senhas que ja estiveram publicas no repositorio.
   // estão no repositório do GitHub. Se alguém nunca trocou, essas senhas valem
   // no sistema no ar. Avisa quem precisa trocar SEM imprimir a senha.
   try {
-    const fracas = ['123', '1234', '12345', '123456', 'senha', 'admin', 'clinica123', 'gruport07072026'];
+    // Mesma fonte do login: uma lista so, para nunca divergirem.
     const hashesFracos = {};
-    fracas.forEach(function (s) { hashesFracos[hashSenhaServer(s)] = true; });
+    HASH_SENHAS_PUBLICAS.forEach(function (h) { hashesFracos[h] = true; });
     const emRisco = (Array.isArray(d.funcionarios) ? d.funcionarios : [])
       .filter(function (f) {
         const s = String(f && f.senha || '');
-        return fracas.indexOf(s) >= 0 || hashesFracos[s] === true;
+        return hashesFracos[s] === true || senhaEhPublica(s);
       })
       .map(function (f) { return f.login; });
     if (emRisco.length) {

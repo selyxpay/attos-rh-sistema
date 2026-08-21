@@ -1,6 +1,13 @@
 // Dados iniciais e mockups para o sistema R&T Empregos
 // Estes dados são carregados no localStorage no primeiro acesso.
 
+// ── NUNCA ESCREVA SENHA NESTE ARQUIVO ──────────────────────────────────────
+// Ele vai para o GitHub. As senhas que estavam aqui — inclusive a real do
+// administrador — ficaram publicas, e continuam no historico do
+// git mesmo depois de removidas. O servidor agora EXIGE a troca no proximo
+// login de quem ainda usa alguma delas (SENHAS_PUBLICAS no server.cjs).
+// Conta sem senha nao entra — quem administra define a senha em Funcionarios.
+// ───────────────────────────────────────────────────────────────────────────
 const INITIAL_DATA = {
   // Funcionários internos para controle de acesso/login e permissões
   funcionarios: [
@@ -9,7 +16,7 @@ const INITIAL_DATA = {
       nome: 'Administrador RT',
       email: 'admin@rtempregos.com',
       login: 'admin',
-      senha: '6101ed3e13dcdc5ea80901f4c5e1c9152d55b33b077b9f0b6ec30e72bf082e08', // gruport07072026 (SHA-256)
+      senha: '',   // o servidor define pela variavel ADMIN_SENHA (nunca aqui)
       departamento: 'administracao',
       cargo: 'Administrador Geral',
       status: 'ativo',
@@ -35,7 +42,7 @@ const INITIAL_DATA = {
       nome: 'Maria da Seleção',
       email: 'maria@rtempregos.com',
       login: 'maria',
-      senha: '123',
+      senha: '',   // sem senha de fabrica: quem cria a conta define
       departamento: 'selecao',
       cargo: 'Representante da Seleção',
       status: 'ativo',
@@ -60,7 +67,7 @@ const INITIAL_DATA = {
       nome: 'Carlos do DP',
       email: 'carlos@rtempregos.com',
       login: 'carlos',
-      senha: '123',
+      senha: '',   // sem senha de fabrica: quem cria a conta define
       departamento: 'dp',
       cargo: 'Representante do DP',
       status: 'ativo',
@@ -85,7 +92,7 @@ const INITIAL_DATA = {
       nome: 'Pedro da Comissão',
       email: 'pedro@rtempregos.com',
       login: 'pedro',
-      senha: '123',
+      senha: '',   // sem senha de fabrica: quem cria a conta define
       departamento: 'comissao',
       cargo: 'Analista Financeiro',
       status: 'ativo',
@@ -110,7 +117,7 @@ const INITIAL_DATA = {
       nome: 'João Balaf (Admin)',
       email: 'joaobalaf@rtempregos.com',
       login: 'joaobalaf',
-      senha: '.jJ970262405',
+      senha: '',   // sem senha de fabrica: quem cria a conta define
       departamento: 'administracao',
       cargo: 'Administrador Geral',
       status: 'ativo',
@@ -136,7 +143,7 @@ const INITIAL_DATA = {
       nome: 'Clínica Médica RT',
       email: 'clinica@rtempregos.com',
       login: 'clinica',
-      senha: 'clinica123',
+      senha: '',   // sem senha de fabrica: quem cria a conta define
       departamento: 'clinica',
       cargo: 'Clínica Parceira',
       status: 'ativo',

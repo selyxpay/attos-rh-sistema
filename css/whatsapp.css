@@ -316,3 +316,85 @@
   .wa-stat, .wa-mini-note, .wa-modal, .wa-search input, .wa-form input, .wa-form textarea, .wa-tpl-opt, .wa-conex-card, .wa-conta-sel select { background: var(--card-bg, #1e293b); }
   .wa-table th { background: rgba(255,255,255,.03); }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TELA CHEIA — igual ao WhatsApp Web
+   --------------------------------------------------------------------------
+   Atender é a única coisa que se faz aqui por horas seguidas. Nesse modo some
+   tudo que não é a conversa: a barra lateral do sistema, o cabeçalho e o
+   banner do módulo. O que sobra é a caixa de entrada ocupando a tela inteira.
+   Sai com o mesmo botão ou com Esc.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.wa-btn-tela-cheia {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: transparent;
+  border: 1px solid var(--color-glass-border, #E5E5E5);
+  border-radius: var(--radius-md, 8px);
+  padding: 8px 14px;
+  font-size: 13px; font-weight: 600;
+  color: var(--color-text-main, #262626);
+  cursor: pointer;
+  transition: border-color .15s ease, color .15s ease;
+}
+.wa-btn-tela-cheia:hover {
+  border-color: var(--color-rt-red, #D40203);
+  color: var(--color-rt-red, #D40203);
+}
+
+body.wa-tela-cheia .sidebar,
+body.wa-tela-cheia .app-header,
+body.wa-tela-cheia #aba-whatsapp .mod-header-banner,
+body.wa-tela-cheia #aba-whatsapp .wa-subtabs { display: none !important; }
+
+/* O conteúdo principal costuma reservar espaço para a barra lateral. Aqui
+   ele volta a começar do zero — senão a conversa fica com uma faixa vazia. */
+body.wa-tela-cheia .main-layout {
+  margin-left: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+body.wa-tela-cheia .wa-container { max-width: 100% !important; }
+body.wa-tela-cheia #aba-whatsapp { padding: 0 !important; }
+
+/* A caixa de entrada passa a ser a tela. Sem borda nem canto arredondado:
+   não há mais "cartão dentro da página", a página é ela. */
+body.wa-tela-cheia .wa-inbox {
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  min-height: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+/* Em tela grande sobra espaço: a lista e a ficha podem respirar. */
+@media (min-width: 1500px) {
+  body.wa-tela-cheia .wa-inbox { grid-template-columns: 380px minmax(0, 1fr) 330px; }
+}
+
+/* O botão de sair fica flutuando, porque o cabeçalho que tinha o outro sumiu. */
+.wa-sair-tela-cheia {
+  display: none;
+  position: fixed; top: 12px; right: 16px; z-index: 9999;
+  align-items: center; gap: 7px;
+  background: rgba(23, 23, 23, .82);
+  color: #fff;
+  border: none; border-radius: var(--radius-pill, 9999px);
+  padding: 8px 15px;
+  font-size: 12.5px; font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .22);
+}
+body.wa-tela-cheia .wa-sair-tela-cheia { display: inline-flex; }
+.wa-sair-tela-cheia:hover { background: var(--color-rt-red, #D40203); }
+
+body.wa-tela-cheia { overflow: hidden; }
+
+@media (max-width: 900px) {
+  body.wa-tela-cheia .wa-inbox { height: 100dvh !important; }
+  .wa-sair-tela-cheia { top: 8px; right: 10px; padding: 7px 12px; }
+}
+
+@media print { .wa-btn-tela-cheia, .wa-sair-tela-cheia { display: none !important; } }
