@@ -15668,6 +15668,10 @@ function _ffRenderDetalhe() {
     if (f.status === 'pago' && _ffEhFinanceiro()) {
       b.push(`<button class="btn btn-success" onclick="document.getElementById('input-comprovante-fluxo').click()"><i class="fa-solid fa-receipt"></i> Anexar Comprovante</button>`);
     }
+    // Desfaz um "Pagamento Realizado" marcado por engano — só o Financeiro vê.
+    if ((f.status === 'pago' || f.status === 'finalizado') && _ffEhFinanceiro()) {
+      b.push(`<button class="btn btn-outline" style="border-color:#D97706;color:#D97706;" onclick="ffVoltarParaPagamento()" title="Desfaz a confirmação de pagamento e devolve pra fila do Financeiro"><i class="fa-solid fa-rotate-left"></i> Voltar p/ Pagamento</button>`);
+    }
     // Cancelar: disponível para fluxos JÁ enviados (nunca apaga — preserva o histórico)
     if (!['rascunho', 'finalizado', 'cancelado'].includes(f.status) &&
         (ehMestre(loggedUser.login) || _ffEhCriador(f) || _ffEhGestao() || _ffEhCoordenacao() || _ffVeTudo())) {
@@ -16333,6 +16337,30 @@ window.anexarComprovanteFluxo = async function(input) {
   } catch (e) {
     alert('Não foi possível anexar: ' + (e.message || e));
   }
+};
+
+// VOLTAR PARA PAGAMENTO: desfaz uma confirmação de pagamento feita por engano
+// (ex.: marcaram "Pagamento Realizado" sem ter pago de verdade). Devolve a
+// ficha pra fila "Aguardando Financeiro", como se o pagamento ainda não
+// tivesse sido confirmado — pra dar pra pagar direito. Só o Financeiro (ou o
+// mestre) decide isso; nunca apaga nada, fica tudo no histórico.
+window.ffVoltarParaPagamento = async function() {
+  const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
+  if (!f) return;
+  if (!['pago', 'finalizado'].includes(f.status) || !_ffEhFinanceiro()) return;
+  const motivo = prompt('Por que este pagamento está voltando para a fila? (fica no histórico)');
+  if (motivo === null) return;
+  if (!String(motivo).trim()) { alert('Escreva o motivo.'); return; }
+  const estadoAnterior = (FF_STATUS[f.status] || {}).rotulo || f.status;
+  const tinhaComprovante = !!f.comprovante;
+  f.status = 'aguardando_financeiro';
+  f.aprovacoes = f.aprovacoes || {};
+  f.aprovacoes.pagamento = null;
+  f.comprovante = null;
+  _ffHist(f, `Voltou de "${estadoAnterior}" para Aguardando Financeiro. Motivo: ${String(motivo).trim()}` +
+    (tinhaComprovante ? ' (o comprovante anexado foi removido).' : '.'));
+  registrarLogGlobal(`Voltou o Fluxo Financeiro #${f.numero} para a fila de pagamento.`, 'dp');
+  await _ffSalvarERender(f, `Fluxo #${f.numero} voltou para "Aguardando Financeiro". Já pode refazer o pagamento.`);
 };
 
 // Sub-aba ativa do Exame Médico: pendentes | concluidos | todos | relatorio
