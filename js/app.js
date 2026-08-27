@@ -12323,13 +12323,28 @@ function _ffMapaDeColunas(linhas) {
     if (!/nome\s+do?\s+funcion/i.test(juntou)) continue;
     if (!/c\.?\s*p\.?\s*f\.?/i.test(juntou)) continue;
 
+    // Testa cada pedaço sozinho primeiro; só junta com o(s) vizinho(s) se
+    // nada bateu ainda. "Nome do funcionário" (ou "...pensionista") no PDF
+    // comum costuma vir como UM pedaço só, mas no OCR cada palavra sai
+    // separada ("Nome" / "do" / "funcionário------") — sem essa janela, a
+    // coluna nunca era reconhecida vinda de imagem.
     const mapa = {};
-    linha.pedacos.forEach(p => {
-      const txt = String(p.str || '').trim();
-      if (!txt) return;
-      const achou = FF_COLUNAS.find(c => c.rx.test(txt));
-      if (achou && mapa[achou.campo] === undefined) mapa[achou.campo] = p.x;
-    });
+    const pedacos = linha.pedacos;
+    for (let i = 0; i < pedacos.length; i++) {
+      let usado = 1;
+      const max = Math.min(4, pedacos.length - i);
+      for (let n = 1; n <= max; n++) {
+        const janela = pedacos.slice(i, i + n).map(p => String(p.str || '').trim()).filter(Boolean).join(' ');
+        if (!janela) continue;
+        const achou = FF_COLUNAS.find(c => c.rx.test(janela));
+        if (achou) {
+          if (mapa[achou.campo] === undefined) mapa[achou.campo] = pedacos[i].x;
+          usado = n;
+          break;
+        }
+      }
+      i += usado - 1;
+    }
     // Precisa ao menos de nome, CPF e valor para valer a pena
     if (mapa.nome !== undefined && mapa.cpf !== undefined && mapa.valor !== undefined) {
       return { mapa, y: linha.y, pagina: linha.pagina };
