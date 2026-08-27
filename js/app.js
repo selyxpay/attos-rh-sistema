@@ -12295,6 +12295,10 @@ async function _ffLerPdf(file) {
 const FF_COLUNAS = [
   { campo: 'codigo',  rx: /^fl\.?\s*c[óo]digo|^c[óo]digo/i },
   { campo: 'nome',    rx: /nome\s+do?\s+funcion/i },
+  // Relatório de Pensão Alimentícia: quem RECEBE o dinheiro é o pensionista,
+  // não o funcionário (dele só saiu o desconto). Coluna própria pra não
+  // grudar os dois nomes num só campo.
+  { campo: 'pensionista', rx: /nome\s+do\s+pensionista/i },
   { campo: 'cpf',     rx: /^c\.?\s*p\.?\s*f\.?/i },
   { campo: 'demissao',rx: /demiss/i },
   { campo: 'comp',    rx: /^comp/i },
@@ -12303,7 +12307,10 @@ const FF_COLUNAS = [
   { campo: 'tc',      rx: /^tcta|^t\.?\s*cta/i },
   { campo: 'agencia', rx: /^age/i },
   { campo: 'conta',   rx: /conta\s+banc/i },
-  { campo: 'valor',   rx: /valor\s+l[íi]quido|^valor$/i },
+  // \b em vez de $: alguns modelos (ex.: SFP0594) imprimem "Valor--------"
+  // (traço decorativo de preenchimento colado na palavra) — sem isso o
+  // cabeçalho inteiro deixava de ser reconhecido por causa só do "Valor".
+  { campo: 'valor',   rx: /valor\s+l[íi]quido|^valor\b/i },
   { campo: 'origem',  rx: /^orig/i }
 ];
 
@@ -12356,10 +12363,51 @@ function _ffLerPorColuna(linhasComPosicao) {
   if (!Array.isArray(linhasComPosicao) || !linhasComPosicao.length) return null;
   const cab = _ffMapaDeColunas(linhasComPosicao);
   if (!cab) return null;
+  // Relatório de Pensão Alimentícia: tem uma coluna "Nome do pensionista"
+  // além de "Nome do funcionário". Esse relatório às vezes não imprime o CPF
+  // do pensionista — por isso, só pra ESTE modelo, o nome (não o CPF) é quem
+  // decide se a linha vale.
+  const temPensionista = cab.mapa.pensionista !== undefined;
 
   const out = [];
   linhasComPosicao.forEach(linha => {
+    // A própria linha do cabeçalho não é gente — sem isto, o rótulo da coluna
+    // ("Nome do pensionista...") virava um "registro" fantasma.
+    if (linha.pagina === cab.pagina && linha.y === cab.y) return;
     const col = _ffEncaixarNasColunas(linha.pedacos, cab.mapa);
+
+    if (temPensionista) {
+      const nomePensionista = String(col.pensionista || '').replace(/[^\p{L}\s'.-]/gu, ' ').replace(/\s+/g, ' ').trim();
+      // Linha de total/rodapé ("Total das pensões...") não é gente — mesmo
+      // que caia por baixo da coluna do pensionista.
+      if (/^total\b/i.test(nomePensionista) || nomePensionista.length < 3) return;
+      const nomeFunc = String(col.nome || '').replace(/[^\p{L}\s'.-]/gu, ' ').replace(/\s+/g, ' ').trim();
+      const cpfBrutoP = String(col.cpf || '').replace(/\s/g, '');
+      const cpfValidoP = /^\d{3}[.,\-]?\d{3}[.,\-]?\d{3}[.,\-]?\d{2}$/.test(cpfBrutoP);
+      const achadosP = [...String(col.valor || '').matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})/g)];
+      const semValorP = !achadosP.length;
+      const valorP = semValorP ? 0 : _ffParseValor(achadosP[achadosP.length - 1][1]);
+      const meioP = _ffParseMeioExata([col.banco, col.lote, col.tc, col.agencia, col.conta].filter(Boolean).join(' '));
+      out.push({
+        id: 'ffl-' + Date.now() + '-' + out.length + '-' + Math.random().toString(36).slice(2, 5),
+        codigo: String(col.codigo || '').replace(/\D/g, ''),
+        // O pagamento é PARA o pensionista — o nome do funcionário fica só de
+        // referência (é dele que saiu o desconto), pra não sumir da ficha.
+        nome: nomeFunc ? `${nomePensionista} (pensão — func. ${nomeFunc})` : nomePensionista,
+        cpf: cpfValidoP ? _ffNormalizarCpf(cpfBrutoP) : '',
+        valor: valorP,
+        origem: 'Pensão',
+        semValorNoPdf: semValorP,
+        lidoPorColuna: true,
+        status: (nomePensionista.length >= 3 && (valorP > 0 || semValorP)) ? 'ok' : 'conferir',
+        banco: meioP.banco || String(col.banco || '').replace(/\D/g, ''),
+        lote: meioP.lote || String(col.lote || '').replace(/\D/g, ''),
+        tc: meioP.tc || String(col.tc || '').trim(),
+        agencia: meioP.agencia, agenciaDg: meioP.agenciaDg,
+        conta: meioP.conta, contaDg: meioP.contaDg
+      });
+      return;
+    }
 
     // Uma pessoa tem CPF na coluna do CPF. Total, cabeçalho e rodapé não têm —
     // e é só isso que precisamos verificar. Nada de adivinhar por palavra.
@@ -12608,7 +12656,8 @@ function _ffAnalisarTexto(texto) {
 
   // Modelo detectado (só para o relatório/rótulo — a leitura funciona nos dois)
   let modelo = 'Genérico';
-  if (/tot\.?\s*cliente|ordem\s+pagamento|total\s+da\s+rela[çc][ãa]o/i.test(txt)) modelo = 'Relação bancária (RT2)';
+  if (/pens[ãa]o\s+aliment[íi]cia|nome\s+do\s+pensionista|sfp0594/i.test(txt)) modelo = 'Pensão Alimentícia (SFP0594)';
+  else if (/tot\.?\s*cliente|ordem\s+pagamento|total\s+da\s+rela[çc][ãa]o/i.test(txt)) modelo = 'Relação bancária (RT2)';
   else if (/sfp99024|sub[\s-]*total|total\s+geral|rela[çc][ãa]o\s+N\./i.test(txt)) modelo = 'SFP99024 (RT1)';
 
   // Metadados
@@ -12641,6 +12690,9 @@ function _ffAnalisarTexto(texto) {
     // ── Totais impressos (nunca viram registro) ──
     const mTG = linha.match(/total\s+geral\s*(?:R\$)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i);
     if (mTG) { totalGeralM1 = _ffParseValor(mTG[1]); return; }
+    // Relatório de Pensão Alimentícia: "Total das pensoes 282,85"
+    const mTP = linha.match(/total\s+das\s+pens[õo]es\s*(?:R\$)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i);
+    if (mTP) { totalGeralM1 = _ffParseValor(mTP[1]); return; }
     const mSub = linha.match(/sub[\s-]*total\s*(?:R\$)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i);
     if (mSub) { subTotal = _ffParseValor(mSub[1]); return; }
     // Modelo 2: "Tot.Cliente - EBAZAR CAJAMAR 130,00" — soma p/ o total do documento
