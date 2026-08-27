@@ -12493,6 +12493,34 @@ function _ffCarregarOcr() {
     .catch(() => { _ffOcrCarregando = null; return false; });
 }
 
+// Converte o hOCR (HTML com a posição de cada palavra, formato padrão do
+// Tesseract) no MESMO formato "linhasComPosicao" que o PDF comum devolve —
+// assim a leitura por coluna (_ffLerPorColuna) funciona igual, mesmo vindo de
+// uma imagem escaneada. Cada .ocr_line do Tesseract já É uma linha da tabela;
+// cada .ocrx_word dentro dela carrega a própria posição horizontal (bbox).
+function _ffHocrParaLinhas(hocrHtml, pagina) {
+  const linhas = [];
+  if (!hocrHtml) return linhas;
+  let doc;
+  try { doc = new DOMParser().parseFromString(hocrHtml, 'text/html'); } catch (e) { return linhas; }
+  const bboxDe = el => {
+    const m = (el.getAttribute('title') || '').match(/bbox\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/);
+    return m ? { x0: +m[1], y0: +m[2] } : null;
+  };
+  doc.querySelectorAll('.ocr_line').forEach((linhaEl, i) => {
+    const bb = bboxDe(linhaEl);
+    const pedacos = [];
+    linhaEl.querySelectorAll('.ocrx_word').forEach(wEl => {
+      const txt = (wEl.textContent || '').trim();
+      if (!txt) return;
+      const wb = bboxDe(wEl);
+      pedacos.push({ str: txt, x: wb ? wb.x0 : 0 });
+    });
+    if (pedacos.length) linhas.push({ pagina, y: bb ? bb.y0 : i, pedacos });
+  });
+  return linhas;
+}
+
 // Lê as letras das imagens das páginas. `aviso` recebe o texto de andamento.
 async function _ffLerPdfPorImagem(file, aviso) {
   if (aviso) aviso('Este PDF é uma imagem. Carregando o leitor de imagem...');
@@ -12511,6 +12539,7 @@ async function _ffLerPdfPorImagem(file, aviso) {
     'O dicionário do leitor de imagem demorou demais para baixar. Tente de novo com uma internet melhor.');
 
   let texto = '';
+  const linhasComPosicao = [];
   try {
     for (let p = 1; p <= paginas; p++) {
       if (aviso) aviso(`Lendo a imagem da página ${p} de ${paginas}... (é mais devagar que PDF comum)`);
@@ -12529,16 +12558,20 @@ async function _ffLerPdfPorImagem(file, aviso) {
       await pagina.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
       // 90s por página. Página de bancária leva 10 a 20s num computador comum;
       // se passar disso, alguma coisa travou e é melhor dizer do que esperar.
-      const r = await _ffComPrazo(worker.recognize(canvas), 90000,
+      // Pede também o hOCR (a posição de cada palavra) — é o que permite ler
+      // por coluna depois, igual um PDF comum (ver _ffHocrParaLinhas).
+      const r = await _ffComPrazo(worker.recognize(canvas, {}, { text: true, hocr: true }), 90000,
         `A leitura da página ${p} passou de 90 segundos e foi interrompida.`);
       texto += ((r && r.data && r.data.text) || '') + '\n';
+      try { linhasComPosicao.push(..._ffHocrParaLinhas((r && r.data && r.data.hocr) || '', p)); }
+      catch (e) { console.error('[FF] hOCR desta página não deu pra aproveitar:', e); }
       canvas.width = canvas.height = 0;   // devolve a memória na hora
     }
   } finally {
     try { await worker.terminate(); } catch (e) {}
     try { doc.destroy(); } catch (e) {}
   }
-  return { texto: _ffArrumarTextoOcr(texto), paginas, letras: texto.replace(/\s/g, '').length };
+  return { texto: _ffArrumarTextoOcr(texto), paginas, letras: texto.replace(/\s/g, '').length, linhasComPosicao };
 }
 
 // O OCR erra de um jeito previsível em tabela bancária. Estas trocas são só
@@ -15233,7 +15266,25 @@ async function criarFluxoFinanceiro() {
                   `e na primeira vez baixa o leitor.\n\nQuer que eu tente?`)) {
         try {
           const porImagem = await _ffLerPdfPorImagem(f, msg => { if (txt) txt.textContent = msg; });
-          const analiseImg = _ffAnalisarTexto(porImagem.texto);
+          let analiseImg = _ffAnalisarTexto(porImagem.texto);
+          // MESMA leitura por coluna do PDF comum, agora com a posição de cada
+          // palavra que o OCR devolve (hOCR). Sem isso, um relatório com duas
+          // pessoas na mesma linha (Pensão Alimentícia) nunca separa os nomes
+          // quando o PDF é escaneado — só functionava pra PDF com texto.
+          try {
+            const porColunaImg = _ffLerPorColuna(porImagem.linhasComPosicao);
+            if (porColunaImg && porColunaImg.length >= (analiseImg.linhas || []).length) {
+              const somaColImg = porColunaImg.reduce((s, l) => s + Number(l.valor || 0), 0);
+              const somaTxtImg = (analiseImg.linhas || []).reduce((s, l) => s + Number(l.valor || 0), 0);
+              const alvoImg = analiseImg.totalGeral || analiseImg.subTotal || null;
+              const melhorImg = alvoImg
+                ? Math.abs(somaColImg - alvoImg) <= Math.abs(somaTxtImg - alvoImg)
+                : porColunaImg.length > (analiseImg.linhas || []).length || somaColImg >= somaTxtImg;
+              if (melhorImg) { analiseImg = Object.assign({}, analiseImg, { linhas: porColunaImg }); lidoPorColuna = true; }
+            }
+          } catch (e) {
+            console.error('[FF] leitura por coluna (via OCR) falhou, seguindo pelo texto do OCR:', e);
+          }
           if (analiseImg.linhas.length) {
             texto = porImagem.texto; analise = analiseImg; lidoPorImagem = true;
           }
