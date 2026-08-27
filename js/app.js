@@ -12755,6 +12755,20 @@ function _ffAnalisarTexto(texto) {
     }));
   });
 
+  // Pensão Alimentícia por TEXTO CORRIDO (sem posição de coluna — PDF escaneado
+  // que caiu no OCR, por exemplo): nome do funcionário e do pensionista vêm
+  // colados, sem nada que separe os dois. Ler por coluna resolve isso (ver
+  // _ffLerPorColuna); aqui, sem coluna, não tem como confiar cegamente —
+  // então marca pra CONFERÊNCIA em vez de fingir que o nome saiu certo.
+  if (modelo === 'Pensão Alimentícia (SFP0594)') {
+    out.forEach(l => {
+      if (!l.lidoPorColuna) {
+        l.status = 'conferir';
+        if (!/conferir nome/i.test(l.origem || '')) l.origem = (l.origem ? l.origem + ' — ' : '') + 'conferir nome (2 pessoas na linha)';
+      }
+    });
+  }
+
   // Total do documento: modelo 1 usa "Total Geral"; modelo 2 usa a soma dos
   // "Tot.Cliente". Sem nenhum dos dois, fica null (o painel avisa "sem total").
   const totalGeral = (totalGeralM1 !== null) ? totalGeralM1 : (temTotCliente ? somaTotCliente : null);
