@@ -129,6 +129,144 @@
 .diaria-doc .diaria-tabela tr:last-child td { border-bottom: none; }
 .diaria-doc .diaria-tabela code { white-space: nowrap; }
 
+.diaria-spec-aviso {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    background: var(--bg-main);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin: 0 0 14px;
+}
+
+/* ============================================================================
+   DIÁRIA — painel funcional (Fase 1): diárias, presença ao vivo, cadastros
+   ========================================================================== */
+.diaria-subnav {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--border-color);
+    overflow-x: auto;
+}
+.diaria-subnav-btn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 10px 14px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.diaria-subnav-btn:hover { color: var(--text-primary); }
+.diaria-subnav-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+.diaria-subnav-btn-fraco { margin-left: auto; opacity: .7; }
+.diaria-badge {
+    background: var(--primary);
+    color: #fff;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 800;
+    padding: 1px 7px;
+    line-height: 1.5;
+}
+
+.diaria-sub-conteudo { min-height: 80px; }
+.diaria-carregando, .diaria-vazio, .diaria-erro-carregar {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 13.5px;
+    padding: 30px 10px;
+}
+.diaria-erro-carregar { color: #DC2626; }
+
+.diaria-toolbar { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+.diaria-form-nova {
+    background: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.diaria-form-nova .diaria-campo:first-child { grid-column: 1 / -1; }
+.diaria-form-nova button { grid-column: 1 / -1; justify-self: start; }
+.diaria-campo label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+}
+.diaria-campo input {
+    width: 100%;
+    padding: 9px 11px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    font-size: 13.5px;
+    font-family: inherit;
+}
+
+.diaria-subtitulo {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: var(--text-secondary);
+    margin: 20px 0 8px;
+}
+.diaria-lista { display: flex; flex-direction: column; gap: 8px; }
+.diaria-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    background: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 12px 16px;
+}
+.diaria-item-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 160px; }
+.diaria-item-info b { font-size: 14px; color: var(--text-primary); }
+.diaria-item-info span { font-size: 12px; color: var(--text-secondary); }
+.diaria-item-acoes { display: flex; gap: 8px; margin-left: auto; }
+
+.diaria-status-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--bg-main);
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+.diaria-status-badge.diaria-status-aberta,
+.diaria-status-badge.diaria-status-confirmado { background: #DCFCE7; color: #15803D; }
+.diaria-status-badge.diaria-status-planejada,
+.diaria-status-badge.diaria-status-aguardando { background: #FEF9C3; color: #854D0E; }
+.diaria-status-badge.diaria-status-encerrada { background: #E2E8F0; color: #475569; }
+.diaria-status-badge.diaria-status-recusado { background: #FEE2E2; color: #B91C1C; }
+
+.diaria-presenca-topo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+.diaria-presenca-topo b { font-size: 15px; }
+.diaria-presenca-contadores { display: block; font-size: 12.5px; color: var(--text-secondary); margin-top: 2px; }
+.diaria-presenca-acoes { display: flex; gap: 8px; }
+
 @media (max-width: 768px) {
     .diaria-doc { padding: 18px 16px; font-size: 14px; }
+    .diaria-form-nova { grid-template-columns: 1fr; }
+    .diaria-item { flex-direction: column; align-items: flex-start; }
+    .diaria-item-acoes { margin-left: 0; width: 100%; }
 }

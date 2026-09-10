@@ -39,20 +39,20 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260910a">
+    <link rel="stylesheet" href="css/style.css?v=20260910b">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260910a">
+    <link rel="stylesheet" href="css/design-system.css?v=20260910b">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260910a">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260910b">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260910a">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260910a">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260910b">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260910b">
     <!-- Margem — custo do exame na clinica x valor repassado ao cliente -->
-    <link rel="stylesheet" href="css/margem.css?v=20260910a">
+    <link rel="stylesheet" href="css/margem.css?v=20260910b">
     <!-- Diária (Presença RT) — página de referência/especificação -->
-    <link rel="stylesheet" href="css/diaria.css?v=20260910a">
+    <link rel="stylesheet" href="css/diaria.css?v=20260910b">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260910a">
+    <link rel="stylesheet" href="css/mobile.css?v=20260910b">
 </head>
 <body class="app-shell">
 
@@ -1290,10 +1290,30 @@
                     <div class="diaria-container">
                         <div class="diaria-topo">
                             <h2><i class="fa-solid fa-calendar-day"></i> Diária — Presença RT</h2>
-                            <p>Anotação da ideia/arquitetura deste projeto futuro. Ninguém além de
-                               quem administra o sistema vê esta aba.</p>
+                            <p>Controle de quem trabalha nas diárias de campo: cadastro do trabalhador,
+                               presença confirmada por GPS e aprovação de quem está no local.</p>
                         </div>
-                        <div id="aba-diaria-conteudo" class="diaria-doc"></div>
+
+                        <div class="diaria-subnav">
+                            <button class="diaria-subnav-btn active" data-diaria-sub="diarias">
+                                <i class="fa-solid fa-calendar-days"></i> Diárias</button>
+                            <button class="diaria-subnav-btn" data-diaria-sub="presenca">
+                                <i class="fa-solid fa-list-check"></i> Presença ao vivo</button>
+                            <button class="diaria-subnav-btn" data-diaria-sub="cadastros">
+                                <i class="fa-solid fa-user-clock"></i> Cadastros
+                                <span id="diaria-badge-pendentes" class="diaria-badge" style="display:none;"></span></button>
+                            <button class="diaria-subnav-btn diaria-subnav-btn-fraco" data-diaria-sub="spec">
+                                <i class="fa-solid fa-file-lines"></i> Especificação</button>
+                        </div>
+
+                        <div id="diaria-sub-diarias" class="diaria-sub-conteudo"></div>
+                        <div id="diaria-sub-presenca" class="diaria-sub-conteudo" style="display:none;"></div>
+                        <div id="diaria-sub-cadastros" class="diaria-sub-conteudo" style="display:none;"></div>
+                        <div id="diaria-sub-spec" class="diaria-sub-conteudo" style="display:none;">
+                            <p class="diaria-spec-aviso">Nota original guardada como referência — o sistema
+                               acima já é a versão em funcionamento (Fase 1: núcleo).</p>
+                            <div id="aba-diaria-conteudo" class="diaria-doc"></div>
+                        </div>
                     </div>
                 </section>
 
@@ -4021,12 +4041,12 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260910a"></script>
-    <script src="js/vps-sync.js?v=20260910a"></script>
-    <script src="js/exata-catalogo.js?v=20260910a"></script>
-    <script src="js/data.js?v=20260910a"></script>
-    <script src="js/app.js?v=20260910a"></script>
-    <script src="js/whatsapp.js?v=20260910a"></script>
+    <script src="js/security.js?v=20260910b"></script>
+    <script src="js/vps-sync.js?v=20260910b"></script>
+    <script src="js/exata-catalogo.js?v=20260910b"></script>
+    <script src="js/data.js?v=20260910b"></script>
+    <script src="js/app.js?v=20260910b"></script>
+    <script src="js/whatsapp.js?v=20260910b"></script>
     <!-- Sair da tela cheia do WhatsApp. Fica fora da aba porque o cabecalho
          que tinha o outro botao some nesse modo. -->
     <button class="wa-sair-tela-cheia" onclick="waTelaCheia(false)" title="Sair da tela cheia (Esc)">

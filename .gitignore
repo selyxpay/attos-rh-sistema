@@ -5,6 +5,7 @@ node_modules/
 *.log
 server-data-test/
 server-data-local/
+server-data-preview/
 INICIAR-SISTEMA-LOCAL.bat
 
 # Variáveis de ambiente (NUNCA devem ir para o Git)

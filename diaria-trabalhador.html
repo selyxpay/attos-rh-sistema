@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diária — Presença RT</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/png" href="img/logo-rt.png">
+  <link rel="apple-touch-icon" href="img/logo-rt.png">
+  <meta name="theme-color" content="#e11d2a">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+        integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/design-system.css">
+  <style>
+    /* Mobile-first de propósito: quem usa isso é gente na rua, com pressa,
+       celular no sol. Botão grande, pouca palavra. */
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: 'Inter', sans-serif;
+      background: #0f172a; color: #0f172a; min-height: 100dvh;
+    }
+    .dtr-topo {
+      background: #0b1f3a; color: #fff; padding: 18px 20px;
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 15px;
+    }
+    .dtr-topo img { width: 30px; height: 30px; border-radius: 50%; }
+    .dtr-corpo { max-width: 460px; margin: 0 auto; padding: 20px 16px 60px; }
+    .dtr-card {
+      background: #fff; border-radius: 16px; padding: 22px 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.15); margin-bottom: 16px;
+    }
+    .dtr-card h2 { margin: 0 0 6px; font-size: 18px; }
+    .dtr-card p.dtr-sub { margin: 0 0 18px; color: #64748b; font-size: 13.5px; line-height: 1.5; }
+    .dtr-campo { margin-bottom: 14px; }
+    .dtr-campo label { display: block; font-size: 12.5px; font-weight: 600; color: #334155; margin-bottom: 5px; }
+    .dtr-campo input {
+      width: 100%; padding: 13px 14px; border-radius: 10px; border: 1.5px solid #e2e8f0;
+      font-size: 15px; font-family: inherit;
+    }
+    .dtr-campo input:focus { outline: none; border-color: #e11d2a; }
+    .dtr-btn {
+      width: 100%; padding: 15px; border: none; border-radius: 12px;
+      background: #e11d2a; color: #fff; font-size: 15.5px; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .dtr-btn:disabled { opacity: .6; cursor: default; }
+    .dtr-btn.dtr-btn-grande { padding: 22px; font-size: 18px; border-radius: 16px; }
+    .dtr-btn.dtr-btn-ok { background: #16a34a; }
+    .dtr-erro {
+      background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;
+      padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; display: none;
+    }
+    .dtr-faixa {
+      display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+      border-radius: 12px; font-size: 13.5px; font-weight: 600; margin-bottom: 16px;
+    }
+    .dtr-faixa.pendente_aprovacao { background: #fefce8; color: #854d0e; }
+    .dtr-faixa.ativo { background: #f0fdf4; color: #166534; }
+    .dtr-faixa.bloqueado { background: #fef2f2; color: #991b1b; }
+    .dtr-saudacao { color: #fff; font-size: 15px; margin: 0 0 16px; }
+    .dtr-saudacao b { font-size: 17px; }
+    .dtr-diaria-titulo { font-size: 16px; font-weight: 800; margin: 0 0 3px; }
+    .dtr-diaria-ponto { font-size: 13px; color: #64748b; margin: 0 0 18px; }
+    .dtr-status-ok {
+      text-align: center; padding: 10px 0 4px;
+    }
+    .dtr-status-ok .emoji { font-size: 40px; display: block; margin-bottom: 8px; }
+    .dtr-vazio { text-align: center; color: #94a3b8; padding: 30px 10px; font-size: 14px; }
+    .dtr-vazio i { font-size: 32px; display: block; margin-bottom: 10px; }
+    .dtr-trocar { text-align: center; margin-top: 8px; }
+    .dtr-trocar a { color: rgba(255,255,255,.7); font-size: 12px; text-decoration: none; }
+    .dtr-carregando { text-align: center; color: rgba(255,255,255,.8); padding: 40px 0; }
+  </style>
+</head>
+<body>
+  <div class="dtr-topo">
+    <img src="img/logo-rt.png" alt="R&amp;T" onerror="this.style.display='none'">
+    <span>DIÁRIA — PRESENÇA RT</span>
+  </div>
+  <div class="dtr-corpo">
+    <div id="dtr-carregando" class="dtr-carregando"><i class="fa-solid fa-spinner fa-spin"></i> Carregando…</div>
+
+    <!-- CADASTRO / LOGIN (nome + telefone) -->
+    <div id="dtr-tela-cadastro" class="dtr-card" style="display:none;">
+      <h2><i class="fa-solid fa-user"></i> Identifique-se</h2>
+      <p class="dtr-sub">Se você já se cadastrou antes, é só digitar seu nome e telefone de novo — não precisa preencher tudo outra vez.</p>
+      <p id="dtr-erro-cadastro" class="dtr-erro"></p>
+      <div class="dtr-campo">
+        <label>Nome completo</label>
+        <input type="text" id="dtr-nome" placeholder="Seu nome completo" autocomplete="name">
+      </div>
+      <div class="dtr-campo">
+        <label>Telefone (com DDD)</label>
+        <input type="tel" id="dtr-telefone" placeholder="(11) 98765-4321" inputmode="numeric" autocomplete="tel">
+      </div>
+      <button class="dtr-btn" id="dtr-btn-cadastrar"><i class="fa-solid fa-arrow-right"></i> Entrar / Cadastrar</button>
+    </div>
+
+    <!-- HOME -->
+    <div id="dtr-tela-home" style="display:none;">
+      <p class="dtr-saudacao">Olá, <b id="dtr-home-nome"></b>!</p>
+      <div id="dtr-faixa-status" class="dtr-faixa"></div>
+
+      <div class="dtr-card" id="dtr-card-diaria">
+        <!-- preenchido via JS -->
+      </div>
+
+      <div class="dtr-trocar"><a href="#" id="dtr-link-trocar">Não é você? Trocar de conta</a></div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var TOKEN_KEY = 'diaria_trabalhador_token';
+      var $ = function (id) { return document.getElementById(id); };
+      var estadoAtual = null; // último /status recebido
+      var pollTimer = null;
+
+      function pegarToken() { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
+      function salvarToken(t) { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {} }
+      function limparToken() { try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
+
+      function mostrar(id) {
+        ['dtr-carregando', 'dtr-tela-cadastro', 'dtr-tela-home'].forEach(function (x) {
+          $(x).style.display = x === id ? '' : 'none';
+        });
+      }
+
+      async function chamarApi(rota, opcoes) {
+        const r = await fetch('/api' + rota, opcoes);
+        let dados = null;
+        try { dados = await r.json(); } catch (e) {}
+        if (!r.ok) throw new Error((dados && dados.error) || 'Erro (' + r.status + ')');
+        return dados;
+      }
+
+      const ROTULO_STATUS = {
+        pendente_aprovacao: { emoji: '🟡', texto: 'Aguardando liberação do cadastro' },
+        ativo: { emoji: '🟢', texto: 'Cadastro aprovado' },
+        bloqueado: { emoji: '🔴', texto: 'Acesso bloqueado — fale com o responsável' }
+      };
+
+      function renderHome() {
+        const t = estadoAtual.trabalhador;
+        $('dtr-home-nome').textContent = t.nome;
+        const st = ROTULO_STATUS[t.status] || { emoji: '⚪', texto: t.status };
+        const faixa = $('dtr-faixa-status');
+        faixa.className = 'dtr-faixa ' + t.status;
+        faixa.innerHTML = '<span>' + st.emoji + '</span><span>' + st.texto + '</span>';
+
+        const card = $('dtr-card-diaria');
+        const diaria = estadoAtual.diariaHoje;
+        const presenca = estadoAtual.presenca;
+
+        if (!diaria) {
+          card.innerHTML = '<div class="dtr-vazio"><i class="fa-solid fa-calendar-xmark"></i>Nenhuma diária aberta hoje.<br>Volte aqui quando avisarem que abriu.</div>';
+          return;
+        }
+
+        if (presenca) {
+          if (presenca.status === 'confirmado') {
+            card.innerHTML = '<div class="dtr-status-ok"><span class="emoji">✅</span><b>Presença confirmada!</b><p style="color:#64748b;font-size:13px;">' + esc(diaria.titulo) + '</p></div>';
+          } else if (presenca.status === 'recusado') {
+            card.innerHTML = '<div class="dtr-status-ok"><span class="emoji">❌</span><b>Presença não confirmada</b><p style="color:#64748b;font-size:13px;">Fale com o responsável no local.</p></div>';
+          } else {
+            card.innerHTML = '<div class="dtr-status-ok"><span class="emoji">⏳</span><b>Presença registrada</b><p style="color:#64748b;font-size:13px;">Aguardando confirmação de quem está no local.</p></div>';
+          }
+          return;
+        }
+
+        card.innerHTML =
+          '<p class="dtr-diaria-titulo">' + esc(diaria.titulo) + '</p>' +
+          (diaria.pontoEncontro ? '<p class="dtr-diaria-ponto"><i class="fa-solid fa-location-dot"></i> ' + esc(diaria.pontoEncontro) + '</p>' : '') +
+          '<p id="dtr-erro-checkin" class="dtr-erro"></p>' +
+          '<button class="dtr-btn dtr-btn-grande dtr-btn-ok" id="dtr-btn-checkin"><i class="fa-solid fa-location-crosshairs"></i> ESTOU NO LOCAL</button>';
+        $('dtr-btn-checkin').onclick = fazerCheckin;
+      }
+
+      function esc(s) {
+        return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      async function carregarStatus() {
+        const token = pegarToken();
+        if (!token) { mostrar('dtr-tela-cadastro'); return; }
+        try {
+          estadoAtual = await chamarApi('/diaria/trabalhador/status?token=' + encodeURIComponent(token), {});
+          renderHome();
+          mostrar('dtr-tela-home');
+        } catch (e) {
+          // token velho/inválido: volta pro cadastro
+          limparToken();
+          mostrar('dtr-tela-cadastro');
+        }
+        if (!pollTimer) pollTimer = setInterval(carregarStatus, 15000);
+      }
+
+      async function cadastrar() {
+        const nome = $('dtr-nome').value.trim();
+        const telefone = $('dtr-telefone').value.replace(/\D/g, '');
+        const erroEl = $('dtr-erro-cadastro');
+        erroEl.style.display = 'none';
+        if (nome.length < 3) { erroEl.textContent = 'Informe seu nome completo.'; erroEl.style.display = ''; return; }
+        if (telefone.length < 10) { erroEl.textContent = 'Telefone incompleto. Use DDD + número.'; erroEl.style.display = ''; return; }
+        const btn = $('dtr-btn-cadastrar');
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando…';
+        try {
+          const r = await chamarApi('/diaria/trabalhador/cadastro', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome: nome, telefone: telefone })
+          });
+          salvarToken(r.token);
+          await carregarStatus();
+        } catch (e) {
+          erroEl.textContent = e.message || 'Não foi possível cadastrar. Tente de novo.';
+          erroEl.style.display = '';
+        } finally {
+          btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Entrar / Cadastrar';
+        }
+      }
+
+      function fazerCheckin() {
+        const btn = $('dtr-btn-checkin');
+        const erroEl = $('dtr-erro-checkin');
+        if (erroEl) erroEl.style.display = 'none';
+        if (!navigator.geolocation) {
+          if (erroEl) { erroEl.textContent = 'Este celular/navegador não tem localização disponível.'; erroEl.style.display = ''; }
+          return;
+        }
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Localizando…';
+        navigator.geolocation.getCurrentPosition(async function (pos) {
+          try {
+            await chamarApi('/diaria/presenca/checkin', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                token: pegarToken(), diariaId: estadoAtual.diariaHoje.id,
+                lat: pos.coords.latitude, lng: pos.coords.longitude, precisao: pos.coords.accuracy
+              })
+            });
+            await carregarStatus();
+          } catch (e) {
+            btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i> ESTOU NO LOCAL';
+            if (erroEl) { erroEl.textContent = e.message || 'Não deu pra registrar. Tente de novo.'; erroEl.style.display = ''; }
+          }
+        }, function () {
+          btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i> ESTOU NO LOCAL';
+          if (erroEl) { erroEl.textContent = 'Não consegui pegar sua localização. Permita o acesso ao GPS e tente de novo.'; erroEl.style.display = ''; }
+        }, { enableHighAccuracy: true, timeout: 15000 });
+      }
+
+      $('dtr-btn-cadastrar').onclick = cadastrar;
+      $('dtr-link-trocar').onclick = function (e) {
+        e.preventDefault();
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        limparToken();
+        $('dtr-nome').value = ''; $('dtr-telefone').value = '';
+        mostrar('dtr-tela-cadastro');
+      };
+
+      carregarStatus();
+    })();
+  </script>
+</body>
+</html>

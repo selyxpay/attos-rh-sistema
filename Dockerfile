@@ -37,6 +37,8 @@ COPY openwa.cjs ./
 
 # --- Frontend --------------------------------------------------------------
 COPY index.html login.html candidato.html talento.html fila-display.html relatorio-equip.html ./
+# Diária (Presença RT) — página pública do trabalhador de campo (cadastro + check-in).
+COPY diaria-trabalhador.html ./
 # Politica de privacidade — PUBLICA de proposito: a Meta exige que ela abra
 # sem login para aprovar o app do WhatsApp Business.
 COPY privacidade.html ./

@@ -1876,10 +1876,272 @@ function _diariaMdParaHtml(md) {
   return out.join('\n');
 }
 
+// ── DIÁRIA (admin) — Fase 1: diárias, presença ao vivo, cadastros ───────────
+// Chama as rotas próprias da Diária (não usa RTCloud.apiGet/apiPost porque
+// são fechadas dentro do módulo vps-sync.js — esta é a mesma convenção
+// (credentials same-origin, JSON), só que local a este arquivo).
+async function _diariaApi(rota, opcoes) {
+  const r = await fetch('/api/diaria' + rota, Object.assign({ credentials: 'same-origin' }, opcoes || {}));
+  let dados = null;
+  try { dados = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error((dados && dados.error) || ('Erro ' + r.status));
+  return dados;
+}
+function _diariaPost(rota, corpo) {
+  return _diariaApi(rota, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) });
+}
+function _diariaFmtHora(iso) {
+  try { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return '—'; }
+}
+function _diariaFmtTelefone(tel) {
+  const dig = String(tel || '').replace(/\D/g, '');
+  if (dig.length < 10) return tel || '';
+  return '(' + dig.slice(-11, -9) + ') ' + dig.slice(-9, -5) + '-' + dig.slice(-5);
+}
+
+let _diariaSubAtual = 'diarias';
+let _diariaSelecionada = null; // id da diária escolhida na aba "Presença ao vivo"
+let _diariaPollTimer = null;
+
 function renderDiaria() {
-  const box = document.getElementById('aba-diaria-conteudo');
+  document.querySelectorAll('.diaria-subnav-btn').forEach(function (b) {
+    b.onclick = function () { _diariaTrocarSub(b.getAttribute('data-diaria-sub')); };
+  });
+  _diariaTrocarSub(_diariaSubAtual);
+}
+
+function _diariaTrocarSub(sub) {
+  _diariaSubAtual = sub;
+  document.querySelectorAll('.diaria-subnav-btn').forEach(function (b) {
+    b.classList.toggle('active', b.getAttribute('data-diaria-sub') === sub);
+  });
+  ['diarias', 'presenca', 'cadastros', 'spec'].forEach(function (s) {
+    const el = document.getElementById('diaria-sub-' + s);
+    if (el) el.style.display = (s === sub) ? '' : 'none';
+  });
+  // Só uma aba por vez fica "viva" com atualização automática — sem isso,
+  // trocar de aba deixava relógios de fundo rodando pra sempre.
+  if (_diariaPollTimer) { clearInterval(_diariaPollTimer); _diariaPollTimer = null; }
+  if (sub === 'diarias') _diariaCarregarDiarias();
+  else if (sub === 'presenca') { _diariaCarregarPresenca(); _diariaPollTimer = setInterval(_diariaCarregarPresenca, 15000); }
+  else if (sub === 'cadastros') _diariaCarregarCadastros();
+  else if (sub === 'spec') {
+    const box = document.getElementById('aba-diaria-conteudo');
+    if (box && !box.innerHTML) box.innerHTML = _diariaMdParaHtml(DIARIA_SPEC_MD);
+  }
+}
+
+async function _diariaCarregarDiarias() {
+  const box = document.getElementById('diaria-sub-diarias');
   if (!box) return;
-  box.innerHTML = _diariaMdParaHtml(DIARIA_SPEC_MD);
+  box.innerHTML = '<p class="diaria-carregando">Carregando…</p>';
+  try {
+    const r = await _diariaApi('/admin/diarias', {});
+    const lista = r.diarias || [];
+    const STATUS_LBL = { planejada: '📝 Planejada', aberta: '🟢 Aberta', encerrada: '⚫ Encerrada' };
+
+    box.innerHTML =
+      '<div class="diaria-toolbar"><button class="btn btn-primary btn-sm" id="diaria-btn-nova"><i class="fa-solid fa-plus"></i> Nova diária</button></div>' +
+      '<div id="diaria-form-nova" class="diaria-form-nova" style="display:none;">' +
+        '<div class="diaria-campo"><label>Título</label><input type="text" id="diaria-nova-titulo" placeholder="Ex.: Panfletagem Centro — Barueri"></div>' +
+        '<div class="diaria-campo"><label>Data</label><input type="date" id="diaria-nova-data"></div>' +
+        '<div class="diaria-campo"><label>Ponto de encontro</label><input type="text" id="diaria-nova-ponto" placeholder="Endereço do encontro"></div>' +
+        '<div class="diaria-campo"><label>Raio aceito (metros)</label><input type="number" id="diaria-nova-raio" value="300" min="50" max="5000"></div>' +
+        '<div class="diaria-campo"><label>Latitude do ponto (opcional)</label><input type="text" id="diaria-nova-lat" placeholder="Ex.: -23.4536"></div>' +
+        '<div class="diaria-campo"><label>Longitude do ponto (opcional)</label><input type="text" id="diaria-nova-lng" placeholder="Ex.: -46.8717"></div>' +
+        '<small class="diaria-item-info" style="grid-column:1/-1;color:var(--text-secondary);font-size:11.5px;">Copie do Google Maps (clique com o botão direito no ponto → primeiras duas casas decimais já bastam). Sem isso, o sistema ainda registra a localização de quem chegou, só não calcula a distância até o ponto.</small>' +
+        '<button class="btn btn-primary btn-sm" id="diaria-btn-salvar-nova"><i class="fa-solid fa-check"></i> Criar diária</button>' +
+      '</div>' +
+      '<div class="diaria-lista">' + (lista.length ? lista.map(function (dd) {
+        return '<div class="diaria-item">' +
+          '<div class="diaria-item-info"><b>' + escapeHTML(dd.titulo) + '</b>' +
+            '<span>' + escapeHTML(dd.data || '') + (dd.pontoEncontro ? ' · ' + escapeHTML(dd.pontoEncontro) : '') + '</span></div>' +
+          '<span class="diaria-status-badge diaria-status-' + dd.status + '">' + (STATUS_LBL[dd.status] || dd.status) + '</span>' +
+          '<div class="diaria-item-acoes">' +
+            (dd.status === 'planejada' ? '<button class="btn btn-outline btn-sm" data-diaria-abrir="' + dd.id + '">Abrir</button>' : '') +
+            (dd.status === 'aberta' ? '<button class="btn btn-outline btn-sm" data-diaria-ver="' + dd.id + '">Ver presença</button><button class="btn btn-outline btn-sm" data-diaria-encerrar="' + dd.id + '">Encerrar</button>' : '') +
+            (dd.status === 'encerrada' ? '<button class="btn btn-outline btn-sm" data-diaria-ver="' + dd.id + '">Ver relatório</button>' : '') +
+          '</div>' +
+        '</div>';
+      }).join('') : '<p class="diaria-vazio">Nenhuma diária criada ainda.</p>') + '</div>';
+
+    document.getElementById('diaria-btn-nova').onclick = function () {
+      const f = document.getElementById('diaria-form-nova');
+      const abrindo = f.style.display === 'none';
+      f.style.display = abrindo ? '' : 'none';
+      if (abrindo) document.getElementById('diaria-nova-data').value = new Date().toISOString().slice(0, 10);
+    };
+    document.getElementById('diaria-btn-salvar-nova').onclick = async function () {
+      const titulo = document.getElementById('diaria-nova-titulo').value.trim();
+      const data = document.getElementById('diaria-nova-data').value;
+      const pontoEncontro = document.getElementById('diaria-nova-ponto').value.trim();
+      const raioMetros = parseInt(document.getElementById('diaria-nova-raio').value, 10) || 300;
+      const latTxt = document.getElementById('diaria-nova-lat').value.trim();
+      const lngTxt = document.getElementById('diaria-nova-lng').value.trim();
+      const lat = latTxt ? parseFloat(latTxt.replace(',', '.')) : null;
+      const lng = lngTxt ? parseFloat(lngTxt.replace(',', '.')) : null;
+      if (!titulo || !data) { alert('Preencha pelo menos o título e a data.'); return; }
+      try {
+        await _diariaPost('/admin/diarias', {
+          titulo: titulo, data: data, pontoEncontro: pontoEncontro, raioMetros: raioMetros,
+          lat: (typeof lat === 'number' && !isNaN(lat)) ? lat : null,
+          lng: (typeof lng === 'number' && !isNaN(lng)) ? lng : null
+        });
+        _diariaCarregarDiarias();
+      } catch (e) { alert(e.message || 'Não foi possível criar a diária.'); }
+    };
+    box.querySelectorAll('[data-diaria-abrir]').forEach(function (b) {
+      b.onclick = async function () {
+        try { await _diariaPost('/admin/diarias/' + b.getAttribute('data-diaria-abrir') + '/abrir', {}); _diariaCarregarDiarias(); }
+        catch (e) { alert(e.message || 'Erro ao abrir.'); }
+      };
+    });
+    box.querySelectorAll('[data-diaria-encerrar]').forEach(function (b) {
+      b.onclick = async function () {
+        if (!confirm('Encerrar esta diária? Ninguém mais consegue marcar presença nela depois disso.')) return;
+        try { await _diariaPost('/admin/diarias/' + b.getAttribute('data-diaria-encerrar') + '/encerrar', {}); _diariaCarregarDiarias(); }
+        catch (e) { alert(e.message || 'Erro ao encerrar.'); }
+      };
+    });
+    box.querySelectorAll('[data-diaria-ver]').forEach(function (b) {
+      b.onclick = function () { _diariaSelecionada = b.getAttribute('data-diaria-ver'); _diariaTrocarSub('presenca'); };
+    });
+  } catch (e) {
+    box.innerHTML = '<p class="diaria-erro-carregar">Não consegui carregar as diárias: ' + escapeHTML(e.message || '') + '</p>';
+  }
+}
+
+async function _diariaCarregarPresenca() {
+  const box = document.getElementById('diaria-sub-presenca');
+  if (!box) return;
+  if (!_diariaSelecionada) {
+    try {
+      const r = await _diariaApi('/admin/diarias', {});
+      const aberta = (r.diarias || []).find(function (dd) { return dd.status === 'aberta'; });
+      if (aberta) _diariaSelecionada = aberta.id;
+    } catch (e) {}
+  }
+  if (!_diariaSelecionada) {
+    box.innerHTML = '<p class="diaria-vazio">Nenhuma diária aberta agora. Abra uma na aba "Diárias" pra acompanhar a presença ao vivo.</p>';
+    return;
+  }
+  try {
+    const presData = await _diariaApi('/admin/diarias/' + _diariaSelecionada + '/presencas', {});
+    const diariasData = await _diariaApi('/admin/diarias', {});
+    const diaria = (diariasData.diarias || []).find(function (dd) { return dd.id === _diariaSelecionada; });
+    const lista = presData.presencas || [];
+    const confirmados = lista.filter(function (p) { return p.status === 'confirmado'; });
+    const aguardando = lista.filter(function (p) { return p.status === 'aguardando'; });
+    const recusados = lista.filter(function (p) { return p.status === 'recusado'; });
+    const STATUS_PRES = { aguardando: '⏳ Aguardando', confirmado: '✅ Confirmado', recusado: '❌ Recusado' };
+
+    box.innerHTML =
+      '<div class="diaria-presenca-topo">' +
+        '<div><b>' + escapeHTML(diaria ? diaria.titulo : '') + '</b>' +
+        '<span class="diaria-presenca-contadores">✅ ' + confirmados.length + ' · ⏳ ' + aguardando.length + ' · ❌ ' + recusados.length + '</span></div>' +
+        '<div class="diaria-presenca-acoes">' +
+          (aguardando.length ? '<button class="btn btn-outline btn-sm" id="diaria-btn-confirmar-todos">Confirmar todos</button>' : '') +
+          '<button class="btn btn-outline btn-sm" id="diaria-btn-copiar-relatorio"><i class="fa-solid fa-copy"></i> Copiar relatório</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="diaria-lista">' + (lista.length ? lista.map(function (p) {
+        return '<div class="diaria-item">' +
+          '<div class="diaria-item-info"><b>' + escapeHTML(p.trabalhadorNome) + '</b>' +
+            '<span>' + escapeHTML(_diariaFmtTelefone(p.trabalhadorTelefone)) + ' · ' + _diariaFmtHora(p.checkinEm) +
+            (p.distanciaDoPonto != null ? ' · ' + p.distanciaDoPonto + 'm do ponto' + (p.dentroDoRaio === false ? ' ⚠' : '') : '') +
+            (p.trabalhadorStatus !== 'ativo' ? ' · ⚠ cadastro pendente' : '') + '</span></div>' +
+          '<span class="diaria-status-badge diaria-status-' + p.status + '">' + (STATUS_PRES[p.status] || p.status) + '</span>' +
+          (p.status === 'aguardando' ? '<div class="diaria-item-acoes"><button class="btn btn-success btn-sm" data-pres-confirmar="' + p.id + '">Confirmar</button><button class="btn btn-outline btn-sm" data-pres-recusar="' + p.id + '">Recusar</button></div>' : '') +
+        '</div>';
+      }).join('') : '<p class="diaria-vazio">Ninguém marcou presença ainda.</p>') + '</div>';
+
+    const btnTodos = document.getElementById('diaria-btn-confirmar-todos');
+    if (btnTodos) btnTodos.onclick = async function () {
+      try { await _diariaPost('/admin/diarias/' + _diariaSelecionada + '/confirmar-todos', {}); _diariaCarregarPresenca(); }
+      catch (e) { alert(e.message || 'Erro.'); }
+    };
+    const btnCopiar = document.getElementById('diaria-btn-copiar-relatorio');
+    if (btnCopiar) btnCopiar.onclick = function () { _diariaCopiarRelatorio(diaria, lista, btnCopiar); };
+    box.querySelectorAll('[data-pres-confirmar]').forEach(function (b) {
+      b.onclick = async function () {
+        try { await _diariaPost('/admin/presencas/' + b.getAttribute('data-pres-confirmar') + '/confirmar', {}); _diariaCarregarPresenca(); }
+        catch (e) { alert(e.message || 'Erro.'); }
+      };
+    });
+    box.querySelectorAll('[data-pres-recusar]').forEach(function (b) {
+      b.onclick = async function () {
+        try { await _diariaPost('/admin/presencas/' + b.getAttribute('data-pres-recusar') + '/recusar', {}); _diariaCarregarPresenca(); }
+        catch (e) { alert(e.message || 'Erro.'); }
+      };
+    });
+  } catch (e) {
+    box.innerHTML = '<p class="diaria-erro-carregar">Não consegui carregar a presença: ' + escapeHTML(e.message || '') + '</p>';
+  }
+}
+
+function _diariaCopiarRelatorio(diaria, lista, botao) {
+  const confirmados = lista.filter(function (p) { return p.status === 'confirmado'; });
+  const outros = lista.filter(function (p) { return p.status !== 'confirmado'; });
+  const L = [];
+  L.push('LISTA DE PRESENÇA — ' + (diaria && diaria.data ? diaria.data.split('-').reverse().join('/') : ''));
+  L.push(diaria ? diaria.titulo : '');
+  L.push('');
+  L.push('CONFIRMADOS (' + confirmados.length + '):');
+  confirmados.forEach(function (p, i) { L.push((i + 1) + '. ' + p.trabalhadorNome + ' — ' + _diariaFmtHora(p.checkinEm)); });
+  if (outros.length) {
+    L.push('');
+    L.push('NÃO CONFIRMADOS (' + outros.length + '):');
+    outros.forEach(function (p) { L.push('- ' + p.trabalhadorNome + ' (' + p.status + ')'); });
+  }
+  L.push('');
+  L.push('Total confirmado: ' + confirmados.length + ' diária(s)');
+  navigator.clipboard.writeText(L.join('\n')).then(function () {
+    const original = botao.innerHTML;
+    botao.innerHTML = '<i class="fa-solid fa-check"></i> Copiado!';
+    setTimeout(function () { botao.innerHTML = original; }, 2000);
+  });
+}
+
+async function _diariaCarregarCadastros() {
+  const box = document.getElementById('diaria-sub-cadastros');
+  if (!box) return;
+  box.innerHTML = '<p class="diaria-carregando">Carregando…</p>';
+  try {
+    const r = await _diariaApi('/admin/trabalhadores', {});
+    const lista = r.trabalhadores || [];
+    const pendentes = lista.filter(function (t) { return t.status === 'pendente_aprovacao'; });
+    const outros = lista.filter(function (t) { return t.status !== 'pendente_aprovacao'; });
+    const badge = document.getElementById('diaria-badge-pendentes');
+    if (badge) { badge.textContent = pendentes.length; badge.style.display = pendentes.length ? '' : 'none'; }
+    const STATUS_LBL = { pendente_aprovacao: '🟡 Pendente', ativo: '🟢 Ativo', bloqueado: '🔴 Bloqueado' };
+
+    function linha(t) {
+      return '<div class="diaria-item">' +
+        '<div class="diaria-item-info"><b>' + escapeHTML(t.nome) + '</b><span>' + escapeHTML(_diariaFmtTelefone(t.telefone)) + '</span></div>' +
+        '<span class="diaria-status-badge">' + (STATUS_LBL[t.status] || t.status) + '</span>' +
+        '<div class="diaria-item-acoes">' +
+          (t.status !== 'ativo' ? '<button class="btn btn-success btn-sm" data-trab-aprovar="' + t.id + '">Aprovar</button>' : '') +
+          (t.status !== 'bloqueado' ? '<button class="btn btn-outline btn-sm" data-trab-bloquear="' + t.id + '">Bloquear</button>' : '<button class="btn btn-outline btn-sm" data-trab-reativar="' + t.id + '">Reativar</button>') +
+        '</div>' +
+      '</div>';
+    }
+
+    box.innerHTML =
+      (pendentes.length ? '<h4 class="diaria-subtitulo">Pendentes de aprovação (' + pendentes.length + ')</h4><div class="diaria-lista">' + pendentes.map(linha).join('') + '</div>' : '') +
+      '<h4 class="diaria-subtitulo">Todo mundo</h4>' +
+      '<div class="diaria-lista">' + (outros.length ? outros.map(linha).join('') : '<p class="diaria-vazio">Nenhum trabalhador cadastrado ainda.</p>') + '</div>';
+
+    ['aprovar', 'bloquear', 'reativar'].forEach(function (acao) {
+      box.querySelectorAll('[data-trab-' + acao + ']').forEach(function (b) {
+        b.onclick = async function () {
+          try { await _diariaPost('/admin/trabalhadores/' + b.getAttribute('data-trab-' + acao) + '/' + acao, {}); _diariaCarregarCadastros(); }
+          catch (e) { alert(e.message || 'Erro.'); }
+        };
+      });
+    });
+  } catch (e) {
+    box.innerHTML = '<p class="diaria-erro-carregar">Não consegui carregar os cadastros: ' + escapeHTML(e.message || '') + '</p>';
+  }
 }
 
 // ÁREA DE DOCUMENTOS NA NUVEM (documentos guardados permanentemente)

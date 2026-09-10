@@ -1454,6 +1454,304 @@ http.createServer(function (req, res) {
     return;
   }
 
+  // ==========================================================================
+  // DIÁRIA (Presença RT) — Fase 1 (núcleo)
+  // Cadastro de trabalhador de campo (nome + telefone, sem senha de staff),
+  // diárias (turno do dia com ponto de encontro) e check-in por GPS, com
+  // confirmação do admin. O trabalhador NÃO é um "funcionário" do sistema —
+  // a identidade pública dele é um token aleatório guardado no localStorage
+  // do celular, no mesmo espírito do token de /api/relatorio-equip: dá pra
+  // reabrir sem senha, mas ninguém adivinha o de outra pessoa.
+  //
+  // Documentos, fotos com carimbo, PDF/Excel e PIN ficam para as próximas
+  // fases (a ideia completa está anotada na aba Diária do painel).
+  // ==========================================================================
+  function diariaDistanciaMetros(lat1, lng1, lat2, lng2) {
+    if ([lat1, lng1, lat2, lng2].some(function (v) { return typeof v !== 'number' || isNaN(v); })) return null;
+    const R = 6371000;
+    const toRad = function (v) { return v * Math.PI / 180; };
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+  }
+  function diariaPodeGerenciar(requester) {
+    return !!(requester && (ehMestreLogin(requester.login) || requester.departamento === 'administracao'));
+  }
+  // Nunca devolve o telefone completo nem o token pro lado errado ler — a
+  // rota de status/cadastro é a única que devolve o token (é do próprio dono).
+  function diariaTrabalhadorPublico(t) {
+    return { id: t.id, nome: t.nome, status: t.status, criadoEm: t.criadoEm };
+  }
+
+  // ---- Trabalhador: cadastro/login unificado (nome + telefone) ------------
+  // Mesmo telefone = mesma pessoa (reentrada): nunca preenche de novo.
+  if (urlPath === '/api/diaria/trabalhador/cadastro' && req.method === 'POST') {
+    lerCorpo(req, function (err, body) {
+      if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
+      const nome = String((body && body.nome) || '').trim().slice(0, 120);
+      const telefone = String((body && body.telefone) || '').replace(/\D/g, '');
+      if (nome.length < 3) { responderJson(res, 400, { error: 'Informe seu nome completo.' }); return; }
+      if (telefone.length < 10 || telefone.length > 13) { responderJson(res, 400, { error: 'Telefone inválido.' }); return; }
+      comTrava(function () {
+        const st = lerEstado();
+        const d = st.dados || {};
+        if (!Array.isArray(d.trabalhadoresDiaria)) d.trabalhadoresDiaria = [];
+        let t = d.trabalhadoresDiaria.find(function (x) { return x && x.telefone === telefone; });
+        let mudou = false;
+        if (!t) {
+          t = {
+            id: 'trab-' + Date.now(),
+            nome: nome, telefone: telefone,
+            token: crypto.randomBytes(24).toString('hex'),
+            status: 'pendente_aprovacao',
+            criadoEm: new Date().toISOString(),
+            aprovadoEm: null, aprovadoPor: null
+          };
+          d.trabalhadoresDiaria.push(t);
+          mudou = true;
+        } else if (nome && nome !== t.nome) {
+          t.nome = nome; // digitou o nome diferente na reentrada: atualiza
+          mudou = true;
+        }
+        try {
+          if (mudou) gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+          responderJson(res, 200, { ok: true, token: t.token, trabalhador: diariaTrabalhadorPublico(t) });
+        } catch (e) {
+          console.error('[Diária] cadastro:', e);
+          responderJson(res, 500, { error: 'Não foi possível salvar. Tente de novo.' });
+        }
+      });
+    });
+    return;
+  }
+
+  // ---- Trabalhador: status + diária de hoje + presença dele nela ----------
+  if (urlPath === '/api/diaria/trabalhador/status' && req.method === 'GET') {
+    const qIdx = req.url.indexOf('?');
+    const qs = new URLSearchParams(qIdx >= 0 ? req.url.slice(qIdx + 1) : '');
+    const token = String(qs.get('token') || '').trim();
+    if (!token || token.length < 20) { responderJson(res, 404, { error: 'Não encontrado.' }); return; }
+    const st = lerEstado();
+    const d = st.dados || {};
+    const t = (d.trabalhadoresDiaria || []).find(function (x) { return x.token === token; });
+    if (!t) { responderJson(res, 404, { error: 'Cadastro não encontrado.' }); return; }
+    const hoje = new Date().toISOString().slice(0, 10);
+    const diariaHoje = (d.diarias || []).find(function (x) { return x.data === hoje && x.status === 'aberta'; }) || null;
+    let presenca = null;
+    if (diariaHoje) {
+      presenca = (d.presencasDiaria || []).find(function (p) { return p.diariaId === diariaHoje.id && p.trabalhadorId === t.id; }) || null;
+    }
+    responderJson(res, 200, {
+      trabalhador: diariaTrabalhadorPublico(t),
+      diariaHoje: diariaHoje ? { id: diariaHoje.id, titulo: diariaHoje.titulo, pontoEncontro: diariaHoje.pontoEncontro, status: diariaHoje.status } : null,
+      presenca: presenca
+    });
+    return;
+  }
+
+  // ---- Trabalhador: check-in por GPS ---------------------------------------
+  if (urlPath === '/api/diaria/presenca/checkin' && req.method === 'POST') {
+    lerCorpo(req, function (err, body) {
+      if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
+      const token = String((body && body.token) || '').trim();
+      const diariaId = String((body && body.diariaId) || '').trim();
+      const lat = Number(body && body.lat);
+      const lng = Number(body && body.lng);
+      const precisao = (body && body.precisao != null) ? Number(body.precisao) : null;
+      if (!token || token.length < 20) { responderJson(res, 401, { error: 'Sessão inválida. Recarregue a página.' }); return; }
+      if (!diariaId) { responderJson(res, 400, { error: 'Diária não informada.' }); return; }
+      comTrava(function () {
+        const st = lerEstado();
+        const d = st.dados || {};
+        const t = (d.trabalhadoresDiaria || []).find(function (x) { return x.token === token; });
+        if (!t) { responderJson(res, 404, { error: 'Cadastro não encontrado.' }); return; }
+        if (t.status === 'bloqueado') { responderJson(res, 403, { error: 'Seu acesso está bloqueado.' }); return; }
+        const diaria = (d.diarias || []).find(function (x) { return x.id === diariaId; });
+        if (!diaria || diaria.status !== 'aberta') { responderJson(res, 409, { error: 'Esta diária não está aberta para check-in.' }); return; }
+        if (!Array.isArray(d.presencasDiaria)) d.presencasDiaria = [];
+        let p = d.presencasDiaria.find(function (x) { return x.diariaId === diariaId && x.trabalhadorId === t.id; });
+        const distancia = diariaDistanciaMetros(lat, lng, diaria.lat, diaria.lng);
+        const dentroDoRaio = (distancia === null) ? null : (distancia <= (diaria.raioMetros || 300));
+        if (p) {
+          p.lat = isNaN(lat) ? p.lat : lat; p.lng = isNaN(lng) ? p.lng : lng;
+          p.precisaoMetros = precisao; p.distanciaDoPonto = distancia; p.dentroDoRaio = dentroDoRaio;
+        } else {
+          p = {
+            id: 'pres-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+            diariaId: diariaId, trabalhadorId: t.id,
+            checkinEm: new Date().toISOString(), // hora do SERVIDOR, nunca do celular
+            lat: isNaN(lat) ? null : lat, lng: isNaN(lng) ? null : lng, precisaoMetros: precisao,
+            distanciaDoPonto: distancia, dentroDoRaio: dentroDoRaio,
+            status: 'aguardando', confirmadoPor: null, confirmadoEm: null
+          };
+          d.presencasDiaria.push(p);
+        }
+        try {
+          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+          responderJson(res, 200, { ok: true, presenca: p });
+        } catch (e) {
+          console.error('[Diária] checkin:', e);
+          responderJson(res, 500, { error: 'Não foi possível registrar. Tente de novo.' });
+        }
+      });
+    });
+    return;
+  }
+
+  // ---- Admin: gerenciar trabalhadores, diárias e presenças -----------------
+  // Mesma trava de todo o painel: cookie de sessão de staff + mestre/admin.
+  if (urlPath.indexOf('/api/diaria/admin/') === 0) {
+    if (!autenticado) { responderJson(res, 401, { error: 'Faça login.' }); return; }
+    const requesterDiaria = usuarioDaReq(req);
+    if (!requesterDiaria) { responderJson(res, 401, { error: 'Faça login.' }); return; }
+    if (!diariaPodeGerenciar(requesterDiaria)) { responderJson(res, 403, { error: 'Sem permissão para gerenciar a Diária.' }); return; }
+
+    if (urlPath === '/api/diaria/admin/trabalhadores' && req.method === 'GET') {
+      const qIdx = req.url.indexOf('?');
+      const qs = new URLSearchParams(qIdx >= 0 ? req.url.slice(qIdx + 1) : '');
+      const filtroStatus = qs.get('status') || '';
+      const st = lerEstado();
+      const d = st.dados || {};
+      let lista = Array.isArray(d.trabalhadoresDiaria) ? d.trabalhadoresDiaria.slice() : [];
+      if (filtroStatus) lista = lista.filter(function (t) { return t.status === filtroStatus; });
+      lista.sort(function (a, b) { return (b.criadoEm || '').localeCompare(a.criadoEm || ''); });
+      responderJson(res, 200, { trabalhadores: lista });
+      return;
+    }
+
+    let m = urlPath.match(/^\/api\/diaria\/admin\/trabalhadores\/([^\/]+)\/(aprovar|bloquear|reativar)$/);
+    if (m && req.method === 'POST') {
+      const alvoId = decodeURIComponent(m[1]);
+      const acao = m[2];
+      comTrava(function () {
+        const st = lerEstado();
+        const d = st.dados || {};
+        const t = (d.trabalhadoresDiaria || []).find(function (x) { return x.id === alvoId; });
+        if (!t) { responderJson(res, 404, { error: 'Trabalhador não encontrado.' }); return; }
+        if (acao === 'aprovar') { t.status = 'ativo'; t.aprovadoEm = new Date().toISOString(); t.aprovadoPor = requesterDiaria.login; }
+        else if (acao === 'bloquear') { t.status = 'bloqueado'; }
+        else if (acao === 'reativar') { t.status = 'ativo'; }
+        try {
+          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+          responderJson(res, 200, { ok: true, trabalhador: t });
+        } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
+      });
+      return;
+    }
+
+    if (urlPath === '/api/diaria/admin/diarias' && req.method === 'GET') {
+      const st = lerEstado();
+      const d = st.dados || {};
+      const lista = (Array.isArray(d.diarias) ? d.diarias : []).slice()
+        .sort(function (a, b) { return (b.criadaEm || '').localeCompare(a.criadaEm || ''); });
+      responderJson(res, 200, { diarias: lista });
+      return;
+    }
+
+    if (urlPath === '/api/diaria/admin/diarias' && req.method === 'POST') {
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
+        const titulo = String((body && body.titulo) || '').trim().slice(0, 160);
+        const data = String((body && body.data) || '').trim();
+        const pontoEncontro = String((body && body.pontoEncontro) || '').trim().slice(0, 300);
+        if (!titulo) { responderJson(res, 400, { error: 'Dê um título pra diária.' }); return; }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) { responderJson(res, 400, { error: 'Data inválida.' }); return; }
+        comTrava(function () {
+          const st = lerEstado();
+          const d = st.dados || {};
+          if (!Array.isArray(d.diarias)) d.diarias = [];
+          const nova = {
+            id: 'diaria-' + Date.now(),
+            titulo: titulo, data: data, pontoEncontro: pontoEncontro,
+            lat: (typeof body.lat === 'number') ? body.lat : null,
+            lng: (typeof body.lng === 'number') ? body.lng : null,
+            raioMetros: Math.max(50, Math.min(5000, parseInt(body.raioMetros, 10) || 300)),
+            status: 'planejada',
+            criadaPor: requesterDiaria.login, criadaEm: new Date().toISOString()
+          };
+          d.diarias.push(nova);
+          try {
+            gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+            responderJson(res, 200, { ok: true, diaria: nova });
+          } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
+        });
+      });
+      return;
+    }
+
+    m = urlPath.match(/^\/api\/diaria\/admin\/diarias\/([^\/]+)\/(abrir|encerrar|confirmar-todos)$/);
+    if (m && req.method === 'POST') {
+      const diariaId = decodeURIComponent(m[1]);
+      const acao = m[2];
+      comTrava(function () {
+        const st = lerEstado();
+        const d = st.dados || {};
+        const diaria = (d.diarias || []).find(function (x) { return x.id === diariaId; });
+        if (!diaria) { responderJson(res, 404, { error: 'Diária não encontrada.' }); return; }
+        if (acao === 'abrir') diaria.status = 'aberta';
+        else if (acao === 'encerrar') diaria.status = 'encerrada';
+        else if (acao === 'confirmar-todos') {
+          (d.presencasDiaria || []).forEach(function (p) {
+            if (p.diariaId === diariaId && p.status === 'aguardando') {
+              p.status = 'confirmado'; p.confirmadoPor = requesterDiaria.login; p.confirmadoEm = new Date().toISOString();
+            }
+          });
+        }
+        try {
+          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+          responderJson(res, 200, { ok: true, diaria: diaria });
+        } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
+      });
+      return;
+    }
+
+    m = urlPath.match(/^\/api\/diaria\/admin\/diarias\/([^\/]+)\/presencas$/);
+    if (m && req.method === 'GET') {
+      const diariaId = decodeURIComponent(m[1]);
+      const st = lerEstado();
+      const d = st.dados || {};
+      const trabs = {};
+      (d.trabalhadoresDiaria || []).forEach(function (t) { trabs[t.id] = t; });
+      const lista = (d.presencasDiaria || []).filter(function (p) { return p.diariaId === diariaId; })
+        .sort(function (a, b) { return (a.checkinEm || '').localeCompare(b.checkinEm || ''); })
+        .map(function (p) {
+          const t = trabs[p.trabalhadorId] || {};
+          return Object.assign({}, p, {
+            trabalhadorNome: t.nome || '(desconhecido)',
+            trabalhadorTelefone: t.telefone || '',
+            trabalhadorStatus: t.status || ''
+          });
+        });
+      responderJson(res, 200, { presencas: lista });
+      return;
+    }
+
+    m = urlPath.match(/^\/api\/diaria\/admin\/presencas\/([^\/]+)\/(confirmar|recusar)$/);
+    if (m && req.method === 'POST') {
+      const presId = decodeURIComponent(m[1]);
+      const acao = m[2];
+      comTrava(function () {
+        const st = lerEstado();
+        const d = st.dados || {};
+        const p = (d.presencasDiaria || []).find(function (x) { return x.id === presId; });
+        if (!p) { responderJson(res, 404, { error: 'Presença não encontrada.' }); return; }
+        p.status = acao === 'confirmar' ? 'confirmado' : 'recusado';
+        p.confirmadoPor = requesterDiaria.login;
+        p.confirmadoEm = new Date().toISOString();
+        try {
+          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+          responderJson(res, 200, { ok: true, presenca: p });
+        } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
+      });
+      return;
+    }
+
+    responderJson(res, 404, { error: 'Rota da Diária não encontrada.' });
+    return;
+  }
+
   // ---- API: ler estado (com login = tudo; sem login = só o público) ----
   if (urlPath === '/api/state' && req.method === 'GET') {
     const s = lerEstado();
