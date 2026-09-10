@@ -1,0 +1,134 @@
+/* ============================================================================
+   DIÁRIA (Presença RT) — página de referência/especificação
+   Não é uma ferramenta operacional: é uma nota longa guardada dentro do
+   sistema, formatada pra dar pra ler. Estilos vivem isolados aqui pra não
+   colidir com o resto do painel.
+   ========================================================================== */
+.diaria-container {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 8px 4px 60px;
+}
+.diaria-topo {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--border-color);
+}
+.diaria-topo h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 22px;
+    color: var(--text-primary);
+    margin: 0 0 6px;
+}
+.diaria-topo h2 i { color: var(--primary); }
+.diaria-topo p {
+    color: var(--text-secondary);
+    font-size: 13.5px;
+    margin: 0;
+}
+
+.diaria-doc {
+    background: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 28px 32px;
+    line-height: 1.65;
+    color: var(--text-primary);
+    font-size: 14.5px;
+}
+
+.diaria-doc .diaria-h1 {
+    font-size: 21px;
+    margin: 0 0 6px;
+    color: var(--text-primary);
+}
+.diaria-doc .diaria-h2 {
+    font-size: 18px;
+    margin: 30px 0 12px;
+    padding-top: 6px;
+    color: var(--primary-hover);
+}
+.diaria-doc .diaria-h3 {
+    font-size: 15.5px;
+    margin: 20px 0 8px;
+    color: var(--text-primary);
+}
+.diaria-doc .diaria-h4 {
+    font-size: 14px;
+    margin: 14px 0 6px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+.diaria-doc .diaria-p { margin: 0 0 12px; }
+.diaria-doc code {
+    background: var(--bg-main);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 12.5px;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    color: var(--primary-hover);
+}
+.diaria-doc .diaria-lista { margin: 0 0 14px; padding-left: 22px; }
+.diaria-doc .diaria-lista li { margin-bottom: 5px; }
+.diaria-doc .diaria-checklist { list-style: none; padding-left: 4px; }
+.diaria-doc .diaria-checklist li { display: flex; gap: 6px; }
+.diaria-doc .diaria-hr {
+    border: none;
+    border-top: 1px dashed var(--border-color);
+    margin: 26px 0;
+}
+.diaria-doc .diaria-quote {
+    margin: 0 0 14px;
+    padding: 10px 16px;
+    border-left: 3px solid var(--primary);
+    background: var(--primary-light);
+    border-radius: 0 8px 8px 0;
+    font-size: 13.5px;
+    color: var(--text-primary);
+}
+.diaria-doc .diaria-code {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 12px;
+    line-height: 1.5;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    white-space: pre;
+    margin: 0 0 14px;
+}
+.diaria-doc .diaria-tabela-wrap {
+    overflow-x: auto;
+    margin: 0 0 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+.diaria-doc .diaria-tabela {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.diaria-doc .diaria-tabela th,
+.diaria-doc .diaria-tabela td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: top;
+}
+.diaria-doc .diaria-tabela th {
+    background: var(--bg-main);
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+.diaria-doc .diaria-tabela tr:last-child td { border-bottom: none; }
+.diaria-doc .diaria-tabela code { white-space: nowrap; }
+
+@media (max-width: 768px) {
+    .diaria-doc { padding: 18px 16px; font-size: 14px; }
+}

@@ -39,18 +39,20 @@
       }
     </script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=20260821a">
+    <link rel="stylesheet" href="css/style.css?v=20260910a">
     <!-- R&T Design System CSS -->
-    <link rel="stylesheet" href="css/design-system.css?v=20260821a">
+    <link rel="stylesheet" href="css/design-system.css?v=20260910a">
     <!-- R&T UX Enhancements (acessibilidade, conforto e polimento) — carregar por último -->
-    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260821a">
+    <link rel="stylesheet" href="css/ux-enhancements.css?v=20260910a">
     <!-- Fluxo Financeiro — Estilos SaaS Premium -->
-    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260821a">
-    <link rel="stylesheet" href="css/whatsapp.css?v=20260821a">
+    <link rel="stylesheet" href="css/fluxo-financeiro.css?v=20260910a">
+    <link rel="stylesheet" href="css/whatsapp.css?v=20260910a">
     <!-- Margem — custo do exame na clinica x valor repassado ao cliente -->
-    <link rel="stylesheet" href="css/margem.css?v=20260821a">
+    <link rel="stylesheet" href="css/margem.css?v=20260910a">
+    <!-- Diária (Presença RT) — página de referência/especificação -->
+    <link rel="stylesheet" href="css/diaria.css?v=20260910a">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
-    <link rel="stylesheet" href="css/mobile.css?v=20260821a">
+    <link rel="stylesheet" href="css/mobile.css?v=20260910a">
 </head>
 <body class="app-shell">
 
@@ -231,6 +233,11 @@
                     </li>
                     <li class="nav-item" data-aba="documentos">
                         <a href="#"><i class="fa-solid fa-folder-open"></i> <span>Documentos</span></a>
+                    </li>
+                    <!-- Diária (Presença RT): ainda não é um sistema, é a especificação/ideia
+                         guardada aqui pra não se perder, até virar projeto de verdade. -->
+                    <li class="nav-item" data-aba="diaria" id="nav-item-diaria" style="display:none;">
+                        <a href="#"><i class="fa-solid fa-calendar-day"></i> <span>Diária</span></a>
                     </li>
 
                     <!-- CATEGORIA: SISTEMA -->
@@ -1274,6 +1281,19 @@
                             </div>
                         </div>
                         <div id="cadastros-exata-conteudo"></div>
+                    </div>
+                </section>
+
+                <!-- ABA: DIÁRIA (Presença RT) — página de referência com a especificação
+                     do projeto, guardada aqui até virar sistema de verdade. -->
+                <section id="aba-diaria" class="aba-content">
+                    <div class="diaria-container">
+                        <div class="diaria-topo">
+                            <h2><i class="fa-solid fa-calendar-day"></i> Diária — Presença RT</h2>
+                            <p>Anotação da ideia/arquitetura deste projeto futuro. Ninguém além de
+                               quem administra o sistema vê esta aba.</p>
+                        </div>
+                        <div id="aba-diaria-conteudo" class="diaria-doc"></div>
                     </div>
                 </section>
 
@@ -4001,12 +4021,12 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
-    <script src="js/security.js?v=20260821a"></script>
-    <script src="js/vps-sync.js?v=20260821a"></script>
-    <script src="js/exata-catalogo.js?v=20260821a"></script>
-    <script src="js/data.js?v=20260821a"></script>
-    <script src="js/app.js?v=20260821a"></script>
-    <script src="js/whatsapp.js?v=20260821a"></script>
+    <script src="js/security.js?v=20260910a"></script>
+    <script src="js/vps-sync.js?v=20260910a"></script>
+    <script src="js/exata-catalogo.js?v=20260910a"></script>
+    <script src="js/data.js?v=20260910a"></script>
+    <script src="js/app.js?v=20260910a"></script>
+    <script src="js/whatsapp.js?v=20260910a"></script>
     <!-- Sair da tela cheia do WhatsApp. Fica fora da aba porque o cabecalho
          que tinha o outro botao some nesse modo. -->
     <button class="wa-sair-tela-cheia" onclick="waTelaCheia(false)" title="Sair da tela cheia (Esc)">
