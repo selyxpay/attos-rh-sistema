@@ -1960,7 +1960,9 @@ async function _diariaCarregarDiarias() {
         '<button class="btn btn-primary btn-sm" id="diaria-btn-salvar-nova"><i class="fa-solid fa-check"></i> Criar diária</button>' +
       '</div>' +
       '<div class="diaria-lista">' + (lista.length ? lista.map(function (dd) {
+        const iconeStatus = dd.status === 'aberta' ? 'fa-calendar-check' : (dd.status === 'encerrada' ? 'fa-calendar-xmark' : 'fa-calendar');
         return '<div class="diaria-item">' +
+          '<div class="diaria-item-icone diaria-status-' + dd.status + '"><i class="fa-solid ' + iconeStatus + '"></i></div>' +
           '<div class="diaria-item-info"><b>' + escapeHTML(dd.titulo) + '</b>' +
             '<span>' + escapeHTML(dd.data || '') + '</span></div>' +
           '<span class="diaria-status-badge diaria-status-' + dd.status + '">' + (STATUS_LBL[dd.status] || dd.status) + '</span>' +
@@ -2112,9 +2114,11 @@ async function _diariaCarregarCadastros() {
     const STATUS_LBL = { pendente_aprovacao: '🟡 Pendente', ativo: '🟢 Ativo', bloqueado: '🔴 Bloqueado' };
 
     function linha(t) {
+      const inicial = (t.nome || '?').trim().charAt(0).toUpperCase() || '?';
       return '<div class="diaria-item">' +
+        '<div class="diaria-item-avatar">' + escapeHTML(inicial) + '</div>' +
         '<div class="diaria-item-info"><b>' + escapeHTML(t.nome) + '</b><span>' + escapeHTML(_diariaFmtTelefone(t.telefone)) + '</span></div>' +
-        '<span class="diaria-status-badge">' + (STATUS_LBL[t.status] || t.status) + '</span>' +
+        '<span class="diaria-status-badge diaria-status-' + t.status + '">' + (STATUS_LBL[t.status] || t.status) + '</span>' +
         '<div class="diaria-item-acoes">' +
           (t.status !== 'ativo' ? '<button class="btn btn-success btn-sm" data-trab-aprovar="' + t.id + '">Aprovar</button>' : '') +
           (t.status !== 'bloqueado' ? '<button class="btn btn-outline btn-sm" data-trab-bloquear="' + t.id + '">Bloquear</button>' : '<button class="btn btn-outline btn-sm" data-trab-reativar="' + t.id + '">Reativar</button>') +
