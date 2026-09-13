@@ -1983,7 +1983,7 @@ async function _diariaCarregarDiarias() {
           '<div class="diaria-item-acoes">' +
             (dd.status === 'planejada' ? '<button class="btn btn-outline btn-sm" data-diaria-abrir="' + dd.id + '">Abrir</button>' : '') +
             (dd.status === 'aberta' ? '<button class="btn btn-outline btn-sm" data-diaria-ver="' + dd.id + '">Ver presença</button><button class="btn btn-outline btn-sm" data-diaria-encerrar="' + dd.id + '">Encerrar</button>' : '') +
-            (dd.status === 'encerrada' ? '<button class="btn btn-outline btn-sm" data-diaria-ver="' + dd.id + '">Ver relatório</button>' : '') +
+            (dd.status === 'encerrada' ? '<button class="btn btn-outline btn-sm" data-diaria-ver="' + dd.id + '">Ver relatório</button><button class="btn btn-outline btn-sm" data-diaria-reabrir="' + dd.id + '">Reabrir</button>' : '') +
           '</div>' +
         '</div>';
       }).join('') : '<p class="diaria-vazio">Nenhuma diária criada ainda.</p>') + '</div>';
@@ -2018,6 +2018,12 @@ async function _diariaCarregarDiarias() {
     });
     box.querySelectorAll('[data-diaria-ver]').forEach(function (b) {
       b.onclick = function () { _diariaSelecionada = b.getAttribute('data-diaria-ver'); _diariaTrocarSub('presenca'); };
+    });
+    box.querySelectorAll('[data-diaria-reabrir]').forEach(function (b) {
+      b.onclick = async function () {
+        try { await _diariaPost('/admin/diarias/' + b.getAttribute('data-diaria-reabrir') + '/reabrir', {}); _diariaCarregarDiarias(); }
+        catch (e) { alert(e.message || 'Erro ao reabrir.'); }
+      };
     });
   } catch (e) {
     box.innerHTML = '<p class="diaria-erro-carregar">Não consegui carregar as diárias: ' + escapeHTML(e.message || '') + '</p>';

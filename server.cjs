@@ -1768,8 +1768,52 @@ http.createServer(function (req, res) {
   }
 
   // Check-in por GPS foi removido (ponto de encontro muda toda semana — ver
-  // comentário no topo do bloco DIÁRIA). O registro de chegada por foto entra
-  // numa sub-fase à frente.
+  // comentário no topo do bloco DIÁRIA). O que existe hoje é o botão simples
+  // "Confirmar presença" (sem foto/GPS): o trabalhador avisa que chegou, e o
+  // admin confirma manualmente olhando quem está realmente no local (ver
+  // rotas /admin/presencas/*). Registro de chegada por foto, se um dia for
+  // preciso, entra como uma camada em cima disso, não troca o modelo.
+  if (urlPath === '/api/diaria/trabalhador/presenca' && req.method === 'POST') {
+    lerCorpo(req, function (err, body) {
+      if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
+      const token = String((body && body.token) || '').trim();
+      if (!token || token.length < 20) { responderJson(res, 404, { error: 'Não encontrado.' }); return; }
+      comTrava(function () {
+        const st = lerEstado();
+        const d = st.dados || {};
+        const t = (d.trabalhadoresDiaria || []).find(function (x) { return Array.isArray(x.tokens) && x.tokens.indexOf(token) >= 0; });
+        if (!t) { responderJson(res, 404, { error: 'Cadastro não encontrado.' }); return; }
+        if (t.status !== 'ativo') { responderJson(res, 403, { error: 'Seu cadastro não está ativo.' }); return; }
+        const hoje = new Date().toISOString().slice(0, 10);
+        const diariaHoje = (d.diarias || []).find(function (x) { return x.data === hoje && x.status === 'aberta'; });
+        if (!diariaHoje) { responderJson(res, 400, { error: 'Não há registro de presença aberto agora.' }); return; }
+        if (!Array.isArray(d.presencasDiaria)) d.presencasDiaria = [];
+        const jaTem = d.presencasDiaria.some(function (p) { return p.diariaId === diariaHoje.id && p.trabalhadorId === t.id; });
+        if (jaTem) {
+          // já confirmou antes — não cria duplicado, só devolve o estado atual.
+          responderJson(res, 200, diariaMontarStatusResposta(t, d));
+          return;
+        }
+        d.presencasDiaria.push({
+          id: 'pres-' + Date.now(),
+          diariaId: diariaHoje.id,
+          trabalhadorId: t.id,
+          status: 'aguardando',
+          checkinEm: new Date().toISOString(),
+          confirmadoPor: null,
+          confirmadoEm: null
+        });
+        try {
+          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+          responderJson(res, 200, diariaMontarStatusResposta(t, d));
+        } catch (e) {
+          console.error('[Diária] presenca:', e);
+          responderJson(res, 500, { error: 'Não foi possível registrar. Tente de novo.' });
+        }
+      });
+    });
+    return;
+  }
 
   // ---- Admin: gerenciar trabalhadores, diárias e presenças -----------------
   // Mesma trava de todo o painel: cookie de sessão de staff + mestre/admin.
@@ -1971,7 +2015,7 @@ http.createServer(function (req, res) {
       return;
     }
 
-    m = urlPath.match(/^\/api\/diaria\/admin\/diarias\/([^\/]+)\/(abrir|encerrar|confirmar-todos)$/);
+    m = urlPath.match(/^\/api\/diaria\/admin\/diarias\/([^\/]+)\/(abrir|encerrar|reabrir|confirmar-todos)$/);
     if (m && req.method === 'POST') {
       const diariaId = decodeURIComponent(m[1]);
       const acao = m[2];
@@ -1982,6 +2026,7 @@ http.createServer(function (req, res) {
         if (!diaria) { responderJson(res, 404, { error: 'Diária não encontrada.' }); return; }
         if (acao === 'abrir') { diaria.status = 'aberta'; diaria.abertaEm = new Date().toISOString(); }
         else if (acao === 'encerrar') { diaria.status = 'encerrada'; diaria.encerradaEm = new Date().toISOString(); }
+        else if (acao === 'reabrir') { diaria.status = 'aberta'; diaria.encerradaEm = null; }
         else if (acao === 'confirmar-todos') {
           (d.presencasDiaria || []).forEach(function (p) {
             if (p.diariaId === diariaId && p.status === 'aguardando') {
