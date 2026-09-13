@@ -1898,8 +1898,22 @@ function _diariaFmtTelefone(tel) {
   if (dig.length < 10) return tel || '';
   return '(' + dig.slice(-11, -9) + ') ' + dig.slice(-9, -5) + '-' + dig.slice(-5);
 }
+function _diariaFmtCpf(cpf) {
+  const d = String(cpf || '').replace(/\D/g, '');
+  if (d.length !== 11) return cpf || '—';
+  return d.slice(0, 3) + '.' + d.slice(3, 6) + '.' + d.slice(6, 9) + '-' + d.slice(9);
+}
+function _diariaFmtCep(cep) {
+  const d = String(cep || '').replace(/\D/g, '');
+  if (d.length !== 8) return cep || '—';
+  return d.slice(0, 5) + '-' + d.slice(5);
+}
+function _diariaFmtData(iso) {
+  try { return new Date(iso).toLocaleDateString('pt-BR'); } catch (e) { return '—'; }
+}
 
 let _diariaSubAtual = 'diarias';
+let _diariaCadastrosCache = []; // ultima lista de trabalhadores carregada, pra abrir a ficha sem outra ida ao servidor
 let _diariaSelecionada = null; // id da diária escolhida na aba "Presença ao vivo"
 let _diariaPollTimer = null;
 
@@ -2107,19 +2121,21 @@ async function _diariaCarregarCadastros() {
   try {
     const r = await _diariaApi('/admin/trabalhadores', {});
     const lista = r.trabalhadores || [];
+    _diariaCadastrosCache = lista;
     const pendentes = lista.filter(function (t) { return t.status === 'pendente_aprovacao'; });
     const outros = lista.filter(function (t) { return t.status !== 'pendente_aprovacao'; });
     const badge = document.getElementById('diaria-badge-pendentes');
     if (badge) { badge.textContent = pendentes.length; badge.style.display = pendentes.length ? '' : 'none'; }
-    const STATUS_LBL = { pendente_aprovacao: '🟡 Pendente', ativo: '🟢 Ativo', bloqueado: '🔴 Bloqueado' };
+    const STATUS_LBL = { pendente_aprovacao: '🟡 Pendente', ativo: '🟢 Ativo', bloqueado: '🔴 Bloqueado', recusado: '🔴 Recusado' };
 
     function linha(t) {
       const inicial = (t.nome || '?').trim().charAt(0).toUpperCase() || '?';
-      return '<div class="diaria-item">' +
+      return '<div class="diaria-item diaria-item-clicavel" data-diaria-ficha="' + t.id + '">' +
         '<div class="diaria-item-avatar">' + escapeHTML(inicial) + '</div>' +
         '<div class="diaria-item-info"><b>' + escapeHTML(t.nome) + '</b><span>' + escapeHTML(_diariaFmtTelefone(t.telefone)) + '</span></div>' +
         '<span class="diaria-status-badge diaria-status-' + t.status + '">' + (STATUS_LBL[t.status] || t.status) + '</span>' +
         '<div class="diaria-item-acoes">' +
+          '<button class="btn btn-outline btn-sm" data-trab-ver="' + t.id + '"><i class="fa-solid fa-eye"></i> Ver ficha</button>' +
           (t.status !== 'ativo' ? '<button class="btn btn-success btn-sm" data-trab-aprovar="' + t.id + '">Aprovar</button>' : '') +
           (t.status !== 'bloqueado' ? '<button class="btn btn-outline btn-sm" data-trab-bloquear="' + t.id + '">Bloquear</button>' : '<button class="btn btn-outline btn-sm" data-trab-reativar="' + t.id + '">Reativar</button>') +
         '</div>' +
@@ -2131,9 +2147,14 @@ async function _diariaCarregarCadastros() {
       '<h4 class="diaria-subtitulo">Todo mundo</h4>' +
       '<div class="diaria-lista">' + (outros.length ? outros.map(linha).join('') : '<p class="diaria-vazio">Nenhum trabalhador cadastrado ainda.</p>') + '</div>';
 
-    ['aprovar', 'bloquear', 'reativar'].forEach(function (acao) {
+    box.querySelectorAll('[data-diaria-ficha]').forEach(function (row) {
+      row.onclick = function () { _diariaAbrirFicha(row.getAttribute('data-diaria-ficha')); };
+    });
+    ['ver', 'aprovar', 'bloquear', 'reativar'].forEach(function (acao) {
       box.querySelectorAll('[data-trab-' + acao + ']').forEach(function (b) {
-        b.onclick = async function () {
+        b.onclick = async function (ev) {
+          ev.stopPropagation();
+          if (acao === 'ver') { _diariaAbrirFicha(b.getAttribute('data-trab-ver')); return; }
           try { await _diariaPost('/admin/trabalhadores/' + b.getAttribute('data-trab-' + acao) + '/' + acao, {}); _diariaCarregarCadastros(); }
           catch (e) { alert(e.message || 'Erro.'); }
         };
@@ -2143,6 +2164,128 @@ async function _diariaCarregarCadastros() {
     box.innerHTML = '<p class="diaria-erro-carregar">Não consegui carregar os cadastros: ' + escapeHTML(e.message || '') + '</p>';
   }
 }
+
+// ── Ficha completa do trabalhador (documentos + dados, pra decidir a
+//    contratação) — abre a partir da lista de Cadastros, sem nova ida ao
+//    servidor (usa o cache carregado por _diariaCarregarCadastros). ────────
+function _diariaAbrirFicha(id) {
+  const t = _diariaCadastrosCache.find(function (x) { return x.id === id; });
+  if (!t) { alert('Não achei esse cadastro — atualize a lista e tente de novo.'); return; }
+
+  const STATUS_LBL = { pendente_aprovacao: '🟡 Pendente de aprovação', ativo: '🟢 Ativo', bloqueado: '🔴 Bloqueado', recusado: '🔴 Recusado' };
+  document.getElementById('diaria-ficha-titulo').textContent = t.nome;
+
+  const endereco = [
+    t.logradouro, t.numero ? ', ' + t.numero : '', t.complemento ? ' - ' + t.complemento : ''
+  ].join('') + (t.bairro ? ' — ' + t.bairro : '') + (t.cidade ? ', ' + t.cidade : '') + (t.uf ? '/' + t.uf : '') +
+    (t.cep ? ' · CEP ' + _diariaFmtCep(t.cep) : '');
+
+  function campo(rotulo, valor) {
+    return '<div class="diaria-ficha-campo"><span>' + escapeHTML(rotulo) + '</span><b>' + escapeHTML(valor || '—') + '</b></div>';
+  }
+
+  const docs = t.documentos || {};
+  const DOC_ROTULOS = { rgFrente: 'RG (frente)', rgVerso: 'RG (verso)', comprovante: 'Comprovante de residência' };
+  const docsHtml = Object.keys(DOC_ROTULOS).map(function (chave) {
+    const nomeArquivo = docs[chave];
+    if (!nomeArquivo) return '<div class="diaria-doc-thumb-vazio">' + escapeHTML(DOC_ROTULOS[chave]) + '<br><span>não enviado</span></div>';
+    const url = '/api/diaria/admin/arquivo/cadastro/' + encodeURIComponent(t.id) + '/' + encodeURIComponent(nomeArquivo);
+    const legenda = DOC_ROTULOS[chave] + ' — ' + t.nome;
+    return '<div class="diaria-doc-thumb-item">' +
+      '<img src="' + escapeHTML(url) + '" class="diaria-doc-thumb" data-legenda="' + escapeHTML(legenda) + '">' +
+      '<span>' + escapeHTML(DOC_ROTULOS[chave]) + '</span>' +
+    '</div>';
+  }).join('');
+
+  document.getElementById('diaria-ficha-corpo').innerHTML =
+    '<div class="diaria-ficha-status"><span class="diaria-status-badge diaria-status-' + t.status + '">' + (STATUS_LBL[t.status] || t.status) + '</span>' +
+      '<span class="diaria-ficha-meta">Cadastrado em ' + _diariaFmtData(t.criadoEm) +
+      (t.aprovadoEm ? ' · Aprovado em ' + _diariaFmtData(t.aprovadoEm) + (t.aprovadoPor ? ' por ' + escapeHTML(t.aprovadoPor) : '') : '') +
+      '</span></div>' +
+    (t.observacaoAdmin ? '<div class="diaria-ficha-observacao"><i class="fa-solid fa-note-sticky"></i> ' + escapeHTML(t.observacaoAdmin) + '</div>' : '') +
+    '<h4 class="diaria-subtitulo" style="margin-top:8px;">Dados pessoais</h4>' +
+    '<div class="diaria-ficha-grid">' +
+      campo('Nome completo', t.nome) + campo('Telefone', _diariaFmtTelefone(t.telefone)) +
+      campo('RG', t.rg) + campo('CPF', _diariaFmtCpf(t.cpf)) +
+      campo('Nome do pai', t.nomePai) + campo('Nome da mãe', t.nomeMae) +
+    '</div>' +
+    '<h4 class="diaria-subtitulo">Endereço</h4>' +
+    '<p class="diaria-ficha-endereco">' + escapeHTML(endereco) + '</p>' +
+    '<h4 class="diaria-subtitulo">Pix</h4>' +
+    '<div class="diaria-ficha-grid">' + campo('Tipo', t.pixTipo) + campo('Chave', t.pixChave) + '</div>' +
+    '<h4 class="diaria-subtitulo">Documentos</h4>' +
+    '<div class="diaria-doc-grid">' + docsHtml + '</div>' +
+    '<div id="diaria-ficha-recusa" style="display:none;margin-top:14px;">' +
+      '<label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px;">Motivo da recusa (a pessoa não vê isso, é só pra sua equipe)</label>' +
+      '<textarea id="diaria-ficha-motivo" rows="2" style="width:100%;border-radius:8px;border:1px solid var(--border-color);padding:8px 10px;font-family:inherit;font-size:13px;"></textarea>' +
+    '</div>';
+
+  document.getElementById('diaria-ficha-corpo').querySelectorAll('.diaria-doc-thumb').forEach(function (img) {
+    img.onclick = function () { diariaAbrirFotoDoc(img.src, img.getAttribute('data-legenda')); };
+  });
+
+  _diariaRenderAcoesFicha(t);
+  document.getElementById('modal-diaria-ficha').classList.add('active');
+}
+
+function _diariaRenderAcoesFicha(t) {
+  const acoes = document.getElementById('diaria-ficha-acoes');
+  const partes = [];
+  if (t.status === 'pendente_aprovacao') {
+    partes.push('<button class="btn btn-outline btn-sm" id="diaria-ficha-btn-recusar-mostrar">Recusar</button>');
+    partes.push('<button class="btn btn-success btn-sm" id="diaria-ficha-btn-aprovar"><i class="fa-solid fa-check"></i> Aprovar e liberar acesso</button>');
+  } else if (t.status === 'ativo') {
+    partes.push('<button class="btn btn-outline btn-sm" id="diaria-ficha-btn-bloquear">Bloquear</button>');
+  } else if (t.status === 'bloqueado') {
+    partes.push('<button class="btn btn-success btn-sm" id="diaria-ficha-btn-reativar">Desbloquear</button>');
+  } else if (t.status === 'recusado') {
+    partes.push('<button class="btn btn-success btn-sm" id="diaria-ficha-btn-aprovar">Aprovar mesmo assim</button>');
+  }
+  acoes.innerHTML = partes.join('');
+
+  const btnAprovar = document.getElementById('diaria-ficha-btn-aprovar');
+  if (btnAprovar) btnAprovar.onclick = function () { _diariaExecutarAcaoFicha(t.id, 'aprovar'); };
+  const btnBloquear = document.getElementById('diaria-ficha-btn-bloquear');
+  if (btnBloquear) btnBloquear.onclick = function () { _diariaExecutarAcaoFicha(t.id, 'bloquear'); };
+  const btnReativar = document.getElementById('diaria-ficha-btn-reativar');
+  if (btnReativar) btnReativar.onclick = function () { _diariaExecutarAcaoFicha(t.id, 'reativar'); };
+  const btnMostrarRecusa = document.getElementById('diaria-ficha-btn-recusar-mostrar');
+  if (btnMostrarRecusa) btnMostrarRecusa.onclick = function () {
+    document.getElementById('diaria-ficha-recusa').style.display = '';
+    acoes.innerHTML =
+      '<button class="btn btn-outline btn-sm" id="diaria-ficha-btn-cancelar-recusa">Cancelar</button>' +
+      '<button class="btn btn-danger btn-sm" id="diaria-ficha-btn-confirmar-recusa"><i class="fa-solid fa-xmark"></i> Confirmar recusa</button>';
+    document.getElementById('diaria-ficha-btn-cancelar-recusa').onclick = function () { _diariaRenderAcoesFicha(t); document.getElementById('diaria-ficha-recusa').style.display = 'none'; };
+    document.getElementById('diaria-ficha-btn-confirmar-recusa').onclick = function () {
+      const motivo = document.getElementById('diaria-ficha-motivo').value.trim();
+      _diariaExecutarAcaoFicha(t.id, 'recusar', motivo);
+    };
+  };
+}
+
+async function _diariaExecutarAcaoFicha(id, acao, observacao) {
+  try {
+    await _diariaPost('/admin/trabalhadores/' + id + '/' + acao, { observacao: observacao || '' });
+    fecharFichaDiaria();
+    _diariaCarregarCadastros();
+  } catch (e) { alert(e.message || 'Erro.'); }
+}
+
+window.fecharFichaDiaria = function () {
+  const m = document.getElementById('modal-diaria-ficha');
+  if (m) m.classList.remove('active');
+};
+
+window.diariaAbrirFotoDoc = function (src, legenda) {
+  const lightboxModal = document.getElementById('modal-documento-preview');
+  const lightboxImg = document.getElementById('lightbox-img');
+  const lightboxPdf = document.getElementById('lightbox-pdf');
+  const lightboxCaption = document.getElementById('lightbox-caption');
+  if (lightboxCaption) lightboxCaption.textContent = legenda || 'Documento';
+  if (lightboxPdf) lightboxPdf.style.display = 'none';
+  if (lightboxImg) { lightboxImg.style.display = 'block'; lightboxImg.src = src; }
+  if (lightboxModal) lightboxModal.classList.add('active');
+};
 
 // ÁREA DE DOCUMENTOS NA NUVEM (documentos guardados permanentemente)
 const ROTULO_DOC = {

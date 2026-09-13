@@ -50,7 +50,7 @@
     <!-- Margem — custo do exame na clinica x valor repassado ao cliente -->
     <link rel="stylesheet" href="css/margem.css?v=20260910b">
     <!-- Diária (Presença RT) — página de referência/especificação -->
-    <link rel="stylesheet" href="css/diaria.css?v=20260913b">
+    <link rel="stylesheet" href="css/diaria.css?v=20260913c">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
     <link rel="stylesheet" href="css/mobile.css?v=20260910b">
 </head>
@@ -3520,6 +3520,21 @@
         </div>
     </div>
 
+    <!-- MODAL: FICHA COMPLETA DO TRABALHADOR (DIÁRIA) -->
+    <div id="modal-diaria-ficha" class="modal-overlay" onclick="if(event.target===this) fecharFichaDiaria()">
+        <div class="modal-exame-box modal-exame-box-detalhe" style="max-width:760px;height:auto;max-height:90vh;" onclick="event.stopPropagation()">
+            <div class="modal-exame-header">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div class="modal-exame-icon" style="background:rgba(225,29,42,0.1);color:var(--primary);"><i class="fa-solid fa-id-card-clip"></i></div>
+                    <h3 id="diaria-ficha-titulo" style="margin:0;font-size:16px;">Ficha do trabalhador</h3>
+                </div>
+                <button class="modal-exame-close" onclick="fecharFichaDiaria()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-exame-body" id="diaria-ficha-corpo"><!-- preenchido via JS --></div>
+            <div class="modal-exame-footer" id="diaria-ficha-acoes" style="flex-wrap:wrap;"><!-- botões via JS --></div>
+        </div>
+    </div>
+
     <!-- MODAL: DEVOLUÇÃO DO DP COM MOTIVO OBRIGATÓRIO -->
     <div id="modal-dp-devolver-motivo" class="modal-overlay">
         <div class="modal-box max-w-sm">
@@ -4055,7 +4070,7 @@
     <script src="js/vps-sync.js?v=20260910b"></script>
     <script src="js/exata-catalogo.js?v=20260910b"></script>
     <script src="js/data.js?v=20260910b"></script>
-    <script src="js/app.js?v=20260913b"></script>
+    <script src="js/app.js?v=20260913c"></script>
     <script src="js/whatsapp.js?v=20260910b"></script>
     <!-- Sair da tela cheia do WhatsApp. Fica fora da aba porque o cabecalho
          que tinha o outro botao some nesse modo. -->

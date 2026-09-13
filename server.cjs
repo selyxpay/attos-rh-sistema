@@ -1811,22 +1811,26 @@ http.createServer(function (req, res) {
       return;
     }
 
-    let m = urlPath.match(/^\/api\/diaria\/admin\/trabalhadores\/([^\/]+)\/(aprovar|bloquear|reativar)$/);
+    let m = urlPath.match(/^\/api\/diaria\/admin\/trabalhadores\/([^\/]+)\/(aprovar|recusar|bloquear|reativar)$/);
     if (m && req.method === 'POST') {
       const alvoId = decodeURIComponent(m[1]);
       const acao = m[2];
-      comTrava(function () {
-        const st = lerEstado();
-        const d = st.dados || {};
-        const t = (d.trabalhadoresDiaria || []).find(function (x) { return x.id === alvoId; });
-        if (!t) { responderJson(res, 404, { error: 'Trabalhador não encontrado.' }); return; }
-        if (acao === 'aprovar') { t.status = 'ativo'; t.aprovadoEm = new Date().toISOString(); t.aprovadoPor = requesterDiaria.login; }
-        else if (acao === 'bloquear') { t.status = 'bloqueado'; }
-        else if (acao === 'reativar') { t.status = 'ativo'; }
-        try {
-          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-          responderJson(res, 200, { ok: true, trabalhador: t });
-        } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
+      lerCorpo(req, function (err, body) {
+        const observacao = String((body && body.observacao) || '').trim().slice(0, 500);
+        comTrava(function () {
+          const st = lerEstado();
+          const d = st.dados || {};
+          const t = (d.trabalhadoresDiaria || []).find(function (x) { return x.id === alvoId; });
+          if (!t) { responderJson(res, 404, { error: 'Trabalhador não encontrado.' }); return; }
+          if (acao === 'aprovar') { t.status = 'ativo'; t.aprovadoEm = new Date().toISOString(); t.aprovadoPor = requesterDiaria.login; t.observacaoAdmin = null; }
+          else if (acao === 'recusar') { t.status = 'recusado'; t.observacaoAdmin = observacao || null; }
+          else if (acao === 'bloquear') { t.status = 'bloqueado'; t.observacaoAdmin = observacao || t.observacaoAdmin || null; }
+          else if (acao === 'reativar') { t.status = 'ativo'; }
+          try {
+            gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+            responderJson(res, 200, { ok: true, trabalhador: t });
+          } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
+        });
       });
       return;
     }
