@@ -50,7 +50,7 @@
     <!-- Margem — custo do exame na clinica x valor repassado ao cliente -->
     <link rel="stylesheet" href="css/margem.css?v=20260910b">
     <!-- Diária (Presença RT) — página de referência/especificação -->
-    <link rel="stylesheet" href="css/diaria.css?v=20260910b">
+    <link rel="stylesheet" href="css/diaria.css?v=20260913a">
     <!-- R&T Responsivo mobile/tablet (só afeta telas pequenas; desktop inalterado) -->
     <link rel="stylesheet" href="css/mobile.css?v=20260910b">
 </head>
@@ -1290,8 +1290,18 @@
                     <div class="diaria-container">
                         <div class="diaria-topo">
                             <h2><i class="fa-solid fa-calendar-day"></i> Diária — Presença RT</h2>
-                            <p>Controle de quem trabalha nas diárias de campo: cadastro do trabalhador,
-                               presença confirmada por GPS e aprovação de quem está no local.</p>
+                            <p>Controle de quem trabalha nas diárias de campo: cadastro do trabalhador
+                               com documentos, aprovação do cadastro e registro de presença.</p>
+                        </div>
+
+                        <div class="diaria-link-trabalhador">
+                            <i class="fa-solid fa-link"></i>
+                            <div class="diaria-link-trabalhador-texto">
+                                <strong>Link para o trabalhador</strong>
+                                <span>Mande esse link pra pessoa: se ela já tem cadastro, entra direto; se não tem, faz o cadastro dela.</span>
+                            </div>
+                            <button class="btn btn-outline btn-sm" id="diaria-btn-copiar-link-trabalhador">
+                                <i class="fa-solid fa-copy"></i> Copiar link</button>
                         </div>
 
                         <div class="diaria-subnav">
@@ -4045,7 +4055,7 @@
     <script src="js/vps-sync.js?v=20260910b"></script>
     <script src="js/exata-catalogo.js?v=20260910b"></script>
     <script src="js/data.js?v=20260910b"></script>
-    <script src="js/app.js?v=20260910b"></script>
+    <script src="js/app.js?v=20260913a"></script>
     <script src="js/whatsapp.js?v=20260910b"></script>
     <!-- Sair da tela cheia do WhatsApp. Fica fora da aba porque o cabecalho
          que tinha o outro botao some nesse modo. -->

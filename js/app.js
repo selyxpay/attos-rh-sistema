@@ -1907,6 +1907,18 @@ function renderDiaria() {
   document.querySelectorAll('.diaria-subnav-btn').forEach(function (b) {
     b.onclick = function () { _diariaTrocarSub(b.getAttribute('data-diaria-sub')); };
   });
+  const btnLink = document.getElementById('diaria-btn-copiar-link-trabalhador');
+  if (btnLink && !btnLink.dataset.listenerAdded) {
+    btnLink.dataset.listenerAdded = 'true';
+    btnLink.onclick = function () {
+      const base = window.location.origin + window.location.pathname.replace('index.html', '');
+      navigator.clipboard.writeText(base + 'diaria-trabalhador.html').then(function () {
+        const original = btnLink.innerHTML;
+        btnLink.innerHTML = '<i class="fa-solid fa-check"></i> Copiado!';
+        setTimeout(function () { btnLink.innerHTML = original; }, 2000);
+      });
+    };
+  }
   _diariaTrocarSub(_diariaSubAtual);
 }
 
