@@ -1798,6 +1798,105 @@ http.createServer(function (req, res) {
       return;
     }
 
+    // ---- Admin: corrige os dados que a pessoa preencheu errado (ela liga
+    //     pedindo, ou o admin percebe olhando a ficha) -------------------------
+    let m = urlPath.match(/^\/api\/diaria\/admin\/trabalhadores\/([^\/]+)\/dados$/);
+    if (m && req.method === 'POST') {
+      const alvoId = decodeURIComponent(m[1]);
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
+        const b = body || {};
+        const nome = String(b.nome || '').trim().slice(0, 120);
+        const telefone = diariaNormalizarTelefone(b.telefone);
+        const nomePai = String(b.nomePai || '').trim().slice(0, 120);
+        const nomeMae = String(b.nomeMae || '').trim().slice(0, 120);
+        const rg = String(b.rg || '').trim().slice(0, 20);
+        const cpf = String(b.cpf || '').replace(/\D/g, '');
+        const cep = String(b.cep || '').replace(/\D/g, '');
+        const logradouro = String(b.logradouro || '').trim().slice(0, 200);
+        const numero = String(b.numero || '').trim().slice(0, 20);
+        const complemento = String(b.complemento || '').trim().slice(0, 100);
+        const bairro = String(b.bairro || '').trim().slice(0, 100);
+        const cidade = String(b.cidade || '').trim().slice(0, 100);
+        const uf = String(b.uf || '').trim().toUpperCase().slice(0, 2);
+        const pixTipo = String(b.pixTipo || '').trim();
+        const pixChave = String(b.pixChave || '').trim().slice(0, 140);
+
+        if (nome.split(/\s+/).filter(Boolean).length < 2) { responderJson(res, 400, { error: 'Informe o nome completo (nome e sobrenome).' }); return; }
+        if (telefone.length < 10 || telefone.length > 13) { responderJson(res, 400, { error: 'Telefone inválido.' }); return; }
+        if (!nomePai) { responderJson(res, 400, { error: 'Informe o nome do pai.' }); return; }
+        if (!nomeMae) { responderJson(res, 400, { error: 'Informe o nome da mãe.' }); return; }
+        if (!rg) { responderJson(res, 400, { error: 'Informe o número do RG.' }); return; }
+        if (!diariaCpfValido(cpf)) { responderJson(res, 400, { error: 'CPF inválido. Confira os números.' }); return; }
+        if (cep.length !== 8) { responderJson(res, 400, { error: 'CEP inválido.' }); return; }
+        if (!logradouro || !numero || !bairro || !cidade || !uf) { responderJson(res, 400, { error: 'Complete o endereço.' }); return; }
+        if (DIARIA_PIX_TIPOS.indexOf(pixTipo) < 0) { responderJson(res, 400, { error: 'Escolha o tipo da chave Pix.' }); return; }
+        if (!diariaPixValida(pixTipo, pixChave)) { responderJson(res, 400, { error: 'Chave Pix inválida pro tipo escolhido.' }); return; }
+
+        comTrava(function () {
+          const st = lerEstado();
+          const d = st.dados || {};
+          const t = (d.trabalhadoresDiaria || []).find(function (x) { return x.id === alvoId; });
+          if (!t) { responderJson(res, 404, { error: 'Trabalhador não encontrado.' }); return; }
+          const outroTelefone = (d.trabalhadoresDiaria || []).find(function (x) { return x.id !== alvoId && diariaNormalizarTelefone(x.telefone) === telefone; });
+          if (outroTelefone) { responderJson(res, 409, { error: 'Já existe outro cadastro com esse telefone.' }); return; }
+          const outroCpf = (d.trabalhadoresDiaria || []).find(function (x) { return x.id !== alvoId && x.cpf === cpf; });
+          if (outroCpf) { responderJson(res, 409, { error: 'Já existe outro cadastro com esse CPF.' }); return; }
+
+          t.nome = nome; t.nomeNormalizado = diariaNormalizarNome(nome); t.telefone = telefone;
+          t.nomePai = nomePai; t.nomeMae = nomeMae; t.rg = rg; t.cpf = cpf;
+          t.cep = cep; t.logradouro = logradouro; t.numero = numero; t.complemento = complemento;
+          t.bairro = bairro; t.cidade = cidade; t.uf = uf;
+          t.pixTipo = pixTipo; t.pixChave = pixChave;
+          try {
+            gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+            responderJson(res, 200, { ok: true, trabalhador: t });
+          } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
+        });
+      });
+      return;
+    }
+
+    // ---- Admin: troca um documento (foto ilegível, PDF que a pessoa mandou
+    //     depois pelo WhatsApp etc.) — some o arquivo velho, fica só o novo ----
+    m = urlPath.match(/^\/api\/diaria\/admin\/trabalhadores\/([^\/]+)\/documento$/);
+    if (m && req.method === 'POST') {
+      const alvoId = decodeURIComponent(m[1]);
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
+        const b = body || {};
+        const CAMPOS_VALIDOS = { rgFrente: 'rg-frente', rgVerso: 'rg-verso', comprovante: 'comprovante' };
+        const campo = String(b.campo || '');
+        if (!CAMPOS_VALIDOS[campo]) { responderJson(res, 400, { error: 'Campo de documento inválido.' }); return; }
+        if (!b.arquivo) { responderJson(res, 400, { error: 'Envie o novo arquivo.' }); return; }
+        comTrava(function () {
+          const st = lerEstado();
+          const d = st.dados || {};
+          const t = (d.trabalhadoresDiaria || []).find(function (x) { return x.id === alvoId; });
+          if (!t) { responderJson(res, 404, { error: 'Trabalhador não encontrado.' }); return; }
+          const nomeAntigo = t.documentos && t.documentos[campo];
+          let novoNome;
+          try {
+            novoNome = diariaSalvarDocumento(alvoId, CAMPOS_VALIDOS[campo], b.arquivo);
+          } catch (e) {
+            responderJson(res, 400, { error: e.message || 'Não foi possível salvar o arquivo.' });
+            return;
+          }
+          if (!novoNome) { responderJson(res, 400, { error: 'Arquivo inválido — envie uma imagem ou PDF.' }); return; }
+          if (!t.documentos) t.documentos = {};
+          t.documentos[campo] = novoNome;
+          if (nomeAntigo && nomeAntigo !== novoNome) {
+            try { fs.unlinkSync(path.join(DIARIA_DOCS_DIR, alvoId, nomeAntigo)); } catch (e) {}
+          }
+          try {
+            gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+            responderJson(res, 200, { ok: true, trabalhador: t });
+          } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
+        });
+      });
+      return;
+    }
+
     if (urlPath === '/api/diaria/admin/trabalhadores' && req.method === 'GET') {
       const qIdx = req.url.indexOf('?');
       const qs = new URLSearchParams(qIdx >= 0 ? req.url.slice(qIdx + 1) : '');
@@ -1811,7 +1910,7 @@ http.createServer(function (req, res) {
       return;
     }
 
-    let m = urlPath.match(/^\/api\/diaria\/admin\/trabalhadores\/([^\/]+)\/(aprovar|recusar|bloquear|reativar)$/);
+    m = urlPath.match(/^\/api\/diaria\/admin\/trabalhadores\/([^\/]+)\/(aprovar|recusar|bloquear|reativar)$/);
     if (m && req.method === 'POST') {
       const alvoId = decodeURIComponent(m[1]);
       const acao = m[2];

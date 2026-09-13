@@ -1743,6 +1743,15 @@ h1, h2, h3, h4, h5, h6 {
     display: flex;
 }
 
+/* Visualizador de documento (lightbox) precisa sempre aparecer por cima de
+   qualquer outro modal — ele pode ser aberto de dentro de outro modal (ex.:
+   a ficha do trabalhador), e como os dois usam o mesmo z-index, o que vem
+   depois no HTML ganhava a frente. Fixando um z-index maior resolve pra
+   sempre, independente da ordem no documento. */
+#modal-documento-preview.active {
+    z-index: 1100;
+}
+
 .modal-box {
     background-color: var(--card-bg);
     border-radius: var(--radius-lg);

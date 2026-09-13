@@ -2168,42 +2168,53 @@ async function _diariaCarregarCadastros() {
 // ── Ficha completa do trabalhador (documentos + dados, pra decidir a
 //    contratação) — abre a partir da lista de Cadastros, sem nova ida ao
 //    servidor (usa o cache carregado por _diariaCarregarCadastros). ────────
+const DIARIA_DOC_ROTULOS = { rgFrente: 'RG (frente)', rgVerso: 'RG (verso)', comprovante: 'Comprovante de residência' };
+function _diariaEhPdf(nomeArquivo) { return /\.pdf$/i.test(nomeArquivo || ''); }
+
 function _diariaAbrirFicha(id) {
   const t = _diariaCadastrosCache.find(function (x) { return x.id === id; });
   if (!t) { alert('Não achei esse cadastro — atualize a lista e tente de novo.'); return; }
 
-  const STATUS_LBL = { pendente_aprovacao: '🟡 Pendente de aprovação', ativo: '🟢 Ativo', bloqueado: '🔴 Bloqueado', recusado: '🔴 Recusado' };
   document.getElementById('diaria-ficha-titulo').textContent = t.nome;
+  document.getElementById('diaria-ficha-corpo').innerHTML =
+    '<div id="diaria-ficha-status-bloco"></div>' +
+    '<div id="diaria-ficha-dados-bloco"></div>' +
+    '<div id="diaria-ficha-docs-bloco"></div>' +
+    '<div id="diaria-ficha-recusa" style="display:none;margin-top:14px;">' +
+      '<label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px;">Motivo da recusa (a pessoa não vê isso, é só pra sua equipe)</label>' +
+      '<textarea id="diaria-ficha-motivo" rows="2" style="width:100%;border-radius:8px;border:1px solid var(--border-color);padding:8px 10px;font-family:inherit;font-size:13px;"></textarea>' +
+    '</div>';
 
+  _diariaRenderStatusFicha(t);
+  _diariaRenderDadosFicha(t);
+  _diariaRenderDocsFicha(t);
+  _diariaRenderAcoesFicha(t);
+  document.getElementById('modal-diaria-ficha').classList.add('active');
+}
+
+function _diariaRenderStatusFicha(t) {
+  const STATUS_LBL = { pendente_aprovacao: '🟡 Pendente de aprovação', ativo: '🟢 Ativo', bloqueado: '🔴 Bloqueado', recusado: '🔴 Recusado' };
+  document.getElementById('diaria-ficha-status-bloco').innerHTML =
+    '<div class="diaria-ficha-status"><span class="diaria-status-badge diaria-status-' + t.status + '">' + (STATUS_LBL[t.status] || t.status) + '</span>' +
+      '<span class="diaria-ficha-meta">Cadastrado em ' + _diariaFmtData(t.criadoEm) +
+      (t.aprovadoEm ? ' · Aprovado em ' + _diariaFmtData(t.aprovadoEm) + (t.aprovadoPor ? ' por ' + escapeHTML(t.aprovadoPor) : '') : '') +
+      '</span></div>' +
+    (t.observacaoAdmin ? '<div class="diaria-ficha-observacao"><i class="fa-solid fa-note-sticky"></i> ' + escapeHTML(t.observacaoAdmin) + '</div>' : '');
+}
+
+// ── Dados pessoais/endereço/Pix: modo visualização (padrão) ────────────────
+function _diariaRenderDadosFicha(t) {
+  function campo(rotulo, valor) {
+    return '<div class="diaria-ficha-campo"><span>' + escapeHTML(rotulo) + '</span><b>' + escapeHTML(valor || '—') + '</b></div>';
+  }
   const endereco = [
     t.logradouro, t.numero ? ', ' + t.numero : '', t.complemento ? ' - ' + t.complemento : ''
   ].join('') + (t.bairro ? ' — ' + t.bairro : '') + (t.cidade ? ', ' + t.cidade : '') + (t.uf ? '/' + t.uf : '') +
     (t.cep ? ' · CEP ' + _diariaFmtCep(t.cep) : '');
 
-  function campo(rotulo, valor) {
-    return '<div class="diaria-ficha-campo"><span>' + escapeHTML(rotulo) + '</span><b>' + escapeHTML(valor || '—') + '</b></div>';
-  }
-
-  const docs = t.documentos || {};
-  const DOC_ROTULOS = { rgFrente: 'RG (frente)', rgVerso: 'RG (verso)', comprovante: 'Comprovante de residência' };
-  const docsHtml = Object.keys(DOC_ROTULOS).map(function (chave) {
-    const nomeArquivo = docs[chave];
-    if (!nomeArquivo) return '<div class="diaria-doc-thumb-vazio">' + escapeHTML(DOC_ROTULOS[chave]) + '<br><span>não enviado</span></div>';
-    const url = '/api/diaria/admin/arquivo/cadastro/' + encodeURIComponent(t.id) + '/' + encodeURIComponent(nomeArquivo);
-    const legenda = DOC_ROTULOS[chave] + ' — ' + t.nome;
-    return '<div class="diaria-doc-thumb-item">' +
-      '<img src="' + escapeHTML(url) + '" class="diaria-doc-thumb" data-legenda="' + escapeHTML(legenda) + '">' +
-      '<span>' + escapeHTML(DOC_ROTULOS[chave]) + '</span>' +
-    '</div>';
-  }).join('');
-
-  document.getElementById('diaria-ficha-corpo').innerHTML =
-    '<div class="diaria-ficha-status"><span class="diaria-status-badge diaria-status-' + t.status + '">' + (STATUS_LBL[t.status] || t.status) + '</span>' +
-      '<span class="diaria-ficha-meta">Cadastrado em ' + _diariaFmtData(t.criadoEm) +
-      (t.aprovadoEm ? ' · Aprovado em ' + _diariaFmtData(t.aprovadoEm) + (t.aprovadoPor ? ' por ' + escapeHTML(t.aprovadoPor) : '') : '') +
-      '</span></div>' +
-    (t.observacaoAdmin ? '<div class="diaria-ficha-observacao"><i class="fa-solid fa-note-sticky"></i> ' + escapeHTML(t.observacaoAdmin) + '</div>' : '') +
-    '<h4 class="diaria-subtitulo" style="margin-top:8px;">Dados pessoais</h4>' +
+  document.getElementById('diaria-ficha-dados-bloco').innerHTML =
+    '<h4 class="diaria-subtitulo" style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;">Dados pessoais' +
+      '<button class="btn btn-outline btn-sm" id="diaria-ficha-btn-editar"><i class="fa-solid fa-pen"></i> Editar dados</button></h4>' +
     '<div class="diaria-ficha-grid">' +
       campo('Nome completo', t.nome) + campo('Telefone', _diariaFmtTelefone(t.telefone)) +
       campo('RG', t.rg) + campo('CPF', _diariaFmtCpf(t.cpf)) +
@@ -2212,20 +2223,205 @@ function _diariaAbrirFicha(id) {
     '<h4 class="diaria-subtitulo">Endereço</h4>' +
     '<p class="diaria-ficha-endereco">' + escapeHTML(endereco) + '</p>' +
     '<h4 class="diaria-subtitulo">Pix</h4>' +
-    '<div class="diaria-ficha-grid">' + campo('Tipo', t.pixTipo) + campo('Chave', t.pixChave) + '</div>' +
-    '<h4 class="diaria-subtitulo">Documentos</h4>' +
-    '<div class="diaria-doc-grid">' + docsHtml + '</div>' +
-    '<div id="diaria-ficha-recusa" style="display:none;margin-top:14px;">' +
-      '<label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px;">Motivo da recusa (a pessoa não vê isso, é só pra sua equipe)</label>' +
-      '<textarea id="diaria-ficha-motivo" rows="2" style="width:100%;border-radius:8px;border:1px solid var(--border-color);padding:8px 10px;font-family:inherit;font-size:13px;"></textarea>' +
+    '<div class="diaria-ficha-grid">' + campo('Tipo', t.pixTipo) + campo('Chave', t.pixChave) + '</div>';
+
+  document.getElementById('diaria-ficha-btn-editar').onclick = function () { _diariaRenderDadosFichaEdicao(t); };
+}
+
+// ── Dados pessoais/endereço/Pix: modo edição (pra corrigir o que a pessoa
+//    preencheu errado, depois de falar com ela no WhatsApp) ────────────────
+function _diariaRenderDadosFichaEdicao(t) {
+  function inp(id, rotulo, valor, extra) {
+    return '<div class="diaria-campo"><label>' + escapeHTML(rotulo) + '</label><input type="text" id="' + id + '" value="' + escapeHTML(valor || '') + '" ' + (extra || '') + '></div>';
+  }
+  document.getElementById('diaria-ficha-dados-bloco').innerHTML =
+    '<h4 class="diaria-subtitulo" style="margin-top:8px;">Editando dados pessoais</h4>' +
+    '<div class="diaria-ficha-form-grid">' +
+      inp('df-nome', 'Nome completo', t.nome) + inp('df-telefone', 'Telefone', _diariaFmtTelefone(t.telefone)) +
+      inp('df-rg', 'RG', t.rg) + inp('df-cpf', 'CPF', _diariaFmtCpf(t.cpf)) +
+      inp('df-nomePai', 'Nome do pai', t.nomePai) + inp('df-nomeMae', 'Nome da mãe', t.nomeMae) +
+    '</div>' +
+    '<h4 class="diaria-subtitulo">Endereço</h4>' +
+    '<div class="diaria-ficha-form-grid">' +
+      inp('df-cep', 'CEP', _diariaFmtCep(t.cep)) + inp('df-logradouro', 'Rua / Logradouro', t.logradouro) +
+      inp('df-numero', 'Número', t.numero) + inp('df-complemento', 'Complemento', t.complemento) +
+      inp('df-bairro', 'Bairro', t.bairro) + inp('df-cidade', 'Cidade', t.cidade) +
+      inp('df-uf', 'UF', t.uf, 'maxlength="2" style="text-transform:uppercase;"') +
+    '</div>' +
+    '<h4 class="diaria-subtitulo">Pix</h4>' +
+    '<div class="diaria-ficha-form-grid">' +
+      '<div class="diaria-campo"><label>Tipo</label><select id="df-pixTipo">' +
+        ['celular', 'email', 'cpf'].map(function (v) { return '<option value="' + v + '"' + (t.pixTipo === v ? ' selected' : '') + '>' + v + '</option>'; }).join('') +
+      '</select></div>' +
+      inp('df-pixChave', 'Chave Pix', t.pixChave) +
+    '</div>' +
+    '<p id="diaria-ficha-erro-edicao" style="color:#B91C1C;font-size:12.5px;display:none;margin:6px 0;"></p>' +
+    '<div style="display:flex;gap:8px;margin-top:8px;">' +
+      '<button class="btn btn-outline btn-sm" id="diaria-ficha-btn-cancelar-edicao">Cancelar</button>' +
+      '<button class="btn btn-primary btn-sm" id="diaria-ficha-btn-salvar-edicao"><i class="fa-solid fa-check"></i> Salvar alterações</button>' +
     '</div>';
 
-  document.getElementById('diaria-ficha-corpo').querySelectorAll('.diaria-doc-thumb').forEach(function (img) {
-    img.onclick = function () { diariaAbrirFotoDoc(img.src, img.getAttribute('data-legenda')); };
-  });
+  document.getElementById('diaria-ficha-btn-cancelar-edicao').onclick = function () { _diariaRenderDadosFicha(t); };
+  document.getElementById('diaria-ficha-btn-salvar-edicao').onclick = async function () {
+    const btn = document.getElementById('diaria-ficha-btn-salvar-edicao');
+    const erroEl = document.getElementById('diaria-ficha-erro-edicao');
+    erroEl.style.display = 'none';
+    const dados = {
+      nome: document.getElementById('df-nome').value.trim(),
+      telefone: document.getElementById('df-telefone').value,
+      rg: document.getElementById('df-rg').value.trim(),
+      cpf: document.getElementById('df-cpf').value,
+      nomePai: document.getElementById('df-nomePai').value.trim(),
+      nomeMae: document.getElementById('df-nomeMae').value.trim(),
+      cep: document.getElementById('df-cep').value,
+      logradouro: document.getElementById('df-logradouro').value.trim(),
+      numero: document.getElementById('df-numero').value.trim(),
+      complemento: document.getElementById('df-complemento').value.trim(),
+      bairro: document.getElementById('df-bairro').value.trim(),
+      cidade: document.getElementById('df-cidade').value.trim(),
+      uf: document.getElementById('df-uf').value.trim(),
+      pixTipo: document.getElementById('df-pixTipo').value,
+      pixChave: document.getElementById('df-pixChave').value.trim(),
+    };
+    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando…';
+    try {
+      const r = await _diariaPost('/admin/trabalhadores/' + t.id + '/dados', dados);
+      _diariaAtualizarCacheTrabalhador(r.trabalhador);
+      _diariaRenderStatusFicha(r.trabalhador);
+      _diariaRenderDadosFicha(r.trabalhador);
+      _diariaCarregarCadastros();
+    } catch (e) {
+      erroEl.textContent = e.message || 'Não foi possível salvar.';
+      erroEl.style.display = '';
+    } finally {
+      btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Salvar alterações';
+    }
+  };
+}
 
-  _diariaRenderAcoesFicha(t);
-  document.getElementById('modal-diaria-ficha').classList.add('active');
+function _diariaAtualizarCacheTrabalhador(atualizado) {
+  const i = _diariaCadastrosCache.findIndex(function (x) { return x.id === atualizado.id; });
+  if (i >= 0) _diariaCadastrosCache[i] = atualizado; else _diariaCadastrosCache.push(atualizado);
+  const titulo = document.getElementById('diaria-ficha-titulo');
+  if (titulo) titulo.textContent = atualizado.nome;
+}
+
+// ── Documentos: miniatura (foto ou ícone de PDF), trocar arquivo, baixar
+//    tudo e imprimir — pro RH conseguir decidir a contratação sem sair do
+//    sistema, e resolver na hora quando alguém manda foto ilegível. ───────
+function _diariaRenderDocsFicha(t) {
+  const docs = t.documentos || {};
+  const docsHtml = Object.keys(DIARIA_DOC_ROTULOS).map(function (chave) {
+    const nomeArquivo = docs[chave];
+    const rotulo = DIARIA_DOC_ROTULOS[chave];
+    let miolo;
+    if (!nomeArquivo) {
+      miolo = '<div class="diaria-doc-thumb-vazio">' + escapeHTML(rotulo) + '<br><span>não enviado</span></div>';
+    } else {
+      const url = '/api/diaria/admin/arquivo/cadastro/' + encodeURIComponent(t.id) + '/' + encodeURIComponent(nomeArquivo);
+      const legenda = rotulo + ' — ' + t.nome;
+      miolo = _diariaEhPdf(nomeArquivo)
+        ? '<div class="diaria-doc-thumb diaria-doc-thumb-pdf" data-url="' + escapeHTML(url) + '" data-legenda="' + escapeHTML(legenda) + '" data-pdf="1"><i class="fa-solid fa-file-pdf"></i><span>Ver PDF</span></div>'
+        : '<img src="' + escapeHTML(url) + '" class="diaria-doc-thumb" data-url="' + escapeHTML(url) + '" data-legenda="' + escapeHTML(legenda) + '">';
+    }
+    return '<div class="diaria-doc-thumb-item">' + miolo +
+      '<span>' + escapeHTML(rotulo) + '</span>' +
+      '<button class="diaria-doc-trocar" data-trocar-campo="' + chave + '"><i class="fa-solid fa-arrow-up-from-bracket"></i> Trocar arquivo</button>' +
+      '<input type="file" accept="image/*,application/pdf,.pdf" data-input-campo="' + chave + '" style="display:none;">' +
+    '</div>';
+  }).join('');
+
+  document.getElementById('diaria-ficha-docs-bloco').innerHTML =
+    '<h4 class="diaria-subtitulo" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">Documentos' +
+      '<span style="display:flex;gap:8px;">' +
+        '<button class="btn btn-outline btn-sm" id="diaria-ficha-btn-baixar-tudo"><i class="fa-solid fa-download"></i> Baixar tudo</button>' +
+        '<button class="btn btn-outline btn-sm" id="diaria-ficha-btn-imprimir"><i class="fa-solid fa-print"></i> Imprimir</button>' +
+      '</span></h4>' +
+    '<div class="diaria-doc-grid">' + docsHtml + '</div>';
+
+  const bloco = document.getElementById('diaria-ficha-docs-bloco');
+  bloco.querySelectorAll('.diaria-doc-thumb').forEach(function (el) {
+    el.onclick = function () { diariaAbrirFotoDoc(el.getAttribute('data-url'), el.getAttribute('data-legenda')); };
+  });
+  bloco.querySelectorAll('[data-trocar-campo]').forEach(function (btn) {
+    btn.onclick = function () {
+      bloco.querySelector('[data-input-campo="' + btn.getAttribute('data-trocar-campo') + '"]').click();
+    };
+  });
+  bloco.querySelectorAll('[data-input-campo]').forEach(function (input) {
+    input.onchange = function () { _diariaTrocarDocumento(t, input.getAttribute('data-input-campo'), input); };
+  });
+  document.getElementById('diaria-ficha-btn-baixar-tudo').onclick = function () { _diariaBaixarDocumentos(t); };
+  document.getElementById('diaria-ficha-btn-imprimir').onclick = function () { _diariaImprimirDocumentos(t); };
+}
+
+async function _diariaTrocarDocumento(t, campo, inputEl) {
+  const arquivo = inputEl.files && inputEl.files[0];
+  if (!arquivo) return;
+  if (arquivo.size > 8 * 1024 * 1024) { alert('Esse arquivo passa de 8MB — comprima a imagem ou o PDF e tente de novo.'); inputEl.value = ''; return; }
+  const btn = document.querySelector('[data-trocar-campo="' + campo + '"]');
+  const rotuloOriginal = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando…';
+  try {
+    const dataUrl = await new Promise(function (resolve, reject) {
+      const leitor = new FileReader();
+      leitor.onload = function () { resolve(leitor.result); };
+      leitor.onerror = reject;
+      leitor.readAsDataURL(arquivo);
+    });
+    const r = await _diariaPost('/admin/trabalhadores/' + t.id + '/documento', { campo: campo, arquivo: dataUrl });
+    _diariaAtualizarCacheTrabalhador(r.trabalhador);
+    _diariaRenderDocsFicha(r.trabalhador);
+    _diariaCarregarCadastros();
+  } catch (e) {
+    alert(e.message || 'Não foi possível enviar o arquivo.');
+    btn.disabled = false; btn.innerHTML = rotuloOriginal;
+  } finally {
+    inputEl.value = '';
+  }
+}
+
+function _diariaBaixarDocumentos(t) {
+  const docs = t.documentos || {};
+  const chaves = Object.keys(DIARIA_DOC_ROTULOS).filter(function (c) { return docs[c]; });
+  if (!chaves.length) { alert('Essa pessoa ainda não enviou nenhum documento.'); return; }
+  chaves.forEach(function (chave, i) {
+    setTimeout(function () {
+      const nomeArquivo = docs[chave];
+      const url = '/api/diaria/admin/arquivo/cadastro/' + encodeURIComponent(t.id) + '/' + encodeURIComponent(nomeArquivo);
+      const ext = (nomeArquivo.split('.').pop() || 'jpg');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = DIARIA_DOC_ROTULOS[chave] + ' - ' + t.nome + '.' + ext;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }, i * 400);
+  });
+}
+
+function _diariaImprimirDocumentos(t) {
+  const docs = t.documentos || {};
+  const paginas = Object.keys(DIARIA_DOC_ROTULOS).filter(function (c) { return docs[c]; }).map(function (chave) {
+    const nomeArquivo = docs[chave];
+    const url = '/api/diaria/admin/arquivo/cadastro/' + encodeURIComponent(t.id) + '/' + encodeURIComponent(nomeArquivo);
+    const conteudo = _diariaEhPdf(nomeArquivo)
+      ? '<embed src="' + escapeHTML(url) + '" type="application/pdf" style="width:100%;height:90vh;">'
+      : '<img src="' + escapeHTML(url) + '" style="max-width:100%;max-height:90vh;">';
+    return '<div class="pg"><h3>' + escapeHTML(DIARIA_DOC_ROTULOS[chave]) + ' — ' + escapeHTML(t.nome) + '</h3>' + conteudo + '</div>';
+  }).join('');
+  if (!paginas) { alert('Essa pessoa ainda não enviou nenhum documento.'); return; }
+  const win = window.open('', '_blank');
+  if (!win) { alert('Seu navegador bloqueou a janela de impressão. Permita pop-ups pra este site e tente de novo.'); return; }
+  win.document.write(
+    '<!doctype html><html><head><meta charset="utf-8"><title>Documentos — ' + escapeHTML(t.nome) + '</title>' +
+    '<style>body{font-family:sans-serif;margin:0;padding:20px;} .pg{page-break-after:always;text-align:center;margin-bottom:30px;} .pg:last-child{page-break-after:auto;} .pg h3{font-size:14px;margin:0 0 10px;} img,embed{border:1px solid #ccc;}</style>' +
+    '</head><body>' + paginas + '</body></html>'
+  );
+  win.document.close();
+  function dispararImpressao() { try { win.focus(); win.print(); } catch (e) {} }
+  win.onload = dispararImpressao;
+  setTimeout(dispararImpressao, 600);
 }
 
 function _diariaRenderAcoesFicha(t) {
@@ -2282,8 +2478,14 @@ window.diariaAbrirFotoDoc = function (src, legenda) {
   const lightboxPdf = document.getElementById('lightbox-pdf');
   const lightboxCaption = document.getElementById('lightbox-caption');
   if (lightboxCaption) lightboxCaption.textContent = legenda || 'Documento';
-  if (lightboxPdf) lightboxPdf.style.display = 'none';
-  if (lightboxImg) { lightboxImg.style.display = 'block'; lightboxImg.src = src; }
+  const isPdf = /\.pdf(\?|$)/i.test(src || '');
+  if (isPdf) {
+    if (lightboxImg) lightboxImg.style.display = 'none';
+    if (lightboxPdf) { lightboxPdf.style.display = 'block'; lightboxPdf.src = src; }
+  } else {
+    if (lightboxPdf) lightboxPdf.style.display = 'none';
+    if (lightboxImg) { lightboxImg.style.display = 'block'; lightboxImg.src = src; }
+  }
   if (lightboxModal) lightboxModal.classList.add('active');
 };
 
