@@ -513,6 +513,38 @@ function diariaPixValida(tipo, chave) {
 function diariaTrabalhadorPublico(t) {
   return { id: t.id, nome: t.nome, status: t.status, criadoEm: t.criadoEm };
 }
+// Usado tanto por /status (reentrada pelo token salvo) quanto por /login
+// (nome+telefone) — os dois devolvem exatamente a mesma forma pro cliente.
+function diariaMontarStatusResposta(t, d) {
+  const hoje = new Date().toISOString().slice(0, 10);
+  const diariaHoje = (d.diarias || []).find(function (x) { return x.data === hoje && x.status === 'aberta'; }) || null;
+  let presenca = null;
+  if (diariaHoje) {
+    presenca = (d.presencasDiaria || []).find(function (p) { return p.diariaId === diariaHoje.id && p.trabalhadorId === t.id; }) || null;
+  }
+  return {
+    trabalhador: diariaTrabalhadorPublico(t),
+    diariaHoje: diariaHoje ? { id: diariaHoje.id, titulo: diariaHoje.titulo, status: diariaHoje.status } : null,
+    presenca: presenca
+  };
+}
+// Login do trabalhador é nome completo + telefone (sem senha de verdade por
+// enquanto — ver "senhaHash" no cadastro). Limite por IP, não por nome: o
+// risco aqui é alguém tentando adivinhar nome+telefone de várias pessoas do
+// mesmo local, não só ficar martelando uma conta.
+const diariaTentativasLoginIp = {};
+function diariaPodeTentarLogin(ip) {
+  const t = diariaTentativasLoginIp[ip];
+  if (!t) return true;
+  if (Date.now() - t.inicio > 10 * 60 * 1000) { delete diariaTentativasLoginIp[ip]; return true; }
+  return t.n < 5;
+}
+function diariaRegistrarFalhaLogin(ip) {
+  const t = diariaTentativasLoginIp[ip];
+  if (!t || Date.now() - t.inicio > 10 * 60 * 1000) { diariaTentativasLoginIp[ip] = { n: 1, inicio: Date.now() }; return; }
+  t.n++;
+}
+function diariaLimparFalhasLogin(ip) { delete diariaTentativasLoginIp[ip]; }
 // Salva uma imagem base64 em disco, FORA da pasta pública (ver DIARIA_DOCS_DIR
 // no topo do arquivo). Devolve só o nome do arquivo, nunca o caminho inteiro
 // nem o base64 — isso é o que vai gravado no state.json.
@@ -1670,16 +1702,53 @@ http.createServer(function (req, res) {
     const d = st.dados || {};
     const t = (d.trabalhadoresDiaria || []).find(function (x) { return Array.isArray(x.tokens) && x.tokens.indexOf(token) >= 0; });
     if (!t) { responderJson(res, 404, { error: 'Cadastro não encontrado.' }); return; }
-    const hoje = new Date().toISOString().slice(0, 10);
-    const diariaHoje = (d.diarias || []).find(function (x) { return x.data === hoje && x.status === 'aberta'; }) || null;
-    let presenca = null;
-    if (diariaHoje) {
-      presenca = (d.presencasDiaria || []).find(function (p) { return p.diariaId === diariaHoje.id && p.trabalhadorId === t.id; }) || null;
-    }
-    responderJson(res, 200, {
-      trabalhador: diariaTrabalhadorPublico(t),
-      diariaHoje: diariaHoje ? { id: diariaHoje.id, titulo: diariaHoje.titulo, status: diariaHoje.status } : null,
-      presenca: presenca
+    responderJson(res, 200, diariaMontarStatusResposta(t, d));
+    return;
+  }
+
+  // ---- Trabalhador: login (reentrada em aparelho novo) ---------------------
+  // Nome completo = usuário, telefone = senha (sem senhaHash de verdade por
+  // enquanto). Funciona pra qualquer status — quem já tinha token continua
+  // podendo usá-lo direto; login é só pra quem trocou/perdeu o aparelho.
+  if (urlPath === '/api/diaria/trabalhador/login' && req.method === 'POST') {
+    const ip = waIpDaReq(req);
+    if (!diariaPodeTentarLogin(ip)) { responderJson(res, 429, { error: 'Muitas tentativas. Aguarde uns minutos e tente de novo.' }); return; }
+    lerCorpo(req, function (err, body) {
+      if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
+      const b = body || {};
+      const nomeNormalizado = diariaNormalizarNome(b.nome);
+      const telefone = String(b.telefone || '').replace(/\D/g, '');
+      if (!nomeNormalizado || !telefone) {
+        diariaRegistrarFalhaLogin(ip);
+        responderJson(res, 401, { error: 'Nome ou telefone incorretos.' });
+        return;
+      }
+      comTrava(function () {
+        const st = lerEstado();
+        const d = st.dados || {};
+        const t = (d.trabalhadoresDiaria || []).find(function (x) {
+          return x && x.nomeNormalizado === nomeNormalizado && x.telefone === telefone;
+        });
+        if (!t) {
+          diariaRegistrarFalhaLogin(ip);
+          responderJson(res, 401, { error: 'Nome ou telefone incorretos.' });
+          return;
+        }
+        diariaLimparFalhasLogin(ip);
+        const token = crypto.randomBytes(24).toString('hex');
+        if (!Array.isArray(t.tokens)) t.tokens = [];
+        t.tokens.push(token);
+        try {
+          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+        } catch (e) {
+          console.error('[Diária] login:', e);
+          responderJson(res, 500, { error: 'Não foi possível entrar. Tente de novo.' });
+          return;
+        }
+        const resposta = diariaMontarStatusResposta(t, d);
+        resposta.token = token;
+        responderJson(res, 200, resposta);
+      });
     });
     return;
   }

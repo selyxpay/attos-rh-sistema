@@ -146,8 +146,20 @@
     <!-- ENTRADA: já tenho conta / criar conta -->
     <div id="dtr-tela-entrada" class="dtr-card" style="display:none;">
       <h2><span class="dtr-icone-titulo"><i class="fa-solid fa-user"></i></span> Bem-vindo(a)</h2>
-      <p class="dtr-sub">Já se cadastrou antes neste aparelho? A gente já reconhece você. Se é a primeira vez, crie seu cadastro.</p>
-      <button class="dtr-btn" id="dtr-btn-ir-cadastro"><i class="fa-solid fa-user-plus"></i> Criar minha conta</button>
+      <p class="dtr-sub">Já tem cadastro aprovado? Entre com seu nome e telefone. Se é a primeira vez, crie seu cadastro.</p>
+      <button class="dtr-btn" id="dtr-btn-ir-login"><i class="fa-solid fa-right-to-bracket"></i> Entrar</button>
+      <button class="dtr-btn dtr-btn-fantasma" id="dtr-btn-ir-cadastro"><i class="fa-solid fa-user-plus"></i> Criar minha conta</button>
+    </div>
+
+    <!-- LOGIN: nome completo + telefone -->
+    <div id="dtr-tela-login" class="dtr-card" style="display:none;">
+      <h2><span class="dtr-icone-titulo"><i class="fa-solid fa-right-to-bracket"></i></span> Entrar</h2>
+      <p class="dtr-sub">Use o mesmo nome completo e telefone do seu cadastro.</p>
+      <p id="dtr-erro-login" class="dtr-erro"></p>
+      <div class="dtr-campo"><label>Nome completo</label><input type="text" id="dtr-login-nome" placeholder="Seu nome completo" autocomplete="name"></div>
+      <div class="dtr-campo"><label>Telefone (sua senha)</label><input type="tel" id="dtr-login-telefone" placeholder="(11) 98765-4321" inputmode="numeric" autocomplete="tel" maxlength="16"></div>
+      <button class="dtr-btn" id="dtr-btn-entrar"><i class="fa-solid fa-right-to-bracket"></i> Entrar</button>
+      <a href="#" class="dtr-link-discreto" id="dtr-link-cancelar-login">Cancelar</a>
     </div>
 
     <!-- CADASTRO — assistente de 3 passos -->
@@ -271,7 +283,7 @@
       function limparToken() { try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
 
       function mostrar(id) {
-        ['dtr-carregando', 'dtr-tela-entrada', 'dtr-tela-cadastro', 'dtr-tela-analise', 'dtr-tela-home'].forEach(function (x) {
+        ['dtr-carregando', 'dtr-tela-entrada', 'dtr-tela-login', 'dtr-tela-cadastro', 'dtr-tela-analise', 'dtr-tela-home'].forEach(function (x) {
           $(x).style.display = x === id ? '' : 'none';
         });
       }
@@ -360,6 +372,7 @@
       $('dtr-telefone').addEventListener('input', function () { this.value = mascaraTelefone(this.value); });
       $('dtr-cpf').addEventListener('input', function () { this.value = mascaraCpf(this.value); });
       $('dtr-cep').addEventListener('input', function () { this.value = mascaraCep(this.value); });
+      $('dtr-login-telefone').addEventListener('input', function () { this.value = mascaraTelefone(this.value); });
 
       // ── Fotos: FileReader -> base64, redimensionada no navegador antes de
       //    guardar (celular no 4G não pode esperar minutos pra mandar 3 fotos
@@ -437,6 +450,38 @@
 
       $('dtr-btn-ir-cadastro').onclick = function () { irParaPasso(1); mostrar('dtr-tela-cadastro'); };
       $('dtr-link-cancelar-cadastro').onclick = function (e) { e.preventDefault(); mostrar('dtr-tela-entrada'); };
+
+      $('dtr-btn-ir-login').onclick = function () {
+        $('dtr-erro-login').style.display = 'none';
+        mostrar('dtr-tela-login');
+      };
+      $('dtr-link-cancelar-login').onclick = function (e) { e.preventDefault(); mostrar('dtr-tela-entrada'); };
+      $('dtr-btn-entrar').onclick = async function () {
+        const erroEl = $('dtr-erro-login');
+        erroEl.style.display = 'none';
+        const nome = $('dtr-login-nome').value.trim();
+        const telefone = $('dtr-login-telefone').value.replace(/\D/g, '');
+        if (nome.split(/\s+/).filter(Boolean).length < 2) { erroEl.textContent = 'Informe seu nome completo.'; erroEl.style.display = ''; return; }
+        if (telefone.length < 10) { erroEl.textContent = 'Telefone incompleto. Use DDD + número.'; erroEl.style.display = ''; return; }
+
+        const btn = $('dtr-btn-entrar');
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Entrando…';
+        try {
+          const r = await chamarApi('/diaria/trabalhador/login', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome: nome, telefone: telefone })
+          });
+          salvarToken(r.token);
+          estadoAtual = r;
+          renderHome();
+          if (!pollTimer) pollTimer = setInterval(carregarStatus, 15000);
+        } catch (e) {
+          erroEl.textContent = e.message || 'Não foi possível entrar. Tente de novo.';
+          erroEl.style.display = '';
+        } finally {
+          btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Entrar';
+        }
+      };
 
       $('dtr-btn-passo1').onclick = function () {
         const nome = $('dtr-nome').value.trim();
