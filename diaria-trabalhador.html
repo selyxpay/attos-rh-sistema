@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Diária — Presença RT</title>
   <meta name="robots" content="noindex, nofollow">
   <link rel="icon" type="image/png" href="img/logo-rt.png">
@@ -20,44 +20,66 @@
   <style>
     /* Mobile-first de propósito: quem usa isso é gente na rua, com pressa,
        celular no sol. Botão grande, pouca palavra. */
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html { -webkit-text-size-adjust: 100%; }
     body {
       margin: 0; font-family: 'Inter', sans-serif;
-      background: #0f172a; color: #0f172a; min-height: 100dvh;
+      background: #0b1220; color: #0f172a; min-height: 100dvh;
+      background-image: radial-gradient(circle at 50% 0%, #16213d 0%, #0b1220 60%);
+      background-attachment: fixed;
     }
     .dtr-topo {
-      background: #0b1f3a; color: #fff; padding: 18px 20px;
+      background: linear-gradient(135deg, #0d2648 0%, #0b1f3a 100%); color: #fff;
+      padding: 16px 20px; padding-top: calc(16px + env(safe-area-inset-top));
       display: flex; align-items: center; gap: 10px;
-      font-weight: 700; font-size: 15px;
+      font-weight: 700; font-size: 14.5px; letter-spacing: .02em;
+      box-shadow: 0 2px 12px rgba(0,0,0,.25); position: relative; z-index: 1;
     }
-    .dtr-topo img { width: 30px; height: 30px; border-radius: 50%; }
-    .dtr-corpo { max-width: 460px; margin: 0 auto; padding: 20px 16px 60px; }
+    .dtr-topo img { width: 30px; height: 30px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,255,255,.15); }
+    .dtr-corpo { max-width: 460px; margin: 0 auto; padding: 20px 16px calc(50px + env(safe-area-inset-bottom)); }
     .dtr-card {
-      background: #fff; border-radius: 16px; padding: 22px 20px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.15); margin-bottom: 16px;
+      background: #fff; border-radius: 18px; padding: 24px 20px;
+      box-shadow: 0 20px 45px -10px rgba(0,0,0,.4); margin-bottom: 16px;
+      animation: dtrEntra .3s ease;
     }
-    .dtr-card h2 { margin: 0 0 6px; font-size: 18px; }
+    @keyframes dtrEntra { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @media (prefers-reduced-motion: reduce) { .dtr-card, .dtr-passo { animation: none !important; } }
+    .dtr-card h2 { margin: 0 0 6px; font-size: 18.5px; display: flex; align-items: center; gap: 10px; }
+    .dtr-card h2 .dtr-icone-titulo {
+      width: 34px; height: 34px; border-radius: 10px; background: #fef2f2; color: #e11d2a;
+      display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0;
+    }
     .dtr-card p.dtr-sub { margin: 0 0 18px; color: #64748b; font-size: 13.5px; line-height: 1.5; }
     .dtr-campo { margin-bottom: 14px; }
     .dtr-campo label { display: block; font-size: 12.5px; font-weight: 600; color: #334155; margin-bottom: 5px; }
     .dtr-campo input, .dtr-campo select {
       width: 100%; padding: 13px 14px; border-radius: 10px; border: 1.5px solid #e2e8f0;
-      font-size: 15px; font-family: inherit; background: #fff; color: #0f172a;
+      font-size: 16px; font-family: inherit; background: #fff; color: #0f172a;
+      transition: border-color .15s ease; touch-action: manipulation;
     }
-    .dtr-campo input:focus, .dtr-campo select:focus { outline: none; border-color: #e11d2a; }
+    .dtr-campo input:focus, .dtr-campo select:focus { outline: none; border-color: #e11d2a; box-shadow: 0 0 0 3px rgba(225,29,42,.1); }
     .dtr-campo input.dtr-invalida { border-color: #dc2626; }
     .dtr-campo-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 340px) { .dtr-campo-2col { grid-template-columns: 1fr; } }
     .dtr-btn {
       width: 100%; padding: 15px; border: none; border-radius: 12px;
       background: #e11d2a; color: #fff; font-size: 15.5px; font-weight: 700;
       cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+      touch-action: manipulation; transition: transform .1s ease, opacity .15s ease;
+      box-shadow: 0 6px 16px -4px rgba(225,29,42,.5);
     }
-    .dtr-btn:disabled { opacity: .6; cursor: default; }
+    .dtr-btn:active { transform: scale(.97); }
+    .dtr-btn:disabled { opacity: .6; cursor: default; transform: none; }
     .dtr-btn-fantasma {
       background: none; color: #64748b; border: 1.5px solid #e2e8f0; margin-bottom: 10px;
+      box-shadow: none;
     }
     .dtr-btn.dtr-btn-grande { padding: 22px; font-size: 18px; border-radius: 16px; }
-    .dtr-btn.dtr-btn-ok { background: #16a34a; }
+    .dtr-btn.dtr-btn-ok { background: #16a34a; box-shadow: 0 6px 16px -4px rgba(22,163,74,.5); }
+    .dtr-link-discreto {
+      display: block; text-align: center; margin-top: 12px; font-size: 12.5px;
+      color: #94a3b8; text-decoration: none;
+    }
     .dtr-erro {
       background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;
       padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; display: none;
@@ -80,26 +102,37 @@
     .dtr-trocar a { color: rgba(255,255,255,.7); font-size: 12px; text-decoration: none; }
     .dtr-carregando { text-align: center; color: rgba(255,255,255,.8); padding: 40px 0; }
 
-    /* Assistente de 3 passos */
-    .dtr-passos { display: flex; gap: 6px; margin-bottom: 18px; }
+    /* Assistente de 3 passos — bolinhas numeradas + linha de progresso */
+    .dtr-passos { display: flex; align-items: flex-start; margin-bottom: 22px; }
+    .dtr-passo-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
     .dtr-passo-bola {
-      flex: 1; height: 5px; border-radius: 3px; background: #e2e8f0;
+      width: 28px; height: 28px; border-radius: 50%; background: #f1f5f9; color: #94a3b8;
+      display: flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 800;
+      border: 2px solid #e2e8f0; transition: all .2s ease; flex-shrink: 0;
     }
-    .dtr-passo-bola.dtr-passo-ok { background: #16a34a; }
-    .dtr-passo-bola.dtr-passo-atual { background: #e11d2a; }
+    .dtr-passo-bola.dtr-passo-ok { background: #16a34a; color: #fff; border-color: #16a34a; }
+    .dtr-passo-bola.dtr-passo-atual { background: #e11d2a; color: #fff; border-color: #e11d2a; box-shadow: 0 0 0 4px rgba(225,29,42,.15); }
+    .dtr-passo-nome { font-size: 10px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; text-align: center; }
+    .dtr-passo-item.dtr-passo-nome-ativa .dtr-passo-nome { color: #334155; }
+    .dtr-passo-linha { flex: 1; height: 2px; background: #e2e8f0; margin: 13px 4px 0; border-radius: 2px; transition: background .2s ease; }
+    .dtr-passo-linha.dtr-passo-ok { background: #16a34a; }
     .dtr-passo-rotulo { font-size: 11.5px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+    .dtr-passo { animation: dtrEntra .25s ease; }
     .dtr-cep-status { font-size: 11.5px; margin-top: 4px; }
     .dtr-cep-status.ok { color: #16a34a; }
     .dtr-cep-status.erro { color: #b45309; }
+    .dtr-foto-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .dtr-foto-campo {
-      border: 2px dashed #e2e8f0; border-radius: 12px; padding: 14px; text-align: center;
-      margin-bottom: 12px; position: relative; cursor: pointer;
+      border: 2px dashed #e2e8f0; border-radius: 12px; padding: 14px 10px; text-align: center;
+      margin-bottom: 12px; position: relative; cursor: pointer; display: block;
+      transition: border-color .15s ease, background-color .15s ease;
     }
     .dtr-foto-campo.dtr-foto-ok { border-color: #16a34a; border-style: solid; background: #f0fdf4; }
-    .dtr-foto-campo input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-    .dtr-foto-campo .emoji { font-size: 26px; display: block; margin-bottom: 4px; }
-    .dtr-foto-campo .rotulo { font-size: 12.5px; font-weight: 700; color: #334155; }
-    .dtr-foto-campo img.dtr-foto-preview { max-width: 100%; max-height: 90px; border-radius: 8px; margin-top: 8px; }
+    .dtr-foto-campo input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; touch-action: manipulation; }
+    .dtr-foto-campo .emoji { font-size: 24px; display: block; margin-bottom: 4px; color: #94a3b8; }
+    .dtr-foto-campo.dtr-foto-ok .emoji { color: #16a34a; }
+    .dtr-foto-campo .rotulo { font-size: 12px; font-weight: 700; color: #334155; line-height: 1.3; }
+    .dtr-foto-campo img.dtr-foto-preview { max-width: 100%; max-height: 80px; border-radius: 8px; margin-top: 8px; object-fit: cover; }
   </style>
 </head>
 <body>
@@ -112,18 +145,20 @@
 
     <!-- ENTRADA: já tenho conta / criar conta -->
     <div id="dtr-tela-entrada" class="dtr-card" style="display:none;">
-      <h2><i class="fa-solid fa-user"></i> Bem-vindo(a)</h2>
+      <h2><span class="dtr-icone-titulo"><i class="fa-solid fa-user"></i></span> Bem-vindo(a)</h2>
       <p class="dtr-sub">Já se cadastrou antes neste aparelho? A gente já reconhece você. Se é a primeira vez, crie seu cadastro.</p>
       <button class="dtr-btn" id="dtr-btn-ir-cadastro"><i class="fa-solid fa-user-plus"></i> Criar minha conta</button>
     </div>
 
     <!-- CADASTRO — assistente de 3 passos -->
     <div id="dtr-tela-cadastro" class="dtr-card" style="display:none;">
-      <h2><i class="fa-solid fa-user-plus"></i> Criar cadastro</h2>
+      <h2><span class="dtr-icone-titulo"><i class="fa-solid fa-user-plus"></i></span> Criar cadastro</h2>
       <div class="dtr-passos">
-        <div class="dtr-passo-bola" data-passo-bola="1"></div>
-        <div class="dtr-passo-bola" data-passo-bola="2"></div>
-        <div class="dtr-passo-bola" data-passo-bola="3"></div>
+        <div class="dtr-passo-item"><div class="dtr-passo-bola" data-passo-bola="1">1</div><span class="dtr-passo-nome">Dados</span></div>
+        <div class="dtr-passo-linha" data-passo-linha="1"></div>
+        <div class="dtr-passo-item"><div class="dtr-passo-bola" data-passo-bola="2">2</div><span class="dtr-passo-nome">Endereço</span></div>
+        <div class="dtr-passo-linha" data-passo-linha="2"></div>
+        <div class="dtr-passo-item"><div class="dtr-passo-bola" data-passo-bola="3">3</div><span class="dtr-passo-nome">Documentos</span></div>
       </div>
       <p id="dtr-erro-cadastro" class="dtr-erro"></p>
 
@@ -131,14 +166,15 @@
       <div id="dtr-passo-1" class="dtr-passo">
         <p class="dtr-passo-rotulo">Passo 1 de 3 — Dados pessoais</p>
         <div class="dtr-campo"><label>Nome completo</label><input type="text" id="dtr-nome" placeholder="Seu nome completo" autocomplete="name"></div>
-        <div class="dtr-campo"><label>Telefone (com DDD)</label><input type="tel" id="dtr-telefone" placeholder="(11) 98765-4321" inputmode="numeric" autocomplete="tel"></div>
+        <div class="dtr-campo"><label>Telefone (com DDD)</label><input type="tel" id="dtr-telefone" placeholder="(11) 98765-4321" inputmode="numeric" autocomplete="tel" maxlength="16"></div>
         <div class="dtr-campo"><label>Nome do pai</label><input type="text" id="dtr-nome-pai" placeholder="Nome completo do pai"></div>
         <div class="dtr-campo"><label>Nome da mãe</label><input type="text" id="dtr-nome-mae" placeholder="Nome completo da mãe"></div>
         <div class="dtr-campo-2col">
-          <div class="dtr-campo"><label>RG</label><input type="text" id="dtr-rg" placeholder="00.000.000-0" inputmode="numeric"></div>
+          <div class="dtr-campo"><label>RG</label><input type="text" id="dtr-rg" placeholder="00.000.000-0" autocomplete="off"></div>
           <div class="dtr-campo"><label>CPF</label><input type="text" id="dtr-cpf" placeholder="000.000.000-00" inputmode="numeric" maxlength="14"></div>
         </div>
         <button class="dtr-btn" id="dtr-btn-passo1"><i class="fa-solid fa-arrow-right"></i> Continuar</button>
+        <a href="#" class="dtr-link-discreto" id="dtr-link-cancelar-cadastro">Cancelar</a>
       </div>
 
       <!-- Passo 2: endereço -->
@@ -177,18 +213,20 @@
         </div>
         <div class="dtr-campo"><label>Chave Pix</label><input type="text" id="dtr-pix-chave" placeholder="Digite a chave"></div>
 
-        <label class="dtr-foto-campo" id="dtr-foto-rgfrente-campo">
-          <input type="file" accept="image/*" capture="environment" id="dtr-foto-rgfrente">
-          <span class="emoji"><i class="fa-solid fa-id-card"></i></span>
-          <span class="rotulo">Foto do RG (frente)</span>
-          <img class="dtr-foto-preview" id="dtr-foto-rgfrente-preview" style="display:none;">
-        </label>
-        <label class="dtr-foto-campo" id="dtr-foto-rgverso-campo">
-          <input type="file" accept="image/*" capture="environment" id="dtr-foto-rgverso">
-          <span class="emoji"><i class="fa-solid fa-id-card"></i></span>
-          <span class="rotulo">Foto do RG (verso)</span>
-          <img class="dtr-foto-preview" id="dtr-foto-rgverso-preview" style="display:none;">
-        </label>
+        <div class="dtr-foto-grid">
+          <label class="dtr-foto-campo" id="dtr-foto-rgfrente-campo">
+            <input type="file" accept="image/*" capture="environment" id="dtr-foto-rgfrente">
+            <span class="emoji"><i class="fa-solid fa-id-card"></i></span>
+            <span class="rotulo">RG (frente)</span>
+            <img class="dtr-foto-preview" id="dtr-foto-rgfrente-preview" style="display:none;">
+          </label>
+          <label class="dtr-foto-campo" id="dtr-foto-rgverso-campo">
+            <input type="file" accept="image/*" capture="environment" id="dtr-foto-rgverso">
+            <span class="emoji"><i class="fa-solid fa-id-card"></i></span>
+            <span class="rotulo">RG (verso)</span>
+            <img class="dtr-foto-preview" id="dtr-foto-rgverso-preview" style="display:none;">
+          </label>
+        </div>
         <label class="dtr-foto-campo" id="dtr-foto-comprovante-campo">
           <input type="file" accept="image/*" capture="environment" id="dtr-foto-comprovante">
           <span class="emoji"><i class="fa-solid fa-file-lines"></i></span>
@@ -298,17 +336,76 @@
       }
       $('dtr-cep').addEventListener('blur', function () { clearTimeout(cepBuscando); buscarCep(); });
 
-      // ── Fotos: FileReader -> base64 (data URL), com pré-visualização ──────
+      // ── Máscaras leves de digitação (não mudam a validação — quem valida
+      //    de verdade sempre lê os dígitos com .replace(/\D/g,'')) ──────────
+      function mascaraTelefone(v) {
+        const d = v.replace(/\D/g, '').slice(0, 11);
+        if (d.length <= 2) return d;
+        if (d.length <= 6) return '(' + d.slice(0, 2) + ') ' + d.slice(2);
+        if (d.length <= 10) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 6) + '-' + d.slice(6);
+        return '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7);
+      }
+      function mascaraCpf(v) {
+        const d = v.replace(/\D/g, '').slice(0, 11);
+        let r = d.slice(0, 3);
+        if (d.length > 3) r += '.' + d.slice(3, 6);
+        if (d.length > 6) r += '.' + d.slice(6, 9);
+        if (d.length > 9) r += '-' + d.slice(9, 11);
+        return r;
+      }
+      function mascaraCep(v) {
+        const d = v.replace(/\D/g, '').slice(0, 8);
+        return d.length > 5 ? d.slice(0, 5) + '-' + d.slice(5) : d;
+      }
+      $('dtr-telefone').addEventListener('input', function () { this.value = mascaraTelefone(this.value); });
+      $('dtr-cpf').addEventListener('input', function () { this.value = mascaraCpf(this.value); });
+      $('dtr-cep').addEventListener('input', function () { this.value = mascaraCep(this.value); });
+
+      // ── Fotos: FileReader -> base64, redimensionada no navegador antes de
+      //    guardar (celular no 4G não pode esperar minutos pra mandar 3 fotos
+      //    de 8MB cada). Se o redimensionamento falhar por qualquer motivo,
+      //    usa a foto original — nunca trava o cadastro por causa disso. ────
+      function redimensionarImagem(dataUrlOriginal, ladoMax, qualidade) {
+        return new Promise(function (resolve) {
+          try {
+            const img = new Image();
+            img.onload = function () {
+              try {
+                let w = img.naturalWidth, h = img.naturalHeight;
+                if (!w || !h) { resolve(dataUrlOriginal); return; }
+                const maior = Math.max(w, h);
+                if (maior > ladoMax) {
+                  const fator = ladoMax / maior;
+                  w = Math.round(w * fator); h = Math.round(h * fator);
+                }
+                const tela = document.createElement('canvas');
+                tela.width = w; tela.height = h;
+                const ctx = tela.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                resolve(tela.toDataURL('image/jpeg', qualidade));
+              } catch (e) { resolve(dataUrlOriginal); }
+            };
+            img.onerror = function () { resolve(dataUrlOriginal); };
+            img.src = dataUrlOriginal;
+          } catch (e) { resolve(dataUrlOriginal); }
+        });
+      }
       function ligarFoto(inputId, campoId, previewId, chaveEstado) {
-        $(inputId).addEventListener('change', function () {
+        $(inputId).addEventListener('change', async function () {
           const arq = this.files && this.files[0];
           if (!arq) return;
+          const campoEl = $(campoId);
+          const rotuloEl = campoEl.querySelector('.rotulo');
+          const rotuloOriginal = rotuloEl.textContent;
+          rotuloEl.textContent = 'Processando…';
           const leitor = new FileReader();
-          leitor.onload = function () {
-            fotos[chaveEstado] = leitor.result;
+          leitor.onload = async function () {
+            const comprimida = await redimensionarImagem(leitor.result, 1600, 0.82);
+            fotos[chaveEstado] = comprimida;
             const preview = $(previewId);
-            preview.src = leitor.result; preview.style.display = '';
-            $(campoId).classList.add('dtr-foto-ok');
+            preview.src = comprimida; preview.style.display = '';
+            rotuloEl.textContent = rotuloOriginal;
+            campoEl.classList.add('dtr-foto-ok');
           };
           leitor.readAsDataURL(arq);
         });
@@ -327,11 +424,19 @@
           $('dtr-passo-' + i).style.display = i === n ? '' : 'none';
           const bola = document.querySelector('[data-passo-bola="' + i + '"]');
           bola.className = 'dtr-passo-bola' + (i < n ? ' dtr-passo-ok' : (i === n ? ' dtr-passo-atual' : ''));
+          bola.innerHTML = i < n ? '<i class="fa-solid fa-check"></i>' : String(i);
+          bola.parentElement.classList.toggle('dtr-passo-nome-ativa', i <= n);
+        });
+        document.querySelectorAll('.dtr-passo-linha').forEach(function (linha) {
+          const i = parseInt(linha.getAttribute('data-passo-linha'), 10);
+          linha.classList.toggle('dtr-passo-ok', i < n);
         });
         $('dtr-erro-cadastro').style.display = 'none';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
 
       $('dtr-btn-ir-cadastro').onclick = function () { irParaPasso(1); mostrar('dtr-tela-cadastro'); };
+      $('dtr-link-cancelar-cadastro').onclick = function (e) { e.preventDefault(); mostrar('dtr-tela-entrada'); };
 
       $('dtr-btn-passo1').onclick = function () {
         const nome = $('dtr-nome').value.trim();
