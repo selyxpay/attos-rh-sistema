@@ -513,6 +513,17 @@ function diariaPixValida(tipo, chave) {
 function diariaTrabalhadorPublico(t) {
   return { id: t.id, nome: t.nome, status: t.status, criadoEm: t.criadoEm };
 }
+// A ficha do admin precisa dos dados todos (CPF, RG, endereço, Pix,
+// documentos...) pra decidir a contratação — mas NUNCA do token de sessão do
+// trabalhador nem do hash de senha: isso é credencial de acesso, não dado
+// cadastral, e não tem por que aparecer numa resposta que o navegador do
+// admin guarda em log/devtools/cache.
+function diariaTrabalhadorAdmin(t) {
+  const copia = Object.assign({}, t);
+  delete copia.tokens;
+  delete copia.senhaHash;
+  return copia;
+}
 // Usado tanto por /status (reentrada pelo token salvo) quanto por /login
 // (nome+telefone) — os dois devolvem exatamente a mesma forma pro cliente.
 function diariaMontarStatusResposta(t, d) {
@@ -539,6 +550,14 @@ function diariaNormalizarTelefone(v) {
     if (resto.length === 10 || resto.length === 11) d = resto;
   }
   return d;
+}
+// Date.now() sozinho pode colidir quando várias pessoas cadastram/confirmam
+// presença no mesmo milissegundo (exatamente o caso de uso real: várias
+// pessoas clicando no link ao mesmo tempo) — dois registros com o mesmo id
+// fariam o segundo pisar nos documentos do primeiro e as ações do admin
+// (que buscam por id) acertarem sempre o registro errado.
+function diariaGerarId(prefixo) {
+  return prefixo + '-' + Date.now() + '-' + crypto.randomBytes(4).toString('hex');
 }
 // Login do trabalhador é nome completo + telefone (sem senha de verdade por
 // enquanto — ver "senhaHash" no cadastro). Limite por IP, não por nome: o
@@ -1661,7 +1680,7 @@ http.createServer(function (req, res) {
           responderJson(res, 409, { error: 'Esse CPF já está cadastrado com outro telefone. Procure a coordenação.' });
           return;
         }
-        const id = 'trab-' + Date.now();
+        const id = diariaGerarId('trab');
         const token = crypto.randomBytes(24).toString('hex');
         let nomesArquivos;
         try {
@@ -1795,7 +1814,7 @@ http.createServer(function (req, res) {
           return;
         }
         d.presencasDiaria.push({
-          id: 'pres-' + Date.now(),
+          id: diariaGerarId('pres'),
           diariaId: diariaHoje.id,
           trabalhadorId: t.id,
           status: 'aguardando',
@@ -1828,11 +1847,18 @@ http.createServer(function (req, res) {
     let mArq = urlPath.match(/^\/api\/diaria\/admin\/arquivo\/([^\/]+)\/([^\/]+)\/([^\/]+)$/);
     if (mArq && req.method === 'GET') {
       const tipoArq = decodeURIComponent(mArq[1]);
-      const idArq = decodeURIComponent(mArq[2]);
-      const nomeArq = path.basename(decodeURIComponent(mArq[3])); // nunca confia em "../"
+      // path.basename tira qualquer "/" de um "../" simples, mas um ".."
+      // sozinho (sem barra) passa direto por ele — por isso o cinto e a
+      // suspensório: monta o caminho e confere que ele continua DENTRO de
+      // DIARIA_DOCS_DIR antes de ler qualquer coisa do disco.
+      const idArq = path.basename(decodeURIComponent(mArq[2]));
+      const nomeArq = path.basename(decodeURIComponent(mArq[3]));
       let caminhoArq = null;
       if (tipoArq === 'cadastro') caminhoArq = path.join(DIARIA_DOCS_DIR, idArq, nomeArq);
-      if (!caminhoArq) { responderJson(res, 404, { error: 'Tipo de arquivo desconhecido.' }); return; }
+      if (!caminhoArq || !(caminhoArq + path.sep).startsWith(DIARIA_DOCS_DIR + path.sep)) {
+        responderJson(res, 404, { error: 'Arquivo não encontrado.' });
+        return;
+      }
       fs.readFile(caminhoArq, function (e, data) {
         if (e) { responderJson(res, 404, { error: 'Arquivo não encontrado.' }); return; }
         const ct = MIME[path.extname(caminhoArq).toLowerCase()] || 'application/octet-stream';
@@ -1894,7 +1920,7 @@ http.createServer(function (req, res) {
           t.pixTipo = pixTipo; t.pixChave = pixChave;
           try {
             gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-            responderJson(res, 200, { ok: true, trabalhador: t });
+            responderJson(res, 200, { ok: true, trabalhador: diariaTrabalhadorAdmin(t) });
           } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
         });
       });
@@ -1934,7 +1960,7 @@ http.createServer(function (req, res) {
           }
           try {
             gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-            responderJson(res, 200, { ok: true, trabalhador: t });
+            responderJson(res, 200, { ok: true, trabalhador: diariaTrabalhadorAdmin(t) });
           } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
         });
       });
@@ -1950,7 +1976,7 @@ http.createServer(function (req, res) {
       let lista = Array.isArray(d.trabalhadoresDiaria) ? d.trabalhadoresDiaria.slice() : [];
       if (filtroStatus) lista = lista.filter(function (t) { return t.status === filtroStatus; });
       lista.sort(function (a, b) { return (b.criadoEm || '').localeCompare(a.criadoEm || ''); });
-      responderJson(res, 200, { trabalhadores: lista });
+      responderJson(res, 200, { trabalhadores: lista.map(diariaTrabalhadorAdmin) });
       return;
     }
 
@@ -1959,6 +1985,7 @@ http.createServer(function (req, res) {
       const alvoId = decodeURIComponent(m[1]);
       const acao = m[2];
       lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
         const observacao = String((body && body.observacao) || '').trim().slice(0, 500);
         comTrava(function () {
           const st = lerEstado();
@@ -1971,9 +1998,31 @@ http.createServer(function (req, res) {
           else if (acao === 'reativar') { t.status = 'ativo'; }
           try {
             gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-            responderJson(res, 200, { ok: true, trabalhador: t });
+            responderJson(res, 200, { ok: true, trabalhador: diariaTrabalhadorAdmin(t) });
           } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
         });
+      });
+      return;
+    }
+
+    // ---- Admin: exclui de vez um cadastro (gente que pediu pra sair antes
+    //     de ser aprovada, ou que não quer mais fazer parte). Some o registro
+    //     e os documentos do disco — histórico de presença que já exista fica
+    //     como está, só sem nome resolvido (GET /presencas já trata isso). ----
+    m = urlPath.match(/^\/api\/diaria\/admin\/trabalhadores\/([^\/]+)\/excluir$/);
+    if (m && req.method === 'POST') {
+      const alvoId = decodeURIComponent(m[1]);
+      comTrava(function () {
+        const st = lerEstado();
+        const d = st.dados || {};
+        const idx = (d.trabalhadoresDiaria || []).findIndex(function (x) { return x.id === alvoId; });
+        if (idx < 0) { responderJson(res, 404, { error: 'Trabalhador não encontrado.' }); return; }
+        d.trabalhadoresDiaria.splice(idx, 1);
+        try { fs.rmSync(path.join(DIARIA_DOCS_DIR, alvoId), { recursive: true, force: true }); } catch (e) {}
+        try {
+          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+          responderJson(res, 200, { ok: true });
+        } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
       });
       return;
     }
@@ -1999,7 +2048,7 @@ http.createServer(function (req, res) {
           const d = st.dados || {};
           if (!Array.isArray(d.diarias)) d.diarias = [];
           const nova = {
-            id: 'diaria-' + Date.now(),
+            id: diariaGerarId('diaria'),
             titulo: titulo, data: data,
             status: 'planejada',
             criadaPor: requesterDiaria.login, criadaEm: new Date().toISOString(),
@@ -2024,6 +2073,13 @@ http.createServer(function (req, res) {
         const d = st.dados || {};
         const diaria = (d.diarias || []).find(function (x) { return x.id === diariaId; });
         if (!diaria) { responderJson(res, 404, { error: 'Diária não encontrada.' }); return; }
+        // O trabalhador só enxerga "a diária aberta hoje" — se tiver duas
+        // abertas no mesmo dia, ninguém sabe em qual a presença dele vai
+        // cair. Trava aqui pra nunca deixar duas abertas na mesma data.
+        if (acao === 'abrir' || acao === 'reabrir') {
+          const outraAberta = (d.diarias || []).find(function (x) { return x.id !== diariaId && x.data === diaria.data && x.status === 'aberta'; });
+          if (outraAberta) { responderJson(res, 409, { error: 'Já tem outra diária aberta nesta mesma data ("' + outraAberta.titulo + '"). Encerre ela antes de abrir esta.' }); return; }
+        }
         if (acao === 'abrir') { diaria.status = 'aberta'; diaria.abertaEm = new Date().toISOString(); }
         else if (acao === 'encerrar') { diaria.status = 'encerrada'; diaria.encerradaEm = new Date().toISOString(); }
         else if (acao === 'reabrir') { diaria.status = 'aberta'; diaria.encerradaEm = null; }

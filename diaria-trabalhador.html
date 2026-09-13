@@ -326,7 +326,11 @@
         const r = await fetch('/api' + rota, opcoes);
         let dados = null;
         try { dados = await r.json(); } catch (e) {}
-        if (!r.ok) throw new Error((dados && dados.error) || 'Erro (' + r.status + ')');
+        if (!r.ok) {
+          const erro = new Error((dados && dados.error) || 'Erro (' + r.status + ')');
+          erro.status = r.status;
+          throw erro;
+        }
         return dados;
       }
 
@@ -695,8 +699,17 @@
           estadoAtual = await chamarApi('/diaria/trabalhador/status?token=' + encodeURIComponent(token), {});
           renderHome();
         } catch (e) {
-          limparToken();
-          mostrar('dtr-tela-entrada');
+          // Só desloga se o SERVIDOR respondeu dizendo que o token não existe
+          // mais (404). Uma falha de rede (sem sinal, app em segundo plano,
+          // celular no bolso) não pode jogar a pessoa pra fora da conta —
+          // isso rodava a cada 15s e um sinal ruim bastava pra "deslogar"
+          // alguém no meio do trabalho.
+          if (e && e.status === 404) {
+            limparToken();
+            mostrar('dtr-tela-entrada');
+          } else if (!estadoAtual) {
+            $('dtr-carregando').innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Sem conexão — tentando de novo…';
+          }
         }
         if (!pollTimer) pollTimer = setInterval(carregarStatus, 15000);
       }
