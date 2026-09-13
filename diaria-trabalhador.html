@@ -177,10 +177,7 @@
 
         card.innerHTML =
           '<p class="dtr-diaria-titulo">' + esc(diaria.titulo) + '</p>' +
-          (diaria.pontoEncontro ? '<p class="dtr-diaria-ponto"><i class="fa-solid fa-location-dot"></i> ' + esc(diaria.pontoEncontro) + '</p>' : '') +
-          '<p id="dtr-erro-checkin" class="dtr-erro"></p>' +
-          '<button class="dtr-btn dtr-btn-grande dtr-btn-ok" id="dtr-btn-checkin"><i class="fa-solid fa-location-crosshairs"></i> ESTOU NO LOCAL</button>';
-        $('dtr-btn-checkin').onclick = fazerCheckin;
+          '<div class="dtr-vazio"><i class="fa-solid fa-camera"></i>Aguarde as instruções da coordenação pra registrar sua chegada.</div>';
       }
 
       function esc(s) {
@@ -224,35 +221,6 @@
         } finally {
           btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Entrar / Cadastrar';
         }
-      }
-
-      function fazerCheckin() {
-        const btn = $('dtr-btn-checkin');
-        const erroEl = $('dtr-erro-checkin');
-        if (erroEl) erroEl.style.display = 'none';
-        if (!navigator.geolocation) {
-          if (erroEl) { erroEl.textContent = 'Este celular/navegador não tem localização disponível.'; erroEl.style.display = ''; }
-          return;
-        }
-        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Localizando…';
-        navigator.geolocation.getCurrentPosition(async function (pos) {
-          try {
-            await chamarApi('/diaria/presenca/checkin', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                token: pegarToken(), diariaId: estadoAtual.diariaHoje.id,
-                lat: pos.coords.latitude, lng: pos.coords.longitude, precisao: pos.coords.accuracy
-              })
-            });
-            await carregarStatus();
-          } catch (e) {
-            btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i> ESTOU NO LOCAL';
-            if (erroEl) { erroEl.textContent = e.message || 'Não deu pra registrar. Tente de novo.'; erroEl.style.display = ''; }
-          }
-        }, function () {
-          btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i> ESTOU NO LOCAL';
-          if (erroEl) { erroEl.textContent = 'Não consegui pegar sua localização. Permita o acesso ao GPS e tente de novo.'; erroEl.style.display = ''; }
-        }, { enableHighAccuracy: true, timeout: 15000 });
       }
 
       $('dtr-btn-cadastrar').onclick = cadastrar;

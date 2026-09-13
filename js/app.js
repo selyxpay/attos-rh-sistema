@@ -1945,17 +1945,12 @@ async function _diariaCarregarDiarias() {
       '<div id="diaria-form-nova" class="diaria-form-nova" style="display:none;">' +
         '<div class="diaria-campo"><label>Título</label><input type="text" id="diaria-nova-titulo" placeholder="Ex.: Panfletagem Centro — Barueri"></div>' +
         '<div class="diaria-campo"><label>Data</label><input type="date" id="diaria-nova-data"></div>' +
-        '<div class="diaria-campo"><label>Ponto de encontro</label><input type="text" id="diaria-nova-ponto" placeholder="Endereço do encontro"></div>' +
-        '<div class="diaria-campo"><label>Raio aceito (metros)</label><input type="number" id="diaria-nova-raio" value="300" min="50" max="5000"></div>' +
-        '<div class="diaria-campo"><label>Latitude do ponto (opcional)</label><input type="text" id="diaria-nova-lat" placeholder="Ex.: -23.4536"></div>' +
-        '<div class="diaria-campo"><label>Longitude do ponto (opcional)</label><input type="text" id="diaria-nova-lng" placeholder="Ex.: -46.8717"></div>' +
-        '<small class="diaria-item-info" style="grid-column:1/-1;color:var(--text-secondary);font-size:11.5px;">Copie do Google Maps (clique com o botão direito no ponto → primeiras duas casas decimais já bastam). Sem isso, o sistema ainda registra a localização de quem chegou, só não calcula a distância até o ponto.</small>' +
         '<button class="btn btn-primary btn-sm" id="diaria-btn-salvar-nova"><i class="fa-solid fa-check"></i> Criar diária</button>' +
       '</div>' +
       '<div class="diaria-lista">' + (lista.length ? lista.map(function (dd) {
         return '<div class="diaria-item">' +
           '<div class="diaria-item-info"><b>' + escapeHTML(dd.titulo) + '</b>' +
-            '<span>' + escapeHTML(dd.data || '') + (dd.pontoEncontro ? ' · ' + escapeHTML(dd.pontoEncontro) : '') + '</span></div>' +
+            '<span>' + escapeHTML(dd.data || '') + '</span></div>' +
           '<span class="diaria-status-badge diaria-status-' + dd.status + '">' + (STATUS_LBL[dd.status] || dd.status) + '</span>' +
           '<div class="diaria-item-acoes">' +
             (dd.status === 'planejada' ? '<button class="btn btn-outline btn-sm" data-diaria-abrir="' + dd.id + '">Abrir</button>' : '') +
@@ -1974,19 +1969,9 @@ async function _diariaCarregarDiarias() {
     document.getElementById('diaria-btn-salvar-nova').onclick = async function () {
       const titulo = document.getElementById('diaria-nova-titulo').value.trim();
       const data = document.getElementById('diaria-nova-data').value;
-      const pontoEncontro = document.getElementById('diaria-nova-ponto').value.trim();
-      const raioMetros = parseInt(document.getElementById('diaria-nova-raio').value, 10) || 300;
-      const latTxt = document.getElementById('diaria-nova-lat').value.trim();
-      const lngTxt = document.getElementById('diaria-nova-lng').value.trim();
-      const lat = latTxt ? parseFloat(latTxt.replace(',', '.')) : null;
-      const lng = lngTxt ? parseFloat(lngTxt.replace(',', '.')) : null;
       if (!titulo || !data) { alert('Preencha pelo menos o título e a data.'); return; }
       try {
-        await _diariaPost('/admin/diarias', {
-          titulo: titulo, data: data, pontoEncontro: pontoEncontro, raioMetros: raioMetros,
-          lat: (typeof lat === 'number' && !isNaN(lat)) ? lat : null,
-          lng: (typeof lng === 'number' && !isNaN(lng)) ? lng : null
-        });
+        await _diariaPost('/admin/diarias', { titulo: titulo, data: data });
         _diariaCarregarDiarias();
       } catch (e) { alert(e.message || 'Não foi possível criar a diária.'); }
     };
@@ -2048,7 +2033,6 @@ async function _diariaCarregarPresenca() {
         return '<div class="diaria-item">' +
           '<div class="diaria-item-info"><b>' + escapeHTML(p.trabalhadorNome) + '</b>' +
             '<span>' + escapeHTML(_diariaFmtTelefone(p.trabalhadorTelefone)) + ' · ' + _diariaFmtHora(p.checkinEm) +
-            (p.distanciaDoPonto != null ? ' · ' + p.distanciaDoPonto + 'm do ponto' + (p.dentroDoRaio === false ? ' ⚠' : '') : '') +
             (p.trabalhadorStatus !== 'ativo' ? ' · ⚠ cadastro pendente' : '') + '</span></div>' +
           '<span class="diaria-status-badge diaria-status-' + p.status + '">' + (STATUS_PRES[p.status] || p.status) + '</span>' +
           (p.status === 'aguardando' ? '<div class="diaria-item-acoes"><button class="btn btn-success btn-sm" data-pres-confirmar="' + p.id + '">Confirmar</button><button class="btn btn-outline btn-sm" data-pres-recusar="' + p.id + '">Recusar</button></div>' : '') +

@@ -466,6 +466,27 @@ const CHAVES_ESCRITA_PUBLICA = ['candidatos', 'bancoTalentos', 'fila', '_docsMet
 //
 // Rodar de novo na mesma versão não muda nada (idempotente).
 // ==========================================================================
+// Diária — Fase 2, sub-fase 1: diárias antigas (de antes da remoção do GPS)
+// ganham abertaEm/encerradaEm null, pra ficha nova não quebrar em cima do
+// dado velho. Os campos antigos (pontoEncontro/lat/lng/raioMetros) ficam nos
+// registros existentes sem problema — nenhuma tela lê mais eles.
+function migrarDiariaFase2() {
+  comTrava(function () {
+    const st = lerEstado();
+    const d = st.dados || {};
+    if (!Array.isArray(d.diarias) || !d.diarias.length) return;
+    let mudou = false;
+    d.diarias.forEach(function (diaria) {
+      if (diaria.abertaEm === undefined) { diaria.abertaEm = null; mudou = true; }
+      if (diaria.encerradaEm === undefined) { diaria.encerradaEm = null; mudou = true; }
+    });
+    if (mudou) {
+      try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); }
+      catch (e) { console.error('[Diária] migração fase 2:', e); }
+    }
+  });
+}
+
 function garantirCadastrosFinanceiro() {
   comTrava(function () {
     let base;
@@ -1455,27 +1476,18 @@ http.createServer(function (req, res) {
   }
 
   // ==========================================================================
-  // DIÁRIA (Presença RT) — Fase 1 (núcleo)
-  // Cadastro de trabalhador de campo (nome + telefone, sem senha de staff),
-  // diárias (turno do dia com ponto de encontro) e check-in por GPS, com
-  // confirmação do admin. O trabalhador NÃO é um "funcionário" do sistema —
-  // a identidade pública dele é um token aleatório guardado no localStorage
+  // DIÁRIA (Presença RT) — Fase 2, sub-fase 1 (modelo de dados)
+  // A presença deixou de ser validada por proximidade de GPS (o ponto de
+  // encontro muda toda semana). A diária agora é só o turno do dia — título,
+  // data e estado — ao qual as presenças se penduram. O jeito de registrar
+  // presença de verdade (foto + geocoding) entra numa sub-fase mais à frente;
+  // até lá, o botão de chegada fica fora do ar de propósito.
+  //
+  // Cadastro de trabalhador de campo (nome + telefone, sem senha de staff).
+  // A identidade pública dele é um token aleatório guardado no localStorage
   // do celular, no mesmo espírito do token de /api/relatorio-equip: dá pra
   // reabrir sem senha, mas ninguém adivinha o de outra pessoa.
-  //
-  // Documentos, fotos com carimbo, PDF/Excel e PIN ficam para as próximas
-  // fases (a ideia completa está anotada na aba Diária do painel).
   // ==========================================================================
-  function diariaDistanciaMetros(lat1, lng1, lat2, lng2) {
-    if ([lat1, lng1, lat2, lng2].some(function (v) { return typeof v !== 'number' || isNaN(v); })) return null;
-    const R = 6371000;
-    const toRad = function (v) { return v * Math.PI / 180; };
-    const dLat = toRad(lat2 - lat1);
-    const dLng = toRad(lng2 - lng1);
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-  }
   function diariaPodeGerenciar(requester) {
     return !!(requester && (ehMestreLogin(requester.login) || requester.departamento === 'administracao'));
   }
@@ -1545,60 +1557,15 @@ http.createServer(function (req, res) {
     }
     responderJson(res, 200, {
       trabalhador: diariaTrabalhadorPublico(t),
-      diariaHoje: diariaHoje ? { id: diariaHoje.id, titulo: diariaHoje.titulo, pontoEncontro: diariaHoje.pontoEncontro, status: diariaHoje.status } : null,
+      diariaHoje: diariaHoje ? { id: diariaHoje.id, titulo: diariaHoje.titulo, status: diariaHoje.status } : null,
       presenca: presenca
     });
     return;
   }
 
-  // ---- Trabalhador: check-in por GPS ---------------------------------------
-  if (urlPath === '/api/diaria/presenca/checkin' && req.method === 'POST') {
-    lerCorpo(req, function (err, body) {
-      if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
-      const token = String((body && body.token) || '').trim();
-      const diariaId = String((body && body.diariaId) || '').trim();
-      const lat = Number(body && body.lat);
-      const lng = Number(body && body.lng);
-      const precisao = (body && body.precisao != null) ? Number(body.precisao) : null;
-      if (!token || token.length < 20) { responderJson(res, 401, { error: 'Sessão inválida. Recarregue a página.' }); return; }
-      if (!diariaId) { responderJson(res, 400, { error: 'Diária não informada.' }); return; }
-      comTrava(function () {
-        const st = lerEstado();
-        const d = st.dados || {};
-        const t = (d.trabalhadoresDiaria || []).find(function (x) { return x.token === token; });
-        if (!t) { responderJson(res, 404, { error: 'Cadastro não encontrado.' }); return; }
-        if (t.status === 'bloqueado') { responderJson(res, 403, { error: 'Seu acesso está bloqueado.' }); return; }
-        const diaria = (d.diarias || []).find(function (x) { return x.id === diariaId; });
-        if (!diaria || diaria.status !== 'aberta') { responderJson(res, 409, { error: 'Esta diária não está aberta para check-in.' }); return; }
-        if (!Array.isArray(d.presencasDiaria)) d.presencasDiaria = [];
-        let p = d.presencasDiaria.find(function (x) { return x.diariaId === diariaId && x.trabalhadorId === t.id; });
-        const distancia = diariaDistanciaMetros(lat, lng, diaria.lat, diaria.lng);
-        const dentroDoRaio = (distancia === null) ? null : (distancia <= (diaria.raioMetros || 300));
-        if (p) {
-          p.lat = isNaN(lat) ? p.lat : lat; p.lng = isNaN(lng) ? p.lng : lng;
-          p.precisaoMetros = precisao; p.distanciaDoPonto = distancia; p.dentroDoRaio = dentroDoRaio;
-        } else {
-          p = {
-            id: 'pres-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-            diariaId: diariaId, trabalhadorId: t.id,
-            checkinEm: new Date().toISOString(), // hora do SERVIDOR, nunca do celular
-            lat: isNaN(lat) ? null : lat, lng: isNaN(lng) ? null : lng, precisaoMetros: precisao,
-            distanciaDoPonto: distancia, dentroDoRaio: dentroDoRaio,
-            status: 'aguardando', confirmadoPor: null, confirmadoEm: null
-          };
-          d.presencasDiaria.push(p);
-        }
-        try {
-          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-          responderJson(res, 200, { ok: true, presenca: p });
-        } catch (e) {
-          console.error('[Diária] checkin:', e);
-          responderJson(res, 500, { error: 'Não foi possível registrar. Tente de novo.' });
-        }
-      });
-    });
-    return;
-  }
+  // Check-in por GPS foi removido (ponto de encontro muda toda semana — ver
+  // comentário no topo do bloco DIÁRIA). O registro de chegada por foto entra
+  // numa sub-fase à frente.
 
   // ---- Admin: gerenciar trabalhadores, diárias e presenças -----------------
   // Mesma trava de todo o painel: cookie de sessão de staff + mestre/admin.
@@ -1655,7 +1622,6 @@ http.createServer(function (req, res) {
         if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
         const titulo = String((body && body.titulo) || '').trim().slice(0, 160);
         const data = String((body && body.data) || '').trim();
-        const pontoEncontro = String((body && body.pontoEncontro) || '').trim().slice(0, 300);
         if (!titulo) { responderJson(res, 400, { error: 'Dê um título pra diária.' }); return; }
         if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) { responderJson(res, 400, { error: 'Data inválida.' }); return; }
         comTrava(function () {
@@ -1664,12 +1630,10 @@ http.createServer(function (req, res) {
           if (!Array.isArray(d.diarias)) d.diarias = [];
           const nova = {
             id: 'diaria-' + Date.now(),
-            titulo: titulo, data: data, pontoEncontro: pontoEncontro,
-            lat: (typeof body.lat === 'number') ? body.lat : null,
-            lng: (typeof body.lng === 'number') ? body.lng : null,
-            raioMetros: Math.max(50, Math.min(5000, parseInt(body.raioMetros, 10) || 300)),
+            titulo: titulo, data: data,
             status: 'planejada',
-            criadaPor: requesterDiaria.login, criadaEm: new Date().toISOString()
+            criadaPor: requesterDiaria.login, criadaEm: new Date().toISOString(),
+            abertaEm: null, encerradaEm: null
           };
           d.diarias.push(nova);
           try {
@@ -1690,8 +1654,8 @@ http.createServer(function (req, res) {
         const d = st.dados || {};
         const diaria = (d.diarias || []).find(function (x) { return x.id === diariaId; });
         if (!diaria) { responderJson(res, 404, { error: 'Diária não encontrada.' }); return; }
-        if (acao === 'abrir') diaria.status = 'aberta';
-        else if (acao === 'encerrar') diaria.status = 'encerrada';
+        if (acao === 'abrir') { diaria.status = 'aberta'; diaria.abertaEm = new Date().toISOString(); }
+        else if (acao === 'encerrar') { diaria.status = 'encerrada'; diaria.encerradaEm = new Date().toISOString(); }
         else if (acao === 'confirmar-todos') {
           (d.presencasDiaria || []).forEach(function (p) {
             if (p.diariaId === diariaId && p.status === 'aguardando') {
@@ -2565,6 +2529,7 @@ http.createServer(function (req, res) {
   console.log('Dados na VPS ativos (state.json + uploads). Login exigido no servidor.');
   try { garantirAdminServidor(); } catch (e) { console.error('garantirAdminServidor:', e); }
   try { garantirCadastrosFinanceiro(); } catch (e) { console.error('garantirCadastrosFinanceiro:', e); }
+  try { migrarDiariaFase2(); } catch (e) { console.error('migrarDiariaFase2:', e); }
   // O resumo entra na MESMA fila do garantirAdminServidor (comTrava), então
   // só roda depois que a carga inicial terminou — senão mostraria zero em tudo.
   comTrava(function () {
