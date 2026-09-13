@@ -2443,8 +2443,17 @@ function _diariaRenderAcoesFicha(t) {
   } else if (t.status === 'recusado') {
     partes.push('<button class="btn btn-success btn-sm" id="diaria-ficha-btn-aprovar">Aprovar mesmo assim</button>');
   }
+  partes.unshift('<button class="btn btn-outline btn-sm" id="diaria-ficha-btn-excluir" style="margin-right:auto;color:#B91C1C;border-color:#FECACA;"><i class="fa-solid fa-trash"></i> Excluir cadastro</button>');
   acoes.innerHTML = partes.join('');
 
+  document.getElementById('diaria-ficha-btn-excluir').onclick = function () {
+    const aviso = 'Excluir o cadastro de ' + t.nome + '?\n\n' +
+      'Isso apaga os dados pessoais e os 3 documentos pra sempre — não dá pra desfazer.\n' +
+      'Use isso quando a pessoa pediu pra sair ou não quer mais fazer parte.\n\n' +
+      'Se for só recusar o cadastro (mantendo o registro), use "Recusar" em vez disso.';
+    if (!confirm(aviso)) return;
+    _diariaExcluirTrabalhador(t.id);
+  };
   const btnAprovar = document.getElementById('diaria-ficha-btn-aprovar');
   if (btnAprovar) btnAprovar.onclick = function () { _diariaExecutarAcaoFicha(t.id, 'aprovar'); };
   const btnBloquear = document.getElementById('diaria-ficha-btn-bloquear');
@@ -2463,6 +2472,21 @@ function _diariaRenderAcoesFicha(t) {
       _diariaExecutarAcaoFicha(t.id, 'recusar', motivo);
     };
   };
+}
+
+async function _diariaExcluirTrabalhador(id) {
+  const btn = document.getElementById('diaria-ficha-btn-excluir');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Excluindo…'; }
+  try {
+    await _diariaPost('/admin/trabalhadores/' + id + '/excluir', {});
+    const i = _diariaCadastrosCache.findIndex(function (x) { return x.id === id; });
+    if (i >= 0) _diariaCadastrosCache.splice(i, 1);
+    fecharFichaDiaria();
+    _diariaCarregarCadastros();
+  } catch (e) {
+    alert(e.message || 'Não foi possível excluir.');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-trash"></i> Excluir cadastro'; }
+  }
 }
 
 async function _diariaExecutarAcaoFicha(id, acao, observacao) {
