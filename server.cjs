@@ -1635,8 +1635,24 @@ http.createServer(function (req, res) {
   // entrando normalmente por ele.
   // ==========================================================================
 
+  // ---- Configuração pública: cadastros novos abertos ou pausados -----------
+  // Lido pela tela de entrada ANTES de mostrar "Criar minha conta" — quando
+  // pausado, quem nunca se cadastrou nem chega a ver o formulário. Quem já
+  // tem conta continua entrando normalmente (login não é afetado por isso).
+  if (urlPath === '/api/diaria/config' && req.method === 'GET') {
+    const st = lerEstado();
+    const d = st.dados || {};
+    responderJson(res, 200, { cadastrosAbertos: !(d.diariaConfig && d.diariaConfig.cadastrosAbertos === false) });
+    return;
+  }
+
   // ---- Trabalhador: cadastro completo --------------------------------------
   if (urlPath === '/api/diaria/trabalhador/cadastro' && req.method === 'POST') {
+    const stPausa = lerEstado();
+    if (stPausa.dados && stPausa.dados.diariaConfig && stPausa.dados.diariaConfig.cadastrosAbertos === false) {
+      responderJson(res, 423, { error: 'Os cadastros estão pausados no momento — já batemos o limite de vagas para esta diária. Se abrir vaga, avisamos no grupo.' });
+      return;
+    }
     lerCorpo(req, function (err, body) {
       if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
       const b = body || {};
@@ -1841,6 +1857,34 @@ http.createServer(function (req, res) {
     const requesterDiaria = usuarioDaReq(req);
     if (!requesterDiaria) { responderJson(res, 401, { error: 'Faça login.' }); return; }
     if (!diariaPodeGerenciar(requesterDiaria)) { responderJson(res, 403, { error: 'Sem permissão para gerenciar a Diária.' }); return; }
+
+    // ---- Pausar/retomar cadastros novos (não mexe em quem já tem conta) ----
+    if (urlPath === '/api/diaria/admin/cadastros/pausar' && req.method === 'POST') {
+      comTrava(function () {
+        const st = lerEstado();
+        const d = st.dados || {};
+        if (!d.diariaConfig) d.diariaConfig = {};
+        d.diariaConfig.cadastrosAbertos = false;
+        try {
+          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+          responderJson(res, 200, { ok: true, cadastrosAbertos: false });
+        } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
+      });
+      return;
+    }
+    if (urlPath === '/api/diaria/admin/cadastros/retomar' && req.method === 'POST') {
+      comTrava(function () {
+        const st = lerEstado();
+        const d = st.dados || {};
+        if (!d.diariaConfig) d.diariaConfig = {};
+        d.diariaConfig.cadastrosAbertos = true;
+        try {
+          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+          responderJson(res, 200, { ok: true, cadastrosAbertos: true });
+        } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
+      });
+      return;
+    }
 
     // Documento pessoal (RG, comprovante) só sai por aqui — nunca pela pasta
     // pública de uploads. Chega aqui já autenticado (checagem acima).

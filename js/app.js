@@ -1933,7 +1933,37 @@ function renderDiaria() {
       });
     };
   }
+  _diariaCarregarStatusCadastros();
   _diariaTrocarSub(_diariaSubAtual);
+}
+
+async function _diariaCarregarStatusCadastros() {
+  const spanStatus = document.getElementById('diaria-status-cadastros');
+  const btn = document.getElementById('diaria-btn-pausar-cadastros');
+  if (!spanStatus || !btn) return;
+  btn.disabled = false;
+  try {
+    const j = await fetch('/api/diaria/config').then(function (r) { return r.json(); });
+    const abertos = j.cadastrosAbertos !== false;
+    spanStatus.textContent = abertos
+      ? 'Abertos — quem clicar no link consegue se cadastrar.'
+      : 'Pausados — quem nunca se cadastrou não consegue mais mandar cadastro.';
+    btn.innerHTML = abertos
+      ? '<i class="fa-solid fa-circle-pause"></i> Pausar cadastros'
+      : '<i class="fa-solid fa-circle-play"></i> Retomar cadastros';
+    btn.onclick = async function () {
+      btn.disabled = true;
+      try {
+        await _diariaPost('/admin/cadastros/' + (abertos ? 'pausar' : 'retomar'), {});
+        _diariaCarregarStatusCadastros();
+      } catch (e) {
+        alert(e.message || 'Não foi possível mudar isso agora.');
+        btn.disabled = false;
+      }
+    };
+  } catch (e) {
+    spanStatus.textContent = 'Não consegui verificar agora.';
+  }
 }
 
 function _diariaTrocarSub(sub) {

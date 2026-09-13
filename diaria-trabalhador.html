@@ -177,6 +177,10 @@
       <p class="dtr-sub">Já tem cadastro aprovado? Entre com seu nome e telefone. Se é a primeira vez, crie seu cadastro.</p>
       <button class="dtr-btn" id="dtr-btn-ir-login"><i class="fa-solid fa-right-to-bracket"></i> Entrar</button>
       <button class="dtr-btn dtr-btn-fantasma" id="dtr-btn-ir-cadastro"><i class="fa-solid fa-user-plus"></i> Criar minha conta</button>
+      <div id="dtr-cadastros-pausados" class="dtr-presenca-status dtr-presenca-aguardando" style="display:none;">
+        <i class="fa-solid fa-circle-pause"></i>
+        <span>Os cadastros novos estão pausados no momento — já batemos o limite de vagas para esta diária. Se abrir vaga, avisamos no grupo.</span>
+      </div>
     </div>
 
     <!-- LOGIN: nome completo + telefone -->
@@ -692,9 +696,24 @@
         }
       }
 
+      async function verificarCadastrosAbertos() {
+        const btnCriar = $('dtr-btn-ir-cadastro');
+        const avisoPausa = $('dtr-cadastros-pausados');
+        try {
+          const r = await fetch('/api/diaria/config');
+          const j = await r.json();
+          const abertos = j.cadastrosAbertos !== false;
+          btnCriar.style.display = abertos ? '' : 'none';
+          avisoPausa.style.display = abertos ? 'none' : '';
+        } catch (e) {
+          // Sem conexão pra checar: deixa tentar — quem realmente decide é o
+          // servidor na hora de enviar o cadastro, isso aqui é só conveniência.
+        }
+      }
+
       async function carregarStatus() {
         const token = pegarToken();
-        if (!token) { mostrar('dtr-tela-entrada'); return; }
+        if (!token) { mostrar('dtr-tela-entrada'); verificarCadastrosAbertos(); return; }
         try {
           estadoAtual = await chamarApi('/diaria/trabalhador/status?token=' + encodeURIComponent(token), {});
           renderHome();
@@ -707,6 +726,7 @@
           if (e && e.status === 404) {
             limparToken();
             mostrar('dtr-tela-entrada');
+            verificarCadastrosAbertos();
           } else if (!estadoAtual) {
             $('dtr-carregando').innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Sem conexão — tentando de novo…';
           }
@@ -719,6 +739,7 @@
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
         limparToken();
         mostrar('dtr-tela-entrada');
+        verificarCadastrosAbertos();
       };
 
       carregarStatus();
