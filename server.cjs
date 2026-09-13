@@ -528,6 +528,18 @@ function diariaMontarStatusResposta(t, d) {
     presenca: presenca
   };
 }
+// Tira o "55" (código do Brasil) de telefones que vieram com DDI colado —
+// gente costuma colar o número direto do WhatsApp (que mostra com +55) no
+// cadastro, mas depois digita só o número puro no login. Sem isso, os dois
+// nunca batem e o login "erra" mesmo sendo a pessoa certa.
+function diariaNormalizarTelefone(v) {
+  let d = String(v || '').replace(/\D/g, '');
+  if ((d.length === 12 || d.length === 13) && d.slice(0, 2) === '55') {
+    const resto = d.slice(2);
+    if (resto.length === 10 || resto.length === 11) d = resto;
+  }
+  return d;
+}
 // Login do trabalhador é nome completo + telefone (sem senha de verdade por
 // enquanto — ver "senhaHash" no cadastro). Limite por IP, não por nome: o
 // risco aqui é alguém tentando adivinhar nome+telefone de várias pessoas do
@@ -1610,7 +1622,7 @@ http.createServer(function (req, res) {
       if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
       const b = body || {};
       const nome = String(b.nome || '').trim().slice(0, 120);
-      const telefone = String(b.telefone || '').replace(/\D/g, '');
+      const telefone = diariaNormalizarTelefone(b.telefone);
       const nomePai = String(b.nomePai || '').trim().slice(0, 120);
       const nomeMae = String(b.nomeMae || '').trim().slice(0, 120);
       const rg = String(b.rg || '').trim().slice(0, 20);
@@ -1641,7 +1653,7 @@ http.createServer(function (req, res) {
         const st = lerEstado();
         const d = st.dados || {};
         if (!Array.isArray(d.trabalhadoresDiaria)) d.trabalhadoresDiaria = [];
-        if (d.trabalhadoresDiaria.some(function (x) { return x && x.telefone === telefone; })) {
+        if (d.trabalhadoresDiaria.some(function (x) { return x && diariaNormalizarTelefone(x.telefone) === telefone; })) {
           responderJson(res, 409, { error: 'Esse telefone já tem cadastro. Continue usando o mesmo aparelho de antes.' });
           return;
         }
@@ -1717,7 +1729,7 @@ http.createServer(function (req, res) {
       if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
       const b = body || {};
       const nomeNormalizado = diariaNormalizarNome(b.nome);
-      const telefone = String(b.telefone || '').replace(/\D/g, '');
+      const telefone = diariaNormalizarTelefone(b.telefone);
       if (!nomeNormalizado || !telefone) {
         diariaRegistrarFalhaLogin(ip);
         responderJson(res, 401, { error: 'Nome ou telefone incorretos.' });
@@ -1726,8 +1738,10 @@ http.createServer(function (req, res) {
       comTrava(function () {
         const st = lerEstado();
         const d = st.dados || {};
+        // Normaliza também o telefone já salvo: cadastros antigos podem ter
+        // ficado gravados com +55 na frente (era antes desse ajuste).
         const t = (d.trabalhadoresDiaria || []).find(function (x) {
-          return x && x.nomeNormalizado === nomeNormalizado && x.telefone === telefone;
+          return x && x.nomeNormalizado === nomeNormalizado && diariaNormalizarTelefone(x.telefone) === telefone;
         });
         if (!t) {
           diariaRegistrarFalhaLogin(ip);

@@ -351,7 +351,15 @@
       // ── Máscaras leves de digitação (não mudam a validação — quem valida
       //    de verdade sempre lê os dígitos com .replace(/\D/g,'')) ──────────
       function mascaraTelefone(v) {
-        const d = v.replace(/\D/g, '').slice(0, 11);
+        let d = v.replace(/\D/g, '');
+        // Se colou o número com +55 na frente (comum copiando do WhatsApp),
+        // tira o código do país antes de aplicar a máscara — senão o corte
+        // de 11 dígitos pega errado e embaralha o número digitado.
+        if ((d.length === 12 || d.length === 13) && d.slice(0, 2) === '55') {
+          const resto = d.slice(2);
+          if (resto.length === 10 || resto.length === 11) d = resto;
+        }
+        d = d.slice(0, 11);
         if (d.length <= 2) return d;
         if (d.length <= 6) return '(' + d.slice(0, 2) + ') ' + d.slice(2);
         if (d.length <= 10) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 6) + '-' + d.slice(6);
