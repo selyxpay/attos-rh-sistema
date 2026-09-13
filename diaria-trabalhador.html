@@ -247,20 +247,20 @@
 
         <div class="dtr-foto-grid">
           <label class="dtr-foto-campo" id="dtr-foto-rgfrente-campo">
-            <input type="file" accept="image/*" capture="environment" id="dtr-foto-rgfrente">
+            <input type="file" accept="image/*" id="dtr-foto-rgfrente">
             <span class="emoji"><i class="fa-solid fa-id-card"></i></span>
             <span class="rotulo">RG (frente)</span>
             <img class="dtr-foto-preview" id="dtr-foto-rgfrente-preview" style="display:none;">
           </label>
           <label class="dtr-foto-campo" id="dtr-foto-rgverso-campo">
-            <input type="file" accept="image/*" capture="environment" id="dtr-foto-rgverso">
+            <input type="file" accept="image/*" id="dtr-foto-rgverso">
             <span class="emoji"><i class="fa-solid fa-id-card"></i></span>
             <span class="rotulo">RG (verso)</span>
             <img class="dtr-foto-preview" id="dtr-foto-rgverso-preview" style="display:none;">
           </label>
         </div>
         <label class="dtr-foto-campo" id="dtr-foto-comprovante-campo">
-          <input type="file" accept="image/*" capture="environment" id="dtr-foto-comprovante">
+          <input type="file" accept="image/*" id="dtr-foto-comprovante">
           <span class="emoji"><i class="fa-solid fa-file-lines"></i></span>
           <span class="rotulo">Foto do comprovante de residência</span>
           <img class="dtr-foto-preview" id="dtr-foto-comprovante-preview" style="display:none;">
@@ -403,23 +403,45 @@
         const d = v.replace(/\D/g, '').slice(0, 8);
         return d.length > 5 ? d.slice(0, 5) + '-' + d.slice(5) : d;
       }
-      $('dtr-telefone').addEventListener('input', function () { this.value = mascaraTelefone(this.value); });
-      $('dtr-cpf').addEventListener('input', function () { this.value = mascaraCpf(this.value); });
-      $('dtr-cep').addEventListener('input', function () { this.value = mascaraCep(this.value); });
-      $('dtr-login-telefone').addEventListener('input', function () { this.value = mascaraTelefone(this.value); });
+      // Reescrever o value inteiro a cada tecla joga o cursor pro final —
+      // no celular isso faz a pessoa não conseguir corrigir um dígito no
+      // meio do número sem o cursor "fugir" pro fim toda hora. Recalcula
+      // a posição contando quantos dígitos existiam antes do cursor.
+      function aplicarMascaraComCursor(el, funcaoMascara) {
+        const posAntes = el.selectionStart == null ? el.value.length : el.selectionStart;
+        const digitosAntesCursor = el.value.slice(0, posAntes).replace(/\D/g, '').length;
+        el.value = funcaoMascara(el.value);
+        if (digitosAntesCursor === 0) { try { el.setSelectionRange(0, 0); } catch (e) {} return; }
+        let contagem = 0, pos = el.value.length;
+        for (let i = 0; i < el.value.length; i++) {
+          if (/\d/.test(el.value[i])) contagem++;
+          if (contagem === digitosAntesCursor) { pos = i + 1; break; }
+        }
+        try { el.setSelectionRange(pos, pos); } catch (e) {}
+      }
+      $('dtr-telefone').addEventListener('input', function () { aplicarMascaraComCursor(this, mascaraTelefone); });
+      $('dtr-cpf').addEventListener('input', function () { aplicarMascaraComCursor(this, mascaraCpf); });
+      $('dtr-cep').addEventListener('input', function () { aplicarMascaraComCursor(this, mascaraCep); });
+      $('dtr-login-telefone').addEventListener('input', function () { aplicarMascaraComCursor(this, mascaraTelefone); });
 
-      // ── Fotos: FileReader -> base64, redimensionada no navegador antes de
-      //    guardar (celular no 4G não pode esperar minutos pra mandar 3 fotos
-      //    de 8MB cada). Se o redimensionamento falhar por qualquer motivo,
-      //    usa a foto original — nunca trava o cadastro por causa disso. ────
-      function redimensionarImagem(dataUrlOriginal, ladoMax, qualidade) {
+      // ── Fotos: redimensiona no navegador antes de guardar (celular no 4G
+      //    não pode esperar minutos pra mandar 3 fotos de 8-15MB — foto de
+      //    iPhone/Android moderno tira em resolução bem maior que isso).
+      //    Usa URL de blob (não base64) pra decodificar a imagem original —
+      //    gasta bem menos memória que passar tudo por FileReader primeiro,
+      //    o que em celular mais fraco podia travar o navegador na hora de
+      //    processar uma foto de 12+ megapixels. Se o redimensionamento
+      //    falhar mesmo assim, cai pro arquivo original — nunca trava o
+      //    cadastro por causa disso, só avisa se der tudo errado. ──────────
+      function redimensionarArquivo(arquivo, ladoMax, qualidade) {
         return new Promise(function (resolve) {
+          let urlObjeto;
           try {
             const img = new Image();
             img.onload = function () {
               try {
                 let w = img.naturalWidth, h = img.naturalHeight;
-                if (!w || !h) { resolve(dataUrlOriginal); return; }
+                if (!w || !h) { resolve(null); return; }
                 const maior = Math.max(w, h);
                 if (maior > ladoMax) {
                   const fator = ladoMax / maior;
@@ -430,11 +452,21 @@
                 const ctx = tela.getContext('2d');
                 ctx.drawImage(img, 0, 0, w, h);
                 resolve(tela.toDataURL('image/jpeg', qualidade));
-              } catch (e) { resolve(dataUrlOriginal); }
+              } catch (e) { resolve(null); }
+              finally { if (urlObjeto) URL.revokeObjectURL(urlObjeto); }
             };
-            img.onerror = function () { resolve(dataUrlOriginal); };
-            img.src = dataUrlOriginal;
-          } catch (e) { resolve(dataUrlOriginal); }
+            img.onerror = function () { if (urlObjeto) URL.revokeObjectURL(urlObjeto); resolve(null); };
+            urlObjeto = URL.createObjectURL(arquivo);
+            img.src = urlObjeto;
+          } catch (e) { resolve(null); }
+        });
+      }
+      function lerComoDataUrl(arquivo) {
+        return new Promise(function (resolve, reject) {
+          const leitor = new FileReader();
+          leitor.onload = function () { resolve(leitor.result); };
+          leitor.onerror = reject;
+          leitor.readAsDataURL(arquivo);
         });
       }
       function ligarFoto(inputId, campoId, previewId, chaveEstado) {
@@ -445,16 +477,20 @@
           const rotuloEl = campoEl.querySelector('.rotulo');
           const rotuloOriginal = rotuloEl.textContent;
           rotuloEl.textContent = 'Processando…';
-          const leitor = new FileReader();
-          leitor.onload = async function () {
-            const comprimida = await redimensionarImagem(leitor.result, 1600, 0.82);
-            fotos[chaveEstado] = comprimida;
-            const preview = $(previewId);
-            preview.src = comprimida; preview.style.display = '';
+          let resultado = await redimensionarArquivo(arq, 1600, 0.82);
+          if (!resultado) {
+            try { resultado = await lerComoDataUrl(arq); } catch (e) { resultado = null; }
+          }
+          if (!resultado) {
             rotuloEl.textContent = rotuloOriginal;
-            campoEl.classList.add('dtr-foto-ok');
-          };
-          leitor.readAsDataURL(arq);
+            mostrarErroCadastro('Não consegui processar essa foto. Tente escolher outra ou tirar de novo.');
+            return;
+          }
+          fotos[chaveEstado] = resultado;
+          const preview = $(previewId);
+          preview.src = resultado; preview.style.display = '';
+          rotuloEl.textContent = rotuloOriginal;
+          campoEl.classList.add('dtr-foto-ok');
         });
       }
       ligarFoto('dtr-foto-rgfrente', 'dtr-foto-rgfrente-campo', 'dtr-foto-rgfrente-preview', 'rgFrente');
