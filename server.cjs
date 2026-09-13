@@ -35,6 +35,10 @@ const DATA_DIR = process.env.DATA_DIR || path.join(BASE, 'server-data');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+// Documentos da Diária (RG, comprovante) ficam FORA de UPLOADS_DIR de propósito:
+// tudo dentro de UPLOADS_DIR é servido sem login nenhum (rota /uploads/..).
+// Documento pessoal só pode sair por rota autenticada — ver /api/diaria/admin/arquivo.
+const DIARIA_DOCS_DIR = path.join(DATA_DIR, 'diaria-docs');
 const LIMITE_CORPO = 160 * 1024 * 1024; // 160 MB. O corpo inteiro e montado na MEMORIA (data += chunk);
 // ATENCAO: ja aconteceu de o state.json passar de 48 MB (fotos gravadas DENTRO
 // do JSON) e TODO save comecar a ser recusado silenciosamente. O limite subiu
@@ -45,6 +49,7 @@ const LIMITE_CORPO = 160 * 1024 * 1024; // 160 MB. O corpo inteiro e montado na 
 // Garante as pastas de dados
 try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (e) {}
 try { fs.mkdirSync(BACKUP_DIR, { recursive: true }); } catch (e) {}
+try { fs.mkdirSync(DIARIA_DOCS_DIR, { recursive: true }); } catch (e) {}
 
 // Rede de proteção dos dados críticos (Entrega/Devolução de Equipamentos).
 // Módulo isolado: se ele falhar, o sistema continua salvando normalmente.
@@ -470,16 +475,97 @@ const CHAVES_ESCRITA_PUBLICA = ['candidatos', 'bancoTalentos', 'fila', '_docsMet
 // ganham abertaEm/encerradaEm null, pra ficha nova não quebrar em cima do
 // dado velho. Os campos antigos (pontoEncontro/lat/lng/raioMetros) ficam nos
 // registros existentes sem problema — nenhuma tela lê mais eles.
+// ── DIÁRIA — helpers puros (módulo inteiro: migração no boot e rotas usam
+//    as MESMAS funções, por isso ficam aqui fora e não dentro do handler
+//    de requisição) ───────────────────────────────────────────────────────
+function diariaPodeGerenciar(requester) {
+  return !!(requester && (ehMestreLogin(requester.login) || requester.departamento === 'administracao'));
+}
+function diariaNormalizarNome(nome) {
+  return String(nome || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().replace(/\s+/g, ' ').trim();
+}
+// Dígito verificador oficial da Receita (mesmo algoritmo usado em qualquer
+// validador de CPF de verdade — dois módulos 11 em sequência).
+function diariaCpfValido(cpf) {
+  const dCpf = String(cpf || '').replace(/\D/g, '');
+  if (dCpf.length !== 11 || /^(\d)\1{10}$/.test(dCpf)) return false;
+  let soma = 0;
+  for (let i = 0; i < 9; i++) soma += parseInt(dCpf[i], 10) * (10 - i);
+  let resto = (soma * 10) % 11; if (resto >= 10) resto = 0;
+  if (resto !== parseInt(dCpf[9], 10)) return false;
+  soma = 0;
+  for (let i = 0; i < 10; i++) soma += parseInt(dCpf[i], 10) * (11 - i);
+  resto = (soma * 10) % 11; if (resto >= 10) resto = 0;
+  return resto === parseInt(dCpf[10], 10);
+}
+const DIARIA_PIX_TIPOS = ['celular', 'email', 'cpf'];
+function diariaPixValida(tipo, chave) {
+  const c = String(chave || '').trim();
+  if (tipo === 'celular') return /^\d{10,11}$/.test(c.replace(/\D/g, ''));
+  if (tipo === 'email') return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c);
+  if (tipo === 'cpf') return diariaCpfValido(c);
+  return false;
+}
+// Nunca devolve telefone completo, CPF, RG, Pix nem token pro lado errado
+// ler — a ficha completa só sai pela rota de admin (autenticada).
+function diariaTrabalhadorPublico(t) {
+  return { id: t.id, nome: t.nome, status: t.status, criadoEm: t.criadoEm };
+}
+// Salva uma imagem base64 em disco, FORA da pasta pública (ver DIARIA_DOCS_DIR
+// no topo do arquivo). Devolve só o nome do arquivo, nunca o caminho inteiro
+// nem o base64 — isso é o que vai gravado no state.json.
+function diariaSalvarDocumento(trabalhadorId, campo, dataUrl) {
+  const m = /^data:([^;]+);base64,([\s\S]*)$/.exec(String(dataUrl || ''));
+  if (!m) return null;
+  const buf = Buffer.from(m[2], 'base64');
+  if (buf.length > 8 * 1024 * 1024) throw new Error('Imagem de ' + campo + ' muito grande (máximo 8MB).');
+  let ext = (m[1].split('/')[1] || 'jpg').split('+')[0].split(';')[0];
+  if (!/^[a-z0-9]{2,5}$/i.test(ext)) ext = 'jpg';
+  const pastaPessoa = path.join(DIARIA_DOCS_DIR, trabalhadorId);
+  fs.mkdirSync(pastaPessoa, { recursive: true });
+  const nome = campo + '.' + ext;
+  fs.writeFileSync(path.join(pastaPessoa, nome), buf);
+  return nome;
+}
+
 function migrarDiariaFase2() {
   comTrava(function () {
     const st = lerEstado();
     const d = st.dados || {};
-    if (!Array.isArray(d.diarias) || !d.diarias.length) return;
     let mudou = false;
-    d.diarias.forEach(function (diaria) {
-      if (diaria.abertaEm === undefined) { diaria.abertaEm = null; mudou = true; }
-      if (diaria.encerradaEm === undefined) { diaria.encerradaEm = null; mudou = true; }
-    });
+    if (Array.isArray(d.diarias)) {
+      d.diarias.forEach(function (diaria) {
+        if (diaria.abertaEm === undefined) { diaria.abertaEm = null; mudou = true; }
+        if (diaria.encerradaEm === undefined) { diaria.encerradaEm = null; mudou = true; }
+      });
+    }
+    // Sub-fase 2: trabalhador cadastrado no modelo simples (só nome+telefone,
+    // um token só) ganha os campos novos com valor neutro, e o token antigo
+    // vira o primeiro item do array — sem isso a pessoa perderia o acesso
+    // que já tinha.
+    if (Array.isArray(d.trabalhadoresDiaria)) {
+      d.trabalhadoresDiaria.forEach(function (t) {
+        if (!Array.isArray(t.tokens)) {
+          t.tokens = t.token ? [t.token] : [];
+          mudou = true;
+        }
+        if (t.nomeNormalizado === undefined) { t.nomeNormalizado = diariaNormalizarNome(t.nome); mudou = true; }
+        if (t.nomePai === undefined) { t.nomePai = null; mudou = true; }
+        if (t.nomeMae === undefined) { t.nomeMae = null; mudou = true; }
+        if (t.rg === undefined) { t.rg = null; mudou = true; }
+        if (t.cpf === undefined) { t.cpf = null; mudou = true; }
+        if (t.cep === undefined) {
+          t.cep = null; t.logradouro = null; t.numero = null; t.complemento = null;
+          t.bairro = null; t.cidade = null; t.uf = null; mudou = true;
+        }
+        if (t.pixTipo === undefined) { t.pixTipo = null; t.pixChave = null; mudou = true; }
+        if (t.documentos === undefined) { t.documentos = {}; mudou = true; }
+        if (t.senhaHash === undefined) { t.senhaHash = null; mudou = true; }
+        if (t.observacaoAdmin === undefined) { t.observacaoAdmin = null; mudou = true; }
+      });
+    }
     if (mudou) {
       try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); }
       catch (e) { console.error('[Diária] migração fase 2:', e); }
@@ -1476,60 +1562,95 @@ http.createServer(function (req, res) {
   }
 
   // ==========================================================================
-  // DIÁRIA (Presença RT) — Fase 2, sub-fase 1 (modelo de dados)
-  // A presença deixou de ser validada por proximidade de GPS (o ponto de
-  // encontro muda toda semana). A diária agora é só o turno do dia — título,
-  // data e estado — ao qual as presenças se penduram. O jeito de registrar
-  // presença de verdade (foto + geocoding) entra numa sub-fase mais à frente;
-  // até lá, o botão de chegada fica fora do ar de propósito.
-  //
-  // Cadastro de trabalhador de campo (nome + telefone, sem senha de staff).
-  // A identidade pública dele é um token aleatório guardado no localStorage
-  // do celular, no mesmo espírito do token de /api/relatorio-equip: dá pra
-  // reabrir sem senha, mas ninguém adivinha o de outra pessoa.
+  // DIÁRIA (Presença RT) — Fase 2, sub-fase 2 (cadastro completo)
+  // Cadastro público em 3 passos (dados pessoais, endereço, Pix+documentos),
+  // enviado de uma vez só ao final — sem registro parcial no meio do caminho.
+  // Identidade pública por token aleatório (array — um por aparelho), igual
+  // ao token de /api/relatorio-equip: nunca é cookie de sessão de staff.
+  // Login por nome+telefone (reentrada num aparelho novo) é a próxima
+  // sub-fase; por enquanto, quem já tem token salvo no navegador continua
+  // entrando normalmente por ele.
   // ==========================================================================
-  function diariaPodeGerenciar(requester) {
-    return !!(requester && (ehMestreLogin(requester.login) || requester.departamento === 'administracao'));
-  }
-  // Nunca devolve o telefone completo nem o token pro lado errado ler — a
-  // rota de status/cadastro é a única que devolve o token (é do próprio dono).
-  function diariaTrabalhadorPublico(t) {
-    return { id: t.id, nome: t.nome, status: t.status, criadoEm: t.criadoEm };
-  }
 
-  // ---- Trabalhador: cadastro/login unificado (nome + telefone) ------------
-  // Mesmo telefone = mesma pessoa (reentrada): nunca preenche de novo.
+  // ---- Trabalhador: cadastro completo --------------------------------------
   if (urlPath === '/api/diaria/trabalhador/cadastro' && req.method === 'POST') {
     lerCorpo(req, function (err, body) {
       if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
-      const nome = String((body && body.nome) || '').trim().slice(0, 120);
-      const telefone = String((body && body.telefone) || '').replace(/\D/g, '');
-      if (nome.length < 3) { responderJson(res, 400, { error: 'Informe seu nome completo.' }); return; }
+      const b = body || {};
+      const nome = String(b.nome || '').trim().slice(0, 120);
+      const telefone = String(b.telefone || '').replace(/\D/g, '');
+      const nomePai = String(b.nomePai || '').trim().slice(0, 120);
+      const nomeMae = String(b.nomeMae || '').trim().slice(0, 120);
+      const rg = String(b.rg || '').trim().slice(0, 20);
+      const cpf = String(b.cpf || '').replace(/\D/g, '');
+      const cep = String(b.cep || '').replace(/\D/g, '');
+      const logradouro = String(b.logradouro || '').trim().slice(0, 200);
+      const numero = String(b.numero || '').trim().slice(0, 20);
+      const complemento = String(b.complemento || '').trim().slice(0, 100);
+      const bairro = String(b.bairro || '').trim().slice(0, 100);
+      const cidade = String(b.cidade || '').trim().slice(0, 100);
+      const uf = String(b.uf || '').trim().toUpperCase().slice(0, 2);
+      const pixTipo = String(b.pixTipo || '').trim();
+      const pixChave = String(b.pixChave || '').trim().slice(0, 140);
+
+      if (nome.split(/\s+/).filter(Boolean).length < 2) { responderJson(res, 400, { error: 'Informe seu nome completo (nome e sobrenome).' }); return; }
       if (telefone.length < 10 || telefone.length > 13) { responderJson(res, 400, { error: 'Telefone inválido.' }); return; }
+      if (!nomePai) { responderJson(res, 400, { error: 'Informe o nome do pai.' }); return; }
+      if (!nomeMae) { responderJson(res, 400, { error: 'Informe o nome da mãe.' }); return; }
+      if (!rg) { responderJson(res, 400, { error: 'Informe o número do RG.' }); return; }
+      if (!diariaCpfValido(cpf)) { responderJson(res, 400, { error: 'CPF inválido. Confira os números.' }); return; }
+      if (cep.length !== 8) { responderJson(res, 400, { error: 'CEP inválido.' }); return; }
+      if (!logradouro || !numero || !bairro || !cidade || !uf) { responderJson(res, 400, { error: 'Complete o endereço.' }); return; }
+      if (DIARIA_PIX_TIPOS.indexOf(pixTipo) < 0) { responderJson(res, 400, { error: 'Escolha o tipo da chave Pix.' }); return; }
+      if (!diariaPixValida(pixTipo, pixChave)) { responderJson(res, 400, { error: 'Chave Pix inválida pro tipo escolhido.' }); return; }
+      if (!b.rgFrente || !b.rgVerso || !b.comprovante) { responderJson(res, 400, { error: 'Envie as três imagens: RG frente, RG verso e comprovante de residência.' }); return; }
+
       comTrava(function () {
         const st = lerEstado();
         const d = st.dados || {};
         if (!Array.isArray(d.trabalhadoresDiaria)) d.trabalhadoresDiaria = [];
-        let t = d.trabalhadoresDiaria.find(function (x) { return x && x.telefone === telefone; });
-        let mudou = false;
-        if (!t) {
-          t = {
-            id: 'trab-' + Date.now(),
-            nome: nome, telefone: telefone,
-            token: crypto.randomBytes(24).toString('hex'),
-            status: 'pendente_aprovacao',
-            criadoEm: new Date().toISOString(),
-            aprovadoEm: null, aprovadoPor: null
-          };
-          d.trabalhadoresDiaria.push(t);
-          mudou = true;
-        } else if (nome && nome !== t.nome) {
-          t.nome = nome; // digitou o nome diferente na reentrada: atualiza
-          mudou = true;
+        if (d.trabalhadoresDiaria.some(function (x) { return x && x.telefone === telefone; })) {
+          responderJson(res, 409, { error: 'Esse telefone já tem cadastro. Continue usando o mesmo aparelho de antes.' });
+          return;
         }
+        if (d.trabalhadoresDiaria.some(function (x) { return x && x.cpf === cpf; })) {
+          responderJson(res, 409, { error: 'Esse CPF já está cadastrado com outro telefone. Procure a coordenação.' });
+          return;
+        }
+        const id = 'trab-' + Date.now();
+        const token = crypto.randomBytes(24).toString('hex');
+        let nomesArquivos;
         try {
-          if (mudou) gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-          responderJson(res, 200, { ok: true, token: t.token, trabalhador: diariaTrabalhadorPublico(t) });
+          nomesArquivos = {
+            rgFrente: diariaSalvarDocumento(id, 'rg-frente', b.rgFrente),
+            rgVerso: diariaSalvarDocumento(id, 'rg-verso', b.rgVerso),
+            comprovante: diariaSalvarDocumento(id, 'comprovante', b.comprovante)
+          };
+        } catch (e) {
+          responderJson(res, 400, { error: e.message || 'Não foi possível salvar as imagens.' });
+          return;
+        }
+        if (!nomesArquivos.rgFrente || !nomesArquivos.rgVerso || !nomesArquivos.comprovante) {
+          responderJson(res, 400, { error: 'Uma das imagens não chegou certo. Tente enviar de novo.' });
+          return;
+        }
+        const t = {
+          id: id, nome: nome, nomeNormalizado: diariaNormalizarNome(nome), telefone: telefone,
+          nomePai: nomePai, nomeMae: nomeMae, rg: rg, cpf: cpf,
+          cep: cep, logradouro: logradouro, numero: numero, complemento: complemento,
+          bairro: bairro, cidade: cidade, uf: uf,
+          pixTipo: pixTipo, pixChave: pixChave,
+          documentos: nomesArquivos,
+          senhaHash: null,
+          tokens: [token],
+          status: 'pendente_aprovacao',
+          criadoEm: new Date().toISOString(),
+          aprovadoEm: null, aprovadoPor: null, observacaoAdmin: null
+        };
+        d.trabalhadoresDiaria.push(t);
+        try {
+          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
+          responderJson(res, 200, { ok: true, token: token, trabalhador: diariaTrabalhadorPublico(t) });
         } catch (e) {
           console.error('[Diária] cadastro:', e);
           responderJson(res, 500, { error: 'Não foi possível salvar. Tente de novo.' });
@@ -1547,7 +1668,7 @@ http.createServer(function (req, res) {
     if (!token || token.length < 20) { responderJson(res, 404, { error: 'Não encontrado.' }); return; }
     const st = lerEstado();
     const d = st.dados || {};
-    const t = (d.trabalhadoresDiaria || []).find(function (x) { return x.token === token; });
+    const t = (d.trabalhadoresDiaria || []).find(function (x) { return Array.isArray(x.tokens) && x.tokens.indexOf(token) >= 0; });
     if (!t) { responderJson(res, 404, { error: 'Cadastro não encontrado.' }); return; }
     const hoje = new Date().toISOString().slice(0, 10);
     const diariaHoje = (d.diarias || []).find(function (x) { return x.data === hoje && x.status === 'aberta'; }) || null;
@@ -1574,6 +1695,25 @@ http.createServer(function (req, res) {
     const requesterDiaria = usuarioDaReq(req);
     if (!requesterDiaria) { responderJson(res, 401, { error: 'Faça login.' }); return; }
     if (!diariaPodeGerenciar(requesterDiaria)) { responderJson(res, 403, { error: 'Sem permissão para gerenciar a Diária.' }); return; }
+
+    // Documento pessoal (RG, comprovante) só sai por aqui — nunca pela pasta
+    // pública de uploads. Chega aqui já autenticado (checagem acima).
+    let mArq = urlPath.match(/^\/api\/diaria\/admin\/arquivo\/([^\/]+)\/([^\/]+)\/([^\/]+)$/);
+    if (mArq && req.method === 'GET') {
+      const tipoArq = decodeURIComponent(mArq[1]);
+      const idArq = decodeURIComponent(mArq[2]);
+      const nomeArq = path.basename(decodeURIComponent(mArq[3])); // nunca confia em "../"
+      let caminhoArq = null;
+      if (tipoArq === 'cadastro') caminhoArq = path.join(DIARIA_DOCS_DIR, idArq, nomeArq);
+      if (!caminhoArq) { responderJson(res, 404, { error: 'Tipo de arquivo desconhecido.' }); return; }
+      fs.readFile(caminhoArq, function (e, data) {
+        if (e) { responderJson(res, 404, { error: 'Arquivo não encontrado.' }); return; }
+        const ct = MIME[path.extname(caminhoArq).toLowerCase()] || 'application/octet-stream';
+        res.writeHead(200, Object.assign({ 'Content-Type': ct }, SECURITY_HEADERS));
+        res.end(data);
+      });
+      return;
+    }
 
     if (urlPath === '/api/diaria/admin/trabalhadores' && req.method === 'GET') {
       const qIdx = req.url.indexOf('?');

@@ -40,17 +40,22 @@
     .dtr-card p.dtr-sub { margin: 0 0 18px; color: #64748b; font-size: 13.5px; line-height: 1.5; }
     .dtr-campo { margin-bottom: 14px; }
     .dtr-campo label { display: block; font-size: 12.5px; font-weight: 600; color: #334155; margin-bottom: 5px; }
-    .dtr-campo input {
+    .dtr-campo input, .dtr-campo select {
       width: 100%; padding: 13px 14px; border-radius: 10px; border: 1.5px solid #e2e8f0;
-      font-size: 15px; font-family: inherit;
+      font-size: 15px; font-family: inherit; background: #fff; color: #0f172a;
     }
-    .dtr-campo input:focus { outline: none; border-color: #e11d2a; }
+    .dtr-campo input:focus, .dtr-campo select:focus { outline: none; border-color: #e11d2a; }
+    .dtr-campo input.dtr-invalida { border-color: #dc2626; }
+    .dtr-campo-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .dtr-btn {
       width: 100%; padding: 15px; border: none; border-radius: 12px;
       background: #e11d2a; color: #fff; font-size: 15.5px; font-weight: 700;
       cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
     }
     .dtr-btn:disabled { opacity: .6; cursor: default; }
+    .dtr-btn-fantasma {
+      background: none; color: #64748b; border: 1.5px solid #e2e8f0; margin-bottom: 10px;
+    }
     .dtr-btn.dtr-btn-grande { padding: 22px; font-size: 18px; border-radius: 16px; }
     .dtr-btn.dtr-btn-ok { background: #16a34a; }
     .dtr-erro {
@@ -63,20 +68,38 @@
     }
     .dtr-faixa.pendente_aprovacao { background: #fefce8; color: #854d0e; }
     .dtr-faixa.ativo { background: #f0fdf4; color: #166534; }
-    .dtr-faixa.bloqueado { background: #fef2f2; color: #991b1b; }
+    .dtr-faixa.bloqueado, .dtr-faixa.recusado { background: #fef2f2; color: #991b1b; }
     .dtr-saudacao { color: #fff; font-size: 15px; margin: 0 0 16px; }
     .dtr-saudacao b { font-size: 17px; }
     .dtr-diaria-titulo { font-size: 16px; font-weight: 800; margin: 0 0 3px; }
-    .dtr-diaria-ponto { font-size: 13px; color: #64748b; margin: 0 0 18px; }
-    .dtr-status-ok {
-      text-align: center; padding: 10px 0 4px;
-    }
+    .dtr-status-ok { text-align: center; padding: 10px 0 4px; }
     .dtr-status-ok .emoji { font-size: 40px; display: block; margin-bottom: 8px; }
     .dtr-vazio { text-align: center; color: #94a3b8; padding: 30px 10px; font-size: 14px; }
     .dtr-vazio i { font-size: 32px; display: block; margin-bottom: 10px; }
     .dtr-trocar { text-align: center; margin-top: 8px; }
     .dtr-trocar a { color: rgba(255,255,255,.7); font-size: 12px; text-decoration: none; }
     .dtr-carregando { text-align: center; color: rgba(255,255,255,.8); padding: 40px 0; }
+
+    /* Assistente de 3 passos */
+    .dtr-passos { display: flex; gap: 6px; margin-bottom: 18px; }
+    .dtr-passo-bola {
+      flex: 1; height: 5px; border-radius: 3px; background: #e2e8f0;
+    }
+    .dtr-passo-bola.dtr-passo-ok { background: #16a34a; }
+    .dtr-passo-bola.dtr-passo-atual { background: #e11d2a; }
+    .dtr-passo-rotulo { font-size: 11.5px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+    .dtr-cep-status { font-size: 11.5px; margin-top: 4px; }
+    .dtr-cep-status.ok { color: #16a34a; }
+    .dtr-cep-status.erro { color: #b45309; }
+    .dtr-foto-campo {
+      border: 2px dashed #e2e8f0; border-radius: 12px; padding: 14px; text-align: center;
+      margin-bottom: 12px; position: relative; cursor: pointer;
+    }
+    .dtr-foto-campo.dtr-foto-ok { border-color: #16a34a; border-style: solid; background: #f0fdf4; }
+    .dtr-foto-campo input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .dtr-foto-campo .emoji { font-size: 26px; display: block; margin-bottom: 4px; }
+    .dtr-foto-campo .rotulo { font-size: 12.5px; font-weight: 700; color: #334155; }
+    .dtr-foto-campo img.dtr-foto-preview { max-width: 100%; max-height: 90px; border-radius: 8px; margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -87,31 +110,111 @@
   <div class="dtr-corpo">
     <div id="dtr-carregando" class="dtr-carregando"><i class="fa-solid fa-spinner fa-spin"></i> Carregando…</div>
 
-    <!-- CADASTRO / LOGIN (nome + telefone) -->
-    <div id="dtr-tela-cadastro" class="dtr-card" style="display:none;">
-      <h2><i class="fa-solid fa-user"></i> Identifique-se</h2>
-      <p class="dtr-sub">Se você já se cadastrou antes, é só digitar seu nome e telefone de novo — não precisa preencher tudo outra vez.</p>
-      <p id="dtr-erro-cadastro" class="dtr-erro"></p>
-      <div class="dtr-campo">
-        <label>Nome completo</label>
-        <input type="text" id="dtr-nome" placeholder="Seu nome completo" autocomplete="name">
-      </div>
-      <div class="dtr-campo">
-        <label>Telefone (com DDD)</label>
-        <input type="tel" id="dtr-telefone" placeholder="(11) 98765-4321" inputmode="numeric" autocomplete="tel">
-      </div>
-      <button class="dtr-btn" id="dtr-btn-cadastrar"><i class="fa-solid fa-arrow-right"></i> Entrar / Cadastrar</button>
+    <!-- ENTRADA: já tenho conta / criar conta -->
+    <div id="dtr-tela-entrada" class="dtr-card" style="display:none;">
+      <h2><i class="fa-solid fa-user"></i> Bem-vindo(a)</h2>
+      <p class="dtr-sub">Já se cadastrou antes neste aparelho? A gente já reconhece você. Se é a primeira vez, crie seu cadastro.</p>
+      <button class="dtr-btn" id="dtr-btn-ir-cadastro"><i class="fa-solid fa-user-plus"></i> Criar minha conta</button>
     </div>
 
-    <!-- HOME -->
+    <!-- CADASTRO — assistente de 3 passos -->
+    <div id="dtr-tela-cadastro" class="dtr-card" style="display:none;">
+      <h2><i class="fa-solid fa-user-plus"></i> Criar cadastro</h2>
+      <div class="dtr-passos">
+        <div class="dtr-passo-bola" data-passo-bola="1"></div>
+        <div class="dtr-passo-bola" data-passo-bola="2"></div>
+        <div class="dtr-passo-bola" data-passo-bola="3"></div>
+      </div>
+      <p id="dtr-erro-cadastro" class="dtr-erro"></p>
+
+      <!-- Passo 1: dados pessoais -->
+      <div id="dtr-passo-1" class="dtr-passo">
+        <p class="dtr-passo-rotulo">Passo 1 de 3 — Dados pessoais</p>
+        <div class="dtr-campo"><label>Nome completo</label><input type="text" id="dtr-nome" placeholder="Seu nome completo" autocomplete="name"></div>
+        <div class="dtr-campo"><label>Telefone (com DDD)</label><input type="tel" id="dtr-telefone" placeholder="(11) 98765-4321" inputmode="numeric" autocomplete="tel"></div>
+        <div class="dtr-campo"><label>Nome do pai</label><input type="text" id="dtr-nome-pai" placeholder="Nome completo do pai"></div>
+        <div class="dtr-campo"><label>Nome da mãe</label><input type="text" id="dtr-nome-mae" placeholder="Nome completo da mãe"></div>
+        <div class="dtr-campo-2col">
+          <div class="dtr-campo"><label>RG</label><input type="text" id="dtr-rg" placeholder="00.000.000-0" inputmode="numeric"></div>
+          <div class="dtr-campo"><label>CPF</label><input type="text" id="dtr-cpf" placeholder="000.000.000-00" inputmode="numeric" maxlength="14"></div>
+        </div>
+        <button class="dtr-btn" id="dtr-btn-passo1"><i class="fa-solid fa-arrow-right"></i> Continuar</button>
+      </div>
+
+      <!-- Passo 2: endereço -->
+      <div id="dtr-passo-2" class="dtr-passo" style="display:none;">
+        <p class="dtr-passo-rotulo">Passo 2 de 3 — Endereço</p>
+        <div class="dtr-campo">
+          <label>CEP</label>
+          <input type="text" id="dtr-cep" placeholder="00000-000" inputmode="numeric" maxlength="9">
+          <div id="dtr-cep-status" class="dtr-cep-status"></div>
+        </div>
+        <div class="dtr-campo"><label>Rua / Logradouro</label><input type="text" id="dtr-logradouro" placeholder="Nome da rua"></div>
+        <div class="dtr-campo-2col">
+          <div class="dtr-campo"><label>Número</label><input type="text" id="dtr-numero" placeholder="Nº" inputmode="numeric"></div>
+          <div class="dtr-campo"><label>Complemento</label><input type="text" id="dtr-complemento" placeholder="Apto, bloco… (opcional)"></div>
+        </div>
+        <div class="dtr-campo"><label>Bairro</label><input type="text" id="dtr-bairro" placeholder="Bairro"></div>
+        <div class="dtr-campo-2col">
+          <div class="dtr-campo"><label>Cidade</label><input type="text" id="dtr-cidade" placeholder="Cidade"></div>
+          <div class="dtr-campo"><label>UF</label><input type="text" id="dtr-uf" placeholder="SP" maxlength="2" style="text-transform:uppercase;"></div>
+        </div>
+        <button class="dtr-btn dtr-btn-fantasma" id="dtr-btn-voltar2"><i class="fa-solid fa-arrow-left"></i> Voltar</button>
+        <button class="dtr-btn" id="dtr-btn-passo2"><i class="fa-solid fa-arrow-right"></i> Continuar</button>
+      </div>
+
+      <!-- Passo 3: Pix e documentos -->
+      <div id="dtr-passo-3" class="dtr-passo" style="display:none;">
+        <p class="dtr-passo-rotulo">Passo 3 de 3 — Pix e documentos</p>
+        <div class="dtr-campo">
+          <label>Tipo da chave Pix</label>
+          <select id="dtr-pix-tipo">
+            <option value="">Escolha…</option>
+            <option value="celular">Celular</option>
+            <option value="email">E-mail</option>
+            <option value="cpf">CPF</option>
+          </select>
+        </div>
+        <div class="dtr-campo"><label>Chave Pix</label><input type="text" id="dtr-pix-chave" placeholder="Digite a chave"></div>
+
+        <label class="dtr-foto-campo" id="dtr-foto-rgfrente-campo">
+          <input type="file" accept="image/*" capture="environment" id="dtr-foto-rgfrente">
+          <span class="emoji"><i class="fa-solid fa-id-card"></i></span>
+          <span class="rotulo">Foto do RG (frente)</span>
+          <img class="dtr-foto-preview" id="dtr-foto-rgfrente-preview" style="display:none;">
+        </label>
+        <label class="dtr-foto-campo" id="dtr-foto-rgverso-campo">
+          <input type="file" accept="image/*" capture="environment" id="dtr-foto-rgverso">
+          <span class="emoji"><i class="fa-solid fa-id-card"></i></span>
+          <span class="rotulo">Foto do RG (verso)</span>
+          <img class="dtr-foto-preview" id="dtr-foto-rgverso-preview" style="display:none;">
+        </label>
+        <label class="dtr-foto-campo" id="dtr-foto-comprovante-campo">
+          <input type="file" accept="image/*" capture="environment" id="dtr-foto-comprovante">
+          <span class="emoji"><i class="fa-solid fa-file-lines"></i></span>
+          <span class="rotulo">Foto do comprovante de residência</span>
+          <img class="dtr-foto-preview" id="dtr-foto-comprovante-preview" style="display:none;">
+        </label>
+
+        <button class="dtr-btn dtr-btn-fantasma" id="dtr-btn-voltar3"><i class="fa-solid fa-arrow-left"></i> Voltar</button>
+        <button class="dtr-btn dtr-btn-ok" id="dtr-btn-enviar"><i class="fa-solid fa-check"></i> Enviar cadastro</button>
+      </div>
+    </div>
+
+    <!-- Aguardando aprovação -->
+    <div id="dtr-tela-analise" class="dtr-card" style="display:none;">
+      <div class="dtr-status-ok">
+        <span class="emoji">🟡</span>
+        <b>Cadastro enviado!</b>
+        <p style="color:#64748b;font-size:13.5px;margin-top:8px;">Suas informações estão em análise. Quando sua conta estiver aprovada, iremos entrar em contato com você.</p>
+      </div>
+    </div>
+
+    <!-- HOME (cadastro ativo) -->
     <div id="dtr-tela-home" style="display:none;">
       <p class="dtr-saudacao">Olá, <b id="dtr-home-nome"></b>!</p>
       <div id="dtr-faixa-status" class="dtr-faixa"></div>
-
-      <div class="dtr-card" id="dtr-card-diaria">
-        <!-- preenchido via JS -->
-      </div>
-
+      <div class="dtr-card" id="dtr-card-diaria"><!-- preenchido via JS --></div>
       <div class="dtr-trocar"><a href="#" id="dtr-link-trocar">Não é você? Trocar de conta</a></div>
     </div>
   </div>
@@ -122,13 +225,15 @@
       var $ = function (id) { return document.getElementById(id); };
       var estadoAtual = null; // último /status recebido
       var pollTimer = null;
+      var cadastro = {}; // acumula os 3 passos antes de enviar tudo junto
+      var fotos = {}; // { rgFrente, rgVerso, comprovante } em base64
 
       function pegarToken() { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
       function salvarToken(t) { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {} }
       function limparToken() { try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
 
       function mostrar(id) {
-        ['dtr-carregando', 'dtr-tela-cadastro', 'dtr-tela-home'].forEach(function (x) {
+        ['dtr-carregando', 'dtr-tela-entrada', 'dtr-tela-cadastro', 'dtr-tela-analise', 'dtr-tela-home'].forEach(function (x) {
           $(x).style.display = x === id ? '' : 'none';
         });
       }
@@ -141,14 +246,167 @@
         return dados;
       }
 
+      function esc(s) {
+        return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      // ── Validações (mesma regra do servidor, só que aqui é pra dar feedback
+      //    na hora — quem manda de verdade é sempre o back-end) ──────────────
+      function cpfValido(cpf) {
+        const d = String(cpf || '').replace(/\D/g, '');
+        if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+        let soma = 0;
+        for (let i = 0; i < 9; i++) soma += parseInt(d[i], 10) * (10 - i);
+        let resto = (soma * 10) % 11; if (resto >= 10) resto = 0;
+        if (resto !== parseInt(d[9], 10)) return false;
+        soma = 0;
+        for (let i = 0; i < 10; i++) soma += parseInt(d[i], 10) * (11 - i);
+        resto = (soma * 10) % 11; if (resto >= 10) resto = 0;
+        return resto === parseInt(d[10], 10);
+      }
+      function pixValida(tipo, chave) {
+        const c = String(chave || '').trim();
+        if (tipo === 'celular') return /^\d{10,11}$/.test(c.replace(/\D/g, ''));
+        if (tipo === 'email') return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c);
+        if (tipo === 'cpf') return cpfValido(c);
+        return false;
+      }
+
+      // ── ViaCEP: chamado do NAVEGADOR. Se falhar, os campos continuam
+      //    editáveis normalmente — nunca trava o cadastro por causa disso. ──
+      let cepBuscando = null;
+      async function buscarCep() {
+        const cep = $('dtr-cep').value.replace(/\D/g, '');
+        const statusEl = $('dtr-cep-status');
+        statusEl.textContent = ''; statusEl.className = 'dtr-cep-status';
+        if (cep.length !== 8) return;
+        statusEl.textContent = 'Buscando endereço…';
+        try {
+          const r = await fetch('https://viacep.com.br/ws/' + cep + '/json/');
+          const j = await r.json();
+          if (j.erro) { statusEl.textContent = 'CEP não encontrado — preencha o endereço manualmente.'; statusEl.className = 'dtr-cep-status erro'; return; }
+          $('dtr-logradouro').value = j.logradouro || $('dtr-logradouro').value;
+          $('dtr-bairro').value = j.bairro || $('dtr-bairro').value;
+          $('dtr-cidade').value = j.localidade || $('dtr-cidade').value;
+          $('dtr-uf').value = j.uf || $('dtr-uf').value;
+          statusEl.textContent = 'Endereço encontrado — confira e complete o número.';
+          statusEl.className = 'dtr-cep-status ok';
+        } catch (e) {
+          statusEl.textContent = 'Não consegui buscar o CEP agora — preencha o endereço manualmente.';
+          statusEl.className = 'dtr-cep-status erro';
+        }
+      }
+      $('dtr-cep').addEventListener('blur', function () { clearTimeout(cepBuscando); buscarCep(); });
+
+      // ── Fotos: FileReader -> base64 (data URL), com pré-visualização ──────
+      function ligarFoto(inputId, campoId, previewId, chaveEstado) {
+        $(inputId).addEventListener('change', function () {
+          const arq = this.files && this.files[0];
+          if (!arq) return;
+          const leitor = new FileReader();
+          leitor.onload = function () {
+            fotos[chaveEstado] = leitor.result;
+            const preview = $(previewId);
+            preview.src = leitor.result; preview.style.display = '';
+            $(campoId).classList.add('dtr-foto-ok');
+          };
+          leitor.readAsDataURL(arq);
+        });
+      }
+      ligarFoto('dtr-foto-rgfrente', 'dtr-foto-rgfrente-campo', 'dtr-foto-rgfrente-preview', 'rgFrente');
+      ligarFoto('dtr-foto-rgverso', 'dtr-foto-rgverso-campo', 'dtr-foto-rgverso-preview', 'rgVerso');
+      ligarFoto('dtr-foto-comprovante', 'dtr-foto-comprovante-campo', 'dtr-foto-comprovante-preview', 'comprovante');
+
+      // ── Navegação do assistente ─────────────────────────────────────────
+      function mostrarErroCadastro(msg) {
+        const el = $('dtr-erro-cadastro');
+        el.textContent = msg; el.style.display = '';
+      }
+      function irParaPasso(n) {
+        [1, 2, 3].forEach(function (i) {
+          $('dtr-passo-' + i).style.display = i === n ? '' : 'none';
+          const bola = document.querySelector('[data-passo-bola="' + i + '"]');
+          bola.className = 'dtr-passo-bola' + (i < n ? ' dtr-passo-ok' : (i === n ? ' dtr-passo-atual' : ''));
+        });
+        $('dtr-erro-cadastro').style.display = 'none';
+      }
+
+      $('dtr-btn-ir-cadastro').onclick = function () { irParaPasso(1); mostrar('dtr-tela-cadastro'); };
+
+      $('dtr-btn-passo1').onclick = function () {
+        const nome = $('dtr-nome').value.trim();
+        const telefone = $('dtr-telefone').value.replace(/\D/g, '');
+        const nomePai = $('dtr-nome-pai').value.trim();
+        const nomeMae = $('dtr-nome-mae').value.trim();
+        const rg = $('dtr-rg').value.trim();
+        const cpf = $('dtr-cpf').value.replace(/\D/g, '');
+        if (nome.split(/\s+/).filter(Boolean).length < 2) { mostrarErroCadastro('Informe seu nome completo (nome e sobrenome).'); return; }
+        if (telefone.length < 10) { mostrarErroCadastro('Telefone incompleto. Use DDD + número.'); return; }
+        if (!nomePai) { mostrarErroCadastro('Informe o nome do pai.'); return; }
+        if (!nomeMae) { mostrarErroCadastro('Informe o nome da mãe.'); return; }
+        if (!rg) { mostrarErroCadastro('Informe o número do RG.'); return; }
+        if (!cpfValido(cpf)) { $('dtr-cpf').classList.add('dtr-invalida'); mostrarErroCadastro('CPF inválido. Confira os números.'); return; }
+        $('dtr-cpf').classList.remove('dtr-invalida');
+        cadastro.nome = nome; cadastro.telefone = telefone; cadastro.nomePai = nomePai;
+        cadastro.nomeMae = nomeMae; cadastro.rg = rg; cadastro.cpf = cpf;
+        irParaPasso(2);
+      };
+
+      $('dtr-btn-voltar2').onclick = function () { irParaPasso(1); };
+      $('dtr-btn-passo2').onclick = function () {
+        const cep = $('dtr-cep').value.replace(/\D/g, '');
+        const logradouro = $('dtr-logradouro').value.trim();
+        const numero = $('dtr-numero').value.trim();
+        const bairro = $('dtr-bairro').value.trim();
+        const cidade = $('dtr-cidade').value.trim();
+        const uf = $('dtr-uf').value.trim().toUpperCase();
+        if (cep.length !== 8) { mostrarErroCadastro('CEP inválido.'); return; }
+        if (!logradouro || !numero || !bairro || !cidade || !uf) { mostrarErroCadastro('Complete o endereço (rua, número, bairro, cidade e UF).'); return; }
+        cadastro.cep = cep; cadastro.logradouro = logradouro; cadastro.numero = numero;
+        cadastro.complemento = $('dtr-complemento').value.trim(); cadastro.bairro = bairro;
+        cadastro.cidade = cidade; cadastro.uf = uf;
+        irParaPasso(3);
+      };
+
+      $('dtr-btn-voltar3').onclick = function () { irParaPasso(2); };
+      $('dtr-btn-enviar').onclick = async function () {
+        const pixTipo = $('dtr-pix-tipo').value;
+        const pixChave = $('dtr-pix-chave').value.trim();
+        if (!pixTipo) { mostrarErroCadastro('Escolha o tipo da chave Pix.'); return; }
+        if (!pixValida(pixTipo, pixChave)) { mostrarErroCadastro('Chave Pix inválida pro tipo escolhido.'); return; }
+        if (!fotos.rgFrente || !fotos.rgVerso || !fotos.comprovante) { mostrarErroCadastro('Envie as três fotos: RG frente, RG verso e comprovante.'); return; }
+
+        const btn = $('dtr-btn-enviar');
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando…';
+        try {
+          const payload = Object.assign({}, cadastro, {
+            pixTipo: pixTipo, pixChave: pixChave,
+            rgFrente: fotos.rgFrente, rgVerso: fotos.rgVerso, comprovante: fotos.comprovante
+          });
+          const r = await chamarApi('/diaria/trabalhador/cadastro', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+          });
+          salvarToken(r.token);
+          mostrar('dtr-tela-analise');
+        } catch (e) {
+          mostrarErroCadastro(e.message || 'Não foi possível enviar. Tente de novo.');
+        } finally {
+          btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Enviar cadastro';
+        }
+      };
+
+      // ── Home (cadastro já existente e reconhecido pelo token salvo) ──────
       const ROTULO_STATUS = {
         pendente_aprovacao: { emoji: '🟡', texto: 'Aguardando liberação do cadastro' },
         ativo: { emoji: '🟢', texto: 'Cadastro aprovado' },
-        bloqueado: { emoji: '🔴', texto: 'Acesso bloqueado — fale com o responsável' }
+        bloqueado: { emoji: '🔴', texto: 'Seu acesso está suspenso — procure a coordenação' },
+        recusado: { emoji: '🔴', texto: 'Cadastro não aprovado — procure a coordenação' }
       };
 
       function renderHome() {
         const t = estadoAtual.trabalhador;
+        if (t.status === 'pendente_aprovacao') { mostrar('dtr-tela-analise'); return; }
+
         $('dtr-home-nome').textContent = t.nome;
         const st = ROTULO_STATUS[t.status] || { emoji: '⚪', texto: t.status };
         const faixa = $('dtr-faixa-status');
@@ -157,79 +415,35 @@
 
         const card = $('dtr-card-diaria');
         const diaria = estadoAtual.diariaHoje;
-        const presenca = estadoAtual.presenca;
-
+        if (t.status !== 'ativo') { card.innerHTML = ''; mostrar('dtr-tela-home'); return; }
         if (!diaria) {
           card.innerHTML = '<div class="dtr-vazio"><i class="fa-solid fa-calendar-xmark"></i>Nenhuma diária aberta hoje.<br>Volte aqui quando avisarem que abriu.</div>';
-          return;
+        } else {
+          card.innerHTML =
+            '<p class="dtr-diaria-titulo">' + esc(diaria.titulo) + '</p>' +
+            '<div class="dtr-vazio"><i class="fa-solid fa-camera"></i>Aguarde as instruções da coordenação pra registrar sua chegada.</div>';
         }
-
-        if (presenca) {
-          if (presenca.status === 'confirmado') {
-            card.innerHTML = '<div class="dtr-status-ok"><span class="emoji">✅</span><b>Presença confirmada!</b><p style="color:#64748b;font-size:13px;">' + esc(diaria.titulo) + '</p></div>';
-          } else if (presenca.status === 'recusado') {
-            card.innerHTML = '<div class="dtr-status-ok"><span class="emoji">❌</span><b>Presença não confirmada</b><p style="color:#64748b;font-size:13px;">Fale com o responsável no local.</p></div>';
-          } else {
-            card.innerHTML = '<div class="dtr-status-ok"><span class="emoji">⏳</span><b>Presença registrada</b><p style="color:#64748b;font-size:13px;">Aguardando confirmação de quem está no local.</p></div>';
-          }
-          return;
-        }
-
-        card.innerHTML =
-          '<p class="dtr-diaria-titulo">' + esc(diaria.titulo) + '</p>' +
-          '<div class="dtr-vazio"><i class="fa-solid fa-camera"></i>Aguarde as instruções da coordenação pra registrar sua chegada.</div>';
-      }
-
-      function esc(s) {
-        return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        mostrar('dtr-tela-home');
       }
 
       async function carregarStatus() {
         const token = pegarToken();
-        if (!token) { mostrar('dtr-tela-cadastro'); return; }
+        if (!token) { mostrar('dtr-tela-entrada'); return; }
         try {
           estadoAtual = await chamarApi('/diaria/trabalhador/status?token=' + encodeURIComponent(token), {});
           renderHome();
-          mostrar('dtr-tela-home');
         } catch (e) {
-          // token velho/inválido: volta pro cadastro
           limparToken();
-          mostrar('dtr-tela-cadastro');
+          mostrar('dtr-tela-entrada');
         }
         if (!pollTimer) pollTimer = setInterval(carregarStatus, 15000);
       }
 
-      async function cadastrar() {
-        const nome = $('dtr-nome').value.trim();
-        const telefone = $('dtr-telefone').value.replace(/\D/g, '');
-        const erroEl = $('dtr-erro-cadastro');
-        erroEl.style.display = 'none';
-        if (nome.length < 3) { erroEl.textContent = 'Informe seu nome completo.'; erroEl.style.display = ''; return; }
-        if (telefone.length < 10) { erroEl.textContent = 'Telefone incompleto. Use DDD + número.'; erroEl.style.display = ''; return; }
-        const btn = $('dtr-btn-cadastrar');
-        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando…';
-        try {
-          const r = await chamarApi('/diaria/trabalhador/cadastro', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nome: nome, telefone: telefone })
-          });
-          salvarToken(r.token);
-          await carregarStatus();
-        } catch (e) {
-          erroEl.textContent = e.message || 'Não foi possível cadastrar. Tente de novo.';
-          erroEl.style.display = '';
-        } finally {
-          btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Entrar / Cadastrar';
-        }
-      }
-
-      $('dtr-btn-cadastrar').onclick = cadastrar;
       $('dtr-link-trocar').onclick = function (e) {
         e.preventDefault();
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
         limparToken();
-        $('dtr-nome').value = ''; $('dtr-telefone').value = '';
-        mostrar('dtr-tela-cadastro');
+        mostrar('dtr-tela-entrada');
       };
 
       carregarStatus();
