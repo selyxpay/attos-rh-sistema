@@ -18,6 +18,10 @@ window.RTCloud = (function () {
   let onRemote = null;
   let onSessaoPerdida = null;
   let pending = null, pendingMerge = false, pendingUpsert = [], pendingSomenteAlvos = false;
+  let pendingExplicito = false;
+  // Foto do estado como o servidor conhece. Serve para descobrir sozinho o que
+  // ESTA tela mudou (ver _oQueMudou).
+  let _foto = null;
   let saveTimer = null, pollTimer = null;
   let lastVersion = 0;
   let flushing = false;
@@ -96,14 +100,76 @@ window.RTCloud = (function () {
         try { aplicou = onRemote(s.dados) !== false; }
         catch (e) { console.error('[RT VPS] não consegui aplicar o estado novo:', e); aplicou = false; }
       }
-      if (aplicou) lastVersion = nova;
+      if (aplicou) { lastVersion = nova; _tirarFoto(s.dados); }
     } catch (e) { /* silencioso: instabilidade de rede */ }
+  }
+
+  // ── O QUE ESTA TELA MUDOU? (diferença automática) ─────────────────────────
+  // Bug real que isto resolve: ~90 telas chamam saveState() sem dizer o que
+  // mudou, e o save subia como "substitui tudo". Quando este navegador estava
+  // um pouco atrasado (bastava outra pessoa ter gravado nos segundos
+  // anteriores), o servidor entrava no modo anti-perda e REAPLICAVA todas as
+  // cópias velhas que esta tela tinha em memória — inclusive a ficha que outra
+  // pessoa acabara de aprovar. A aprovação "voltava sozinha", e ninguém
+  // conseguia ligar o efeito à causa, porque quem causava estava em OUTRA aba.
+  //
+  // Agora guardamos uma foto do estado toda vez que ele vem do servidor e, na
+  // hora de salvar, mandamos só o que realmente mudou aqui.
+  const CHAVES_COM_MERGE_PROPRIO = { fila: true, _docsMeta: true };
+
+  function _ehListaComId(v) {
+    return Array.isArray(v) && v.length > 0 && v.every(function (x) { return x && x.id != null; });
+  }
+  function _txt(v) { try { return JSON.stringify(v); } catch (e) { return null; } }
+
+  function _tirarFoto(dados) {
+    if (!dados || typeof dados !== 'object') { _foto = null; return; }
+    const reg = {}, chaves = {}, tipos = {};
+    Object.keys(dados).forEach(function (k) {
+      if (CHAVES_COM_MERGE_PROPRIO[k]) return;
+      const v = dados[k];
+      if (_ehListaComId(v)) {
+        tipos[k] = 'ids';
+        v.forEach(function (x) { reg[String(x.id)] = _txt(x); });
+      } else {
+        tipos[k] = 'bruto';
+        chaves[k] = _txt(v);
+      }
+    });
+    _foto = { reg: reg, chaves: chaves, tipos: tipos };
+  }
+
+  // Devolve { upsertIds, deleteIds, setKeys } ou null se não dá para confiar
+  // (sem foto ainda) — nesse caso quem chama mantém o comportamento antigo.
+  function _oQueMudou(dados) {
+    if (!_foto || !dados || typeof dados !== 'object') return null;
+    const upsertIds = [], setKeys = [], vistos = {};
+    Object.keys(dados).forEach(function (k) {
+      if (CHAVES_COM_MERGE_PROPRIO[k]) return;
+      const v = dados[k];
+      // O tipo vem da foto: assim uma lista que ficou vazia não muda de
+      // categoria no meio do caminho.
+      const tipo = _foto.tipos[k] || (_ehListaComId(v) ? 'ids' : 'bruto');
+      if (tipo === 'ids' && Array.isArray(v)) {
+        v.forEach(function (x) {
+          if (!x || x.id == null) return;
+          const id = String(x.id);
+          vistos[id] = true;
+          if (_foto.reg[id] !== _txt(x)) upsertIds.push(id);
+        });
+      } else {
+        if (_foto.chaves[k] !== _txt(v)) setKeys.push(k);
+      }
+    });
+    const deleteIds = Object.keys(_foto.reg).filter(function (id) { return !vistos[id]; });
+    return { upsertIds: upsertIds, deleteIds: deleteIds, setKeys: setKeys };
   }
 
   // -- Lê o estado do servidor -----------------------------------------------
   async function loadState() {
     const s = await apiGet('/state');
     lastVersion = s.version || 0;
+    _tirarFoto(s.dados);
     return s.dados || null;
   }
 
@@ -181,6 +247,7 @@ window.RTCloud = (function () {
     pendingMerge = !!(options && options.merge);
     pendingUpsert = (options && options.upsertIds) ? options.upsertIds.slice() : [];
     pendingSomenteAlvos = !!(options && options.somenteAlvos);
+    pendingExplicito = !!(options && (options.merge || options.upsertIds || options.deleteIds || options.setKeys));
     clearTimeout(saveTimer);
     saveTimer = setTimeout(flush, SAVE_DEBOUNCE_MS);
   }
@@ -200,8 +267,8 @@ window.RTCloud = (function () {
     flushing = true;
     try {
       await processarDocumentos(state);   // sobe as fotos e troca o base64 por link
-      const merge = !!(options && options.merge);
-      const upsertIds = (options && options.upsertIds) ? options.upsertIds.slice() : [];
+      let merge = !!(options && options.merge);
+      let upsertIds = (options && options.upsertIds) ? options.upsertIds.slice() : [];
       // baseVersion = versão em que este cliente se baseou. O servidor usa isso
       // para NÃO deixar um save desatualizado apagar o que outra pessoa gravou.
       // deleteIds: o que foi APAGADO. O merge sozinho nunca remove nada, entao
@@ -209,11 +276,18 @@ window.RTCloud = (function () {
       // verdade -- sumia da tela e voltava no proximo carregamento.
       // setKeys: chave de configuracao (que nao e lista) que este save esta
       // mudando de proposito -- sem isso o merge descartava a mudanca.
-      const deleteIds = (options && options.deleteIds) ? options.deleteIds.slice() : [];
-      const setKeys = (options && options.setKeys) ? options.setKeys.slice() : [];
+      let deleteIds = (options && options.deleteIds) ? options.deleteIds.slice() : [];
+      let setKeys = (options && options.setKeys) ? options.setKeys.slice() : [];
+      // Chamador que não disse nada: descobrimos sozinhos o que mudou, para
+      // não subir como "substitui tudo" e acabar desfazendo o trabalho alheio.
+      if (!(options && (options.merge || options.upsertIds || options.deleteIds || options.setKeys))) {
+        const d = _oQueMudou(state);
+        if (d) { merge = true; upsertIds = d.upsertIds; deleteIds = d.deleteIds; setKeys = d.setKeys; }
+      }
       const corpo = _corpoDoSave(state, merge, upsertIds, !!(options && options.somenteAlvos));
       const res = await apiPost('/state', { dados: corpo, merge: merge, upsertIds: upsertIds, deleteIds: deleteIds, setKeys: setKeys, baseVersion: lastVersion });
       if (res && res.version) lastVersion = res.version;
+      _tirarFoto(state);   // o servidor agora tem isto
       return res;
     } finally {
       flushing = false;
@@ -223,16 +297,24 @@ window.RTCloud = (function () {
   async function flush() {
     if (!pending) return;
     const state = pending;
-    const merge = pendingMerge;
-    const upsert = pendingUpsert;
-    pending = null; pendingUpsert = [];
+    let merge = pendingMerge;
+    let upsert = pendingUpsert;
+    let apagar = [], chaves = [];
+    // Mesmo motivo do salvarAgora: sem isto, o save genérico de qualquer tela
+    // desfazia o que outra pessoa tinha acabado de gravar.
+    if (!pendingExplicito) {
+      const d = _oQueMudou(state);
+      if (d) { merge = true; upsert = d.upsertIds; apagar = d.deleteIds; chaves = d.setKeys; }
+    }
+    pending = null; pendingUpsert = []; pendingExplicito = false;
     clearTimeout(saveTimer);
     flushing = true;
     try {
       await processarDocumentos(state);   // sobe base64 -> /uploads e troca por link
       const corpo = _corpoDoSave(state, merge, upsert, pendingSomenteAlvos);
-      const res = await apiPost('/state', { dados: corpo, merge: merge, upsertIds: upsert, baseVersion: lastVersion });
+      const res = await apiPost('/state', { dados: corpo, merge: merge, upsertIds: upsert, deleteIds: apagar, setKeys: chaves, baseVersion: lastVersion });
       if (res && res.version) lastVersion = res.version; // evita "eco" do nosso próprio save
+      _tirarFoto(state);   // o servidor agora tem isto
     } catch (e) {
       console.error('[RT VPS] Falha ao salvar (tentaremos de novo):', e);
       if (!pending) { pending = state; pendingMerge = merge; pendingUpsert = upsert; clearTimeout(saveTimer); saveTimer = setTimeout(flush, 3000); }
