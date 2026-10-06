@@ -130,7 +130,7 @@ const SECURITY_HEADERS = {
 // MESCLAGEM (páginas públicas): mantém o servidor e só ADICIONA/atualiza
 // (portado da antiga camada de nuvem — mesma regra)
 // ==========================================================================
-function mesclarEstado(servidor, local, upsertIds) {
+function mesclarEstado(servidor, local, upsertIds, deleteIds, setKeys) {
   const ups = {};
   (upsertIds || []).forEach(function (id) { ups[id] = true; });
   const out = JSON.parse(JSON.stringify(servidor || {}));
@@ -171,6 +171,28 @@ function mesclarEstado(servidor, local, upsertIds) {
   });
   if (local && local._docsMeta) {
     out._docsMeta = Object.assign({}, out._docsMeta || {}, local._docsMeta);
+  }
+  // APAGAR de verdade. O merge sozinho só junta, nunca remove — então quem
+  // apagava algo estando com a versão atrasada via o item sumir da tela e
+  // voltar no próximo carregamento (o save caía no merge anti-perda, que
+  // preserva tudo que o cliente não mandou). Com deleteIds o cliente diz
+  // explicitamente o que tirar, e a exclusão vale mesmo no merge.
+  if (deleteIds && deleteIds.length) {
+    const del = {};
+    deleteIds.forEach(function (id) { del[String(id)] = true; });
+    Object.keys(out).forEach(function (k) {
+      if (!Array.isArray(out[k])) return;
+      out[k] = out[k].filter(function (it) { return !(it && it.id != null && del[String(it.id)]); });
+    });
+  }
+  // Chave que NÃO é lista (configuração — ex.: ffWorkflow) só entrava quando
+  // o servidor ainda não tinha a chave. Ou seja: mudar a configuração com a
+  // versão atrasada não gravava nada e voltava sozinho. setKeys marca as
+  // chaves que o cliente está mudando de propósito.
+  if (setKeys && setKeys.length) {
+    setKeys.forEach(function (k) {
+      if (local && Object.prototype.hasOwnProperty.call(local, k)) out[k] = local[k];
+    });
   }
   return out;
 }
@@ -2215,7 +2237,7 @@ http.createServer(function (req, res) {
         if (autenticado) {
           // Staff logado: comportamento normal (merge ou substituição total)
           if (body && body.merge) {
-            dados = mesclarEstado(atual.dados || {}, body.dados || {}, body.upsertIds || []);
+            dados = mesclarEstado(atual.dados || {}, body.dados || {}, body.upsertIds || [], body.deleteIds || [], body.setKeys || []);
           } else {
             // GUARDA ANTI-PERDA: se o cliente salvou baseado numa versão MAIS
             // ANTIGA que a atual (outra pessoa gravou nesse meio-tempo), NÃO
@@ -2226,7 +2248,7 @@ http.createServer(function (req, res) {
             const base = (body && body.baseVersion != null) ? Number(body.baseVersion) : null;
             if (base != null && base < (atual.version || 0)) {
               console.log('[RT] Save desatualizado (base ' + base + ' < atual ' + atual.version + ') — merge anti-perda aplicado.');
-              dados = mesclarEstado(atual.dados || {}, body.dados || {}, _todosIds(body.dados || {}));
+              dados = mesclarEstado(atual.dados || {}, body.dados || {}, _todosIds(body.dados || {}), body.deleteIds || [], body.setKeys || []);
             } else {
               dados = (body && body.dados) || {};
             }

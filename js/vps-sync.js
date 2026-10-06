@@ -204,8 +204,15 @@ window.RTCloud = (function () {
       const upsertIds = (options && options.upsertIds) ? options.upsertIds.slice() : [];
       // baseVersion = versão em que este cliente se baseou. O servidor usa isso
       // para NÃO deixar um save desatualizado apagar o que outra pessoa gravou.
+      // deleteIds: o que foi APAGADO. O merge sozinho nunca remove nada, entao
+      // sem isso uma exclusao feita com a versao atrasada nao acontecia de
+      // verdade -- sumia da tela e voltava no proximo carregamento.
+      // setKeys: chave de configuracao (que nao e lista) que este save esta
+      // mudando de proposito -- sem isso o merge descartava a mudanca.
+      const deleteIds = (options && options.deleteIds) ? options.deleteIds.slice() : [];
+      const setKeys = (options && options.setKeys) ? options.setKeys.slice() : [];
       const corpo = _corpoDoSave(state, merge, upsertIds, !!(options && options.somenteAlvos));
-      const res = await apiPost('/state', { dados: corpo, merge: merge, upsertIds: upsertIds, baseVersion: lastVersion });
+      const res = await apiPost('/state', { dados: corpo, merge: merge, upsertIds: upsertIds, deleteIds: deleteIds, setKeys: setKeys, baseVersion: lastVersion });
       if (res && res.version) lastVersion = res.version;
       return res;
     } finally {

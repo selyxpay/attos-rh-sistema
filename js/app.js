@@ -14110,7 +14110,11 @@ window.ffToggleResponsavel = async function(etapaId, login) {
   else et.responsaveis.push(login);
   registrarLogGlobal(`Fluxo Financeiro — ${i >= 0 ? 'removeu' : 'definiu'} "${fu ? fu.nome : login}" como responsável da etapa "${etapaId}".`, 'dp');
   try {
-    if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') await RTCloud.salvarAgora(state);
+    // setKeys: ffWorkflow e um OBJETO de configuracao, nao uma lista com id.
+    // Sem marcar a chave, um save feito com a versao atrasada caia no merge
+    // anti-perda, que mantem a configuracao do SERVIDOR e descarta a nova --
+    // a tela mostrava o responsavel trocado e ele voltava sozinho depois.
+    if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') await RTCloud.salvarAgora(state, { merge: true, setKeys: ['ffWorkflow'] });
     else saveState();
   } catch (e) { alert('Não salvou: ' + (e.message || e)); }
   _ffRenderLista();
@@ -14122,7 +14126,11 @@ window.ffToggleAcaoEtapa = async function(etapaId, acao) {
   const et = state.ffWorkflow[etapaId];
   et[acao] = (et[acao] === false);   // alterna (default é true)
   try {
-    if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') await RTCloud.salvarAgora(state);
+    // setKeys: ffWorkflow e um OBJETO de configuracao, nao uma lista com id.
+    // Sem marcar a chave, um save feito com a versao atrasada caia no merge
+    // anti-perda, que mantem a configuracao do SERVIDOR e descarta a nova --
+    // a tela mostrava o responsavel trocado e ele voltava sozinho depois.
+    if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') await RTCloud.salvarAgora(state, { merge: true, setKeys: ['ffWorkflow'] });
     else saveState();
   } catch (e) { alert('Não salvou: ' + (e.message || e)); }
   _ffRenderLista();
@@ -15808,7 +15816,10 @@ window.cadApagar = async function (id) {
   }
   if (!confirm('Apagar "' + (reg.nome || reg.codigo) + '" de vez?\n\nNão dá para desfazer.')) return;
   state[FF_CHAVE[_cadAba] || _cadAba] = lista.filter(r => r && r.id !== id);
-  try { await RTCloud.salvarAgora(state); }
+  // deleteIds: sem isso, apagar estando com a versao atrasada nao apagava de
+  // verdade no servidor (o merge anti-perda so junta, nunca remove) -- o
+  // cadastro sumia da tela e reaparecia no proximo carregamento.
+  try { await RTCloud.salvarAgora(state, { merge: true, deleteIds: [id] }); }
   catch (e) { alert('Não consegui salvar: ' + (e.message || e)); return; }
   registrarLogGlobal('Apagou ' + _cadAba.slice(0, -1) + ' do Fluxo Financeiro: ' + (reg.nome || reg.codigo) + '.', 'sistema');
   _cadRender();
@@ -17238,7 +17249,10 @@ window.ffExcluirFluxo = async function() {
   registrarLogGlobal(`Excluiu o rascunho de Fluxo Financeiro #${f.numero}.`, 'dp');
   fecharDetalheFluxo();
   try {
-    if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') await RTCloud.salvarAgora(state);
+    // deleteIds: exclusao tem que ser explicita, senao um save feito com a
+    // versao atrasada nao removia a ficha de verdade (o merge so junta) e
+    // ela reaparecia pra todo mundo no proximo carregamento.
+    if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') await RTCloud.salvarAgora(state, { merge: true, deleteIds: [f.id] });
     else saveState();
     try { localStorage.setItem('rt_empregos_data', _estadoParaCache()); } catch (e) {}
   } catch (e) { alert('Não foi possível salvar: ' + (e.message || e)); }
@@ -19077,9 +19091,11 @@ async function mgExcluirItem(id) {
   mgFecharModal();
   renderMargem();
   saveState();
-  // Exclusão NÃO pode ir com merge: o merge junta listas e o item voltaria.
+  // Exclusão vai com merge + deleteIds: o merge sozinho juntaria as listas e
+  // o item voltaria; deleteIds diz ao servidor o que remover de verdade, sem
+  // pisar no que outra pessoa estiver gravando ao mesmo tempo.
   if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
-    try { await RTCloud.salvarAgora(state); }
+    try { await RTCloud.salvarAgora(state, { merge: true, deleteIds: [id] }); }
     catch (e) { alert('Excluí aqui, mas não consegui gravar no servidor: ' + e.message); }
   }
 }
