@@ -12929,7 +12929,25 @@ function _ffMoedaBR(n) {
 function _ffParseValor(s) {
   const t = String(s == null ? '' : s).replace(/[^\d,.-]/g, '').trim();
   if (!t) return 0;
-  const n = parseFloat(t.replace(/\./g, '').replace(',', '.'));
+  let normalizado;
+  if (t.includes(',')) {
+    // Padrão brasileiro: vírgula é decimal, ponto (se tiver) é milhar.
+    normalizado = t.replace(/\./g, '').replace(',', '.');
+  } else {
+    const ultimoPonto = t.lastIndexOf('.');
+    if (ultimoPonto >= 0 && t.length - ultimoPonto - 1 === 2) {
+      // Sem vírgula nenhuma, mas o ÚLTIMO ponto tem exatamente 2 casas
+      // depois — é alguém editando no padrão americano ("1500.00" ou
+      // "1.500.00"). Sem isso, "1.500.00" virava 150000 (100x maior) em
+      // vez de 1500 — os pontos antes do último são milhar, viram nada.
+      normalizado = t.slice(0, ultimoPonto).replace(/\./g, '') + '.' + t.slice(ultimoPonto + 1);
+    } else {
+      // Só ponto(s) fora desse padrão — trata como separador de milhar
+      // (ex.: "1.500" sozinho quer dizer 1500, não 1,5).
+      normalizado = t.replace(/\./g, '');
+    }
+  }
+  const n = parseFloat(normalizado);
   return isNaN(n) ? 0 : Math.round(n * 100) / 100;
 }
 function _ffTotal(f) {
@@ -13155,9 +13173,16 @@ function _ffLerPorColuna(linhasComPosicao) {
 
   const out = [];
   linhasComPosicao.forEach(linha => {
-    // A própria linha do cabeçalho não é gente — sem isto, o rótulo da coluna
-    // ("Nome do pensionista...") virava um "registro" fantasma.
-    if (linha.pagina === cab.pagina && linha.y === cab.y) return;
+    // A própria linha do cabeçalho não é gente — e ela se REPETE em toda
+    // página do relatório, não só na primeira. Comparar com a posição de UMA
+    // ocorrência só pegava o cabeçalho da página 1 e deixava passar o das
+    // páginas seguintes como se fosse gente — virava um "registro" fantasma
+    // com o rótulo da coluna no lugar do nome (mais visível no relatório de
+    // Pensão Alimentícia, onde não tem CPF pra barrar isso). Por isso aqui
+    // testamos CADA linha pelo mesmo critério usado pra achar o cabeçalho,
+    // não só a posição da primeira vez que ele apareceu.
+    const juntouLinha = linha.pedacos.map(p => p.str).join(' ');
+    if (/nome\s+do?\s+funcion/i.test(juntouLinha) && /c\.?\s*p\.?\s*f\.?/i.test(juntouLinha)) return;
     const col = _ffEncaixarNasColunas(linha.pedacos, cab.mapa);
 
     if (temPensionista) {
@@ -13219,7 +13244,10 @@ function _ffLerPorColuna(linhasComPosicao) {
       origem: String(col.origem || '').trim(),
       semValorNoPdf: semValor,
       lidoPorColuna: true,
-      status: 'ok',
+      // Mesmo critério do leitor de texto: nome curto (3-4 letras) passa
+      // pelo corte de "não é gente" mas ainda pode ser um pedaço de nome
+      // truncado pela OCR — vai pra conferência manual em vez de 'ok' direto.
+      status: (nome.length >= 5 && (valor > 0 || semValor)) ? 'ok' : 'conferir',
       demissao: meio.demissao, competencia: meio.competencia,
       banco: meio.banco || String(col.banco || '').replace(/\D/g, ''),
       lote: meio.lote || String(col.lote || '').replace(/\D/g, ''),
@@ -16158,7 +16186,7 @@ async function criarFluxoFinanceiro() {
     if (txt) txt.textContent = 'Enviando os arquivos e salvando no servidor... (não feche esta janela)';
     if (barra) barra.style.width = '90%';
     if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
-      await RTCloud.salvarAgora(state);
+      await RTCloud.salvarAgora(state, { merge: true, upsertIds: [fluxo.id] });
     } else { saveState(); }
     try { localStorage.setItem('rt_empregos_data', _estadoParaCache()); } catch (e) {}
     if (barra) barra.style.width = '100%';
@@ -17027,7 +17055,13 @@ async function _ffSalvarERender(f, msgOk) {
   setTimeout(function(){ try { _rtRenderAvisos(); _rtAtualizarSinoMenu(); } catch (e) {} }, 100);
   try {
     if (window.RTCloud && RTCloud.configured && typeof RTCloud.salvarAgora === 'function') {
-      await RTCloud.salvarAgora(state);
+      // merge+upsertIds (igual ao ffFinalizarPagamentos): sem isso, duas
+      // pessoas agindo em fichas DIFERENTES quase ao mesmo tempo podiam fazer
+      // a segunda gravação reverter a aprovação/pagamento que a primeira
+      // acabou de salvar, porque o merge de versão antiga reaplicava a cópia
+      // desatualizada de TODAS as fichas que a segunda pessoa ainda tinha na
+      // memória — não só a que ela mexeu.
+      await RTCloud.salvarAgora(state, { merge: true, upsertIds: f && f.id ? [f.id] : undefined });
     } else { saveState(); }
     try { localStorage.setItem('rt_empregos_data', _estadoParaCache()); } catch (e) {}
     _ffRenderDetalhe(); renderFluxoFinanceiro();
