@@ -165,7 +165,11 @@ const TEXTO = [
   // ---------- 3) a TELA mostra as quebras ----------
   console.log('\n=== 3) A TELA MOSTRA AS QUEBRAS (era aqui que se perdia) ===');
   await cdp.eval(`(function(){ switchAba('vagas'); })()`);
-  await espera(1600);
+  // Espera o CARTAO aparecer, nao o relogio: com a maquina ocupada, 1,6s nao
+  // bastava e o teste falhava so na execucao completa.
+  await esperarPor(cdp,
+    "Array.from(document.querySelectorAll('.vaga-desc')).some(function(p){ return (p.textContent||'').indexOf('Auxiliar de Produção') >= 0; })",
+    30000, 'o cartao da vaga aparecer na tela');
   const naTela = await cdp.eval(`(function(){
     const ps = Array.from(document.querySelectorAll('.vaga-desc'));
     const alvo = ps.find(p => (p.textContent || '').indexOf('Auxiliar de Produção') >= 0);

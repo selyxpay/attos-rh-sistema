@@ -99,7 +99,11 @@ const ok = (c, m) => { console.log((c ? '  OK   ' : '  FALHOU: ') + m); if (!c) 
   ok(await cdp.eval(`typeof renderDashboardKanban === 'undefined'`), 'renderDashboardKanban nao existe mais');
   ok(await cdp.eval(`typeof setupDragAndDrop === 'undefined'`), 'setupDragAndDrop nao existe mais');
   excecoes.length = 0;
-  await cdp.eval(`(function(){ switchAba('dashboard'); })()`); await espera(1500);
+  await cdp.eval(`(function(){ switchAba('dashboard'); })()`);
+  // Espera a aba ter CONTEUDO, nao o relogio (mesma licao da regra 18).
+  await esperarPor(cdp,
+    "(function(){ var a=document.getElementById('aba-dashboard'); return !!a && a.classList.contains('active') && a.innerHTML.length > 200; })()",
+    30000, 'o Dashboard desenhar');
   ok(excecoes.length === 0, 'Dashboard abre sem erro (excecoes: ' + JSON.stringify(excecoes.slice(0, 2)) + ')');
   const dashOk = await cdp.eval(`(function(){
     const a = document.getElementById('aba-dashboard');

@@ -181,6 +181,18 @@ async function testarSemOBot() {
 
         const log4 = fs.readFileSync(path.join(tmp, 'servidor.log'), 'utf8');
         ok(/\[Bot\] módulo NÃO carregou/.test(log4), 'e o log explica o motivo em uma linha');
+
+        // O /api/saude existe justamente por causa deste incidente: era
+        // impossivel ver de FORA que o modulo estava desligado, porque toda
+        // rota /api/whatsapp/ responde 401 sem sessao.
+        const rs = await fetch(u + '/api/saude');
+        const js = await rs.json().catch(function () { return {}; });
+        ok(rs.status === 200, '/api/saude responde sem login (' + rs.status + ')');
+        ok(js.whatsapp && js.whatsapp.modulos_carregados === true,
+          'e diz que o WhatsApp esta CARREGADO, mesmo sem o bot');
+        ok(js.whatsapp && js.whatsapp.banco_pronto === true, 'e com o banco pronto');
+        ok(js.bot && js.bot.modulo_carregado === false,
+          'apontando o bot como o unico ausente — e isto que faltava para diagnosticar');
       }
     }
   } finally {
@@ -257,6 +269,18 @@ async function testarContasSobrevivem() {
   const rBot = await fetch(BASE + '/api/whatsapp/bot/painel', { headers: { Cookie: ck } });
   const jBot = await rBot.json().catch(function () { return {}; });
   ok(rBot.status === 200 && jBot.disponivel === true, 'e o bot está disponível (' + rBot.status + ')');
+
+  console.log('\n=== 5) SAUDE PUBLICA, PARA DIAGNOSTICAR SEM LOGIN ===');
+  const rSaude = await fetch(BASE + '/api/saude');
+  const jSaude = await rSaude.json().catch(function () { return {}; });
+  ok(rSaude.status === 200, '/api/saude responde sem login (' + rSaude.status + ')');
+  ok(jSaude.whatsapp && jSaude.whatsapp.modulos_carregados === true, 'WhatsApp carregado');
+  ok(jSaude.whatsapp && jSaude.whatsapp.banco_pronto === true, 'banco pronto');
+  ok(jSaude.bot && jSaude.bot.modulo_carregado === true, 'bot carregado');
+  // E nao pode vazar NADA alem de sim/nao.
+  const texto = JSON.stringify(jSaude);
+  ok(!/token|senha|phone|conta|account|path|\/data|\/app/i.test(texto),
+    'e nao vaza token, telefone, caminho nem nome de conta: ' + texto.slice(0, 110));
 }
 
 (async () => {

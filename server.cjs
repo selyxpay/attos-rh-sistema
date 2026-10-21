@@ -2089,6 +2089,30 @@ http.createServer(function (req, res) {
     return;
   }
 
+  // ---- API: saúde dos módulos (pública, de propósito) ----
+  // Existe por causa de um incidente: o módulo do WhatsApp ficou desligado em
+  // produção (um arquivo não entrou na imagem) e NÃO HAVIA COMO VER isso de
+  // fora. Toda rota /api/whatsapp/ responde 401 sem sessão, então o 503 de
+  // "inicializando" só aparecia para quem já estava logado — e quem estava
+  // logado só via a mensagem, sem o motivo.
+  // Devolve só SIM/NÃO de cada peça. Nenhum dado, nenhuma contagem, nenhum
+  // nome de conta, nenhum caminho de arquivo: nada que ajude quem não deveria
+  // estar olhando.
+  if (urlPath === '/api/saude' && req.method === 'GET') {
+    responderJson(res, 200, {
+      ok: true,
+      epoch: Date.now(),
+      whatsapp: {
+        modulos_carregados: !!_waCarregado,   // os require funcionaram
+        banco_pronto: !!_waReady              // o SQLite abriu
+      },
+      bot: {
+        modulo_carregado: !!waBot             // extra: pode estar off sem afetar o resto
+      }
+    });
+    return;
+  }
+
   // ---- API: só a VERSÃO do estado (resposta minúscula) ----
   // O navegador consulta isto a cada poucos segundos para saber se alguém
   // alterou algo. Antes ele baixava o ESTADO INTEIRO só para comparar um
