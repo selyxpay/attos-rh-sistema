@@ -46,6 +46,27 @@ const LIMITE_CORPO = 160 * 1024 * 1024; // 160 MB. O corpo inteiro e montado na 
 //   node limpar-fotos-embutidas.cjs --aplicar
 // 500 MB viravam ~1 GB de RAM e derrubariam a VPS. 48 MB comporta 1 arquivo de 20 MB em base64 (~27 MB) com folga.
 
+// ── ÚLTIMA REDE: ERRO NÃO TRATADO ──────────────────────────────────────────
+// De propósito, isto NÃO mantém o processo vivo. Um processo que seguiu depois
+// de um erro desconhecido pode estar com o estado pela metade, e gravar em
+// cima disso é pior que cair. O que ele faz é deixar o motivo REGISTRADO no
+// log (antes ficava só o stack cru) e encerrar com código de erro, para o
+// Coolify subir um processo novo e limpo.
+// A proteção de verdade é não deixar a exceção chegar aqui: ver decodeSeguro
+// (endereço mal formado) e o try/catch do comTrava (falha ao gravar estado).
+function _encerrarPorErroFatal(origem, erro) {
+  try {
+    console.error('');
+    console.error('*** ERRO FATAL (' + origem + ') — o processo vai encerrar e subir de novo.');
+    console.error('*** ' + ((erro && erro.stack) || erro));
+    console.error('*** Hora: ' + new Date().toISOString());
+    console.error('');
+  } catch (e) { /* nem o log pode impedir o encerramento */ }
+  process.exit(1);
+}
+process.on('uncaughtException', function (e) { _encerrarPorErroFatal('uncaughtException', e); });
+process.on('unhandledRejection', function (e) { _encerrarPorErroFatal('unhandledRejection', e); });
+
 // Garante as pastas de dados
 try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (e) {}
 try { fs.mkdirSync(BACKUP_DIR, { recursive: true }); } catch (e) {}
@@ -277,9 +298,25 @@ function _todosIds(dados) {
   return ids;
 }
 let _fila = Promise.resolve();
-function comTrava(fn) {
+// Serializa as gravações de estado (mutex). A fila NUNCA trava: mesmo que o
+// corpo falhe, o próximo da fila roda.
+//
+// `res` é opcional e serve para o caso de uso HTTP. Sem ele, uma exceção
+// dentro do corpo era ENGOLIDA aqui: o processo não caía (certo), mas o
+// handler morria no meio sem responder nada. O fetch do navegador ficava
+// pendurado para sempre e, como o `flushing` do vps-sync nunca voltava a
+// false, AQUELA ABA parava de receber as alterações das outras pessoas — em
+// silêncio, sem erro na tela nem no log. Passando o `res`, a falha sempre
+// vira um 500 e o navegador sabe que precisa tentar de novo.
+function comTrava(fn, res) {
   const p = _fila.then(fn, fn);
   _fila = p.then(function () {}, function () {});
+  p.catch(function (e) {
+    console.error('[comTrava] falha na operação serializada:', (e && e.stack) || e);
+    if (res && !res.headersSent) {
+      try { responderJson(res, 500, { error: 'falha interna ao gravar' }); } catch (e2) {}
+    }
+  });
   return p;
 }
 
@@ -289,6 +326,35 @@ function comTrava(fn) {
 function responderJson(res, code, obj) {
   res.writeHead(code, Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, SECURITY_HEADERS));
   res.end(JSON.stringify(obj));
+}
+
+// ── DECODIFICAR ENDEREÇO SEM DERRUBAR O SERVIDOR ───────────────────────────
+// decodeURIComponent LANÇA (URIError) quando a URL tem um "%" solto ou um
+// escape pela metade (ex.: "/%", "?token=%"). Isso ficava fora de qualquer
+// try/catch e derrubava o PROCESSO INTEIRO — todo mundo caía junto, e bastava
+// um robô varrendo o site ou um link colado com "%" sobrando. Agora toda
+// decodificação passa por aqui: devolve null em vez de lançar, e quem chama
+// responde 400.
+function decodeSeguro(s) {
+  try { return decodeURIComponent(String(s == null ? '' : s)); }
+  catch (e) { return null; }
+}
+// Monta o mapa da query string. Devolve null se qualquer pedaço estiver
+// mal formado (mesmo motivo do decodeSeguro).
+function queryParaMapa(query) {
+  const qp = {};
+  const partes = String(query || '').split('&');
+  for (let i = 0; i < partes.length; i++) {
+    if (!partes[i]) continue;
+    const kv = partes[i].split('=');
+    const k = decodeSeguro(kv[0]);
+    if (k === null) return null;
+    if (!k) continue;
+    const v = decodeSeguro(kv.slice(1).join('=') || '');
+    if (v === null) return null;
+    qp[k] = v;
+  }
+  return qp;
 }
 function lerCorpo(req, cb) {
   let data = '';
@@ -365,6 +431,31 @@ function senhaEhPublica(texto) {
 const tentativasLogin = {};
 function podeTentarLogin(login) { const t = tentativasLogin[login]; return !(t && t.ate && Date.now() < t.ate); }
 function registrarFalhaLogin(login) { const t = tentativasLogin[login] || { n: 0, ate: 0 }; t.n++; if (t.n % 5 === 0) t.ate = Date.now() + 60 * 1000; tentativasLogin[login] = t; }
+
+// ── LIMITE DE UPLOAD SEM LOGIN ─────────────────────────────────────────────
+// A ficha pública de candidatura precisa subir 3 fotos, e uma pessoa pode
+// refazer. 40 por hora por IP dá folga para isso e ainda assim impede que
+// alguém encha o volume de dados da empresa.
+const subidasAnonimas = {};
+const LIMITE_SUBIDA_ANONIMA = 40;
+const JANELA_SUBIDA_ANONIMA = 60 * 60 * 1000;
+function _podeSubirAnonimo(ip) {
+  const r = subidasAnonimas[ip];
+  if (!r || (Date.now() - r.desde) > JANELA_SUBIDA_ANONIMA) return true;
+  return r.n < LIMITE_SUBIDA_ANONIMA;
+}
+function _registrarSubidaAnonima(ip) {
+  const agora = Date.now();
+  const r = subidasAnonimas[ip];
+  if (!r || (agora - r.desde) > JANELA_SUBIDA_ANONIMA) { subidasAnonimas[ip] = { n: 1, desde: agora }; return; }
+  r.n++;
+  // Limpeza simples para a tabela não crescer sem parar.
+  if (Object.keys(subidasAnonimas).length > 5000) {
+    Object.keys(subidasAnonimas).forEach(function (k) {
+      if ((agora - subidasAnonimas[k].desde) > JANELA_SUBIDA_ANONIMA) delete subidasAnonimas[k];
+    });
+  }
+}
 function limparFalhasLogin(login) { delete tentativasLogin[login]; }
 
 // ==========================================================================
@@ -868,6 +959,80 @@ function garantirAdminServidor() {
 
 // Contas MESTRE (veem todas as senhas)
 function ehMestreLogin(login) { const l = (login || '').toLowerCase(); return l === 'joaobalaf' || l === 'admin'; }
+// Quem pode mexer em acesso de outra pessoa: mestre ou administração.
+function ehAdminDeAcesso(requester) {
+  return !!(requester && (ehMestreLogin(requester.login) || requester.departamento === 'administracao'));
+}
+
+// ── CAMPOS DE ACESSO: O CLIENTE NÃO MANDA, O SERVIDOR REPÕE ────────────────
+// Mesmo molde do _devolverSigilo: o POST /api/state manda o estado inteiro, e
+// em cima dele o servidor REPÕE o que aquela sessão não tinha direito de
+// mudar. Não precisa comparar nem adivinhar o que o cliente tentou: o valor
+// gravado é simplesmente o do servidor.
+//
+// O que isso fechava: qualquer funcionário logado podia mandar um POST com o
+// próprio registro alterado — departamento 'administracao', permissões todas
+// true — e virava administrador. Ou reescrever o HASH da senha de
+// 'joaobalaf' e entrar como mestre. Não havia nenhum 403 no caminho.
+//
+// SENHA é caso à parte: ninguém, nem admin, troca senha por aqui. Isso é das
+// rotas dedicadas (/api/login, /api/trocar-senha, /api/reset-senha), que
+// conferem permissão e registram. Repor sempre também é o que impede o
+// estado novo (sem o campo `senha`, removido do GET) de apagar a senha de
+// todo mundo no primeiro save.
+const CAMPOS_SENHA = ['senha', 'senhaVisivel'];
+const CAMPOS_ACESSO = [
+  'permissoes', 'permissoesFluxo', 'permissoesEspeciais', 'telas',
+  'departamento', 'perfil', 'status', 'bloqueadoLogin',
+  'podeVerSenhas', 'representanteDepto', 'login'
+];
+
+function _reporCamposDeAcesso(dados, antes, requester) {
+  if (!dados || !Array.isArray(dados.funcionarios)) return dados;
+  const podeAcesso = ehAdminDeAcesso(requester);
+  const antigos = {};
+  ((antes && antes.funcionarios) || []).forEach(function (f) {
+    if (f && f.id != null) antigos[String(f.id)] = f;
+  });
+
+  dados.funcionarios = dados.funcionarios.map(function (f) {
+    if (!f) return f;
+    const a = f.id != null ? antigos[String(f.id)] : null;
+
+    if (a) {
+      // Registro que JÁ EXISTE: senha sempre do servidor; acesso só muda se
+      // quem está salvando for admin.
+      CAMPOS_SENHA.forEach(function (k) {
+        if (a[k] !== undefined) f[k] = a[k]; else delete f[k];
+      });
+      if (!podeAcesso) {
+        CAMPOS_ACESSO.forEach(function (k) {
+          if (a[k] !== undefined) f[k] = a[k]; else delete f[k];
+        });
+      }
+      return f;
+    }
+
+    // Registro NOVO. A tela de Funcionários cria colaborador JÁ COM senha, e
+    // isso precisa continuar funcionando — então admin pode definir a senha
+    // de uma conta nova. O que nunca é permitido é trocar a senha de uma
+    // conta que JÁ EXISTE (tratado acima), que era o caminho da tomada da
+    // conta mestre. `senhaVisivel` é sempre do servidor (gravada no login).
+    delete f.senhaVisivel;
+    if (!podeAcesso) delete f.senha;
+    if (!podeAcesso) {
+      f.permissoes = {};
+      delete f.permissoesFluxo;
+      delete f.permissoesEspeciais;
+      delete f.telas;
+      delete f.podeVerSenhas;
+      delete f.representanteDepto;
+      f.status = 'aguardando_aprovacao';
+    }
+    return f;
+  });
+  return dados;
+}
 // Funcionário dono da sessão da requisição
 function usuarioDaReq(req) {
   const s = sessaoValida(tokenDaReq(req));
@@ -917,6 +1082,13 @@ function filtrarSenhaVisivel(dados) {
     const armazenada = String(f.senha || '');
     const ehHash = armazenada.length === 64 && /^[0-9a-f]{64}$/i.test(armazenada);
     c.senhaConhecida = !!f.senhaVisivel || (!!armazenada && !ehHash);
+    // E o HASH também não sai. O comentário acima sempre disse isso, mas o
+    // código só removia `senhaVisivel`: o SHA-256 de TODOS os funcionários
+    // (inclusive das contas mestre) descia para qualquer pessoa logada, e
+    // SHA-256 sem sal se quebra fora do sistema para senha curta ou numérica.
+    // A tela não precisa do hash: usa `senhaConhecida` e `temSenha`.
+    c.temSenha = !!armazenada;
+    delete c.senha;
     return c;
   });
   return dados;
@@ -1088,7 +1260,11 @@ function lerCorpoBruto(req, cb) {
 // SERVIDOR
 // ==========================================================================
 http.createServer(function (req, res) {
-  const urlPath = decodeURIComponent(req.url.split('?')[0]);
+  // PRIMEIRA COISA do handler, e por isso a mais perigosa: aqui um "%" solto
+  // no endereço derrubava o processo inteiro (URIError sem try/catch). Agora a
+  // requisição mal formada recebe 400 e o servidor segue de pé para todos.
+  const urlPath = decodeSeguro(req.url.split('?')[0]);
+  if (urlPath === null) { responderJson(res, 400, { error: 'endereço inválido' }); return; }
   const autenticado = reqAutenticada(req);
 
   // ---- API: LOGIN (verificação REAL no servidor) ----
@@ -1198,7 +1374,7 @@ http.createServer(function (req, res) {
         });
         try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); } catch (e) {}
         responderJson(res, 200, { ok: true });
-      });
+      }, res);
     });
     return;
   }
@@ -1221,7 +1397,7 @@ http.createServer(function (req, res) {
         u.nomeExibicao = nomeExibicao;
         try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); } catch (e) {}
         responderJson(res, 200, { ok: true, nomeExibicao: nomeExibicao });
-      });
+      }, res);
     });
     return;
   }
@@ -1261,7 +1437,8 @@ http.createServer(function (req, res) {
   if (urlPath === '/api/status-senha' && req.method === 'GET') {
     limparPedidos();
     const q = req.url.indexOf('?') >= 0 ? req.url.slice(req.url.indexOf('?') + 1) : '';
-    const token = decodeURIComponent((/(?:^|&)token=([^&]*)/.exec(q) || [])[1] || '');
+    const token = decodeSeguro((/(?:^|&)token=([^&]*)/.exec(q) || [])[1] || '');
+    if (token === null) { responderJson(res, 400, { error: 'token inválido' }); return; }
     const p = pedidos.find(function (x) { return x.token === token; });
     // Token desconhecido responde "pendente" — assim não dá para descobrir nada por aqui.
     responderJson(res, 200, { ok: true, status: p ? p.status : 'pendente' });
@@ -1358,7 +1535,7 @@ http.createServer(function (req, res) {
         salvarPedidos();
         limparFalhasLogin(p.login);     // destrava eventual bloqueio por erro de senha
         responderJson(res, 200, { ok: true, login: p.login });
-      });
+      }, res);
     });
     return;
   }
@@ -1392,7 +1569,7 @@ http.createServer(function (req, res) {
         });
         try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); responderJson(res, 200, { ok: true }); }
         catch (e) { responderJson(res, 500, { ok: false }); }
-      });
+      }, res);
     });
     return;
   }
@@ -1416,7 +1593,7 @@ http.createServer(function (req, res) {
         alvo.bloqueadoLogin = false;
         try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); responderJson(res, 200, { ok: true }); }
         catch (e) { responderJson(res, 500, { ok: false }); }
-      });
+      }, res);
     });
     return;
   }
@@ -1478,7 +1655,7 @@ http.createServer(function (req, res) {
         }
 
         responderJson(res, 200, { ok: true, senha: senhaRevelada, motivo: motivo });
-      });
+      }, res);
     });
     return;
   }
@@ -1520,7 +1697,8 @@ http.createServer(function (req, res) {
   // Servem de comprovante: ficam gravados o nome informado, a data/hora e o
   // que a pessoa conferiu (ou não conferiu, com o motivo).
   if (urlPath.indexOf('/api/relatorio-equip/') === 0 && req.method === 'POST') {
-    const resto = decodeURIComponent(urlPath.slice('/api/relatorio-equip/'.length));
+    const resto = decodeSeguro(urlPath.slice('/api/relatorio-equip/'.length));
+    if (resto === null) { responderJson(res, 400, { error: 'endereço inválido' }); return; }
     const barra = resto.lastIndexOf('/');
     const token = barra > 0 ? resto.slice(0, barra).trim() : '';
     const acao = barra > 0 ? resto.slice(barra + 1).trim() : '';
@@ -1582,13 +1760,15 @@ http.createServer(function (req, res) {
           console.error('[RT] relatorio-equip ' + acao + ':', e);
           responderJson(res, 500, { error: 'falha ao gravar' });
         }
-      });
+      }, res);
     });
     return;
   }
 
   if (urlPath.indexOf('/api/relatorio-equip/') === 0 && req.method === 'GET') {
-    const token = decodeURIComponent(urlPath.slice('/api/relatorio-equip/'.length)).trim();
+    const _tokenBruto = decodeSeguro(urlPath.slice('/api/relatorio-equip/'.length));
+    if (_tokenBruto === null) { responderJson(res, 400, { error: 'endereço inválido' }); return; }
+    const token = _tokenBruto.trim();
     if (!token || token.length < 20) { responderJson(res, 404, { error: 'Relatório não encontrado.' }); return; }
 
     const st = lerEstado();
@@ -1756,7 +1936,7 @@ http.createServer(function (req, res) {
           console.error('[Diária] cadastro:', e);
           responderJson(res, 500, { error: 'Não foi possível salvar. Tente de novo.' });
         }
-      });
+      }, res);
     });
     return;
   }
@@ -1819,7 +1999,7 @@ http.createServer(function (req, res) {
         const resposta = diariaMontarStatusResposta(t, d);
         resposta.token = token;
         responderJson(res, 200, resposta);
-      });
+      }, res);
     });
     return;
   }
@@ -1867,7 +2047,7 @@ http.createServer(function (req, res) {
           console.error('[Diária] presenca:', e);
           responderJson(res, 500, { error: 'Não foi possível registrar. Tente de novo.' });
         }
-      });
+      }, res);
     });
     return;
   }
@@ -1891,7 +2071,7 @@ http.createServer(function (req, res) {
           gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
           responderJson(res, 200, { ok: true, cadastrosAbertos: false });
         } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-      });
+      }, res);
       return;
     }
     if (urlPath === '/api/diaria/admin/cadastros/retomar' && req.method === 'POST') {
@@ -1904,7 +2084,7 @@ http.createServer(function (req, res) {
           gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
           responderJson(res, 200, { ok: true, cadastrosAbertos: true });
         } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-      });
+      }, res);
       return;
     }
 
@@ -1912,13 +2092,18 @@ http.createServer(function (req, res) {
     // pública de uploads. Chega aqui já autenticado (checagem acima).
     let mArq = urlPath.match(/^\/api\/diaria\/admin\/arquivo\/([^\/]+)\/([^\/]+)\/([^\/]+)$/);
     if (mArq && req.method === 'GET') {
-      const tipoArq = decodeURIComponent(mArq[1]);
+      const tipoArq = decodeSeguro(mArq[1]);
+      const _idArqBruto = decodeSeguro(mArq[2]);
+      const _nomeArqBruto = decodeSeguro(mArq[3]);
+      if (tipoArq === null || _idArqBruto === null || _nomeArqBruto === null) {
+        responderJson(res, 400, { error: 'endereço inválido' }); return;
+      }
       // path.basename tira qualquer "/" de um "../" simples, mas um ".."
       // sozinho (sem barra) passa direto por ele — por isso o cinto e a
       // suspensório: monta o caminho e confere que ele continua DENTRO de
       // DIARIA_DOCS_DIR antes de ler qualquer coisa do disco.
-      const idArq = path.basename(decodeURIComponent(mArq[2]));
-      const nomeArq = path.basename(decodeURIComponent(mArq[3]));
+      const idArq = path.basename(_idArqBruto);
+      const nomeArq = path.basename(_nomeArqBruto);
       let caminhoArq = null;
       if (tipoArq === 'cadastro') caminhoArq = path.join(DIARIA_DOCS_DIR, idArq, nomeArq);
       if (!caminhoArq || !(caminhoArq + path.sep).startsWith(DIARIA_DOCS_DIR + path.sep)) {
@@ -1938,7 +2123,8 @@ http.createServer(function (req, res) {
     //     pedindo, ou o admin percebe olhando a ficha) -------------------------
     let m = urlPath.match(/^\/api\/diaria\/admin\/trabalhadores\/([^\/]+)\/dados$/);
     if (m && req.method === 'POST') {
-      const alvoId = decodeURIComponent(m[1]);
+      const alvoId = decodeSeguro(m[1]);
+      if (alvoId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
       lerCorpo(req, function (err, body) {
         if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
         const b = body || {};
@@ -1988,7 +2174,7 @@ http.createServer(function (req, res) {
             gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
             responderJson(res, 200, { ok: true, trabalhador: diariaTrabalhadorAdmin(t) });
           } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-        });
+        }, res);
       });
       return;
     }
@@ -1997,7 +2183,8 @@ http.createServer(function (req, res) {
     //     depois pelo WhatsApp etc.) — some o arquivo velho, fica só o novo ----
     m = urlPath.match(/^\/api\/diaria\/admin\/trabalhadores\/([^\/]+)\/documento$/);
     if (m && req.method === 'POST') {
-      const alvoId = decodeURIComponent(m[1]);
+      const alvoId = decodeSeguro(m[1]);
+      if (alvoId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
       lerCorpo(req, function (err, body) {
         if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
         const b = body || {};
@@ -2028,7 +2215,7 @@ http.createServer(function (req, res) {
             gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
             responderJson(res, 200, { ok: true, trabalhador: diariaTrabalhadorAdmin(t) });
           } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-        });
+        }, res);
       });
       return;
     }
@@ -2048,7 +2235,8 @@ http.createServer(function (req, res) {
 
     m = urlPath.match(/^\/api\/diaria\/admin\/trabalhadores\/([^\/]+)\/(aprovar|recusar|bloquear|reativar)$/);
     if (m && req.method === 'POST') {
-      const alvoId = decodeURIComponent(m[1]);
+      const alvoId = decodeSeguro(m[1]);
+      if (alvoId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
       const acao = m[2];
       lerCorpo(req, function (err, body) {
         if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
@@ -2066,7 +2254,7 @@ http.createServer(function (req, res) {
             gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
             responderJson(res, 200, { ok: true, trabalhador: diariaTrabalhadorAdmin(t) });
           } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-        });
+        }, res);
       });
       return;
     }
@@ -2077,7 +2265,8 @@ http.createServer(function (req, res) {
     //     como está, só sem nome resolvido (GET /presencas já trata isso). ----
     m = urlPath.match(/^\/api\/diaria\/admin\/trabalhadores\/([^\/]+)\/excluir$/);
     if (m && req.method === 'POST') {
-      const alvoId = decodeURIComponent(m[1]);
+      const alvoId = decodeSeguro(m[1]);
+      if (alvoId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
       comTrava(function () {
         const st = lerEstado();
         const d = st.dados || {};
@@ -2089,7 +2278,7 @@ http.createServer(function (req, res) {
           gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
           responderJson(res, 200, { ok: true });
         } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-      });
+      }, res);
       return;
     }
 
@@ -2125,14 +2314,15 @@ http.createServer(function (req, res) {
             gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
             responderJson(res, 200, { ok: true, diaria: nova });
           } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-        });
+        }, res);
       });
       return;
     }
 
     m = urlPath.match(/^\/api\/diaria\/admin\/diarias\/([^\/]+)\/(abrir|encerrar|reabrir|confirmar-todos)$/);
     if (m && req.method === 'POST') {
-      const diariaId = decodeURIComponent(m[1]);
+      const diariaId = decodeSeguro(m[1]);
+      if (diariaId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
       const acao = m[2];
       comTrava(function () {
         const st = lerEstado();
@@ -2160,13 +2350,14 @@ http.createServer(function (req, res) {
           gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
           responderJson(res, 200, { ok: true, diaria: diaria });
         } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-      });
+      }, res);
       return;
     }
 
     m = urlPath.match(/^\/api\/diaria\/admin\/diarias\/([^\/]+)\/presencas$/);
     if (m && req.method === 'GET') {
-      const diariaId = decodeURIComponent(m[1]);
+      const diariaId = decodeSeguro(m[1]);
+      if (diariaId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
       const st = lerEstado();
       const d = st.dados || {};
       const trabs = {};
@@ -2187,7 +2378,8 @@ http.createServer(function (req, res) {
 
     m = urlPath.match(/^\/api\/diaria\/admin\/presencas\/([^\/]+)\/(confirmar|recusar)$/);
     if (m && req.method === 'POST') {
-      const presId = decodeURIComponent(m[1]);
+      const presId = decodeSeguro(m[1]);
+      if (presId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
       const acao = m[2];
       comTrava(function () {
         const st = lerEstado();
@@ -2201,7 +2393,7 @@ http.createServer(function (req, res) {
           gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
           responderJson(res, 200, { ok: true, presenca: p });
         } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-      });
+      }, res);
       return;
     }
 
@@ -2269,15 +2461,11 @@ http.createServer(function (req, res) {
             dados = _devolverSigilo(atual.dados || {}, dados);
           }
         }
-        // A SENHA VISÍVEL é gerenciada só pelo servidor (registro/redefinir). Na gravação geral,
-        // preserva a de cada funcionário existente — assim ninguém apaga a senha de outro depto.
-        if (autenticado && Array.isArray(dados.funcionarios) && atual.dados && Array.isArray(atual.dados.funcionarios)) {
-          const antigos = {};
-          atual.dados.funcionarios.forEach(function (f) { if (f && f.id != null) antigos[f.id] = f; });
-          dados.funcionarios.forEach(function (f) {
-            const a = antigos[f.id];
-            if (a) { if (a.senhaVisivel !== undefined) f.senhaVisivel = a.senhaVisivel; else delete f.senhaVisivel; }
-          });
+        // SENHA e CAMPOS DE ACESSO são do servidor, não do cliente. Repõe tudo
+        // a partir do estado gravado (ver _reporCamposDeAcesso). Senha nunca
+        // muda por aqui; permissão/departamento só se quem salvou é admin.
+        if (autenticado) {
+          dados = _reporCamposDeAcesso(dados, atual.dados || {}, usuarioDaReq(req));
         }
         // GUARDA ANTI-SUMIÇO: última barreira antes de gravar. Se este save
         // faria vários registros críticos (equipamentos, candidatos...) sumirem
@@ -2297,17 +2485,43 @@ http.createServer(function (req, res) {
         const novo = { dados: dados, version: (atual.version || 0) + 1, atualizadoEm: Date.now() };
         try { gravarEstado(novo); responderJson(res, 200, { ok: true, version: novo.version }); }
         catch (e) { console.error('Erro ao gravar estado:', e); responderJson(res, 500, { error: 'falha ao gravar' }); }
-      });
+      }, res);
     });
     return;
   }
 
   // ---- API: upload de documento/foto (base64 -> arquivo) ----
   if (urlPath === '/api/upload' && req.method === 'POST') {
+    // Esta rota não pedia NADA: qualquer pessoa na internet gravava arquivo na
+    // pasta pública e recebia o link — enchia o volume (onde ficam TODOS os
+    // dados da empresa) e hospedava arquivo no domínio.
+    //
+    // Não dá para simplesmente exigir sessão: a ficha pública de candidatura
+    // (candidato.html) e o banco de talentos (talento.html) sobem os
+    // documentos por aqui, sem login, pelo vps-sync. Então quem NÃO está
+    // logado continua podendo enviar, mas só IMAGEM, com tamanho menor e com
+    // limite por IP. Quem está logado segue como antes.
+    const _ipUp = waIpDaReq(req);
+    if (!autenticado && !_podeSubirAnonimo(_ipUp)) {
+      responderJson(res, 429, { error: 'muitos envios; tente de novo em alguns minutos' });
+      return;
+    }
     lerCorpo(req, function (err, body) {
       if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
       const m = /^data:([^;]+);base64,([\s\S]*)$/.exec((body && body.dataUrl) || '');
       if (!m) { responderJson(res, 400, { error: 'dataUrl inválido' }); return; }
+      const mimeUp = String(m[1] || '').toLowerCase();
+      if (!autenticado) {
+        if (!/^image\/(png|jpe?g|gif|webp|bmp)$/.test(mimeUp)) {
+          responderJson(res, 400, { error: 'sem login, só imagem é aceita' }); return;
+        }
+        // base64 ocupa ~4/3 do original; 8 MB de imagem é folga de sobra para
+        // foto de celular já reduzida no navegador.
+        if (m[2].length > 11 * 1024 * 1024) {
+          responderJson(res, 413, { error: 'imagem muito grande' }); return;
+        }
+        _registrarSubidaAnonima(_ipUp);
+      }
       let ext = (m[1].split('/')[1] || 'bin').split('+')[0].split(';')[0];
       if (!ext || ext.length > 5) ext = 'bin';
       const limpo = String((body && body.hint) || 'doc').replace(/[^a-zA-Z0-9]+/g, '_').slice(0, 32);
@@ -2326,8 +2540,23 @@ http.createServer(function (req, res) {
     const arq = path.join(UPLOADS_DIR, nome);
     fs.readFile(arq, function (e, data) {
       if (e) { res.writeHead(404, Object.assign({ 'Content-Type': 'text/plain' }, SECURITY_HEADERS)); res.end('404'); return; }
-      const ct = MIME[path.extname(arq).toLowerCase()] || 'application/octet-stream';
-      res.writeHead(200, Object.assign({ 'Content-Type': ct, 'Cache-Control': 'public, max-age=31536000' }, SECURITY_HEADERS));
+      const ext = path.extname(arq).toLowerCase();
+      const ct = MIME[ext] || 'application/octet-stream';
+      // Esta pasta é PÚBLICA (regra 7). Um arquivo .html aqui era servido como
+      // PÁGINA no próprio domínio, e a política de segurança libera script
+      // inline — então um HTML subido aqui rodava JavaScript na origem do
+      // sistema, com a sessão de quem abrisse o link.
+      // Imagem continua sendo entregue normal, porque a tela mostra foto de
+      // candidato e de equipamento direto no <img>. Qualquer outra coisa vai
+      // como ANEXO e com tipo neutro: o navegador baixa em vez de executar.
+      const ehImagem = ext === '.png' || ext === '.jpg' || ext === '.jpeg' ||
+                       ext === '.gif' || ext === '.webp' || ext === '.bmp';
+      const cab = {
+        'Content-Type': ehImagem ? ct : 'application/octet-stream',
+        'Cache-Control': 'public, max-age=31536000'
+      };
+      if (!ehImagem) cab['Content-Disposition'] = 'attachment; filename="' + nome.replace(/"/g, '') + '"';
+      res.writeHead(200, Object.assign(cab, SECURITY_HEADERS));
       res.end(data);
     });
     return;
@@ -2411,7 +2640,9 @@ http.createServer(function (req, res) {
 
     // QR Code da sessão (o servidor busca e devolve; a imagem vem do OpenWA)
     if (urlPath.indexOf('/api/openwa/qr/') === 0 && req.method === 'GET') {
-      const nome = _openwaNome(decodeURIComponent(urlPath.slice('/api/openwa/qr/'.length)));
+      const _nomeBruto = decodeSeguro(urlPath.slice('/api/openwa/qr/'.length));
+      if (_nomeBruto === null) { responderJson(res, 400, { error: 'sessão inválida' }); return; }
+      const nome = _openwaNome(_nomeBruto);
       if (!nome) { responderJson(res, 400, { error: 'sessão inválida' }); return; }
       _openwaResolverId(nome)
         .then(function (achou) {
@@ -2644,7 +2875,8 @@ http.createServer(function (req, res) {
       var u = waUsuarioTemPermissao(req, 'visualizar');
       if (!u) { responderJson(res, 403, { ok: false }); return; }
       var query = req.url.indexOf('?') >= 0 ? req.url.slice(req.url.indexOf('?') + 1) : '';
-      var qp = {}; query.split('&').forEach(function (p) { var kv = p.split('='); if (kv[0]) qp[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || ''); });
+      var qp = queryParaMapa(query);
+      if (qp === null) { responderJson(res, 400, { error: 'parâmetros inválidos' }); return; }
       var filters = {};
       if (qp.status) filters.status = qp.status;
       if (qp.search) filters.search = qp.search;
@@ -2676,7 +2908,8 @@ http.createServer(function (req, res) {
       if (!conv) { responderJson(res, 404, { ok: false, error: 'Conversa não encontrada.' }); return; }
       conv.tags = waDb.tags.getForConversation(convId);
       var query = req.url.indexOf('?') >= 0 ? req.url.slice(req.url.indexOf('?') + 1) : '';
-      var qp = {}; query.split('&').forEach(function (p) { var kv = p.split('='); if (kv[0]) qp[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || ''); });
+      var qp = queryParaMapa(query);
+      if (qp === null) { responderJson(res, 400, { error: 'parâmetros inválidos' }); return; }
       var msgs = waDb.messages.listByConversation(convId, parseInt(qp.limit) || 50, parseInt(qp.offset) || 0);
       var totalMsgs = waDb.messages.countByConversation(convId);
       // Marca como lido ao abrir
@@ -2839,7 +3072,8 @@ http.createServer(function (req, res) {
       var u = waUsuarioTemPermissao(req, 'visualizar');
       if (!u) { responderJson(res, 403, { ok: false }); return; }
       var query = req.url.indexOf('?') >= 0 ? req.url.slice(req.url.indexOf('?') + 1) : '';
-      var qp = {}; query.split('&').forEach(function (p) { var kv = p.split('='); if (kv[0]) qp[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || ''); });
+      var qp = queryParaMapa(query);
+      if (qp === null) { responderJson(res, 400, { error: 'parâmetros inválidos' }); return; }
       var filters = {};
       if (qp.search) filters.search = qp.search;
       if (qp.limit) filters.limit = parseInt(qp.limit);
@@ -2883,7 +3117,8 @@ http.createServer(function (req, res) {
       var u = waUsuarioTemPermissao(req, 'visualizar');
       if (!u) { responderJson(res, 403, { ok: false }); return; }
       var query = req.url.indexOf('?') >= 0 ? req.url.slice(req.url.indexOf('?') + 1) : '';
-      var qp = {}; query.split('&').forEach(function (p) { var kv = p.split('='); if (kv[0]) qp[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || ''); });
+      var qp = queryParaMapa(query);
+      if (qp === null) { responderJson(res, 400, { error: 'parâmetros inválidos' }); return; }
       responderJson(res, 200, { ok: true, templates: waDb.templates.list(qp.account_id ? parseInt(qp.account_id) : null) });
       return;
     }
@@ -2935,7 +3170,8 @@ http.createServer(function (req, res) {
       var u = waUsuarioTemPermissao(req, 'aprovar');
       if (!u) { responderJson(res, 403, { ok: false, error: 'Apenas administradores podem ver logs de auditoria.' }); return; }
       var query = req.url.indexOf('?') >= 0 ? req.url.slice(req.url.indexOf('?') + 1) : '';
-      var qp = {}; query.split('&').forEach(function (p) { var kv = p.split('='); if (kv[0]) qp[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || ''); });
+      var qp = queryParaMapa(query);
+      if (qp === null) { responderJson(res, 400, { error: 'parâmetros inválidos' }); return; }
       var filters = {};
       if (qp.user_login) filters.user_login = qp.user_login;
       if (qp.action) filters.action = qp.action;
