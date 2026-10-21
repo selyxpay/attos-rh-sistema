@@ -171,8 +171,15 @@
 .wa-inbox {
   display: grid;
   grid-template-columns: 330px minmax(0, 1fr) 290px;
-  height: calc(100vh - 240px);
-  min-height: 460px;
+  /* A altura NÃO é mais um número fixo. Antes era calc(100vh - 240px), mas o
+     que fica acima da caixa (cabeçalho do sistema + banner do módulo +
+     sub-abas + respiro de baixo) soma por volta de 312px, não 240 — então a
+     caixa passava da borda de baixo da tela e o último contato ficava
+     cortado para sempre, mesmo rolando a página até o fim.
+     Quem define a altura agora é o bloco de ENCAIXE POR FLEX mais abaixo, que
+     mede sozinho o espaço que sobrou. Este min-height é só um piso, para a
+     caixa nunca colapsar se o encaixe não se aplicar. */
+  min-height: 420px;
   border: 1px solid var(--border-color, #e2e8f0);
   border-radius: 12px;
   overflow: hidden;
@@ -184,7 +191,17 @@
 .wa-conv-filtros { display: flex; gap: 5px; padding: 10px 10px 6px; flex-wrap: wrap; }
 .wa-fchip { border: 1px solid var(--border-color, #e2e8f0); background: transparent; color: var(--text-secondary, #64748b); font-size: 11.5px; font-weight: 600; padding: 5px 11px; border-radius: 9999px; cursor: pointer; }
 .wa-fchip.active { background: #059669; color: #fff; border-color: #059669; }
-.wa-search-conv { margin: 0 10px 8px; }
+/* flex: 0 0 auto é o conserto do ESPAÇO VAZIO e dos CONTATOS ESCONDIDOS.
+   Este mesmo elemento também tem a classe .wa-search, que define flex: 1 por
+   causa da barra de ferramentas HORIZONTAL (onde esticar na largura é o certo).
+   Dentro de .wa-col-list, que é uma coluna, esse flex: 1 passava a valer para
+   a ALTURA: a caixa de busca e a lista ficavam com flex-grow 1 e dividiam o
+   espaço livre pela METADE. Num monitor Full HD a busca ficava com ~330px no
+   lugar de 37px, sobrava uma faixa branca enorme entre o campo e o primeiro
+   contato (com a lupa flutuando no meio dela) e a lista cabia ~5 contatos em
+   vez de ~13. Quanto maior o monitor, pior — por isso só incomodava no
+   computador. */
+.wa-search-conv { margin: 0 10px 8px; flex: 0 0 auto; }
 .wa-conv-list { flex: 1; overflow-y: auto; min-height: 0; }
 .wa-conv-item { display: flex; gap: 10px; padding: 11px 12px; cursor: pointer; border-bottom: 1px solid var(--border-color, #f1f5f9); align-items: flex-start; }
 .wa-conv-item:hover { background: rgba(5,150,105,.04); }
@@ -241,6 +258,44 @@
 .wa-anexo:disabled { opacity: .4; cursor: not-allowed; }
 .wa-nota-aviso { font-size: 11px; color: #b45309; margin-top: 6px; }
 .wa-composer-somente { text-align: center; color: var(--text-secondary, #64748b); font-size: 12.5px; padding: 8px; }
+
+/* ── ENCAIXE DA CAIXA DO INBOX (sem número mágico) ─────────────────────────
+   O .content-viewport já tem altura definida. Faltava a cadeia entre ele e a
+   caixa: #aba-whatsapp, .wa-container e #wa-content não tinham altura, então
+   um height em porcentagem não resolvia e só restava chutar um calc(100vh -
+   N). O N estava errado (240 contra ~312 reais) e, pior, quebrava de novo a
+   cada mudança no cabeçalho ou nas sub-abas.
+   Aqui a cadeia é fechada com flex, e a caixa simplesmente ocupa o que sobrou.
+   :has(.wa-inbox) mantém isto restrito à sub-aba do Inbox — as outras
+   (Contatos, Modelos, Conexões) continuam fluindo como antes.
+   min-width 861px: abaixo disso vale a regra de celular, que define a própria
+   altura e não pode ser atropelada. */
+@media (min-width: 861px) {
+  #aba-whatsapp.active:has(.wa-inbox) {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+  #aba-whatsapp:has(.wa-inbox) .wa-container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+  #aba-whatsapp:has(.wa-inbox) #wa-content {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  #aba-whatsapp:has(.wa-inbox) .wa-inbox {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+  }
+}
 
 /* Coluna 3: info do contato */
 .wa-col-info { border-left: 1px solid var(--border-color, #e2e8f0); padding: 16px 14px; overflow-y: auto; background: var(--surface-subtle, #f8fafc); }
