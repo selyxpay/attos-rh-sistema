@@ -401,6 +401,17 @@ function criarTabelas() {
     atualizado_em          TEXT DEFAULT (datetime('now'))
   )`);
 
+  // fora_exp_periodo: em qual PERÍODO do "modo fora do expediente" este contato
+  // já recebeu o funil. Enquanto o modo estiver ligado o período não muda,
+  // então quem escrever de novo NÃO recebe o funil outra vez. Contato antigo
+  // fica vazio, o que está certo: nunca recebeu.
+  // FICA AQUI, e não junto dos outros ALTER mais acima: a tabela de contatos
+  // do bot é criada logo acima desta linha, e um ALTER antes disso falha
+  // calado ("no such column" só aparece na primeira mensagem de verdade).
+  ['fora_exp_periodo TEXT DEFAULT \'\''].forEach(function (col) {
+    try { db.run('ALTER TABLE whatsapp_bot_contatos ADD COLUMN ' + col); } catch (e) {}
+  });
+
   // Fila de envio. É ela que dá: controle de ritmo, retomada depois de
   // reinício (a linha pendente continua aqui) e a garantia de NÃO DUPLICAR --
   // wamid_gatilho é UNIQUE, então a mesma mensagem recebida nunca enfileira
@@ -731,6 +742,11 @@ const conversations = {
         where += " AND EXISTS (SELECT 1 FROM whatsapp_messages m WHERE m.conversation_id = c.id" +
                  " AND (m.origem = 'bot' OR m.sent_by_bot = 1))";
       }
+      // Filtro "Fora do expediente": quem recebeu o funil de fora do horario.
+      if (filters.fora_exp_only) {
+        where += " AND EXISTS (SELECT 1 FROM whatsapp_bot_contatos bc" +
+                 " WHERE bc.contact_id = c.contact_id AND bc.fora_exp_periodo <> '')";
+      }
       if (filters.search) {
         where += " AND (ct.name LIKE ? OR ct.phone LIKE ? OR ct.profile_name LIKE ? OR c.last_message_text LIKE ?)";
         const s = '%' + filters.search + '%';
@@ -752,6 +768,7 @@ const conversations = {
                WHERE m.conversation_id = c.id AND (m.origem = 'bot' OR m.sent_by_bot = 1)) AS bot_em,
              (SELECT bc.pausado FROM whatsapp_bot_contatos bc WHERE bc.contact_id = c.contact_id) AS bot_pausado,
              (SELECT bc.optou_sair FROM whatsapp_bot_contatos bc WHERE bc.contact_id = c.contact_id) AS bot_saiu,
+             (SELECT bc.fora_exp_periodo FROM whatsapp_bot_contatos bc WHERE bc.contact_id = c.contact_id) AS fora_exp,
              (SELECT COUNT(*) FROM whatsapp_lembretes l
                WHERE l.conversation_id = c.id AND l.status = 'agendado') AS lembretes_agendados
       FROM whatsapp_conversations c
@@ -1292,14 +1309,16 @@ const bot = {
     return {
       contact_id: contactId, optou_sair: 0, aguardando_atendente: 0, pausado: 0,
       ultima_resposta_em: null, ultima_msg_recebida_em: null,
-      respostas_no_dia: 0, dia_da_contagem: '', total_respostas: 0
+      respostas_no_dia: 0, dia_da_contagem: '', total_respostas: 0,
+      fora_exp_periodo: ''
     };
   },
   gravarContato: function (contactId, campos) {
     const atual = getOne('SELECT contact_id FROM whatsapp_bot_contatos WHERE contact_id = ?', [contactId]);
     const permitidos = ['optou_sair', 'optou_sair_em', 'aguardando_atendente', 'aguardando_desde',
       'pausado', 'pausado_em', 'pausado_por', 'ultima_resposta_em', 'ultima_msg_recebida_em',
-      'respostas_no_dia', 'dia_da_contagem', 'total_respostas'];
+      'respostas_no_dia', 'dia_da_contagem', 'total_respostas',
+      'fora_exp_periodo'];
     const cols = [], vals = [];
     permitidos.forEach(function (c) {
       if (campos[c] !== undefined) { cols.push(c); vals.push(campos[c]); }

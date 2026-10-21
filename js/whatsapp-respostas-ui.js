@@ -298,11 +298,22 @@
     respostasFecharLista();
     const botoes = document.querySelectorAll('#wa-prontas button');
     botoes.forEach(function (b) { b.disabled = true; });
+    // Id temporário: o servidor devolve junto e a tela troca a bolha otimista
+    // pela real, em vez de desenhar a mesma mensagem duas vezes.
+    const cid = (typeof _waNovoClienteId === 'function')
+      ? _waNovoClienteId()
+      : ('tmp-' + Date.now().toString(36));
     try {
       const resp = await fetch('/api/whatsapp/respostas/enviar', {
         method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation_id: _convDaFileira, resposta_id: id })
+        body: JSON.stringify({
+          conversation_id: _convDaFileira, resposta_id: id, cliente_id: cid,
+          // Horário escolhido SÓ para este envio (quando o atendente mexeu na
+          // linha acima da caixa). Sem isto, o envio direto ignorava a troca.
+          lembrete_horario: (_prontaNaCaixa && _prontaNaCaixa.id === id && _prontaNaCaixa.horario) || '',
+          lembrete_data: (_prontaNaCaixa && _prontaNaCaixa.id === id) ? _prontaNaCaixa.data : undefined
+        })
       });
       const j = await resp.json().catch(function () { return {}; });
       if (j && j.ok) {
@@ -312,12 +323,16 @@
           media_url: r.arquivo ? '/api/whatsapp/respostas/midia/' + encodeURIComponent(r.arquivo) : '',
           status: 'sent', created_at: new Date().toISOString()
         };
-        // O servidor avisa todo mundo pelo tempo real, inclusive esta aba — e
-        // é por ali que o balão entra. Desenhar aqui TAMBÉM mostraria a mesma
-        // mensagem duas vezes. Só quando o tempo real está fora do ar é que
-        // esta aba desenha por conta própria.
+        // O servidor avisa todo mundo pelo tempo real, inclusive esta aba, e
+        // devolve o cliente_id — então a bolha que entra por ali já é a real.
+        // Aqui só se desenha quando o tempo real está fora do ar, e com a mesma
+        // tranca contra repetido.
+        nova.cliente_id = cid;
+        if (j.message_id) nova.id = j.message_id;
+        if (j.wamid) nova.wamid = j.wamid;
         const semTempoReal = (typeof _waSSE === 'undefined') || !_waSSE || _waSSE.readyState === 2;
-        if (semTempoReal) {
+        const repetida = (typeof _waJaNaTela === 'function') && _waJaNaTela(nova);
+        if (semTempoReal && !repetida) {
           if (typeof _waMsgsCache !== 'undefined' && _waMsgsCache) _waMsgsCache.push(nova);
           if (typeof _waAppendBolha === 'function') _waAppendBolha(nova);
         }

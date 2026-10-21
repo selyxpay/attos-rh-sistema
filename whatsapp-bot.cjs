@@ -63,7 +63,16 @@ const CONFIG_PADRAO = {
   // que vai para a pessoa é escrito na tela, nada fica fixo aqui.
   lembrete: { ligado: false, titulo: '', horario: '', data: '', lembretes: [] },
   // Momento em que o bot foi ligado, para a faixa "Bot no ar desde HH:MM".
-  ligadoEm: ''
+  ligadoEm: '',
+  // MODO FORA DO EXPEDIENTE. Ligado, tem prioridade sobre o modo normal e vale
+  // para contato novo ou antigo: quem escrever recebe o funil que o atendente
+  // escreveu, UMA vez por período ligado. Nasce desligado e sem texto.
+  foraExpediente: {
+    ligado: false, ligadoEm: '', ligadoPor: '', periodo: '',
+    desligarEm: '',                 // ISO: desliga sozinho nesse momento
+    passos: [],
+    lembrete: { ligado: false, titulo: '', horario: '', data: '', lembretes: [] }
+  }
 };
 
 function configAtual() {
@@ -165,14 +174,43 @@ function aplicarVariaveis(texto, dados) {
 // A configuração é a MESMA forma usada pelas mensagens prontas
 // (ligado/horario/data/lembretes), e quem envia é o MESMO motor
 // (whatsapp-lembretes.cjs), na MESMA fila. Aqui só se decide se agenda.
+// DESLIGAMENTO AUTOMÁTICO. "Desligo às 18h e volto 8h" — o sistema não pode
+// depender de alguém abrir a tela para desligar. A cada passada da fila (e a
+// cada mensagem) isto confere o horário combinado.
+function conferirDesligamentoAutomatico() {
+  if (!_lerConfig || !_gravarConfig) return;
+  let cfg = {};
+  try { cfg = _lerConfig() || {}; } catch (e) { return; }
+  const fe = cfg.foraExpediente || {};
+  if (!fe.ligado || !fe.desligarEm) return;
+  if (new Date(fe.desligarEm).getTime() > Date.now()) return;
+  try {
+    _gravarConfig({
+      foraExpediente: Object.assign({}, fe, { ligado: false, desligarEm: '' })
+    }, 'desligamento automático no horário combinado');
+    _db.bot.registrar('fora_expediente', null, '',
+      'modo fora do expediente DESLIGADO sozinho no horário combinado');
+    console.log('[Bot] fora do expediente desligado sozinho (horário combinado).');
+  } catch (e) {
+    console.error('[Bot] não consegui desligar o fora do expediente:', e.message);
+  }
+}
+
 function horarioDoEvento(cfg) {
+  // Com o FORA DO EXPEDIENTE ligado, tudo que sai é o funil dele — então o
+  // {horario} da sequência tem que ser o da entrevista configurada ALI.
+  // Sem isto, a mensagem do funil saía com o horário em branco.
+  const fe = cfg && cfg.foraExpediente;
+  if (fe && fe.ligado && fe.lembrete && fe.lembrete.ligado && fe.lembrete.horario) {
+    return String(fe.lembrete.horario);
+  }
   const l = cfg && cfg.lembrete;
   return (l && l.ligado && l.horario) ? String(l.horario) : '';
 }
 
 // Agenda os lembretes deste contato. Chamado quando o bot começa a responder.
 // Devolve o resumo, ou null quando não há o que agendar.
-function agendarLembretesDoContato(cfg, ctx, contactId) {
+function agendarLembretesDoContato(cfg, ctx, contactId, respostaId, rotulo) {
   const l = cfg && cfg.lembrete;
   if (!l || !l.ligado) return null;
   if (!_lembretes || typeof _lembretes.agendar !== 'function') return null;
@@ -181,30 +219,50 @@ function agendarLembretesDoContato(cfg, ctx, contactId) {
       id: ctx.conversation_id, account_id: ctx.account_id, contact_id: contactId,
       contact_phone: ctx.telefone, contact_name: ctx.nome || ''
     };
-    // O "evento" do bot usa o id fixo 'bot': é isso que faz o painel
-    // identificar a origem e, junto com a chave única da tabela, impede
-    // agendamento duplicado quando a pessoa chama o bot de novo.
+    // O "evento" usa um id fixo ('bot' ou 'fora-expediente'): é isso que faz o
+    // painel identificar a origem e, junto com a chave única da tabela, impede
+    // agendamento duplicado quando a pessoa escreve de novo.
     const comoResposta = {
-      id: 'bot', titulo: 'Bot — ' + (l.titulo || 'atendimento automático'),
+      id: respostaId || 'bot',
+      titulo: (rotulo || 'Bot') + ' — ' + (l.titulo || 'atendimento automático'),
       // O {link} do lembrete sai do link das vagas configurado no bot.
-      texto: String(cfg.linkVagas || ''),
+      texto: String(cfg.linkVagas || _linkDaSequencia(cfg) || ''),
       lembrete: l
     };
-    // naoVirarODia: horário vencido NÃO vira lembrete de amanhã. Quem chama o
-    // bot às 14h não pode receber lembrete da entrevista do meio-dia.
+    // LIMITE DA JANELA DE 24 HORAS: lembrete que cair depois de 24h da última
+    // mensagem da pessoa não pode ser texto livre. Em vez de falhar na hora do
+    // envio, já entra marcado como "janela fechada" e aparece no painel.
+    let limite = null;
+    try {
+      const u = _db.messages.ultimaRecebida(ctx.conversation_id);
+      if (u && u.horas !== null && u.horas !== undefined) {
+        limite = new Date(Date.now() + (24 - Number(u.horas)) * 3600000);
+      }
+    } catch (e) { limite = null; }
+    // naoVirarODia: horário vencido NÃO vira lembrete de amanhã. Quem escreve
+    // às 14h não pode receber lembrete da entrevista do meio-dia.
     const r = _lembretes.agendar({
       resposta: comoResposta, conversa: conversa,
-      usuario: 'bot', naoVirarODia: true
+      usuario: respostaId === 'fora-expediente' ? 'fora-expediente' : 'bot',
+      naoVirarODia: true, limiteJanela: limite
     });
-    if (r && r.agendados) {
+    if (r && (r.agendados || r.fora_da_janela)) {
       _db.bot.registrar('lembrete', contactId, ctx.telefone,
-        r.agendados + ' lembrete(s) agendado(s) para as ' + r.evento_horario);
+        r.agendados + ' lembrete(s) agendado(s) para as ' + r.evento_horario +
+        (r.fora_da_janela ? ' · ' + r.fora_da_janela + ' fora da janela de 24h' : ''));
     }
     return r;
   } catch (e) {
     console.error('[Bot] não agendei o lembrete:', e.message);
     return null;
   }
+}
+
+// O primeiro link que estiver na sequência, para o {link} do lembrete quando
+// não há link das vagas configurado.
+function _linkDaSequencia(cfg) {
+  const m = JSON.stringify((cfg && cfg.passos) || []).match(/https?:\/\/[^\s"\\]+/);
+  return m ? m[0] : '';
 }
 
 // ── A ORDEM DE DECISÃO ─────────────────────────────────────────────────────
@@ -216,7 +274,11 @@ function decidir(entrada) {
   const texto = entrada.texto || '';
   const agora = entrada.agora ? new Date(entrada.agora) : new Date();
 
-  if (!cfg.ligado) return { acao: 'nada', motivo: 'bot desligado' };
+  // FORA DO EXPEDIENTE tem interruptor PRÓPRIO: ele funciona mesmo com o bot
+  // normal desligado — é justamente para isso que serve ("saí do trabalho").
+  const fe = cfg.foraExpediente || {};
+  const feLigado = !!fe.ligado && Array.isArray(fe.passos) && fe.passos.length > 0;
+  if (!cfg.ligado && !feLigado) return { acao: 'nada', motivo: 'bot desligado' };
 
   // 1) PEDIDO DE SAÍDA — vale antes de tudo, inclusive de atendente.
   if (contemPalavra(texto, cfg.saida.palavras)) {
@@ -251,6 +313,18 @@ function decidir(entrada) {
   // reinicia nem dispara outra coisa junto.
   if (entrada.temFilaPendente) {
     return { acao: 'encerrar_fila', motivo: 'pessoa respondeu no meio da sequencia' };
+  }
+
+  // 5) FORA DO EXPEDIENTE — prioridade sobre o modo normal.
+  // Vale para contato NOVO ou ANTIGO (não olha "primeira vez" nem contagem do
+  // dia), mas só UMA vez por período ligado: quem escreve de novo não recebe
+  // o funil outra vez.
+  if (feLigado) {
+    const periodo = String(fe.periodo || '1');
+    if (String(est.fora_exp_periodo || '') === periodo) {
+      return { acao: 'nada', motivo: 'ja recebeu o funil de fora do expediente neste periodo' };
+    }
+    return { acao: 'fora_expediente', motivo: 'fora do expediente' };
   }
 
   // Sem passo configurado não há o que mandar.
@@ -339,6 +413,27 @@ async function aoReceberMensagem(ctx) {
       return d;
     }
 
+    // ── FORA DO EXPEDIENTE ────────────────────────────────────────────────
+    // Entra DEPOIS de saída, atendente e contato pausado (aquelas três ganham
+    // de tudo) e ANTES do modo normal — é o que faz "tem prioridade".
+    if (d.acao === 'fora_expediente') {
+      const fe = cfg.foraExpediente || {};
+      const id = _db.bot.enfileirar({
+        wamid: ctx.wamid, account_id: ctx.account_id, conversation_id: ctx.conversation_id,
+        contact_id: contactId, telefone: ctx.telefone, nome_contato: ctx.nome || '',
+        passos: fe.passos, motivo: d.motivo,
+        enviar_em: new Date().toISOString()
+      });
+      if (id === null) return { acao: 'nada', motivo: 'webhook repetido (mesma mensagem)' };
+      // Marca o PERÍODO: enquanto o modo estiver ligado, esta pessoa não
+      // recebe o funil outra vez, mesmo escrevendo dez vezes.
+      _db.bot.gravarContato(contactId, { fora_exp_periodo: String(fe.periodo || '1') });
+      _db.bot.registrar('fora_expediente', contactId, ctx.telefone, d.motivo);
+      const lembFe = agendarLembretesDoContato(fe, ctx, contactId, 'fora-expediente', 'Fora do expediente');
+      processarFila();
+      return Object.assign({}, d, { lembretes: lembFe ? lembFe.agendados : 0 });
+    }
+
     if (d.acao === 'sequencia') {
       // Se o contato estava aguardando atendente e o prazo passou, limpa.
       if (estado.aguardando_atendente) {
@@ -358,7 +453,7 @@ async function aoReceberMensagem(ctx) {
       _db.bot.registrar('inicio', contactId, ctx.telefone, d.motivo);
       // LEMBRETES: agenda para este contato, se o lembrete do bot estiver
       // ligado. Horário vencido não agenda nada — manda só a sequência.
-      const lemb = agendarLembretesDoContato(cfg, ctx, contactId);
+      const lemb = agendarLembretesDoContato(cfg, ctx, contactId, 'bot', 'Bot');
       processarFila();   // não espera: a fila cuida do ritmo
       return Object.assign({}, d, { lembretes: lemb ? lemb.agendados : 0 });
     }
@@ -631,6 +726,7 @@ async function enviarTeste(accountId, telefone, nome) {
 // O motor de lembretes e opcional: se ele nao carregou, o bot continua
 // respondendo normalmente, so nao agenda lembrete.
 let _lembretes = null;
+let _gravarConfig = null;
 
 function iniciar(opcoes) {
   _db = opcoes.db;
@@ -640,12 +736,19 @@ function iniciar(opcoes) {
   _pastaMidia = opcoes.pastaMidia;
   try { _lembretes = opcoes.lembretes || require('./whatsapp-lembretes.cjs'); }
   catch (e) { _lembretes = null; }
+  // Quem sabe GRAVAR a configuração é o servidor (o state.json tem contrato
+  // próprio). O bot só precisa disso para desligar o fora do expediente no
+  // horário combinado, sem ninguém abrir a tela.
+  _gravarConfig = opcoes.gravarConfig || null;
   try { fs.mkdirSync(_pastaMidia, { recursive: true }); } catch (e) {}
 
   // RETOMADA DEPOIS DE REINÍCIO: nada a restaurar em memória, porque a fila
   // vive no banco. O timer só volta a olhar as linhas pendentes.
   if (_timer) clearInterval(_timer);
-  _timer = setInterval(function () { processarFila(); }, 2000);
+  _timer = setInterval(function () {
+    conferirDesligamentoAutomatico();
+    processarFila();
+  }, 2000);
   if (_timer.unref) _timer.unref();
 
   const pendentes = (function () {
@@ -662,6 +765,6 @@ module.exports = {
   iniciar, parar,
   configAtual,
   decidir, normalizar, contemPalavra, saudacao, aplicarVariaveis, primeiroNome,
-  aoReceberMensagem, aoAtendenteResponder,
+  aoReceberMensagem, aoAtendenteResponder, conferirDesligamentoAutomatico,
   processarFila, enviarTeste
 };

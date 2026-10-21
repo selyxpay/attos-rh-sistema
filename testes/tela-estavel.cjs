@@ -381,6 +381,125 @@ const ABRIR_CHAT = `(function(){
   })()`);
   ok(semSpinner && semSpinner.viuSpinner === false, 'reabrir a mesma conversa NAO mostra "carregando"');
 
+  // ────────────────────────────────────────────────────────────────────────
+  // 6) UMA MENSAGEM, UMA BOLHA
+  // A tela desenha a mensagem na hora de mandar e o servidor avisa a MESMA
+  // mensagem pelo tempo real. Sem a amarra do cliente_id, apareciam duas.
+  // ────────────────────────────────────────────────────────────────────────
+  console.log('\n=== 6) A MENSAGEM QUE EU MANDO APARECE UMA VEZ SO ===');
+  excecoes.length = 0;
+  const dup = await cdp.eval(`(async function(){
+    // Conversa de teste limpa.
+    const msgs = [{ id: 1, direction: 'incoming', type: 'text', content: 'oi, tudo bem?',
+                    status: 'read', created_at: '2026-10-21T10:00:00Z' }];
+    _waConvAberta = 77;
+    _waConvAbertaObj = { id: 77, contact_name: 'Teste Duplicada', contact_phone: '5511900000077', status: 'open' };
+    _waRenderChat(_waConvAbertaObj, msgs);
+
+    // O servidor responde ok e devolve o cliente_id, como em producao.
+    const original = window.fetch;
+    let corpoEnviado = null;
+    window.fetch = function (url, opcoes) {
+      if (String(url).indexOf('/messages/send') >= 0) {
+        corpoEnviado = JSON.parse((opcoes && opcoes.body) || '{}');
+        return Promise.resolve(new Response(JSON.stringify({
+          ok: true, message_id: 501, wamid: 'wamid.TESTE501',
+          cliente_id: corpoEnviado.cliente_id
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      }
+      return original.apply(window, arguments);
+    };
+    try {
+      const caixa = document.getElementById('wa-msg-input');
+      caixa.value = 'mensagem que nao pode duplicar';
+      await waEnviarMensagem();
+      await new Promise(function (r) { setTimeout(r, 200); });
+    } finally {
+      window.fetch = original;
+    }
+
+    const contar = function () {
+      return Array.from(document.querySelectorAll('#wa-msgs .wa-msg'))
+        .filter(function (e) { return /nao pode duplicar/.test(e.textContent); }).length;
+    };
+    const depoisDoEnvio = contar();
+
+    // Agora o TEMPO REAL avisa a mesma mensagem (e o que acontece de verdade).
+    const aviso = {
+      type: 'new_message', conversation_id: 77,
+      message: {
+        id: 501, cliente_id: corpoEnviado ? corpoEnviado.cliente_id : '', wamid: 'wamid.TESTE501',
+        direction: 'outgoing', type: 'text', content: 'mensagem que nao pode duplicar',
+        status: 'sent', sender_name: 'Administrador', origem: 'atendente',
+        created_at: new Date().toISOString()
+      }
+    };
+    _waTratarEvento(aviso);
+    await new Promise(function (r) { setTimeout(r, 120); });
+    const depoisDoTempoReal = contar();
+
+    // E de novo, como se a Meta repetisse o aviso.
+    _waTratarEvento(aviso);
+    await new Promise(function (r) { setTimeout(r, 120); });
+    const depoisDeRepetir = contar();
+
+    // E a busca incremental trazendo a mesma mensagem.
+    const naCache = (_waMsgsCache || []).filter(function (m) { return /nao pode duplicar/.test(m.content || ''); }).length;
+
+    return {
+      mandouClienteId: !!(corpoEnviado && corpoEnviado.cliente_id),
+      depoisDoEnvio: depoisDoEnvio,
+      depoisDoTempoReal: depoisDoTempoReal,
+      depoisDeRepetir: depoisDeRepetir,
+      naCache: naCache,
+      temIdReal: (_waMsgsCache || []).some(function (m) { return Number(m.id) === 501; })
+    };
+  })()`);
+  ok(dup && dup.mandouClienteId === true, 'o envio manda um id temporario (cliente_id) para o servidor');
+  ok(dup && dup.depoisDoEnvio === 1, 'a bolha aparece na hora, uma vez (' + (dup || {}).depoisDoEnvio + ')');
+  ok(dup && dup.depoisDoTempoReal === 1, 'o aviso do tempo real NAO cria uma segunda bolha (' + (dup || {}).depoisDoTempoReal + ')');
+  ok(dup && dup.depoisDeRepetir === 1, 'nem o aviso repetido (' + (dup || {}).depoisDeRepetir + ')');
+  ok(dup && dup.naCache === 1, 'e na memoria da conversa ela tambem esta uma vez (' + (dup || {}).naCache + ')');
+  ok(dup && dup.temIdReal === true, 'a bolha otimista foi SUBSTITUIDA pela real (ficou com o id do banco)');
+  ok(excecoes.length === 0, 'sem erro de console (' + JSON.stringify(excecoes.slice(0, 2)) + ')');
+
+  // Mensagem do BOT e de LEMBRETE: chegam so pelo tempo real, e tambem nao
+  // podem repetir quando o aviso vem duas vezes.
+  const autos = await cdp.eval(`(async function(){
+    const mandar = function (m) {
+      _waTratarEvento({ type: 'new_message', conversation_id: 77, message: m });
+    };
+    const doBot = { id: 601, direction: 'outgoing', type: 'text', content: 'mensagem do bot aqui',
+                    status: 'sent', sender_name: 'bot', sent_by_bot: 1, origem: 'bot',
+                    created_at: new Date().toISOString() };
+    const doLembrete = { id: 602, direction: 'outgoing', type: 'text', content: 'lembrete automatico aqui',
+                         status: 'sent', sender_name: 'Lembrete automático', origem: 'lembrete',
+                         created_at: new Date().toISOString() };
+    const comAnexo = { id: 603, direction: 'outgoing', type: 'document', content: 'segue a tabela',
+                       media_url: '/api/whatsapp/respostas/midia/pronta_x.pdf', status: 'sent',
+                       sender_name: 'Administrador', origem: 'atendente', created_at: new Date().toISOString() };
+    mandar(doBot); mandar(doBot);
+    mandar(doLembrete); mandar(doLembrete);
+    mandar(comAnexo); mandar(comAnexo);
+    await new Promise(function (r) { setTimeout(r, 150); });
+    const conta = function (txt) {
+      return Array.from(document.querySelectorAll('#wa-msgs .wa-msg'))
+        .filter(function (e) { return e.textContent.indexOf(txt) >= 0; }).length;
+    };
+    return {
+      bot: conta('mensagem do bot aqui'),
+      lembrete: conta('lembrete automatico aqui'),
+      anexo: conta('segue a tabela'),
+      rotuloBot: /Bot/.test((document.querySelector('[data-msg="601"]') || {}).textContent || ''),
+      rotuloLembrete: /Lembrete autom/.test((document.querySelector('[data-msg="602"]') || {}).textContent || '')
+    };
+  })()`);
+  ok(autos && autos.bot === 1, 'mensagem do BOT aparece uma vez, mesmo com aviso repetido (' + (autos || {}).bot + ')');
+  ok(autos && autos.lembrete === 1, 'mensagem de LEMBRETE tambem (' + (autos || {}).lembrete + ')');
+  ok(autos && autos.anexo === 1, 'e a mensagem pronta COM ANEXO tambem (' + (autos || {}).anexo + ')');
+  ok(autos && autos.rotuloBot === true, 'com o rotulo "Bot" no balao');
+  ok(autos && autos.rotuloLembrete === true, 'e "Lembrete automatico" no outro');
+
   console.log('\n' + (falhas === 0 ? 'TELA ESTAVEL: TODOS OS TESTES OK' : falhas + ' FALHA(S)'));
   process.exit(falhas ? 1 : 0);
 })().catch(e => { console.error('ERRO NO TESTE:', e.stack || e.message); process.exit(1); });

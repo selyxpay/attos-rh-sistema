@@ -637,6 +637,79 @@ pediu para sair" ou "o interruptor geral está desligado". Antes o motivo só
 existia no `title` (aparecia parando o mouse em cima) e ninguém via. O diário do
 bot passou a mostrar o **nome** do contato, o que o bot fez e por quê.
 
+### 5.8 Uma mensagem, uma bolha
+
+A tela desenha a mensagem **na hora de mandar** (a "otimista", para a conversa
+responder na velocidade do dedo) e o servidor avisa a **mesma** mensagem pelo
+tempo real. Sem amarrar as duas, apareciam **duas bolhas** no painel — para o
+contato sempre chegou uma só.
+
+A amarra é o **`cliente_id`**: um id temporário gerado no navegador, enviado no
+corpo do envio e devolvido pelo servidor na resposta **e** no aviso do tempo
+real. Quem chega com esse id **substitui** a otimista em vez de empilhar.
+`wamid` e `id` do banco são a segunda tranca, para os outros caminhos (busca
+incremental `?since=`, status da Meta, aviso repetido) não repetirem nada —
+e `_waAppendBolha` ainda confere se já existe bolha com aquele id.
+
+Vale para os quatro casos: envio do atendente (pelo avião e pelo envio direto
+da mensagem pronta, inclusive **com anexo**), mensagem do **bot** e **lembrete
+automático**.
+
+O tratamento do aviso de tempo real virou função com nome
+(`_waTratarEvento`), e não um bloco anônimo dentro do `onmessage`: é o que
+permite a prova entregar exatamente o mesmo aviso que a Meta provoca em
+produção, sem depender de uma conexão aberta.
+
+**Testado por:** suíte `estavel` (seção 6).
+
+### 5.9 Modo fora do expediente
+
+"Saio do trabalho às 18h e ligo o botão." A partir daí, **qualquer pessoa** que
+escrever — contato novo ou antigo — recebe o funil que o atendente escreveu, e
+os lembretes ficam agendados.
+
+É o **mesmo** motor do bot e dos lembretes, ativado por um interruptor próprio:
+
+| O que | Onde |
+|---|---|
+| Configuração (funil, lembretes, horário de desligar) | `state.botWhatsapp.foraExpediente` |
+| Decisão | `decidir()` do `whatsapp-bot.cjs`, ação `fora_expediente` |
+| Agendamento | `whatsapp-lembretes.cjs`, com `resposta_id = 'fora-expediente'` |
+| Quem já recebeu | coluna `fora_exp_periodo` em `whatsapp_bot_contatos` |
+
+**As regras:**
+
+- **Prioridade sobre o modo normal**, e funciona mesmo com o bot normal
+  desligado (interruptor próprio). O que continua ganhando dele: pedido de
+  **saída**, pedido de **atendente** e contato **pausado** à mão.
+- **Uma vez por pessoa em cada período ligado.** O período é marcado quando se
+  liga (`periodo`); quem escreve de novo não recebe o funil outra vez.
+  Desligar e ligar de novo começa um período novo.
+- **Horário vencido não agenda** (`naoVirarODia`): o funil vai, o lembrete não.
+- **Lembrete que cairia depois de 24 horas** da última mensagem da pessoa não é
+  enviado — a Meta não permite texto livre fora da janela. Em vez de falhar na
+  hora, já entra no painel como **janela fechada**, com o motivo.
+- **Desliga sozinho** no horário escolhido (ex.: amanhã às 08:00). Quem confere
+  é o próprio motor, a cada passada da fila — não depende de ninguém abrir a
+  tela. Para isso o servidor passa um `gravarConfig` ao bot.
+- **Auditoria**: quem ligou, quem desligou e quando. Por isso o interruptor tem
+  **rota própria** (`POST /api/whatsapp/bot/fora-expediente`) em vez de ser
+  gravado pelo `/api/state`.
+- No painel **Lembretes agendados**, esses eventos vêm com o selo **Fora do
+  expediente**. Na lista de conversas, uma **lua** marca quem recebeu o funil, e
+  há um filtro **Fora do expediente** ao lado do filtro **Bot**.
+
+**Na tela:** um cartão na aba Bot, com interruptor (confirmação + resumo),
+faixa "Fora do expediente ligado desde HH:MM", opção de desligar sozinho,
+sequência própria (texto, imagem, áudio, PDF, link) com prévia, e lembretes
+próprios com atalho **amanhã** na data. O funil e os lembretes seguem a regra
+da aba: ficam no rascunho e só valem no **Salvar alterações**; o interruptor,
+não — ele vale na hora, com confirmação.
+
+**Testado por:** suíte `fora` (funil para contato novo e antigo, não repetir,
+prioridade, saída/atendente/pausado, horário vencido, janela de 24 h,
+desligamento automático, lua e filtro) e pela suíte `respostas-ui` (o cartão).
+
 ---
 
 ## 6. Fluxo Financeiro em detalhe
@@ -825,6 +898,8 @@ tipo de erro que volta: se você mexer na área, confira que não reintroduziu.
 | Lembrete/agendamento no horário errado | Comparar data do SQLite (UTC, com espaço) com hora de Brasília. Guardar sempre UTC no formato do SQLite e converter só na tela |
 | Mudança no bot valendo antes de confirmar | Campo que grava sozinho no `onchange`. A aba Bot agora edita em rascunho e só grava no "Salvar alterações" |
 | Lembrete de horário que já passou | Sem data, o cálculo empurrava o evento para amanhã. No bot isso é errado: usa-se `naoVirarODia` e não se agenda nada |
+| Mensagem aparecendo duas vezes só no painel | Bolha otimista desenhada no envio + a mesma mensagem chegando pelo tempo real. Amarrar com `cliente_id` e trancar por `wamid`/`id` |
+| `no such column` numa coluna que "existe" | `ALTER TABLE` rodando ANTES de o `CREATE TABLE` daquela tabela, no mesmo `criarTabelas`: falha calada no try/catch e só aparece na primeira mensagem de verdade |
 | Mensagem velha passando na frente da nova | `ORDER BY` numa data gravada como texto: `"...T10:00"` é maior que `"... 23:00"` (o `T` vem depois do espaço). Ordene por `julianday(...)` |
 
 ---
@@ -883,9 +958,11 @@ docs/                        deploy no Coolify, WhatsApp, equipamentos
   (seção 5.6), e o rótulo de quem mandou cada mensagem (seção 5.7).
 - Aba Bot em passo a passo, com rascunho e confirmação para ligar, lembrete
   do bot na mesma fila e robozinho na lista de conversas (seção 5.2).
+- Mensagem que aparecia duas vezes no painel (seção 5.8) e o modo fora do
+  expediente (seção 5.9).
 - Testes automatizados **no repositório**: `node testes/rodar.cjs` sobe um
   servidor isolado numa porta livre (com pasta de dados descartável) por suíte,
-  e um Chrome sem janela nas suítes de tela. Hoje são 25 suítes, cobrindo
+  e um Chrome sem janela nas suítes de tela. Hoje são 26 suítes, cobrindo
   sincronização com duas sessões, segurança, permissão por tela, upload por
   conteúdo, bot, mensagens prontas e varredura das 25 abas no navegador.
   `node testes/rodar.cjs --lista` mostra todas; `node testes/rodar.cjs <nome>`

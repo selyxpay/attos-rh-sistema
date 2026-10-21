@@ -491,7 +491,8 @@ function _waRenderFiltrosConv() {
   // "Bot" entra ao lado dessas: mostra as conversas em que o bot já falou,
   // que é o que se quer olhar para saber se ele está ajudando ou atrapalhando.
   const fs = [['', 'Todas'], ['unread', 'Não lidas'], ['pending', 'Aguardando atendente'],
-              ['bot', 'Bot'], ['open', 'Abertas'], ['closed', 'Fechadas']];
+              ['bot', 'Bot'], ['fora', 'Fora do expediente'],
+              ['open', 'Abertas'], ['closed', 'Fechadas']];
   box.innerHTML = fs.map(([v, l]) => `<button class="wa-fchip ${v === _waFiltroConv ? 'active' : ''}" onclick="waFiltroConversa('${v}')">${l}</button>`).join('');
 }
 window.waFiltroConversa = function (v) { _waFiltroConv = v; _waRenderFiltrosConv(); _waCarregarConversas(); };
@@ -506,6 +507,7 @@ async function _waCarregarConversas() {
   else if (_waFiltroConv === 'unread') qs += '&unread_only=true';
   else if (_waFiltroConv === 'pending') qs += '&status=pending';
   else if (_waFiltroConv === 'bot') qs += '&bot_only=true';
+  else if (_waFiltroConv === 'fora') qs += '&fora_exp_only=true';
   if (_waFiltroConta) qs += '&account_id=' + encodeURIComponent(_waFiltroConta);
   if (_waBuscaConv) qs += '&search=' + encodeURIComponent(_waBuscaConv);
   const r = await waGet('/conversations' + qs);
@@ -586,6 +588,7 @@ function _waAssinaturaConversa(c) {
           c.unread_count || 0, c.status || '', c.assigned_to_name || '',
           // sinais do bot: sem eles na assinatura, o robozinho nao atualizaria
           c.bot_em || '', c.bot_pausado || 0, c.bot_saiu || 0, c.lembretes_agendados || 0,
+          c.fora_exp || '',
           c.id === _waConvAberta ? '1' : '0'].join('|');
 }
 
@@ -635,6 +638,11 @@ function _waSinaisDoBot(c) {
       : (pausado ? 'Bot pausado neste contato · atendido pelo bot às ' + quando
                  : 'Atendido pelo bot às ' + quando);
     html += '<i class="fa-solid fa-robot wa-sinal-bot ' + classe + '" title="' + _waEsc(dica) + '"></i>';
+  }
+  // Lua: recebeu o funil de fora do expediente. Fica junto do robozinho
+  // porque e a mesma pergunta — "o automatico falou com essa pessoa?".
+  if (c.fora_exp) {
+    html += '<i class="fa-solid fa-moon wa-sinal-lua" title="Recebeu o funil de fora do expediente"></i>';
   }
   if (Number(c.lembretes_agendados) > 0) {
     const n = Number(c.lembretes_agendados);
@@ -797,7 +805,10 @@ function _waBolha(m) {
 
   // data-msg: o aviso de "mídia baixou" troca SÓ este balão, sem redesenhar a
   // conversa inteira e sem perder o lugar da rolagem.
-  const idAttr = m.id ? ` data-msg="${_waEsc(m.id)}"` : '';
+  // A otimista ainda não tem id do banco: usa o cliente_id, que é o que
+  // permite trocá-la pela real quando ela chegar.
+  const _marca = m.id || m.cliente_id || '';
+  const idAttr = _marca ? ` data-msg="${_waEsc(_marca)}"` : '';
 
   // FIGURINHA: imagem solta, sem balão — é assim no WhatsApp.
   if (tipo === 'sticker' && m.media_url) {
@@ -1017,10 +1028,12 @@ async function _waBuscarNovasDaConversa() {
     _waRedeVoltou();
     const novas = r.messages || [];
     if (!novas.length) return;
-    const jaTem = {};
-    (_waMsgsCache || []).forEach(function (m) { if (m.id) jaTem[m.id] = true; });
     novas.forEach(function (m) {
-      if (m.id && jaTem[m.id]) return;
+      // A mesma tranca de sempre: cliente_id, id e wamid. É isto que faz a
+      // mensagem que acabei de mandar não aparecer duas vezes quando a busca
+      // incremental passa por cima dela.
+      if (m.cliente_id && _waReconciliar(m.cliente_id, m)) return;
+      if (_waJaNaTela(m)) return;
       _waMsgsCache.push(m);
       _waAppendBolha(m);
     });
@@ -1127,17 +1140,31 @@ window.waEnviarMensagem = async function () {
   // LEMBRETE: se o texto veio de uma mensagem pronta que tem lembrete, o
   // servidor precisa saber qual — e assim o envio pelo aviao tambem agenda.
   const _pronta = (typeof respostasProntaDaCaixa === 'function') ? respostasProntaDaCaixa() : null;
+  // A bolha aparece ANTES da resposta do servidor (a conversa tem que
+  // responder na velocidade do dedo), já com o cliente_id que vai amarrar as
+  // duas pontas.
+  const cid = _waNovoClienteId();
+  const conversaDoEnvio = _waConvAberta;
+  const otimista = {
+    cliente_id: cid, direction: 'outgoing', type: 'text', content: texto,
+    status: 'enviando',
+    sender_name: (loggedUser && (loggedUser.nomeExibicao || loggedUser.nome)) || '',
+    origem: 'atendente', created_at: new Date().toISOString()
+  };
+  _waMsgsCache.push(otimista);
+  _waAppendBolha(otimista);
+
   const r = await waSend('/messages/send', 'POST', {
-    conversation_id: _waConvAberta, type: 'text', content: texto,
+    conversation_id: conversaDoEnvio, type: 'text', content: texto,
+    cliente_id: cid,
     resposta_id: _pronta ? _pronta.id : undefined,
     lembrete_horario: _pronta ? _pronta.horario : undefined,
     lembrete_data: _pronta ? _pronta.data : undefined
   });
   if (r && r.ok) {
-    const nova = { direction: 'outgoing', type: 'text', content: texto, status: 'sent',
-                   sender_name: (loggedUser && (loggedUser.nomeExibicao || loggedUser.nome)) || '',
-                   origem: 'atendente', created_at: new Date().toISOString() };
-    _waMsgsCache.push(nova); _waAppendBolha(nova);
+    // A real substitui a otimista. Se o tempo real chegou primeiro, ele já
+    // substituiu e aqui é só confirmar o status.
+    _waReconciliar(cid, { id: r.message_id, wamid: r.wamid, status: 'sent' });
     _waCarregarConversas();
     // Mandou: a mensagem pronta sai da caixa e o aviso do que foi agendado
     // aparece na conversa.
@@ -1148,10 +1175,51 @@ window.waEnviarMensagem = async function () {
       respostasAvisoAgendado(_waConvAberta);
     }
   } else {
-    _waAppendBolha({ direction: 'outgoing', type: 'text', content: texto, status: 'failed', created_at: new Date().toISOString() });
+    // Não desenha outra bolha: marca a que já está na tela.
+    _waReconciliar(cid, { status: 'failed' });
     _waToast((r && r.error) || 'Falha ao enviar. Verifique se o número está conectado à Meta.', true);
   }
 };
+// ══════════════════════════════════════════════════════════════════════════════
+// UMA MENSAGEM, UMA BOLHA
+// ──────────────────────────────────────────────────────────────────────────────
+// A tela desenha a mensagem na hora de mandar (a "otimista", para a conversa
+// responder na velocidade do dedo) e o servidor avisa a mesma mensagem pelo
+// tempo real. Sem amarrar as duas, apareciam DUAS bolhas no painel — para o
+// contato sempre chegou uma só.
+// A amarra é o `cliente_id`: um id temporário gerado aqui, que o servidor
+// devolve na resposta e no aviso. Quem chega com esse id SUBSTITUI a otimista.
+// `wamid` e `id` do banco servem de segunda tranca, para qualquer outro
+// caminho (busca incremental, status da Meta) não repetir nada.
+function _waNovoClienteId() {
+  return 'tmp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+}
+
+// Esta mensagem já está na tela? Olha pelos três identificadores.
+function _waJaNaTela(m) {
+  if (!m) return false;
+  const cache = _waMsgsCache || [];
+  if (m.cliente_id && cache.some(function (x) { return x.cliente_id && x.cliente_id === m.cliente_id; })) return true;
+  if (m.id && cache.some(function (x) { return String(x.id) === String(m.id); })) return true;
+  if (m.wamid && cache.some(function (x) { return x.wamid && x.wamid === m.wamid; })) return true;
+  return false;
+}
+
+// A mensagem real chegou: troca a otimista no lugar, sem mexer na rolagem.
+// Devolve true quando encontrou a otimista para substituir.
+function _waReconciliar(clienteId, real) {
+  if (!clienteId) return false;
+  const cache = _waMsgsCache || [];
+  const i = cache.findIndex(function (x) { return x.cliente_id === clienteId; });
+  if (i < 0) return false;
+  const antigo = cache[i];
+  const novo = Object.assign({}, antigo, real || {}, { cliente_id: clienteId });
+  cache[i] = novo;
+  const el = document.querySelector('[data-msg="' + (antigo.id || clienteId) + '"]');
+  if (el) el.outerHTML = _waBolha(novo);
+  return true;
+}
+
 // Acrescenta um balão. A ROLAGEM SEGUE A REGRA DO WHATSAPP: se a pessoa está
 // no fim, acompanha a mensagem nova; se subiu para ler, não mexe na rolagem e
 // mostra o pino "novas mensagens ↓". Antes, toda mensagem puxava a tela para
@@ -1159,6 +1227,8 @@ window.waEnviarMensagem = async function () {
 function _waAppendBolha(m) {
   const box = document.getElementById('wa-msgs');
   if (!box) return;
+  // Tranca final: se já existe bolha com este id, não desenha outra.
+  if (m && m.id && box.querySelector('[data-msg="' + m.id + '"]')) return;
   const vazio = box.querySelector('.wa-msgs-vazio');
   if (vazio) vazio.remove();
   const estavaNoFim = _waNoFim(box);
@@ -1333,8 +1403,31 @@ function _waConectarSSE() {
     };
     _waSSE.onmessage = function (ev) {
       let d; try { d = JSON.parse(ev.data); } catch (e) { return; }
+      _waTratarEvento(d);
+    };
+    _waSSE.onerror = _waSSEErro;
+  } catch (e) {
+    // Navegador sem tempo real: a reserva assume.
+    _waLigarReserva();
+  }
+}
+
+// O QUE FAZER COM CADA AVISO DO SERVIDOR. Função com nome (e não um bloco
+// anônimo dentro do onmessage) para a prova poder entregar o mesmo aviso que a
+// Meta provoca em produção, sem precisar de uma conexão aberta.
+window._waTratarEvento = function (d) {
+  if (!d) return;
       if (d.type === 'new_message') {
-        if (d.conversation_id === _waConvAberta && d.message) { _waMsgsCache.push(d.message); _waAppendBolha(d.message); }
+        if (d.conversation_id === _waConvAberta && d.message) {
+          // Veio do MEU envio? Então substitui a bolha otimista.
+          const trocou = d.message.cliente_id && _waReconciliar(d.message.cliente_id, d.message);
+          // Já está na tela por outro caminho (busca incremental, status)?
+          // Então não desenha de novo.
+          if (!trocou && !_waJaNaTela(d.message)) {
+            _waMsgsCache.push(d.message);
+            _waAppendBolha(d.message);
+          }
+        }
         // Mensagem RECEBIDA reabre a janela de 24 horas: a fileira de mensagens
         // prontas precisa voltar a ficar habilitada sem o atendente reabrir a
         // conversa.
@@ -1357,20 +1450,16 @@ function _waConectarSSE() {
       } else if (d.type === 'conversation_updated') {
         if (_waSubAba === 'inbox') _waCarregarConversas();
       }
-    };
-    _waSSE.onerror = function () {
-      // O EventSource reconecta sozinho, mas pode demorar. Enquanto isso, a
-      // reserva mantém a tela viva e a faixa avisa — sem apagar nada.
-      if (_waSSE && _waSSE.readyState === 2) {
-        _waMostrarFaixa('Reconectando…');
-        _waLigarReserva();
-        clearTimeout(_waTimerVolta);
-        _waTimerVolta = setTimeout(function () { _waSSE = null; _waConectarSSE(); }, 5000);
-      }
-    };
-  } catch (e) {
-    // Navegador sem tempo real: a reserva assume.
+};
+
+// Tempo real caiu: o EventSource reconecta sozinho, mas pode demorar. Enquanto
+// isso a reserva mantém a tela viva e a faixa avisa — sem apagar nada.
+function _waSSEErro() {
+  if (_waSSE && _waSSE.readyState === 2) {
+    _waMostrarFaixa('Reconectando…');
     _waLigarReserva();
+    clearTimeout(_waTimerVolta);
+    _waTimerVolta = setTimeout(function () { _waSSE = null; _waConectarSSE(); }, 5000);
   }
 }
 

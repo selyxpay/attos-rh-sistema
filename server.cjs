@@ -1684,6 +1684,12 @@ let _waReady = false;
           // O bot agenda lembrete reusando o MESMO motor das mensagens
           // prontas. Se o motor nao carregou, o bot segue respondendo.
           lembretes: waLembretes,
+          // Para desligar o "fora do expediente" no horario combinado sem
+          // ninguem aberto na tela.
+          gravarConfig: function (mudancas, porQue) {
+            try { _waSalvarConfigBot(mudancas, porQue, null); }
+            catch (e) { console.error('[Bot] nao gravei a configuracao:', e.message); }
+          },
           lerConfig: function () {
             try { return (lerEstado().dados || {}).botWhatsapp || {}; }
             catch (e) { return {}; }
@@ -1770,6 +1776,34 @@ function waIpDaReq(req) {
 // Conversas com varredura de mídia em andamento. Evita que cada abertura de
 // conversa empilhe uma fila nova de downloads para os mesmos arquivos.
 var _waVarrendoMidia = {};
+
+// ── GRAVAR A CONFIGURAÇÃO DO BOT PELO SERVIDOR ─────────────────────────────
+// Quase tudo do bot é gravado pela tela (pelo /api/state, com setKeys). Mas
+// duas coisas precisam ser gravadas AQUI: o interruptor do "fora do
+// expediente" (que registra na Auditoria quem ligou e quando) e o
+// desligamento automático no horário combinado, que acontece sem ninguém
+// aberto na tela.
+function _waSalvarConfigBot(mudancas, porQue, usuario) {
+  const st = lerEstadoParaGravar();
+  const d = st.dados || (st.dados = {});
+  const atual = d.botWhatsapp && typeof d.botWhatsapp === 'object' ? d.botWhatsapp : {};
+  d.botWhatsapp = Object.assign({}, atual, mudancas || {});
+  st.version = (st.version || 0) + 1;
+  st.atualizadoEm = Date.now();
+  gravarEstado(st);
+  // Auditoria: quem mexeu no automático, e quando.
+  try {
+    if (_waReady && waDb) {
+      waDb.audit.log({
+        user_login: (usuario && usuario.login) || 'sistema',
+        user_name: (usuario && usuario.nome) || 'Sistema',
+        action: 'Bot: ' + (porQue || 'configuração alterada'),
+        details: JSON.stringify(Object.keys(mudancas || {})).slice(0, 180)
+      });
+    }
+  } catch (e) {}
+  return d.botWhatsapp;
+}
 
 // ── JANELA DE 24 HORAS ─────────────────────────────────────────────────────
 // A Meta só aceita mensagem escrita à mão nas 24 horas seguintes à ÚLTIMA
@@ -3936,7 +3970,8 @@ http.createServer(function (req, res) {
             notifySSEClients({
               type: 'new_message', conversation_id: convId,
               message: {
-                id: msgId, direction: 'outgoing', type: tipo, content: conteudo || '',
+                id: msgId, cliente_id: body.cliente_id || '', wamid: wamid || '',
+                direction: 'outgoing', type: tipo, content: conteudo || '',
                 media_url: urlMidia || '', status: wamid ? 'sent' : 'failed',
                 sender_name: uRe.nome || uRe.login, origem: 'atendente',
                 created_at: new Date().toISOString()
@@ -3993,7 +4028,7 @@ http.createServer(function (req, res) {
           auditar(r && r.ok ? 'enviada' : 'FALHOU: ' + ((r && r.error) || 'erro'));
           if (r && r.ok) {
             responderJson(res, 200, {
-              ok: true, wamid: r.wamid, texto: texto,
+              ok: true, wamid: r.wamid, texto: texto, cliente_id: body.cliente_id || '',
               lembretes: agendamento ? {
                 evento_chave: agendamento.evento_chave, evento_horario: agendamento.evento_horario,
                 agendados: agendamento.agendados,
@@ -4141,6 +4176,57 @@ http.createServer(function (req, res) {
         details: 'contato ' + alvoId, ip: waIpDaReq(req)
       });
       responderJson(res, 200, { ok: true, pausado: pausar });
+      return;
+    }
+
+    // ── INTERRUPTOR DO MODO FORA DO EXPEDIENTE ───────────────────────────
+    // Rota propria (em vez de gravar pelo /api/state) por tres motivos: a
+    // Auditoria registra QUEM ligou e QUANDO, o periodo e marcado aqui (e o
+    // que impede repetir o funil para a mesma pessoa) e o horario de
+    // desligar automatico fica guardado em formato que o servidor entende.
+    if (urlPath === '/api/whatsapp/bot/fora-expediente' && req.method === 'POST') {
+      var uFe = waUsuarioTemPermissao(req, 'editar');
+      if (!uFe) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false, error: 'corpo inválido' }); return; }
+        var ligar = !!(body && body.ligar);
+        var cfgAtual = {};
+        try { cfgAtual = (lerEstado().dados || {}).botWhatsapp || {}; } catch (e) { cfgAtual = {}; }
+        var fe = Object.assign({}, cfgAtual.foraExpediente || {});
+        if (ligar && !(Array.isArray(fe.passos) && fe.passos.length)) {
+          responderJson(res, 200, {
+            ok: false,
+            error: 'Escreva a sequência do fora do expediente antes de ligar.'
+          });
+          return;
+        }
+        if (ligar) {
+          fe.ligado = true;
+          fe.ligadoEm = new Date().toISOString();
+          fe.ligadoPor = uFe.nome || uFe.login;
+          // O PERÍODO é o que faz cada contato receber o funil uma vez só
+          // enquanto o modo estiver ligado.
+          fe.periodo = String(Date.now());
+          fe.desligarEm = body.desligarEm ? String(body.desligarEm) : '';
+        } else {
+          fe.ligado = false;
+          fe.desligarEm = '';
+          fe.desligadoEm = new Date().toISOString();
+          fe.desligadoPor = uFe.nome || uFe.login;
+        }
+        try {
+          var nova = _waSalvarConfigBot({ foraExpediente: fe },
+            ligar ? 'LIGOU o modo fora do expediente' : 'DESLIGOU o modo fora do expediente', uFe);
+          if (_waReady && waDb && waDb.bot && waDb.bot.registrar) {
+            waDb.bot.registrar('fora_expediente', null, '',
+              (ligar ? 'LIGADO' : 'DESLIGADO') + ' por ' + (uFe.nome || uFe.login) +
+              (ligar && fe.desligarEm ? ' · desliga sozinho em ' + fe.desligarEm : ''));
+          }
+          responderJson(res, 200, { ok: true, foraExpediente: (nova && nova.foraExpediente) || fe });
+        } catch (e) {
+          responderJson(res, 500, { ok: false, error: e.message });
+        }
+      });
       return;
     }
 
@@ -4347,6 +4433,7 @@ http.createServer(function (req, res) {
       if (qp.assigned_to) filters.assigned_to = qp.assigned_to;
       if (qp.unread_only === 'true') filters.unread_only = true;
       if (qp.bot_only === 'true') filters.bot_only = true;      // filtro "Bot" da lista
+      if (qp.fora_exp_only === 'true') filters.fora_exp_only = true;   // filtro "Fora do expediente"
       if (qp.limit) filters.limit = parseInt(qp.limit);
       if (qp.offset) filters.offset = parseInt(qp.offset);
       // MULTI-CONTA: o funcionário comum vê só as conversas das contas em que ele
@@ -4553,7 +4640,9 @@ http.createServer(function (req, res) {
             } catch (e) { console.error('[Bot] nao pausei no contato:', e.message); }
           }
           waDb.audit.log({ user_login: u.login, user_name: u.nome, action: 'Enviou mensagem WhatsApp', details: 'Para: ' + toPhone + ' | Tipo: ' + (body.type || 'text'), ip: waIpDaReq(req), conversation_id: convId, message_id: msgId });
-          notifySSEClients({ type: 'new_message', conversation_id: convId, message: { id: msgId, direction: 'outgoing', type: body.type || 'text', content: body.content || body.caption || '', status: result.ok ? 'sent' : 'failed', sender_name: u.nome || u.login, origem: body.is_internal_note ? '' : 'atendente', created_at: new Date().toISOString() } });
+          // cliente_id VOLTA JUNTO: e a amarra que faz a tela trocar a bolha
+          // otimista pela real, em vez de desenhar a mesma mensagem duas vezes.
+          notifySSEClients({ type: 'new_message', conversation_id: convId, message: { id: msgId, cliente_id: body.cliente_id || '', wamid: result.wamid || '', direction: 'outgoing', type: body.type || 'text', content: body.content || body.caption || '', status: result.ok ? 'sent' : 'failed', sender_name: u.nome || u.login, origem: body.is_internal_note ? '' : 'atendente', created_at: new Date().toISOString() } });
           // LEMBRETES: a tela diz de qual mensagem pronta veio o texto que
           // esta sendo enviado (o atendente clicou nela, ajustou e mandou pelo
           // aviao). Sem isso, so o envio direto agendaria lembrete.
@@ -4576,8 +4665,8 @@ http.createServer(function (req, res) {
               }
             } catch (e) { console.error('[Lembretes] nao agendei no envio normal:', e.message); }
           }
-          if (result.ok) { responderJson(res, 200, { ok: true, message_id: msgId, wamid: result.wamid, lembretes: lembretesDoEnvio }); }
-          else { responderJson(res, 200, { ok: false, error: result.error, error_code: result.error_code, message_id: msgId }); }
+          if (result.ok) { responderJson(res, 200, { ok: true, message_id: msgId, wamid: result.wamid, cliente_id: body.cliente_id || '', lembretes: lembretesDoEnvio }); }
+          else { responderJson(res, 200, { ok: false, error: result.error, error_code: result.error_code, message_id: msgId, cliente_id: body.cliente_id || '' }); }
         }).catch(function (e) {
           responderJson(res, 500, { ok: false, error: 'Erro ao enviar: ' + e.message });
         });

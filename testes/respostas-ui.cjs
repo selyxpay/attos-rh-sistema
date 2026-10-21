@@ -441,6 +441,37 @@ const SEMEAR = `(async function(){
   ok(desligar && desligar.faixa === false, 'e a faixa verde sai');
   ok(excecoes.length === 0, 'sem erro de console na aba Bot (' + JSON.stringify(excecoes.slice(0, 2)) + ')');
 
+  console.log('\n=== 9b) CARTAO DO MODO FORA DO EXPEDIENTE ===');
+  const fora = await cdp.eval(`(async function(){
+    switchAba('whatsapp');
+    waTrocarSubAba('bot');
+    await new Promise(function(r){ setTimeout(r, 400); });
+    const antes = document.getElementById('wa-content').textContent;
+    // Escreve o funil no rascunho e liga os lembretes dele.
+    botForaAddPasso('texto');
+    botForaMudarPasso(0, 'texto', 'Estamos fora do horario, {nome}. Amanha as {horario}.');
+    botForaLembreteLigar(true);
+    await new Promise(function(r){ setTimeout(r, 250); });
+    const depois = document.getElementById('wa-content').textContent;
+    return {
+      temCartao: /Modo fora do expediente/i.test(antes),
+      temInterruptor: /Ligar o modo fora do expediente/i.test(antes),
+      temDesligarSozinho: /desligar sozinho/i.test(antes),
+      temFunil: /Funil de fora do expediente/i.test(depois),
+      temLembretes: /Lembretes do fora do expediente/i.test(depois),
+      temAtalhoAmanha: /amanh/i.test(depois),
+      temPrevia: !!document.querySelector('.bot-passo-fora .bot-previa'),
+      barraSalvar: !!document.querySelector('.bot-barra-salvar')
+    };
+  })()`);
+  ok(fora && fora.temCartao, 'a aba Bot tem o cartao "Modo fora do expediente"');
+  ok(fora && fora.temInterruptor, 'com o interruptor para ligar');
+  ok(fora && fora.temDesligarSozinho, 'e a opcao de desligar sozinho num horario');
+  ok(fora && fora.temFunil && fora.temLembretes, 'o funil e os lembretes proprios aparecem');
+  ok(fora && fora.temAtalhoAmanha, 'com o atalho de amanha na data');
+  ok(fora && fora.temPrevia, 'e a previa do funil');
+  ok(fora && fora.barraSalvar, 'mexer no funil pede "Salvar alteracoes" (nao vale sozinho)');
+
   console.log('\n=== 10) ROBOZINHO E SININHO NA LISTA DE CONVERSAS ===');
   const sinais = await cdp.eval(`(function(){
     const box = document.createElement('div');
@@ -453,7 +484,8 @@ const SEMEAR = `(async function(){
         bot_em: '2026-10-21 10:00:00', bot_pausado: 0, bot_saiu: 0, lembretes_agendados: 2 },
       { id: 92, contact_name: 'Bot pausado', contact_phone: '5511900000092', status: 'open', unread_count: 0,
         last_message_text: 'oi', last_message_at: '2026-10-21T09:00:00Z',
-        bot_em: '2026-10-21 09:00:00', bot_pausado: 1, bot_saiu: 0, lembretes_agendados: 0 },
+        bot_em: '2026-10-21 09:00:00', bot_pausado: 1, bot_saiu: 0, lembretes_agendados: 0,
+        fora_exp: 'per-1' },
       { id: 93, contact_name: 'Sem bot', contact_phone: '5511900000093', status: 'open', unread_count: 0,
         last_message_text: 'oi', last_message_at: '2026-10-21T08:00:00Z' }
     ];
@@ -466,6 +498,8 @@ const SEMEAR = `(async function(){
       pausado: !!it(92).querySelector('.wa-sinal-bot.pausado'),
       semSininho: !it(92).querySelector('.wa-sinal-lembrete'),
       semBot: !it(93).querySelector('.wa-sinal-bot'),
+      lua: !!it(92).querySelector('.wa-sinal-lua'),
+      semLua: !it(93).querySelector('.wa-sinal-lua'),
       limpar: (function(){ box.remove(); return true; })()
     };
   })()`);
@@ -491,6 +525,10 @@ const SEMEAR = `(async function(){
     return { nomes: nomes, temBot: nomes.indexOf('Bot') >= 0 };
   })()`);
   ok(filtro && filtro.temBot === true, 'o filtro "Bot" esta na lista: ' + JSON.stringify((filtro || {}).nomes));
+  ok(sinais && sinais.lua === true, 'quem recebeu o funil de fora do expediente mostra a lua');
+  ok(sinais && sinais.semLua === true, 'e quem nao recebeu nao mostra');
+  ok(filtro && (filtro.nomes || []).indexOf('Fora do expediente') >= 0,
+    'e o filtro "Fora do expediente" tambem esta la');
 
   console.log('\n' + (falhas === 0 ? 'MENSAGENS PRONTAS (tela): TODOS OS TESTES OK' : falhas + ' FALHA(S)'));
   process.exit(falhas ? 1 : 0);

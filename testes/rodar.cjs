@@ -84,6 +84,8 @@ const SUITES = [
     titulo: 'Bot de atendimento: ordem de decisao, fila, permissao e midia' },
   { nome: 'bot-lembrete', arquivo: 'bot-lembrete.cjs', servidor: true, navegador: false, semente: sementeAcesso,
     titulo: 'Bot agendando lembrete: horario vencido, sem duplicar, sinais na lista' },
+  { nome: 'fora',      arquivo: 'fora-expediente.cjs', servidor: true, navegador: false, semente: sementeAcesso,
+    titulo: 'Modo fora do expediente: funil, prioridade, uma vez por periodo, janela e auto-desligar' },
   { nome: 'midia',     arquivo: 'midia.cjs',          servidor: true,  navegador: false, semente: sementeAcesso,
     titulo: 'Midia que chega: tipo certo, rota com sessao, persistencia e nova tentativa' },
   { nome: 'lembretes', arquivo: 'lembretes.cjs',      servidor: true,  navegador: false, semente: sementeAcesso,

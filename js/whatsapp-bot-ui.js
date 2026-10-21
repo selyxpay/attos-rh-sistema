@@ -213,9 +213,26 @@
     const p = (_painel && _painel.painel) || {};
     const faltas = _botPendencias(c);
     const L = c.lembrete || { ligado: false, lembretes: [] };
+    // FE: o modo fora do expediente. O interruptor vem do que esta SALVO (ele
+    // tem rota propria, com Auditoria); o resto vem do rascunho em edicao.
+    const FE = Object.assign(
+      { ligado: false, passos: [], lembrete: { ligado: false, lembretes: [] } },
+      c.foraExpediente || {},
+      { ligado: !!((salvo.foraExpediente || {}).ligado),
+        ligadoEm: (salvo.foraExpediente || {}).ligadoEm || '',
+        desligarEm: (salvo.foraExpediente || {}).desligarEm || '' }
+    );
 
     cont.innerHTML = `
       <div class="bot-tela">
+
+        ${(salvo.foraExpediente && salvo.foraExpediente.ligado) ? `<div class="bot-faixa-fora">
+          <i class="fa-solid fa-moon"></i>
+          <b>Fora do expediente ligado</b>
+          ${salvo.foraExpediente.ligadoEm ? 'desde ' + esc(_botHoraCurta(salvo.foraExpediente.ligadoEm)) : ''}
+          ${salvo.foraExpediente.desligarEm ? '· desliga sozinho ' + esc(_botQuandoDesliga(salvo.foraExpediente.desligarEm)) : ''}
+          · quem escrever recebe o funil que você escreveu
+        </div>` : ''}
 
         ${salvo.ligado ? `<div class="bot-faixa-no-ar">
           <i class="fa-solid fa-circle-check"></i>
@@ -384,6 +401,93 @@
           <div id="bot-teste-res" class="bot-ajuda"></div>` : '<p class="bot-ajuda">Só quem edita o bot pode enviar teste.</p>'}
         </section>
 
+        <!-- MODO FORA DO EXPEDIENTE -->
+        <section class="bot-passo bot-passo-fora">
+          <div class="bot-passo-cab">
+            <span class="bot-passo-num"><i class="fa-solid fa-moon"></i></span>
+            <h3>Modo fora do expediente</h3>
+            ${_botSituacaoFora(c)}
+          </div>
+          <p class="bot-ajuda">Saiu do trabalho? Ligue aqui. A partir daí,
+          <b>qualquer pessoa</b> que escrever — contato novo ou antigo — recebe o
+          funil que você escrever abaixo, e os lembretes ficam agendados. Vale
+          uma vez por pessoa em cada período ligado.</p>
+
+          ${podeEditar ? `<div class="bot-fora-liga">
+            <button class="${FE.ligado ? 'mod-btn-secondary' : 'mod-btn-primary'}"
+                    onclick="botForaExpediente(${FE.ligado ? 'false' : 'true'})">
+              <i class="fa-solid fa-moon"></i> ${FE.ligado ? 'Desligar o modo fora do expediente' : 'Ligar o modo fora do expediente'}
+            </button>
+            ${FE.ligado ? '' : `<label class="bot-fora-auto">
+              desligar sozinho:
+              <select id="bot-fora-auto">
+                <option value="">não desligar</option>
+                <option value="amanha-08:00" selected>amanhã às 08:00</option>
+                <option value="amanha-07:00">amanhã às 07:00</option>
+                <option value="amanha-09:00">amanhã às 09:00</option>
+                <option value="amanha-12:00">amanhã ao meio-dia</option>
+              </select>
+            </label>`}
+          </div>` : ''}
+
+          <div class="bot-fora-corpo">
+            <h4>Funil de fora do expediente</h4>
+            <p class="bot-ajuda">Variáveis: <code>{nome}</code>, <code>{saudacao}</code>,
+            <code>{horario}</code> (o horário do lembrete) e <code>{link}</code>.</p>
+            <div class="bot-passo1">
+              <div>
+                <div id="bot-fora-passos">${_passosHtml({ passos: FE.passos || [] }, podeEditar, 'fora')}</div>
+                ${podeEditar ? `<div class="bot-add">
+                  <button class="mod-btn-secondary" onclick="botForaAddPasso('texto')"><i class="fa-solid fa-font"></i> Texto</button>
+                  <button class="mod-btn-secondary" onclick="botForaAddPasso('imagem')"><i class="fa-solid fa-image"></i> Imagem</button>
+                  <button class="mod-btn-secondary" onclick="botForaAddPasso('audio')"><i class="fa-solid fa-microphone"></i> Áudio</button>
+                  <button class="mod-btn-secondary" onclick="botForaAddPasso('documento')"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                  <button class="mod-btn-secondary" onclick="botForaAddPasso('link')"><i class="fa-solid fa-link"></i> Link</button>
+                </div>` : ''}
+              </div>
+              <div class="bot-passo1-previa">
+                <div class="bot-previa-tit"><i class="fa-regular fa-eye"></i> Como vai chegar</div>
+                <div class="bot-previa">${_previaHtml({ passos: FE.passos || [], linkVagas: c.linkVagas, lembrete: FE.lembrete })}</div>
+              </div>
+            </div>
+
+            <h4>Lembretes do fora do expediente</h4>
+            <label class="bot-lembrete-chave">
+              <input type="checkbox" ${(FE.lembrete || {}).ligado ? 'checked' : ''} ${trava}
+                     onchange="botForaLembreteLigar(this.checked)">
+              <span><i class="fa-solid fa-clock"></i> Agendar lembretes para quem receber o funil</span>
+            </label>
+            ${!(FE.lembrete || {}).ligado ? '' : `
+            <div class="bot-lembrete-corpo">
+              <div class="bot-lembrete-quando">
+                <label>Horário da entrevista
+                  <input type="time" value="${esc(FE.lembrete.horario || '')}" ${trava}
+                         onchange="botForaLembreteCampo('horario', this.value)">
+                </label>
+                <label>Data
+                  <input type="date" id="bot-fora-data" value="${esc(FE.lembrete.data || '')}" ${trava}
+                         onchange="botForaLembreteCampo('data', this.value)">
+                </label>
+                <button class="wa-lembrete-add" onclick="botForaLembreteAmanha()">
+                  <i class="fa-solid fa-forward"></i> amanhã</button>
+                <p class="bot-ajuda">${FE.lembrete.data
+                  ? 'Vale nessa data.'
+                  : 'Sem data, vale o próximo ' + esc(FE.lembrete.horario || 'horário') + '. <b>Horário vencido não agenda.</b>'}
+                  Lembrete que caísse depois de 24 horas da última mensagem da pessoa
+                  não é enviado (a Meta não permite) e aparece no painel como
+                  <b>janela fechada</b>.</p>
+              </div>
+              <div class="bot-lembrete-lista">
+                ${((FE.lembrete.lembretes) || []).length === 0
+                  ? '<div class="bot-vazio">Nenhum lembrete ainda. Clique em <b>+ adicionar lembrete</b>.</div>'
+                  : FE.lembrete.lembretes.map(function (l, i) { return _botLembreteItemHtml(l, i, trava, 'fora'); }).join('')}
+              </div>
+              ${podeEditar ? '<button class="wa-lembrete-add" onclick="botForaLembreteNovo()"><i class="fa-solid fa-plus"></i> adicionar lembrete</button>' : ''}
+              ${_botLembretePreviaHtml({ linkVagas: c.linkVagas, passos: FE.passos }, FE.lembrete)}
+            </div>`}
+          </div>
+        </section>
+
         <!-- LIGAR / DESLIGAR -->
         <section class="bot-passo bot-passo-ligar">
           <div class="bot-passo-cab"><span class="bot-passo-num"><i class="fa-solid fa-power-off"></i></span>
@@ -472,21 +576,27 @@
   const ROTULO_PASSO = { texto: 'Texto', imagem: 'Imagem', audio: 'Áudio', documento: 'PDF', link: 'Link' };
   const ICONE_PASSO = { texto: 'fa-font', imagem: 'fa-image', audio: 'fa-microphone', documento: 'fa-file-pdf', link: 'fa-link' };
 
-  function _passosHtml(c, podeEditar) {
+  // `onde` diz de QUAL sequência é este passo: a do atendimento normal ou a do
+  // fora do expediente. As duas usam o mesmo desenho; muda só qual função os
+  // botões chamam — assim não existe uma cópia da tela para cada uma.
+  function _passosHtml(c, podeEditar, onde) {
+    const pre = onde === 'fora' ? 'botFora' : 'bot';
     if (!c.passos.length) {
-      return '<div class="bot-vazio">Nenhum passo ainda. Comece por um texto com o link das vagas.</div>';
+      return '<div class="bot-vazio">' + (onde === 'fora'
+        ? 'Nenhuma mensagem ainda. Escreva o que a pessoa recebe fora do horário.'
+        : 'Nenhum passo ainda. Comece por um texto com o link das vagas.') + '</div>';
     }
     return c.passos.map(function (p, i) {
       const trava = podeEditar ? '' : 'disabled';
       let corpo = '';
       if (p.tipo === 'texto') {
         corpo = `<textarea class="form-control bot-textarea" rows="4" placeholder="Mensagem..." ${trava}
-                   onchange="botMudarPasso(${i},'texto', this.value)">${esc(p.texto)}</textarea>`;
+                   onchange="${pre}MudarPasso(${i},'texto', this.value)">${esc(p.texto)}</textarea>`;
       } else if (p.tipo === 'link') {
         corpo = `<textarea class="form-control bot-textarea" rows="2" placeholder="Texto antes do link (opcional)" ${trava}
-                   onchange="botMudarPasso(${i},'texto', this.value)">${esc(p.texto)}</textarea>
+                   onchange="${pre}MudarPasso(${i},'texto', this.value)">${esc(p.texto)}</textarea>
                  <input type="url" class="form-control" placeholder="https://... (ou deixe vazio e use {link_vagas} no texto)"
-                   value="${esc(p.url)}" ${trava} onchange="botMudarPasso(${i},'url', this.value)">`;
+                   value="${esc(p.url)}" ${trava} onchange="${pre}MudarPasso(${i},'url', this.value)">`;
       } else {
         const temArquivo = !!p.arquivo;
         corpo = `
@@ -497,13 +607,13 @@
             ${podeEditar ? `<label class="bot-btn-arq">
               <i class="fa-solid fa-upload"></i> ${temArquivo ? 'Trocar' : 'Enviar'}
               <input type="file" hidden accept="${p.tipo === 'imagem' ? 'image/*' : (p.tipo === 'audio' ? 'audio/ogg,.ogg,.opus' : 'application/pdf,.pdf')}"
-                     onchange="botSubirMidia(${i}, this)">
+                     onchange="${pre}SubirMidia(${i}, this)">
             </label>` : ''}
           </div>
           ${p.tipo === 'audio'
             ? '<small class="bot-ajuda">A Meta só mostra como <b>mensagem de voz</b> se o arquivo for OGG/Opus. Exporte nesse formato.</small>'
             : `<textarea class="form-control bot-textarea" rows="2" placeholder="Legenda (opcional)" ${trava}
-                 onchange="botMudarPasso(${i},'legenda', this.value)">${esc(p.legenda)}</textarea>`}`;
+                 onchange="${pre}MudarPasso(${i},'legenda', this.value)">${esc(p.legenda)}</textarea>`}`;
       }
       return `
         <div class="bot-passo" data-idx="${i}">
@@ -515,12 +625,12 @@
             ${i > 0 ? `<label class="bot-intervalo">espera
               <input type="number" min="0" max="600" class="bot-mini" value="${p.intervaloSeg == null ? '' : p.intervaloSeg}"
                 placeholder="${Number(c.intervaloPadraoSeg) || 3}" ${podeEditar ? '' : 'disabled'}
-                onchange="botMudarPasso(${i},'intervaloSeg', this.value)">s</label>` : ''}
+                onchange="${pre}MudarPasso(${i},'intervaloSeg', this.value)">s</label>` : ''}
             ${podeEditar ? `
-              <button class="bot-ic" title="Subir"    onclick="botMoverPasso(${i},-1)" ${i === 0 ? 'disabled' : ''}><i class="fa-solid fa-arrow-up"></i></button>
-              <button class="bot-ic" title="Descer"   onclick="botMoverPasso(${i},1)" ${i === c.passos.length - 1 ? 'disabled' : ''}><i class="fa-solid fa-arrow-down"></i></button>
-              <button class="bot-ic" title="Duplicar" onclick="botDuplicarPasso(${i})"><i class="fa-solid fa-copy"></i></button>
-              <button class="bot-ic bot-ic-mau" title="Remover" onclick="botRemoverPasso(${i})"><i class="fa-solid fa-trash"></i></button>` : ''}
+              <button class="bot-ic" title="Subir"    onclick="${pre}MoverPasso(${i},-1)" ${i === 0 ? 'disabled' : ''}><i class="fa-solid fa-arrow-up"></i></button>
+              <button class="bot-ic" title="Descer"   onclick="${pre}MoverPasso(${i},1)" ${i === c.passos.length - 1 ? 'disabled' : ''}><i class="fa-solid fa-arrow-down"></i></button>
+              <button class="bot-ic" title="Duplicar" onclick="${pre}DuplicarPasso(${i})"><i class="fa-solid fa-copy"></i></button>
+              <button class="bot-ic bot-ic-mau" title="Remover" onclick="${pre}RemoverPasso(${i})"><i class="fa-solid fa-trash"></i></button>` : ''}
           </div>
           ${corpo}
         </div>`;
@@ -706,34 +816,274 @@
     L.lembretes[i].mime = ''; L.lembretes[i].tipoAnexo = '';
     redesenhar();
   };
+  // ══════════════════════════════════════════════════════════════════════════
+  // MODO FORA DO EXPEDIENTE — handlers
+  // O funil e os lembretes ficam no RASCUNHO (valem ao salvar). O
+  // INTERRUPTOR tem rota propria: ele precisa registrar na Auditoria quem
+  // ligou e marcar o periodo, e vale na hora.
+  // ══════════════════════════════════════════════════════════════════════════
+  function _foraDoRascunho() {
+    const c = rasc();
+    if (!c.foraExpediente || typeof c.foraExpediente !== 'object') {
+      c.foraExpediente = { ligado: false, passos: [], lembrete: { ligado: false, titulo: '', horario: '', data: '', lembretes: [] } };
+    }
+    if (!Array.isArray(c.foraExpediente.passos)) c.foraExpediente.passos = [];
+    if (!c.foraExpediente.lembrete || typeof c.foraExpediente.lembrete !== 'object') {
+      c.foraExpediente.lembrete = { ligado: false, titulo: '', horario: '', data: '', lembretes: [] };
+    }
+    if (!Array.isArray(c.foraExpediente.lembrete.lembretes)) c.foraExpediente.lembrete.lembretes = [];
+    return c.foraExpediente;
+  }
+
+  function _botSituacaoFora(c) {
+    const fe = (cfg().foraExpediente) || {};
+    const rascFe = (c.foraExpediente) || {};
+    if (fe.ligado) {
+      return '<span class="bot-passo-ok"><i class="fa-solid fa-circle-check"></i> ligado' +
+        (fe.ligadoPor ? ' por ' + esc(fe.ligadoPor) : '') + '</span>';
+    }
+    if (!(rascFe.passos || []).length) {
+      return '<span class="bot-passo-falta"><i class="fa-solid fa-circle-exclamation"></i> sem o funil escrito</span>';
+    }
+    return '<span class="bot-passo-ok"><i class="fa-regular fa-circle"></i> pronto, desligado</span>';
+  }
+
+  function _botQuandoDesliga(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    const p = function (n) { return String(n).padStart(2, '0'); };
+    const hoje = new Date();
+    const hora = p(d.getHours()) + ':' + p(d.getMinutes());
+    return d.toDateString() === hoje.toDateString() ? 'hoje às ' + hora
+      : p(d.getDate()) + '/' + p(d.getMonth() + 1) + ' às ' + hora;
+  }
+
+  // O interruptor: confirmacao com resumo, e a rota propria do servidor.
+  window.botForaExpediente = async function (ligar) {
+    if (temRascunho()) {
+      alert('Salve ou descarte as alteracoes antes de ' + (ligar ? 'ligar' : 'desligar') + ' o modo fora do expediente.');
+      return;
+    }
+    const fe = (cfg().foraExpediente) || {};
+    if (ligar) {
+      if (!((fe.passos || []).length)) {
+        alert('Escreva o funil do fora do expediente antes de ligar.');
+        return;
+      }
+      const L = fe.lembrete || {};
+      const sel = document.getElementById('bot-fora-auto');
+      const auto = sel ? sel.value : '';
+      const resumo = [
+        'Ligar o modo FORA DO EXPEDIENTE?',
+        '',
+        '- Quem escrever (contato novo ou antigo) recebe o funil: ' + (fe.passos || []).length + ' mensagem(ns)',
+        '- Cada pessoa recebe uma vez, enquanto o modo estiver ligado',
+        '- Lembretes: ' + (L.ligado
+            ? ((L.lembretes || []).length + ' lembrete(s), entrevista as ' + (L.horario || '?') + (L.data ? ' de ' + L.data : ''))
+            : 'desligados'),
+        '- Desligar sozinho: ' + (auto ? auto.replace('amanha-', 'amanha as ') : 'nao'),
+        '',
+        'Pedido de saida, pedido de atendente e contato pausado continuam sendo respeitados.'
+      ].join('\n');
+      if (!confirm(resumo)) return;
+      let desligarEm = '';
+      if (auto && auto.indexOf('amanha-') === 0) {
+        const hhmm = auto.split('-')[1].split(':');
+        const d = new Date();
+        d.setDate(d.getDate() + 1);
+        d.setHours(Number(hhmm[0]) || 8, Number(hhmm[1]) || 0, 0, 0);
+        desligarEm = d.toISOString();
+      }
+      await _botChamarForaExpediente(true, desligarEm);
+    } else {
+      if (!confirm('Desligar o modo fora do expediente?\n\nQuem escrever volta a cair no atendimento normal. Os lembretes ja agendados continuam valendo (cancele no painel se nao quiser).')) return;
+      await _botChamarForaExpediente(false, '');
+    }
+  };
+
+  async function _botChamarForaExpediente(ligar, desligarEm) {
+    try {
+      const r = await fetch('/api/whatsapp/bot/fora-expediente', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ligar: !!ligar, desligarEm: desligarEm || '' })
+      });
+      const j = await r.json().catch(function () { return {}; });
+      if (!j.ok) { alert(j.error || 'Nao consegui mudar o modo.'); return; }
+      // O servidor e quem manda aqui: a tela adota o que ele devolveu.
+      if (window.state) {
+        state.botWhatsapp = state.botWhatsapp || {};
+        state.botWhatsapp.foraExpediente = j.foraExpediente || {};
+      }
+      _painel = null;
+      redesenhar();
+    } catch (e) {
+      alert('Falha: ' + (e.message || e));
+    }
+  }
+
+  // Funil: os mesmos handlers dos passos, mas no fora do expediente.
+  window.botForaAddPasso = function (tipo) {
+    _foraDoRascunho().passos.push({ id: _novoIdPasso(), tipo: tipo, texto: '', legenda: '', url: '', arquivo: '', nomeArquivo: '', mime: '', intervaloSeg: null });
+    redesenhar();
+  };
+  window.botForaMudarPasso = function (i, campo, valor) {
+    const fe = _foraDoRascunho();
+    if (!fe.passos[i]) return;
+    if (campo === 'intervaloSeg') {
+      const n = String(valor).trim();
+      fe.passos[i].intervaloSeg = n === '' ? null : Math.max(0, Number(n) || 0);
+    } else {
+      fe.passos[i][campo] = String(valor == null ? '' : valor);
+    }
+    if (campo !== 'texto' && campo !== 'legenda') redesenhar();
+  };
+  window.botForaRemoverPasso = function (i) {
+    const fe = _foraDoRascunho();
+    if (!fe.passos[i]) return;
+    if (!confirm('Remover a mensagem ' + (i + 1) + ' do funil?')) return;
+    fe.passos.splice(i, 1);
+    redesenhar();
+  };
+  window.botForaDuplicarPasso = function (i) {
+    const fe = _foraDoRascunho();
+    if (!fe.passos[i]) return;
+    const copia = JSON.parse(JSON.stringify(fe.passos[i]));
+    copia.id = _novoIdPasso();
+    fe.passos.splice(i + 1, 0, copia);
+    redesenhar();
+  };
+  window.botForaMoverPasso = function (i, dir) {
+    const fe = _foraDoRascunho();
+    const j = i + dir;
+    if (j < 0 || j >= fe.passos.length) return;
+    const t = fe.passos[i]; fe.passos[i] = fe.passos[j]; fe.passos[j] = t;
+    redesenhar();
+  };
+  window.botForaSubirMidia = async function (i, input) {
+    const fe = _foraDoRascunho();
+    const arq = input && input.files && input.files[0];
+    if (!arq || !fe.passos[i]) return;
+    const destino = fe.passos[i].tipo;
+    const leitor = new FileReader();
+    leitor.onload = async function () {
+      try {
+        const r = await fetch('/api/whatsapp/bot/midia', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dataUrl: leitor.result, destino: destino })
+        });
+        const j = await r.json().catch(function () { return {}; });
+        if (!j.ok) { alert(j.error || 'Nao consegui enviar o arquivo.'); return; }
+        fe.passos[i].arquivo = j.arquivo;
+        fe.passos[i].nomeArquivo = arq.name;
+        fe.passos[i].mime = j.mime;
+        redesenhar();
+      } catch (e) { alert('Falha no envio: ' + (e.message || e)); }
+    };
+    leitor.readAsDataURL(arq);
+  };
+
+  // Lembretes do fora do expediente.
+  window.botForaLembreteLigar = function (ligado) {
+    const L = _foraDoRascunho().lembrete;
+    L.ligado = !!ligado;
+    if (L.ligado && !L.lembretes.length) {
+      L.horario = L.horario || '10:00';
+      L.lembretes = [
+        { id: _novoIdLembrete(), tipo: 'minutos', valor: 10, texto: 'Nao esquece, {nome}: a entrevista comeca em 10 minutos. Link: {link}' },
+        { id: _novoIdLembrete(), tipo: 'na_hora', valor: 0, texto: '{nome}, a entrevista comecou agora. Estou te esperando: {link}' }
+      ];
+    }
+    redesenhar();
+  };
+  window.botForaLembreteCampo = function (campo, valor) {
+    _foraDoRascunho().lembrete[campo] = String(valor || '');
+    redesenhar();
+  };
+  window.botForaLembreteAmanha = function () {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const p = function (n) { return String(n).padStart(2, '0'); };
+    _foraDoRascunho().lembrete.data = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    redesenhar();
+  };
+  window.botForaLembreteNovo = function () {
+    _foraDoRascunho().lembrete.lembretes.push({ id: _novoIdLembrete(), tipo: 'minutos', valor: 30, texto: '' });
+    redesenhar();
+  };
+  window.botForaLembreteRemover = function (i) {
+    _foraDoRascunho().lembrete.lembretes.splice(i, 1);
+    redesenhar();
+  };
+  window.botForaLembreteItem = function (i, campo, valor) {
+    const L = _foraDoRascunho().lembrete;
+    if (!L.lembretes[i]) return;
+    L.lembretes[i][campo] = campo === 'valor' ? Math.max(0, Number(valor) || 0) : String(valor || '');
+    if (campo !== 'texto') redesenhar();
+  };
+  window.botForaLembreteAnexar = function (i, input) {
+    const L = _foraDoRascunho().lembrete;
+    const arq = input && input.files && input.files[0];
+    if (!arq || !L.lembretes[i]) return;
+    if (arq.size > 20 * 1024 * 1024) { alert('Arquivo muito grande (maximo 20 MB).'); input.value = ''; return; }
+    const leitor = new FileReader();
+    leitor.onload = async function () {
+      try {
+        const r = await fetch('/api/whatsapp/respostas/midia', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dataUrl: leitor.result })
+        });
+        const j = await r.json().catch(function () { return {}; });
+        if (!j.ok) { alert(j.error || 'Nao consegui enviar o arquivo.'); return; }
+        L.lembretes[i].arquivo = j.arquivo;
+        L.lembretes[i].nomeArquivo = arq.name;
+        L.lembretes[i].mime = j.mime;
+        L.lembretes[i].tipoAnexo = j.tipoAnexo;
+        redesenhar();
+      } catch (e) { alert('Falha no envio: ' + (e.message || e)); }
+    };
+    leitor.readAsDataURL(arq);
+  };
+  window.botForaLembreteTirarAnexo = function (i) {
+    const L = _foraDoRascunho().lembrete;
+    if (!L.lembretes[i]) return;
+    L.lembretes[i].arquivo = ''; L.lembretes[i].nomeArquivo = '';
+    L.lembretes[i].mime = ''; L.lembretes[i].tipoAnexo = '';
+    redesenhar();
+  };
+
   function _novoIdLembrete() {
     return 'lem-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   }
 
   // Um item do lembrete na tela.
-  function _botLembreteItemHtml(l, i, trava) {
+  function _botLembreteItemHtml(l, i, trava, onde) {
+    const pre = onde === 'fora' ? 'botForaLembrete' : 'botLembrete';
     const tipo = l.tipo || 'minutos';
     const anexo = l.arquivo
       ? '<span class="wa-prontas-chip"><i class="fa-solid ' + (l.tipoAnexo === 'documento' ? 'fa-file-pdf' : 'fa-image') + '"></i> ' +
         esc(l.nomeArquivo || l.arquivo) +
-        '<button class="wa-btn-mini perigo" title="Tirar o anexo" onclick="botLembreteTirarAnexo(' + i + ')"><i class="fa-solid fa-xmark"></i></button></span>'
+        '<button class="wa-btn-mini perigo" title="Tirar o anexo" onclick="' + pre + 'TirarAnexo(' + i + ')"><i class="fa-solid fa-xmark"></i></button></span>'
       : '<label class="wa-btn-arq-mini"><i class="fa-solid fa-paperclip"></i> anexo' +
-        '<input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" style="display:none" onchange="botLembreteAnexar(' + i + ', this)"></label>';
+        '<input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" style="display:none" onchange="' + pre + 'Anexar(' + i + ', this)"></label>';
     return '<div class="wa-lembrete-item">' +
       '<div class="wa-lembrete-item-topo">' +
-        '<select ' + trava + ' onchange="botLembreteItem(' + i + ', \'tipo\', this.value)">' +
+        '<select ' + trava + ' onchange="' + pre + 'Item(' + i + ', \'tipo\', this.value)">' +
           '<option value="minutos"' + (tipo === 'minutos' ? ' selected' : '') + '>minutos antes</option>' +
           '<option value="horas"' + (tipo === 'horas' ? ' selected' : '') + '>horas antes</option>' +
           '<option value="na_hora"' + (tipo === 'na_hora' ? ' selected' : '') + '>na hora do evento</option>' +
         '</select>' +
         (tipo === 'na_hora' ? '' :
           '<input type="number" min="1" max="999" class="wa-lembrete-num" value="' + (Number(l.valor) || 15) + '" ' + trava +
-          ' onchange="botLembreteItem(' + i + ', \'valor\', this.value)">') +
+          ' onchange="' + pre + 'Item(' + i + ', \'valor\', this.value)">') +
         anexo +
-        '<button class="wa-btn-mini perigo" title="Remover este lembrete" onclick="botLembreteRemover(' + i + ')"><i class="fa-solid fa-trash"></i></button>' +
+        '<button class="wa-btn-mini perigo" title="Remover este lembrete" onclick="' + pre + 'Remover(' + i + ')"><i class="fa-solid fa-trash"></i></button>' +
       '</div>' +
       '<textarea rows="2" placeholder="Ex.: {saudacao} {nome}! Sua entrevista e as {horario}. Link: {link}" ' + trava +
-        ' oninput="botLembreteItem(' + i + ', \'texto\', this.value)">' + esc(l.texto || '') + '</textarea>' +
+        ' oninput="' + pre + 'Item(' + i + ', \'texto\', this.value)">' + esc(l.texto || '') + '</textarea>' +
     '</div>';
   }
 

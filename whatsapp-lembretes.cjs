@@ -188,10 +188,36 @@ function agendar(opcoes) {
   // sai de cena, senão a pessoa receberia lembrete de dois eventos.
   try { _db.lembretes.cancelarOutrosEventos(conv.contact_id, resp.id, eventoSql, opcoes.usuario || ''); } catch (e) {}
   let agendados = 0;
+  let foraDaJanela = 0;
+  // LIMITE DA JANELA DE 24 HORAS: quando o chamador informa até quando a Meta
+  // aceita mensagem livre nesta conversa, o lembrete que cair depois disso NÃO
+  // entra na fila. Ele e gravado como 'janela_fechada' para APARECER no
+  // painel: melhor a pessoa ver que nao vai sair do que descobrir pelo
+  // silencio.
+  const limite = opcoes.limiteJanela ? new Date(opcoes.limiteJanela).getTime() : 0;
   prev.lembretes.forEach(function (l) {
     // Lembrete cujo horário já passou não entra na fila (o atraso só é
     // tolerado para quem ficou na fila e o servidor estava fora do ar).
     if (new Date(l.enviar_em).getTime() <= Date.now() - 60000) return;
+    if (limite && new Date(l.enviar_em).getTime() > limite) {
+      try {
+        _db.lembretes.agendar({
+          resposta_id: String(resp.id), titulo: String(resp.titulo || ''),
+          evento_em: eventoSql, evento_chave: chave,
+          lembrete_id: l.lembrete_id, rotulo: l.rotulo, enviar_em: paraSql(l.enviar_em),
+          account_id: conv.account_id, conversation_id: conv.id, contact_id: conv.contact_id,
+          telefone: conv.contact_phone, nome_contato: conv.contact_name || conv.contact_profile_name || '',
+          texto: l.texto, link: link, arquivo: l.arquivo, tipo_anexo: l.tipoAnexo,
+          mime: l.mime, nome_arquivo: l.nomeArquivo, criado_por: opcoes.usuario || ''
+        });
+        const linha = _db.lembretes.doEvento(chave).find(function (x) {
+          return x.contact_id === conv.contact_id && x.lembrete_id === l.lembrete_id;
+        });
+        if (linha) _db.lembretes.marcar(linha.id, 'janela_fechada', { erro: 'cairia depois das 24 horas da ultima mensagem' });
+      } catch (e) {}
+      foraDaJanela++;
+      return;
+    }
     try {
       _db.lembretes.agendar({
         resposta_id: String(resp.id), titulo: String(resp.titulo || ''),
@@ -210,7 +236,7 @@ function agendar(opcoes) {
     }
   });
   return { evento_chave: chave, evento_em: prev.evento_em, evento_horario: prev.evento_horario,
-           agendados: agendados, lembretes: prev.lembretes };
+           agendados: agendados, fora_da_janela: foraDaJanela, lembretes: prev.lembretes };
 }
 
 // ── ENVIO ──────────────────────────────────────────────────────────────────
