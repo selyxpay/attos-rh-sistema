@@ -72,6 +72,142 @@ try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (e) {}
 try { fs.mkdirSync(BACKUP_DIR, { recursive: true }); } catch (e) {}
 try { fs.mkdirSync(DIARIA_DOCS_DIR, { recursive: true }); } catch (e) {}
 
+// ── BACKUP DA INICIALIZAÇÃO ────────────────────────────────────────────────
+// Guarda uma cópia do state.json ANTES de o sistema ler ou gravar qualquer
+// coisa. Roda a cada subida do processo, e deploy é justamente quando o
+// processo sobe — então todo deploy deixa para trás a foto de como o sistema
+// estava um instante antes dele.
+//
+// Isto é diferente do backup por hora que já existia mais abaixo
+// (fazerBackupSePreciso): aquele gira em 24 slots de hora + 7 de dia, com
+// nomes fixos, então a cópia das 14h de hoje sobrescreve a das 14h de ontem.
+// Aqui cada subida gera um arquivo NOVO, com data e hora no nome, e ficam as
+// 20 mais recentes.
+//
+// Três coisas que esta função NUNCA faz:
+//   - não altera, não move e não renomeia o state.json (só LÊ e escreve outro
+//     arquivo);
+//   - não apaga nada que não seja uma cópia dela mesma (os arquivos
+//     state-hora-* e state-dia-* do outro backup ficam intactos);
+//   - não impede o sistema de subir: qualquer falha vira log e a vida segue.
+//
+// A pasta é DATA_DIR/backups, ou seja, dentro do volume persistente do
+// Coolify (DATA_DIR=/data no container). Se ficasse dentro do container,
+// sumiria no deploy seguinte — que é exatamente quando o backup mais importa.
+const PREFIXO_BACKUP_SUBIDA = 'state_';
+const MAX_BACKUPS_SUBIDA = 20;
+
+// ── O QUE É DADO E NUNCA PODE SER SERVIDO ──────────────────────────────────
+// Usado pelo servidor de arquivos estáticos. Vale para o DATA_DIR configurado
+// E para os nomes de pasta/arquivo de dados, porque a pasta padrão fica
+// dentro da própria aplicação e a conferência de "está dentro de BASE"
+// deixava passar.
+const PASTAS_DE_DADOS = ['server-data', 'server-data-test', 'server-data-local',
+                         'server-data-preview', '.data', 'backups', 'backups-manuais',
+                         'diaria-docs', 'equipamentos', 'sessions'];
+const ARQUIVOS_DE_DADOS = ['state.json', 'sessions.json', '.env'];
+
+// Arquivos que são do SERVIDOR e nunca foram para o navegador. O handler de
+// estáticos só perguntava "está dentro da pasta da aplicação?", então
+// /server.cjs entregava os 196 KB do backend inteiro para qualquer um, sem
+// login — com a lógica de login mestre, a estrutura das rotas e a criação da
+// conta de administração. O navegador nunca pediu nada disto: ele pede
+// .html na raiz, js/, css/, img/ e precificacao-base.json.
+function _arquivoDoServidor(caminhoAbsoluto) {
+  const nome = path.basename(caminhoAbsoluto).toLowerCase();
+  if (/\.(cjs|mjs|md|log|bak|tmp|sh|yml|yaml|lock)$/.test(nome)) return true;
+  if (nome === 'dockerfile' || nome === '.dockerignore' || nome === '.gitignore') return true;
+  if (nome === 'package.json' || nome === 'package-lock.json') return true;
+  if (nome.charAt(0) === '.') return true;                 // .env, .git*, qualquer oculto
+  // a pasta docs/ é documentação interna (inclui o passo a passo do deploy)
+  const partes = path.resolve(caminhoAbsoluto).split(path.sep);
+  if (partes.indexOf('docs') >= 0 || partes.indexOf('node_modules') >= 0 || partes.indexOf('.git') >= 0) return true;
+  if (partes.indexOf('testes') >= 0) return true;
+  return false;
+}
+
+function _caminhoDeDados(caminhoAbsoluto) {
+  const alvo = path.resolve(caminhoAbsoluto);
+  // 1) dentro da pasta de dados configurada (em produção, /data)
+  const dataDir = path.resolve(DATA_DIR);
+  if (alvo === dataDir || alvo.startsWith(dataDir + path.sep)) return true;
+  // 2) qualquer pasta de dados conhecida, em qualquer nível
+  const partes = alvo.split(path.sep);
+  for (let i = 0; i < partes.length; i++) {
+    if (PASTAS_DE_DADOS.indexOf(partes[i]) >= 0) return true;
+  }
+  // 3) arquivo de dado pelo nome, e banco SQLite
+  const nome = path.basename(alvo);
+  if (ARQUIVOS_DE_DADOS.indexOf(nome) >= 0) return true;
+  if (/\.(db|db-wal|db-shm|sqlite|sqlite3)$/i.test(nome)) return true;
+  return false;
+}
+
+function backupDaInicializacao() {
+  try {
+    if (!fs.existsSync(STATE_FILE)) {
+      console.log('[Backup] primeira subida: ainda não existe state.json para copiar.');
+      return null;
+    }
+    const conteudo = fs.readFileSync(STATE_FILE);          // só LEITURA do original
+    if (!conteudo || conteudo.length < 2) {
+      console.warn('[Backup] state.json está vazio — nada copiado (não sobrescreve cópia boa com arquivo vazio).');
+      return null;
+    }
+    const a = new Date();
+    const p2 = n => String(n).padStart(2, '0');
+    const carimbo = a.getFullYear() + '-' + p2(a.getMonth() + 1) + '-' + p2(a.getDate()) +
+                    '_' + p2(a.getHours()) + 'h' + p2(a.getMinutes());
+    let nome = PREFIXO_BACKUP_SUBIDA + carimbo + '.json';
+    // Duas subidas no mesmo minuto (reinício em sequência) não podem se
+    // sobrescrever: a segunda ganha um sufixo.
+    if (fs.existsSync(path.join(BACKUP_DIR, nome))) {
+      nome = PREFIXO_BACKUP_SUBIDA + carimbo + '_' + p2(a.getSeconds()) + 's.json';
+      let n = 2;
+      while (fs.existsSync(path.join(BACKUP_DIR, nome)) && n < 100) {
+        nome = PREFIXO_BACKUP_SUBIDA + carimbo + '_' + p2(a.getSeconds()) + 's-' + n + '.json';
+        n++;
+      }
+    }
+    const destino = path.join(BACKUP_DIR, nome);
+    fs.writeFileSync(destino, conteudo);                   // arquivo NOVO
+
+    // Confere que a cópia saiu idêntica. Se não saiu, avisa alto: um backup
+    // que não confere é pior que nenhum, porque dá falsa segurança.
+    const gravado = fs.readFileSync(destino);
+    if (!gravado.equals(conteudo)) {
+      console.error('[Backup] *** a cópia ' + nome + ' saiu DIFERENTE do original. NÃO confie nela.');
+    } else {
+      console.log('[Backup] cópia da inicialização: ' + nome +
+                  ' (' + (conteudo.length / 1024).toFixed(1) + ' KB) em ' + BACKUP_DIR);
+    }
+
+    // Mantém as 20 mais recentes DESTAS cópias. A ordem vem do nome, que
+    // começa com a data no formato ano-mês-dia — ordenar por texto já ordena
+    // por tempo.
+    const minhas = fs.readdirSync(BACKUP_DIR)
+      .filter(function (f) { return f.indexOf(PREFIXO_BACKUP_SUBIDA) === 0 && /\.json$/.test(f); })
+      .sort();
+    if (minhas.length > MAX_BACKUPS_SUBIDA) {
+      const sobrando = minhas.slice(0, minhas.length - MAX_BACKUPS_SUBIDA);
+      sobrando.forEach(function (f) {
+        try {
+          fs.unlinkSync(path.join(BACKUP_DIR, f));
+          console.log('[Backup] cópia antiga removida: ' + f);
+        } catch (e) {
+          console.error('[Backup] não consegui remover a cópia antiga ' + f + ':', e.message);
+        }
+      });
+    }
+    return nome;
+  } catch (e) {
+    // Backup é rede de segurança, não pode virar o motivo de o sistema não subir.
+    console.error('[Backup] FALHOU a cópia da inicialização (o sistema segue subindo):', e.message);
+    return null;
+  }
+}
+backupDaInicializacao();
+
 // Rede de proteção dos dados críticos (Entrega/Devolução de Equipamentos).
 // Módulo isolado: se ele falhar, o sistema continua salvando normalmente.
 let equipProtecao = null;
@@ -3458,6 +3594,22 @@ http.createServer(function (req, res) {
   if (!filePath.startsWith(BASE)) {
     res.writeHead(403, Object.assign({ 'Content-Type': 'text/plain' }, SECURITY_HEADERS));
     res.end('403 Forbidden');
+    return;
+  }
+  // DADO NUNCA SAI PELA WEB.
+  // A conferência de cima só garante "está dentro da pasta da aplicação" — e
+  // isso não basta: a pasta de dados padrão (BASE/server-data) fica DENTRO
+  // dela. Um pedido por /server-data/state.json entregava o banco INTEIRO,
+  // com todos os cadastros, sem login nenhum; /server-data/backups/...
+  // entregava as cópias; /server-data/sessions.json, as sessões ativas.
+  // No container de produção DATA_DIR é /data (fora de /app), então lá isto
+  // não alcançava — mas segurança não pode depender de variável de ambiente
+  // nem de onde alguém resolveu apontar a pasta.
+  // A rota /uploads/ é tratada ANTES daqui e continua funcionando: é a única
+  // parte da pasta de dados que é pública de propósito (regra 7).
+  if (_caminhoDeDados(filePath) || _arquivoDoServidor(filePath)) {
+    res.writeHead(404, Object.assign({ 'Content-Type': 'text/plain' }, SECURITY_HEADERS));
+    res.end('404 Not Found');
     return;
   }
   fs.readFile(filePath, function (err, data) {

@@ -56,6 +56,8 @@ function sementeTelas() {
 
 // ── AS SUITES ──────────────────────────────────────────────────────────────
 const SUITES = [
+  { nome: 'backup',    arquivo: 'backup.cjs',         servidor: false, navegador: false,
+    titulo: 'Backup automatico na inicializacao (sobe o servidor por conta propria)' },
   { nome: 'ff',        arquivo: 'ff-leitura.cjs',     servidor: false, navegador: false,
     titulo: 'Fluxo Financeiro — leitura de PDF e valor em reais' },
   { nome: 'seguranca', arquivo: 'seguranca.cjs',      servidor: true,  navegador: false, semente: sementeAcesso,

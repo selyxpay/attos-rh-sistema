@@ -134,11 +134,50 @@ baixa o estado inteiro quando a versão mudou. A versão local **só avança qua
 a tela realmente absorveu** o estado novo — se falhar, fica atrasada de
 propósito, para o próximo save ser tratado como "mesclar" em vez de "substituir".
 
-### 3.4 Backup
+### 3.4 Backup — dois, que se completam
 
-`server.cjs` grava backup por hora e por dia do `state.json` em `backups/`.
-Há ainda `equipamentos-protecao.cjs`, um módulo isolado com redes de segurança
-extras para os dados de equipamento (parte crítica do negócio).
+**Na inicialização** (`backupDaInicializacao`, no `server.cjs`). A cada subida do
+processo, **antes de o sistema ler ou gravar qualquer coisa**, o `state.json`
+atual é copiado para `DATA_DIR/backups/` com data e hora no nome
+(`state_2026-10-21_10h30.json`). Deploy é justamente quando o processo sobe, então
+**todo deploy deixa para trás a foto de como o sistema estava um instante antes
+dele** — sem ninguém precisar lembrar de fazer backup à mão.
+
+Ficam as **20 cópias mais recentes**. O que essa função nunca faz:
+
+- não altera, não move e não renomeia o `state.json` (só **lê** e escreve outro
+  arquivo);
+- não apaga nada que não seja cópia dela mesma (os `state-hora-*` e
+  `state-dia-*` do backup por hora ficam intactos);
+- não impede o sistema de subir: qualquer falha vira log e a vida segue. Isso é
+  testado.
+
+Ela também confere a cópia depois de escrever e grita no log se saiu diferente
+do original — backup que não confere é pior que nenhum, porque dá falsa
+segurança.
+
+**Por hora e por dia** (`fazerBackupSePreciso`). Gira em 24 slots de hora + 7 de
+dia, com nomes fixos. A cópia das 14h de hoje sobrescreve a das 14h de ontem.
+Serve para voltar algumas horas; a da inicialização serve para voltar um deploy.
+
+**As duas ficam em `DATA_DIR/backups/`**, ou seja, dentro do volume persistente
+do Coolify (`DATA_DIR=/data` no container). Se ficassem dentro do container,
+sumiriam no deploy seguinte — que é exatamente quando o backup mais importa.
+
+**A pasta nunca sai pela web.** O servidor de arquivos estáticos recusa qualquer
+caminho que caia na pasta de dados (`_caminhoDeDados`) e qualquer arquivo que
+seja do servidor (`_arquivoDoServidor`). Isso não é detalhe: a conferência
+anterior só perguntava "está dentro da pasta da aplicação?", e a pasta de dados
+padrão fica **dentro** dela — então `/server-data/state.json` entregava o banco
+inteiro sem login, e `/server.cjs` entregava o backend todo. A única parte da
+pasta de dados que é pública de propósito é `/uploads/` (regra 7).
+
+### 3.5 Outras redes de segurança
+
+`equipamentos-protecao.cjs` é um módulo isolado com proteções extras para os
+dados de equipamento (parte crítica do negócio): guarda anti-sumiço, espelho
+independente em pasta própria e arquivo dos excluídos. Se ele falhar, o sistema
+continua salvando normalmente.
 
 ---
 
