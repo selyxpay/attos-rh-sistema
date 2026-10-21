@@ -33,6 +33,22 @@ class CDP {
 }
 const BASE = process.env.BASE || BASE;
 const espera = ms => new Promise(r => setTimeout(r, ms));
+// Espera por CONDICAO, nao por tempo fixo: na execucao completa a maquina
+// esta ocupada e um espera(3000) nao basta. Devolve true quando a condicao
+// ficou verdadeira, false no limite.
+async function esperarPor(cdp, expressao, limiteMs, oQue) {
+  const fim = Date.now() + (limiteMs || 30000);
+  while (Date.now() < fim) {
+    try { if (await cdp.eval(expressao) === true) return true; } catch (e) { /* ainda carregando */ }
+    await new Promise(function (r) { setTimeout(r, 250); });
+  }
+  console.log("  (limite) esperei " + ((limiteMs || 30000) / 1000) + "s por: " + (oQue || expressao));
+  return false;
+}
+// Pagina de login pronta (ou o painel ja carregado, se a sessao existe).
+const APP_PRONTO = "typeof state !== 'undefined' && !!state";
+const LOGIN_PRONTO = "document.readyState === 'complete' && (!!document.getElementById('login-form') || (typeof state !== 'undefined' && !!state))";
+
 let falhas = 0;
 const ok = (c, m) => { console.log((c ? '  OK   ' : '  FALHOU: ') + m); if (!c) falhas++; };
 
@@ -70,14 +86,15 @@ const MEDIR = `(function(){
   await cdp.send('Page.enable'); await cdp.send('Runtime.enable');
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
 
-  await cdp.send('Page.navigate', { url: BASE + '/' }); await espera(3000);
+  await cdp.send('Page.navigate', { url: BASE + '/' });
+  await esperarPor(cdp, LOGIN_PRONTO, 30000, 'a pagina abrir');
   if (await cdp.eval(`!!document.getElementById('login-form')`)) {
     await cdp.eval(`(function(){
       document.getElementById('login-username').value='admin';
       document.getElementById('login-password').value='TesteLocal#123';
       document.getElementById('login-form').requestSubmit();
     })()`);
-    await espera(4500);
+    await esperarPor(cdp, APP_PRONTO, 45000, 'o sistema carregar depois do login');
   }
 
   // abre a aba do WhatsApp e injeta conversas de teste na lista, para medir

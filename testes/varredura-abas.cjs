@@ -96,16 +96,27 @@ const CDP_PORT = Number(process.env.CDP || 9222);
   });
 
   const espera = ms => new Promise(r => setTimeout(r, ms));
+  // Espera por CONDICAO, nao por tempo fixo: na execucao completa a maquina
+  // esta ocupada e um espera(4000) nao basta.
+  const esperarPor = async function (expr, limiteMs, oQue) {
+    const fim = Date.now() + (limiteMs || 30000);
+    while (Date.now() < fim) {
+      try { if (await cdp.eval(expr) === true) return true; } catch (e) {}
+      await espera(250);
+    }
+    console.log('  (limite) esperei por: ' + (oQue || expr));
+    return false;
+  };
 
   // ---------- login ----------
   await cdp.send('Page.navigate', { url: BASE + '/' });
-  await espera(2500);
+  await esperarPor("!!document.getElementById('login-form') || (typeof state !== 'undefined' && !!state)", 30000, 'a pagina abrir');
   await cdp.eval(`(function(){
     document.getElementById('login-username').value = 'admin';
     document.getElementById('login-password').value = 'TesteLocal#123';
     document.getElementById('login-form').requestSubmit();
   })()`);
-  await espera(4000);
+  await esperarPor("typeof state !== 'undefined' && !!state", 45000, 'o sistema carregar depois do login');
   const logado = await cdp.eval(`!!document.querySelector('.sidebar, #sidebar, nav')`);
   console.log('login ok?', logado);
 

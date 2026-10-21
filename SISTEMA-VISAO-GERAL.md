@@ -156,6 +156,12 @@ Ela também confere a cópia depois de escrever e grita no log se saiu diferente
 do original — backup que não confere é pior que nenhum, porque dá falsa
 segurança.
 
+**O banco do WhatsApp e as sessões** também são copiados na subida
+(`backupExtraDaInicializacao`), com os mesmos cuidados e o mesmo limite de 20.
+Eles guardam o que **não dá para recriar**: as conversas e as contas
+conectadas (com o token) ficam no SQLite, e as sessões abertas no
+`sessions.json`. Faltava cópia dos dois — o backup só cobria o `state.json`.
+
 **Por hora e por dia** (`fazerBackupSePreciso`). Gira em 24 slots de hora + 7 de
 dia, com nomes fixos. A cópia das 14h de hoje sobrescreve a das 14h de ontem.
 Serve para voltar algumas horas; a da inicialização serve para voltar um deploy.
@@ -528,6 +534,23 @@ montado continua dentro da pasta de documentos.
     aparece todo emendado — foi o que acontecia com o descritivo da vaga. Sem
     o `escapeHTML`, um descritivo com `<img onerror=...>` executava.
     Para campo de ENTRADA (`textarea`) não precisa de nada: ele já preserva.
+16. **Arquivo `.cjs` novo que o servidor exige TEM que entrar no `COPY` do
+    Dockerfile.** Ele lista os arquivos **um por um**; não copia a raiz
+    inteira. Arquivo esquecido não existe na imagem, o `require` falha e o
+    módulo morre **só em produção** — localmente tudo passa, porque o arquivo
+    está lá. Já aconteceu: o `whatsapp-bot.cjs` ficou fora do `COPY` e
+    derrubou o canal inteiro do WhatsApp.
+    A suíte `imagem` confere isso sozinha. Rode os testes antes de subir.
+17. **Peça opcional carrega no `try` dela, sozinha.** Juntar um extra no mesmo
+    `try/catch` das peças essenciais faz a falha do extra desligar o
+    essencial. Foi assim que um arquivo faltando virou "WhatsApp
+    inicializando" e aba Conexões vazia: o bot é um extra, mas estava no mesmo
+    `try` do banco, da API e do webhook.
+18. **Teste de tela espera CONDIÇÃO, nunca tempo fixo.** Na execução completa
+    a máquina está ocupada e um `espera(3000)` não basta: duas suítes falharam
+    por carga e passavam sozinhas. Suíte que falha por carga é pior que suíte
+    que não existe, porque ensina a ignorar a falha. Use o `esperarPor` que já
+    existe nas suítes.
 
 ---
 
@@ -559,6 +582,8 @@ tipo de erro que volta: se você mexer na área, confira que não reintroduziu.
 | Qualquer logado virava administrador | `POST /api/state` aceitava `departamento`/`permissoes`/`senha` do cliente |
 | Hash da senha de todos no payload | O filtro removia só `senhaVisivel`, não `senha` |
 | Arquivo anônimo hospedado no domínio | `/api/upload` sem checagem e `/uploads/` servindo `.html` como página |
+| WhatsApp preso em "inicializando" e Conexões vazia | Arquivo `.cjs` novo fora do `COPY` do Dockerfile: o `require` falha e, por estar no mesmo `try` dos módulos essenciais, desliga o canal todo. **Nada havia sumido** |
+| Suíte de tela falhando só na execução completa | Espera por tempo fixo em vez de por condição, com a máquina ocupada |
 
 ---
 

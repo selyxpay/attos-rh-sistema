@@ -212,6 +212,61 @@ function backupDaInicializacao() {
 }
 backupDaInicializacao();
 
+// ── BACKUP DO BANCO DO WHATSAPP E DAS SESSÕES ──────────────────────────────
+// O state.json já tinha cópia a cada subida. Faltavam estes dois, e eles
+// guardam coisa que não dá para recriar: as CONVERSAS e as CONTAS conectadas
+// (com o token) ficam no SQLite, e as sessões abertas no sessions.json.
+// Roda junto com o backup do state, ANTES de qualquer código novo encostar
+// neles — é o que permite voltar atrás se um deploy mexer no formato.
+// Mesmas três garantias: só LÊ o original, só apaga cópia sua, e nunca
+// impede o sistema de subir.
+function backupExtraDaInicializacao() {
+  const alvos = [
+    { origem: path.join(DATA_DIR, 'whatsapp.db'), prefixo: 'whatsapp_' },
+    { origem: path.join(DATA_DIR, 'sessions.json'), prefixo: 'sessions_' }
+  ];
+  const a = new Date();
+  const p2 = n => String(n).padStart(2, '0');
+  const carimbo = a.getFullYear() + '-' + p2(a.getMonth() + 1) + '-' + p2(a.getDate()) +
+                  '_' + p2(a.getHours()) + 'h' + p2(a.getMinutes());
+
+  alvos.forEach(function (alvo) {
+    try {
+      if (!fs.existsSync(alvo.origem)) return;              // ainda não existe
+      const conteudo = fs.readFileSync(alvo.origem);          // só LEITURA
+      if (!conteudo || !conteudo.length) return;              // vazio: não sobrescreve cópia boa
+      const ext = path.extname(alvo.origem) || '.bak';
+      let nome = alvo.prefixo + carimbo + ext;
+      if (fs.existsSync(path.join(BACKUP_DIR, nome))) {
+        nome = alvo.prefixo + carimbo + '_' + p2(a.getSeconds()) + 's' + ext;
+      }
+      const destino = path.join(BACKUP_DIR, nome);
+      fs.writeFileSync(destino, conteudo);
+      const gravado = fs.readFileSync(destino);
+      if (!gravado.equals(conteudo)) {
+        console.error('[Backup] *** a cópia ' + nome + ' saiu DIFERENTE do original. NÃO confie nela.');
+      } else {
+        console.log('[Backup] cópia da inicialização: ' + nome +
+                    ' (' + (conteudo.length / 1024).toFixed(1) + ' KB)');
+      }
+      // Mantém as 20 mais recentes DESTE prefixo. Não encosta nas outras.
+      const minhas = fs.readdirSync(BACKUP_DIR)
+        .filter(function (f) { return f.indexOf(alvo.prefixo) === 0 && f.endsWith(ext); })
+        .sort();
+      if (minhas.length > MAX_BACKUPS_SUBIDA) {
+        minhas.slice(0, minhas.length - MAX_BACKUPS_SUBIDA).forEach(function (f) {
+          try { fs.unlinkSync(path.join(BACKUP_DIR, f)); }
+          catch (e) { console.error('[Backup] não removi ' + f + ':', e.message); }
+        });
+      }
+    } catch (e) {
+      console.error('[Backup] FALHOU a cópia de ' + path.basename(alvo.origem) +
+                    ' (o sistema segue subindo):', e.message);
+    }
+  });
+}
+backupExtraDaInicializacao();
+
 // ── LIMPEZA PONTUAL (outubro de 2026) ──────────────────────────────────────
 // Arquivo de 70 bytes que ficou órfão na pasta pública: foi um pixel subido
 // para CONFERIR, num deploy, que a validação de upload por conteúdo estava
@@ -1479,11 +1534,26 @@ try {
   waDb      = require('./whatsapp-db.cjs');
   waApi     = require('./whatsapp-api.cjs');
   waWebhook = require('./whatsapp-webhook.cjs');
-  waBot     = require('./whatsapp-bot.cjs');
   _waCarregado = true;
 } catch (e) {
   console.error('[WhatsApp] Módulo NÃO carregou (o resto do sistema segue normal):', e.message);
   console.error('[WhatsApp] Se quiser usar o WhatsApp, rode: npm install');
+}
+
+// ── O BOT CARREGA SEPARADO, E DE PROPÓSITO ─────────────────────────────────
+// Ele estava no MESMO try dos três módulos acima, e isso derrubou o WhatsApp
+// inteiro em produção: o arquivo whatsapp-bot.cjs não tinha sido incluído no
+// COPY do Dockerfile, o require falhou, _waCarregado virou false e o canal
+// todo desligou — a tela ficou presa em "WhatsApp inicializando" e a aba
+// Conexões apareceu vazia, como se as contas tivessem sumido. Nada havia
+// sumido: o módulo nunca carregou.
+// O bot é um EXTRA. Se ele falhar, o atendimento manual tem que continuar
+// funcionando. Por isso agora é um try só dele.
+try {
+  waBot = require('./whatsapp-bot.cjs');
+} catch (e) {
+  console.error('[Bot] módulo NÃO carregou — o WhatsApp segue funcionando SEM o bot:', e.message);
+  waBot = null;
 }
 
 // Variáveis de ambiente do WhatsApp

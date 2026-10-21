@@ -30,7 +30,11 @@ COPY equipamentos-protecao.cjs restaurar-equipamentos.cjs ./
 COPY verificar-sistema.cjs backup-dados.cjs limpar-fotos-embutidas.cjs reparar-listas-infladas.cjs restaurar-empresas.cjs restaurar-registros.cjs ./
 # Módulo WhatsApp (API Oficial da Meta). Se faltar, o servidor sobe do mesmo
 # jeito e só o WhatsApp responde 503 — o resto do sistema não é afetado.
-COPY whatsapp-db.cjs whatsapp-api.cjs whatsapp-webhook.cjs ./
+# ATENCAO: este COPY lista os arquivos UM POR UM. Arquivo .cjs novo que o
+# server.cjs passe a exigir TEM que entrar aqui, senao o require falha e o
+# modulo morre em producao -- foi o que aconteceu com o whatsapp-bot.cjs.
+# A suite "imagem" confere isso automaticamente: rode os testes antes de subir.
+COPY whatsapp-db.cjs whatsapp-api.cjs whatsapp-webhook.cjs whatsapp-bot.cjs ./
 # Ponte para o SEGUNDO WhatsApp (QR Code, serviço OpenWA à parte). Mesma regra:
 # se faltar ou não estiver configurado, só essa aba avisa — nada mais é afetado.
 COPY openwa.cjs ./

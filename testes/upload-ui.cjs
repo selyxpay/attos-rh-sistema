@@ -34,6 +34,22 @@ class CDP {
 const BASE = process.env.BASE || BASE;
 const CDP_PORT = Number(process.env.CDP || 9222);
 const espera = ms => new Promise(r => setTimeout(r, ms));
+// Espera por CONDICAO, nao por tempo fixo: na execucao completa a maquina
+// esta ocupada e um espera(3000) nao basta. Devolve true quando a condicao
+// ficou verdadeira, false no limite.
+async function esperarPor(cdp, expressao, limiteMs, oQue) {
+  const fim = Date.now() + (limiteMs || 30000);
+  while (Date.now() < fim) {
+    try { if (await cdp.eval(expressao) === true) return true; } catch (e) { /* ainda carregando */ }
+    await new Promise(function (r) { setTimeout(r, 250); });
+  }
+  console.log("  (limite) esperei " + ((limiteMs || 30000) / 1000) + "s por: " + (oQue || expressao));
+  return false;
+}
+// Pagina de login pronta (ou o painel ja carregado, se a sessao existe).
+const APP_PRONTO = "typeof state !== 'undefined' && !!state";
+const LOGIN_PRONTO = "document.readyState === 'complete' && (!!document.getElementById('login-form') || (typeof state !== 'undefined' && !!state))";
+
 let falhas = 0;
 const ok = (c, m) => { console.log((c ? '  OK   ' : '  FALHOU: ') + m); if (!c) falhas++; };
 
@@ -49,7 +65,8 @@ const PNG_B64 = '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c
 
   // ---------- 1) ficha publica: sobe foto SEM login ----------
   console.log('=== FICHA PUBLICA: sobe foto sem login (pelo mesmo caminho do vps-sync) ===');
-  await cdp.send('Page.navigate', { url: BASE + '/candidato.html' }); await espera(2500);
+  await cdp.send('Page.navigate', { url: BASE + '/candidato.html' });
+  await esperarPor(cdp, LOGIN_PRONTO, 30000, 'a pagina abrir');
   const semSessao = await cdp.eval(`document.cookie.indexOf('rt_session') < 0`);
   console.log('   esta sem sessao?', semSessao);
   const envio = await cdp.eval(`(async function(){
@@ -97,14 +114,15 @@ const PNG_B64 = '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c
 
   // ---------- 3) SVG com login NAO renderiza como imagem nem executa ----------
   console.log('\n=== SVG NAO E SERVIDO COMO IMAGEM ===');
-  await cdp.send('Page.navigate', { url: BASE + '/' }); await espera(2500);
+  await cdp.send('Page.navigate', { url: BASE + '/' });
+  await esperarPor(cdp, LOGIN_PRONTO, 30000, 'a pagina abrir');
   if (await cdp.eval(`!!document.getElementById('login-form')`)) {
     await cdp.eval(`(function(){
       document.getElementById('login-username').value='admin';
       document.getElementById('login-password').value='TesteLocal#123';
       document.getElementById('login-form').requestSubmit();
     })()`);
-    await espera(4500);
+    await esperarPor(cdp, APP_PRONTO, 45000, 'o sistema carregar depois do login');
   }
   const svgRes = await cdp.eval(`(async function(){
     const dataUrl = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>');
