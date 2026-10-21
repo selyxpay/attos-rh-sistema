@@ -23,10 +23,17 @@ function ehMestre(login) { return login === 'joaobalaf' || login === 'admin'; }
 // a senha do admin depois, ela NÃO é sobrescrita. Retorna true se mudou algo.
 function garantirAdminMestre() {
   if (!state || !Array.isArray(state.funcionarios)) return false;
-  // Hash da senha antiga do admin. NAO escreva a senha em texto aqui: este
-  // arquivo vai para o GitHub, e foi assim que ela vazou.
-  const SENHA_ADMIN_MESTRE = '6101ed3e13dcdc5ea80901f4c5e1c9152d55b33b077b9f0b6ec30e72bf082e08';
-  const HASH_ADMIN_PADRAO = '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918'; // 'admin'
+  // SENHA NÃO É ASSUNTO DO NAVEGADOR.
+  // Aqui existiam dois hashes de senha de administrador escritos no código, e
+  // a linha que os usava tentava RESETAR a senha do admin a partir do
+  // navegador. Hoje isso é código morto por dois motivos, nessa ordem:
+  // o servidor não manda mais o campo `senha` no estado (então a comparação
+  // nunca dava verdadeira), e ele repõe `senha` do próprio estado em toda
+  // gravação (então o navegador não consegue defini-la de jeito nenhum).
+  // Quem cuida da senha do admin é o servidor, por ADMIN_SENHA, e a troca
+  // passa pelas rotas próprias, que conferem permissão e registram.
+  // Os hashes saíram junto: constante de senha em arquivo de front não tem
+  // uso legítimo, e este arquivo já esteve num repositório público.
   let mudou = false;
   let contaAdmin = state.funcionarios.find(f => f.login === 'admin');
   if (!contaAdmin) {
@@ -36,7 +43,6 @@ function garantirAdminMestre() {
   if (contaAdmin) {
     if (contaAdmin.departamento !== 'administracao') { contaAdmin.departamento = 'administracao'; mudou = true; }
     if (contaAdmin.status !== 'ativo') { contaAdmin.status = 'ativo'; mudou = true; }
-    if (contaAdmin.senha === 'admin' || contaAdmin.senha === HASH_ADMIN_PADRAO) { contaAdmin.senha = SENHA_ADMIN_MESTRE; mudou = true; }
   }
   return mudou;
 }

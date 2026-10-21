@@ -1109,12 +1109,18 @@ function garantirAdminServidor() {
                 // admin vem de ADMIN_SENHA. Sem a variavel, cai na senha antiga
                 // — que e publica, e o sistema exige trocar no primeiro login.
                 if ((nova.login || '').toLowerCase() === 'admin' && !nova.senha) {
-                  nova.senha = process.env.ADMIN_SENHA
-                    ? hashSenhaServer(String(process.env.ADMIN_SENHA))
-                    : '6101ed3e13dcdc5ea80901f4c5e1c9152d55b33b077b9f0b6ec30e72bf082e08';
-                  if (!process.env.ADMIN_SENHA) {
-                    console.warn('[RT] ADMIN_SENHA nao definida — admin nasceu com a senha PUBLICA.');
-                    console.warn('[RT] Defina ADMIN_SENHA no Coolify, ou troque no primeiro login.');
+                  // Sem ADMIN_SENHA a conta nasce SEM SENHA e ninguem entra
+                  // nela (senhaConfere recusa senha vazia). Antes caia num
+                  // hash fixo escrito aqui, de uma senha publica — e este
+                  // arquivo ficou baixavel em producao. Falhar fechado e o
+                  // certo: deploy mal configurado nao pode virar porta aberta.
+                  if (process.env.ADMIN_SENHA) {
+                    nova.senha = hashSenhaServer(String(process.env.ADMIN_SENHA));
+                  } else {
+                    nova.senha = '';
+                    console.warn('[RT] *** ADMIN_SENHA nao esta definida.');
+                    console.warn('[RT] *** A conta admin foi criada SEM SENHA e NINGUEM consegue entrar nela.');
+                    console.warn('[RT] *** Defina ADMIN_SENHA no Coolify e reinicie para a conta ficar utilizavel.');
                   }
                 }
                 d.funcionarios.push(nova);
@@ -1137,14 +1143,12 @@ function garantirAdminServidor() {
       // exige trocar no primeiro login.
       d.funcionarios.push({
         id: 'func-admin', nome: 'Administrador', login: 'admin',
-        senha: process.env.ADMIN_SENHA
-          ? hashSenhaServer(String(process.env.ADMIN_SENHA))
-          : '6101ed3e13dcdc5ea80901f4c5e1c9152d55b33b077b9f0b6ec30e72bf082e08',
+        senha: process.env.ADMIN_SENHA ? hashSenhaServer(String(process.env.ADMIN_SENHA)) : '',
         departamento: 'administracao', status: 'ativo', permissoes: {}
       });
       if (!process.env.ADMIN_SENHA) {
-        console.warn('[RT] ADMIN_SENHA nao definida — a conta admin nasceu com a senha PUBLICA.');
-        console.warn('[RT] Defina ADMIN_SENHA no Coolify, ou troque a senha no primeiro login.');
+        console.warn('[RT] *** ADMIN_SENHA nao esta definida: a conta admin nasceu SEM SENHA.');
+        console.warn('[RT] *** Ninguem entra nela. Defina ADMIN_SENHA no Coolify e reinicie.');
       }
       mudou = true;
       console.log('[RT] Conta admin criada.');
@@ -1160,13 +1164,15 @@ function garantirAdminServidor() {
     {
       const adm = d.funcionarios.find(function (f) { return (f.login || '').toLowerCase() === 'admin'; });
       if (adm && !adm.senha) {
-        adm.senha = process.env.ADMIN_SENHA
-          ? hashSenhaServer(String(process.env.ADMIN_SENHA))
-          : '6101ed3e13dcdc5ea80901f4c5e1c9152d55b33b077b9f0b6ec30e72bf082e08';
-        mudou = true;
+        // Só entra aqui quando a senha está VAZIA (ver o if acima): senha de
+        // produção nunca é sobrescrita. Sem ADMIN_SENHA, continua vazia.
+        if (process.env.ADMIN_SENHA) {
+          adm.senha = hashSenhaServer(String(process.env.ADMIN_SENHA));
+          mudou = true;
+        }
         if (!process.env.ADMIN_SENHA) {
-          console.warn('[RT] ADMIN_SENHA nao definida — admin nasceu com a senha PUBLICA.');
-          console.warn('[RT] Defina ADMIN_SENHA no Coolify, ou troque no primeiro login.');
+          console.warn('[RT] *** ADMIN_SENHA nao esta definida e a conta admin esta SEM SENHA.');
+          console.warn('[RT] *** Ninguem consegue entrar nela. Defina ADMIN_SENHA no Coolify e reinicie.');
         }
       }
     }

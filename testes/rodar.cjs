@@ -60,6 +60,8 @@ const SUITES = [
     titulo: 'Backup automatico na inicializacao (sobe o servidor por conta propria)' },
   { nome: 'ff',        arquivo: 'ff-leitura.cjs',     servidor: false, navegador: false,
     titulo: 'Fluxo Financeiro — leitura de PDF e valor em reais' },
+  { nome: 'backend',   arquivo: 'backend-fechado.cjs', servidor: true, navegador: false,
+    titulo: 'Backend e pasta de dados fechados para a web (o vazamento do /server.cjs)' },
   { nome: 'seguranca', arquivo: 'seguranca.cjs',      servidor: true,  navegador: false, semente: sementeAcesso,
     titulo: 'Seguranca e estabilidade (queda por URL, escalada de acesso, senha no payload)' },
   { nome: 'upload',    arquivo: 'upload.cjs',         servidor: true,  navegador: false,
