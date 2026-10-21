@@ -328,6 +328,80 @@ function responderJson(res, code, obj) {
   res.end(JSON.stringify(obj));
 }
 
+// ── QUE ARQUIVO É ESTE, DE VERDADE? (magic bytes) ──────────────────────────
+// NUNCA confie na extensão nem no Content-Type que o cliente mandou: os dois
+// são escolhidos por quem envia. Um SVG declarado como "image/png" passava
+// pela conferência antiga e ia para a pasta pública com extensão .png — e SVG
+// é XML, carrega <script> dentro. HTML renomeado para .jpg, idem.
+// Aqui o tipo sai dos PRIMEIROS BYTES do conteúdo.
+//
+// Devolve uma etiqueta curta: 'png' | 'jpeg' | 'gif' | 'webp' | 'bmp' |
+// 'svg' | 'html' | 'pdf' | 'zip' | 'ole' | 'mp4' | 'mp3' | 'ogg' | 'amr' |
+// 'aac' | 'wav' | 'texto' | 'desconhecido'.
+const TIPOS_IMAGEM_SEGURA = { png: 'image/png', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp' };
+const EXT_DO_TIPO = {
+  png: 'png', jpeg: 'jpg', gif: 'gif', webp: 'webp', bmp: 'bmp',
+  svg: 'svg', pdf: 'pdf', zip: 'zip', ole: 'doc',
+  mp4: 'mp4', mp3: 'mp3', ogg: 'ogg', amr: 'amr', aac: 'aac', wav: 'wav',
+  texto: 'txt', html: 'html'
+};
+
+function detectarTipoReal(buf) {
+  if (!buf || buf.length < 2) return 'desconhecido';
+  const b = buf;
+  const comeca = function (bytes, off) {
+    const o = off || 0;
+    if (b.length < o + bytes.length) return false;
+    for (let i = 0; i < bytes.length; i++) if (b[o + i] !== bytes[i]) return false;
+    return true;
+  };
+  const texto = function (s, off) {
+    const o = off || 0;
+    if (b.length < o + s.length) return false;
+    return b.slice(o, o + s.length).toString('latin1') === s;
+  };
+
+  // ---- imagens (as únicas que podem ser servidas inline) ----
+  if (comeca([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])) return 'png';
+  if (comeca([0xFF, 0xD8, 0xFF])) return 'jpeg';
+  if (texto('GIF87a') || texto('GIF89a')) return 'gif';
+  if (texto('RIFF') && texto('WEBP', 8)) return 'webp';
+  if (texto('WAVE', 8)) return 'wav';
+  if (texto('BM')) return 'bmp';
+
+  // ---- documentos e mídia ----
+  if (texto('%PDF')) return 'pdf';
+  if (comeca([0x50, 0x4B, 0x03, 0x04]) || comeca([0x50, 0x4B, 0x05, 0x06])) return 'zip';   // docx/xlsx/pptx
+  if (comeca([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1])) return 'ole';               // doc/xls/ppt antigos
+  if (texto('ftyp', 4)) return 'mp4';                                                        // mp4 / 3gp / m4a
+  if (texto('ID3') || comeca([0xFF, 0xFB]) || comeca([0xFF, 0xF3]) || comeca([0xFF, 0xF2])) return 'mp3';
+  if (texto('OggS')) return 'ogg';
+  if (texto('#!AMR')) return 'amr';
+  if (comeca([0xFF, 0xF1]) || comeca([0xFF, 0xF9])) return 'aac';
+
+  // ---- texto: SVG e HTML não têm magic byte, são XML/marcação ----
+  // Olha só o começo, já sem BOM e sem espaço em branco.
+  let inicio = b.slice(0, 1024).toString('utf8');
+  inicio = inicio.replace(/^﻿/, '').replace(/^\s+/, '');
+  const minusculo = inicio.toLowerCase();
+  if (/^<svg[\s>]/.test(minusculo)) return 'svg';
+  if (/^<\?xml/.test(minusculo) && /<svg[\s>]/.test(minusculo)) return 'svg';
+  if (/^<!doctype\s+html/.test(minusculo) || /^<html[\s>]/.test(minusculo)) return 'html';
+  // Marcação solta com script/iframe/onload é tratada como HTML: não interessa
+  // o nome, interessa que o navegador executaria.
+  if (/^</.test(minusculo) && /<script|<iframe|\son\w+\s*=/.test(minusculo)) return 'html';
+  // Texto puro de verdade (sem byte de controle fora de tab/nova linha).
+  const amostra = b.slice(0, 512);
+  let ehTexto = true;
+  for (let i = 0; i < amostra.length; i++) {
+    const c = amostra[i];
+    if (c === 0) { ehTexto = false; break; }
+    if (c < 9 || (c > 13 && c < 32)) { ehTexto = false; break; }
+  }
+  if (ehTexto && amostra.length) return 'texto';
+  return 'desconhecido';
+}
+
 // ── DECODIFICAR ENDEREÇO SEM DERRUBAR O SERVIDOR ───────────────────────────
 // decodeURIComponent LANÇA (URIError) quando a URL tem um "%" solto ou um
 // escape pela metade (ex.: "/%", "?token=%"). Isso ficava fora de qualquer
@@ -2597,25 +2671,45 @@ http.createServer(function (req, res) {
       if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
       const m = /^data:([^;]+);base64,([\s\S]*)$/.exec((body && body.dataUrl) || '');
       if (!m) { responderJson(res, 400, { error: 'dataUrl inválido' }); return; }
-      const mimeUp = String(m[1] || '').toLowerCase();
+      // base64 ocupa ~4/3 do original. O limite de quem não tem login é menor:
+      // foto de celular já vem reduzida pelo navegador.
+      if (!autenticado && m[2].length > 11 * 1024 * 1024) {
+        responderJson(res, 413, { error: 'imagem muito grande' }); return;
+      }
+      let dados;
+      try { dados = Buffer.from(m[2], 'base64'); }
+      catch (e) { responderJson(res, 400, { error: 'base64 inválido' }); return; }
+      if (!dados.length) { responderJson(res, 400, { error: 'arquivo vazio' }); return; }
+
+      // O TIPO SAI DOS BYTES, não do que o cliente declarou no data URL nem de
+      // extensão nenhuma. Um SVG anunciado como "image/png" passava pela
+      // conferência antiga e era gravado como .png na pasta pública — e SVG é
+      // XML, leva <script> dentro.
+      const tipoReal = detectarTipoReal(dados);
+
+      // HTML nunca entra, de ninguém. Nenhum fluxo do sistema sobe HTML por
+      // aqui, e é exatamente o arquivo que viraria página no próprio domínio.
+      if (tipoReal === 'html') {
+        responderJson(res, 400, { error: 'arquivo não permitido' }); return;
+      }
       if (!autenticado) {
-        if (!/^image\/(png|jpe?g|gif|webp|bmp)$/.test(mimeUp)) {
-          responderJson(res, 400, { error: 'sem login, só imagem é aceita' }); return;
-        }
-        // base64 ocupa ~4/3 do original; 8 MB de imagem é folga de sobra para
-        // foto de celular já reduzida no navegador.
-        if (m[2].length > 11 * 1024 * 1024) {
-          responderJson(res, 413, { error: 'imagem muito grande' }); return;
+        // Sem login só entra IMAGEM de verdade (a ficha pública de candidatura
+        // e o banco de talentos dependem disto). SVG fica de fora: é o único
+        // formato de "imagem" que executa script.
+        if (!TIPOS_IMAGEM_SEGURA[tipoReal]) {
+          responderJson(res, 400, { error: 'sem login, só foto é aceita' }); return;
         }
         _registrarSubidaAnonima(_ipUp);
       }
-      let ext = (m[1].split('/')[1] || 'bin').split('+')[0].split(';')[0];
-      if (!ext || ext.length > 5) ext = 'bin';
+
+      // A extensão gravada vem do tipo DETECTADO. Conteúdo que não dá para
+      // identificar vira .bin, e .bin é sempre entregue como anexo.
+      const ext = EXT_DO_TIPO[tipoReal] || 'bin';
       const limpo = String((body && body.hint) || 'doc').replace(/[^a-zA-Z0-9]+/g, '_').slice(0, 32);
       const nome = Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '_' + limpo + '.' + ext;
       try {
-        fs.writeFileSync(path.join(UPLOADS_DIR, nome), Buffer.from(m[2], 'base64'));
-        responderJson(res, 200, { url: '/uploads/' + nome });
+        fs.writeFileSync(path.join(UPLOADS_DIR, nome), dados);
+        responderJson(res, 200, { url: '/uploads/' + nome, tipo: tipoReal });
       } catch (e) { console.error('Erro no upload:', e); responderJson(res, 500, { error: 'falha no upload' }); }
     });
     return;
@@ -2627,23 +2721,44 @@ http.createServer(function (req, res) {
     const arq = path.join(UPLOADS_DIR, nome);
     fs.readFile(arq, function (e, data) {
       if (e) { res.writeHead(404, Object.assign({ 'Content-Type': 'text/plain' }, SECURITY_HEADERS)); res.end('404'); return; }
+      // Esta pasta é PÚBLICA (regra 7), e quem decide como o arquivo é
+      // entregue é o CONTEÚDO dele, não a extensão. Um .html (ou um .svg
+      // renomeado para .png) era servido como PÁGINA no próprio domínio, e a
+      // política de segurança libera script inline — então rodava JavaScript
+      // na origem do sistema, com a sessão de quem abrisse o link.
+      // Reconferir aqui também cobre o que já está na pasta de antes.
+      const tipoReal = detectarTipoReal(data);
       const ext = path.extname(arq).toLowerCase();
-      const ct = MIME[ext] || 'application/octet-stream';
-      // Esta pasta é PÚBLICA (regra 7). Um arquivo .html aqui era servido como
-      // PÁGINA no próprio domínio, e a política de segurança libera script
-      // inline — então um HTML subido aqui rodava JavaScript na origem do
-      // sistema, com a sessão de quem abrisse o link.
-      // Imagem continua sendo entregue normal, porque a tela mostra foto de
-      // candidato e de equipamento direto no <img>. Qualquer outra coisa vai
-      // como ANEXO e com tipo neutro: o navegador baixa em vez de executar.
-      const ehImagem = ext === '.png' || ext === '.jpg' || ext === '.jpeg' ||
-                       ext === '.gif' || ext === '.webp' || ext === '.bmp';
+      const nomeLimpo = nome.replace(/[^\w.\- ]/g, '_');
+
+      let contentType = 'application/octet-stream';
+      let anexo = true;
+
+      if (TIPOS_IMAGEM_SEGURA[tipoReal]) {
+        // Foto de verdade: vai inline, porque a tela mostra foto de candidato
+        // e de equipamento direto no <img>. SVG NÃO entra aqui de propósito.
+        contentType = TIPOS_IMAGEM_SEGURA[tipoReal];
+        anexo = false;
+      } else if (/^wa_/.test(nome) && tipoReal !== 'svg' && tipoReal !== 'html' && tipoReal !== 'desconhecido') {
+        // Mídia do WhatsApp. A API da Meta BUSCA o arquivo por esta URL e
+        // recusa quando o Content-Type não casa com o tipo da mensagem, então
+        // áudio, vídeo e documento precisam sair com o tipo certo e inline.
+        // A tabela de extensão foi montada justamente para isso (ver a rota
+        // de upload de mídia). SVG e HTML seguem barrados, e a Meta não aceita
+        // esses formatos de qualquer forma.
+        contentType = MIME[ext] || 'application/octet-stream';
+        anexo = false;
+      }
+
       const cab = {
-        'Content-Type': ehImagem ? ct : 'application/octet-stream',
-        'Cache-Control': 'public, max-age=31536000'
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=31536000',
+        // nosniff explícito: sem ele o navegador podia "adivinhar" o tipo pelo
+        // conteúdo e tratar como HTML algo que mandamos como octet-stream.
+        'X-Content-Type-Options': 'nosniff'
       };
-      if (!ehImagem) cab['Content-Disposition'] = 'attachment; filename="' + nome.replace(/"/g, '') + '"';
-      res.writeHead(200, Object.assign(cab, SECURITY_HEADERS));
+      if (anexo) cab['Content-Disposition'] = 'attachment; filename="' + nomeLimpo + '"';
+      res.writeHead(200, Object.assign({}, SECURITY_HEADERS, cab));
       res.end(data);
     });
     return;
@@ -3289,6 +3404,14 @@ http.createServer(function (req, res) {
         var buf;
         try { buf = Buffer.from(m[2], 'base64'); } catch (e) { responderJson(res, 400, { ok: false, error: 'Base64 inválido.' }); return; }
         if (buf.length > 20 * 1024 * 1024) { responderJson(res, 400, { ok: false, error: 'Arquivo acima de 20 MB.' }); return; }
+        // A conferência de MIME acima olha o que o CLIENTE declarou. Esta aqui
+        // olha os BYTES: sem isto, um SVG ou um HTML anunciado como
+        // "image/png" ia para a pasta pública (que é a mesma do resto) com a
+        // extensão errada. A Meta não aceita esses formatos de qualquer forma.
+        var tipoRealWa = detectarTipoReal(buf);
+        if (tipoRealWa === 'svg' || tipoRealWa === 'html') {
+          responderJson(res, 400, { ok: false, error: 'Tipo de arquivo não permitido.' }); return;
+        }
         // audio/mp4 NAO pode virar '.mp4': seria servido como video/mp4 e a
         // Meta rejeita audio com Content-Type de video. Cada tipo de audio tem
         // a extensao que devolve o MESMO tipo na hora de servir.
