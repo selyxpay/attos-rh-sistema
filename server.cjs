@@ -991,6 +991,47 @@ function ehAdminDeAcesso(requester) {
   return !!(requester && (ehMestreLogin(requester.login) || requester.departamento === 'administracao'));
 }
 
+// ── PERMISSÃO POR TELA ─────────────────────────────────────────────────────
+// Mesma fonte usada pelo navegador (js/telas.js). Antes o servidor só sabia
+// "tem sessão ou não", e esconder a aba do menu não protegia nada.
+const RTTelas = require('./js/telas.js');
+
+// Rotas que pertencem a uma tela. GET/HEAD exige 'ver'; o resto exige
+// 'editar'. O que não está aqui segue pela cadeia normal (e /api/state tem
+// tratamento próprio, por chave, mais abaixo).
+const ROTAS_POR_TELA = [
+  { re: /^\/api\/diaria\/admin\//,                                      tela: 'diaria' },
+  { re: /^\/api\/openwa\//,                                             tela: 'whatsapp-qr' },
+  { re: /^\/api\/whatsapp\//,                                           tela: 'whatsapp' },
+  { re: /^\/api\/(ver-senha|reset-senha|aprovar-senha|solicitacoes-senha)$/, tela: 'funcionarios' },
+  { re: /^\/api\/relatorio-equip-admin\//,                              tela: 'equipamentos' }
+];
+
+// Responde 401/403 e devolve false quando a sessão não pode usar a rota.
+function permitirRota(req, res, urlPath, metodo, autenticado) {
+  let regra = null;
+  for (let i = 0; i < ROTAS_POR_TELA.length; i++) {
+    if (ROTAS_POR_TELA[i].re.test(urlPath)) { regra = ROTAS_POR_TELA[i]; break; }
+  }
+  if (!regra) return true;
+  if (!autenticado) { responderJson(res, 401, { error: 'não autorizado' }); return false; }
+  const u = usuarioDaReq(req);
+  if (!u) { responderJson(res, 401, { error: 'não autorizado' }); return false; }
+  if (RTTelas.ehMestreLogin(u.login)) return true;
+  const dados = (lerEstado().dados) || {};
+  const nivelExigido = (metodo === 'GET' || metodo === 'HEAD') ? 'ver' : 'editar';
+  const ok = nivelExigido === 'ver'
+    ? RTTelas.podeVerTela(u, dados, regra.tela)
+    : RTTelas.podeEditarTela(u, dados, regra.tela);
+  if (!ok) {
+    console.log('[Telas] 403 ' + metodo + ' ' + urlPath + ' — ' + u.login +
+                ' não tem "' + regra.tela + '" em nível ' + nivelExigido);
+    responderJson(res, 403, { error: 'sem permissão para esta tela' });
+    return false;
+  }
+  return true;
+}
+
 // ── CAMPOS DE ACESSO: O CLIENTE NÃO MANDA, O SERVIDOR REPÕE ────────────────
 // Mesmo molde do _devolverSigilo: o POST /api/state manda o estado inteiro, e
 // em cima dele o servidor REPÕE o que aquela sessão não tinha direito de
@@ -1293,6 +1334,11 @@ http.createServer(function (req, res) {
   const urlPath = decodeSeguro(req.url.split('?')[0]);
   if (urlPath === null) { responderJson(res, 400, { error: 'endereço inválido' }); return; }
   const autenticado = reqAutenticada(req);
+
+  // PORTÃO DE PERMISSÃO POR TELA. Um ponto só, antes de qualquer rota. Rota
+  // que não pertence a uma tela passa direto; /api/state é filtrado por
+  // chave, no próprio handler dele.
+  if (!permitirRota(req, res, urlPath, req.method, autenticado)) return;
 
   // ---- API: LOGIN (verificação REAL no servidor) ----
   if (urlPath === '/api/login' && req.method === 'POST') {
@@ -2434,6 +2480,12 @@ http.createServer(function (req, res) {
     if (autenticado) {
       // A senha visível é removida daqui — só sai pela rota /api/ver-senha (com registro)
       let dadosFiltrados = filtrarSenhaVisivel(s.dados);
+      // PERMISSÃO POR TELA: o que a pessoa não pode ver não desce. Antes o
+      // estado INTEIRO ia para qualquer sessão — salário de todas as fichas,
+      // exames, inaptos, auditoria, tabela de custo x repasse — bastava estar
+      // logado. Esconder a aba do menu não escondia o dado.
+      const _usuarioEstado = usuarioDaReq(req);
+      if (_usuarioEstado) dadosFiltrados = RTTelas.filtrarEstadoPorTelas(dadosFiltrados, _usuarioEstado);
       // Empresas sigilosas: quem não está autorizado nem recebe os dados.
       const _sessao = sessaoValida(tokenDaReq(req));
       if (!_sigiloAutorizado(s.dados, _sessao && _sessao.login)) {
@@ -2492,7 +2544,15 @@ http.createServer(function (req, res) {
         // a partir do estado gravado (ver _reporCamposDeAcesso). Senha nunca
         // muda por aqui; permissão/departamento só se quem salvou é admin.
         if (autenticado) {
-          dados = _reporCamposDeAcesso(dados, atual.dados || {}, usuarioDaReq(req));
+          const _quemSalva = usuarioDaReq(req);
+          dados = _reporCamposDeAcesso(dados, atual.dados || {}, _quemSalva);
+          // PERMISSÃO POR TELA na ESCRITA: as chaves das telas que esta pessoa
+          // não pode editar voltam a ser as do servidor. Nível "só ver" passa a
+          // valer de verdade — antes era enfeite, porque o POST /api/state
+          // aceitava qualquer alteração de qualquer sessão.
+          if (_quemSalva) {
+            dados = RTTelas.reporChavesNaoEditaveis(dados, atual.dados || {}, _quemSalva);
+          }
         }
         // GUARDA ANTI-SUMIÇO: última barreira antes de gravar. Se este save
         // faria vários registros críticos (equipamentos, candidatos...) sumirem
@@ -3265,7 +3325,7 @@ http.createServer(function (req, res) {
   // A tabela de precos (custo pago a clinica x repasse cobrado do cliente) e
   // informacao comercial da empresa: so vai para quem tem sessao valida.
   if ((rel === '/js/app.js' || rel === '/js/data.js' || rel === '/js/whatsapp.js' ||
-       rel === '/precificacao-base.json') && !autenticado) {
+       rel === '/js/telas.js' || rel === '/precificacao-base.json') && !autenticado) {
     res.writeHead(404, Object.assign({ 'Content-Type': 'text/plain' }, SECURITY_HEADERS));
     res.end('404 Not Found');
     return;

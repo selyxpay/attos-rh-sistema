@@ -3695,6 +3695,37 @@
                             <span><i class="fa-solid fa-shield-halved" style="color: var(--primary);"></i> Matriz de Permissões de Acesso</span>
                             <button type="button" class="btn btn-secondary btn-sm" id="btn-toggle-all-perms" style="font-size: 11px; padding: 2px 8px;">Marcar/Desmarcar Todos</button>
                         </h4>
+                        <!-- ACESSO POR TELA: o que de fato vale. O servidor confere
+                             isto em toda leitura e toda gravacao. -->
+                        <div style="margin-bottom:18px;">
+                            <h4 style="margin:0 0 4px; font-size:13px;">Acesso por tela</h4>
+                            <p style="margin:0 0 8px; font-size:11.5px; color:var(--text-secondary);">
+                                Vale para o menu <b>e</b> para o servidor: em &quot;Só ver&quot; a pessoa abre a tela
+                                mas não consegue gravar, e em &quot;Sem acesso&quot; os dados daquela tela nem
+                                chegam ao navegador dela.
+                            </p>
+                            <div class="table-scroll-container" style="max-height: 280px; overflow-y: auto;">
+                                <table class="excel-table matrix-table" style="font-size: 12px; width: 100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>Tela</th>
+                                            <th class="text-center">Sem acesso</th>
+                                            <th class="text-center">Só ver</th>
+                                            <th class="text-center">Ver e editar</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="telas-matrix-body">
+                                        <!-- Gerado dinamicamente por JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <h4 style="margin:0 0 4px; font-size:13px;">Permissões detalhadas por área</h4>
+                        <p style="margin:0 0 8px; font-size:11.5px; color:var(--text-secondary);">
+                            Ajuste fino dentro das telas que a pessoa já acessa (quais botões aparecem).
+                            Quem manda no acesso à tela é a tabela de cima.
+                        </p>
                         <div class="table-scroll-container" style="max-height: 250px; overflow-y: auto;">
                             <table class="excel-table matrix-table" style="font-size: 12px; width: 100%;">
                                 <thead>
@@ -4079,6 +4110,10 @@
     <script src="js/vps-sync.js?v=20261021a"></script>
     <script src="js/exata-catalogo.js?v=20260910b"></script>
     <script src="js/data.js?v=20260910b"></script>
+    <!-- Permissao por tela: MESMO arquivo que o servidor usa (require), para a
+         regra nao existir em dois lugares e divergir. Precisa vir antes do
+         app.js, que o consome. -->
+    <script src="js/telas.js?v=20261021a"></script>
     <script src="js/app.js?v=20261021b"></script>
     <script src="js/whatsapp.js?v=20260910b"></script>
     <!-- Sair da tela cheia do WhatsApp. Fica fora da aba porque o cabecalho

@@ -262,121 +262,40 @@ function verificarSessao() {
   }
 }
 
+// ── PERMISSAO DE TELA (uma fonte so) ──────────────────────────────────────
+// Isto era uma cadeia de ~50 linhas de casos especiais, DUPLICADA em parte
+// no verificarPermissoesMenu -- e as duas copias ja divergiam: Exame Medico,
+// Inaptos, Lixeira e Controle de Acesso respondiam uma coisa aqui e outra no
+// menu, entao havia tela que o menu escondia mas a funcao deixava entrar.
+// Agora a regra vive em js/telas.js, o MESMO arquivo que o servidor usa.
+function _telasDoUsuario() {
+  if (!loggedUser || !window.RTTelas) return {};
+  return RTTelas.telasDoFuncionario(loggedUser, state || {});
+}
 function isAbaAutorizada(abaId) {
   if (!loggedUser) return false;
-  if (abaId === 'meu-painel') return true;
-  if (abaId === 'fila') return true; // todos os logados acessam
-  if (abaId === 'lixeira') return ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao';
-  if (abaId === 'controle-acesso') return podeGerenciarHorarios();
-  if (abaId === 'cadastros-exata') return ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao';
-  // Diária (Presença RT): é a especificação de um projeto ainda não construído,
-  // não é operação do dia a dia — só quem administra a empresa precisa ver.
-  if (abaId === 'diaria') return ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao';
-  // Equipamentos: módulo do Departamento Pessoal. A Seleção não enxerga.
-  if (abaId === 'equipamentos') return podeVerEquipamentos();
-  // Fluxo Financeiro: DP, Administração e Financeiro (ou permissão granular).
-  if (abaId === 'fluxo-financeiro') return _ffPodeVer();
-  // WhatsApp: só quem o administrador liberou (permissão whatsapp.visualizar).
-  // Mestre (João Balaf) e Administração sempre têm acesso total.
-  if (abaId === 'whatsapp') return ehMestre(loggedUser.login)
-    || loggedUser.departamento === 'administracao'
-    || hasPermission('whatsapp', 'visualizar');
-  // WhatsApp QR (não oficial): mais restrito que o Oficial — só quem administra,
-  // porque é aqui que se conecta o aparelho e se corre o risco de bloqueio.
-  if (abaId === 'whatsapp-qr') return ehMestre(loggedUser.login)
-    || loggedUser.departamento === 'administracao'
-    || hasPermission('whatsapp', 'aprovar');
-  // Margem (custo × repasse): é preço de venda e custo de fornecedor. Fica com
-  // quem decide dinheiro — administração, financeiro e a diretoria.
-  if (abaId === 'margem') return ehMestre(loggedUser.login)
-    || ['administracao', 'financeiro', 'gestao'].includes(loggedUser.departamento)
-    || hasPermission('comissao', 'visualizar');
-  // Exame Médico: clínica (anexa o laudo online), seleção (envia o candidato),
-  // DP (anexa a foto da ficha nos exames presenciais) e administração.
-  // Também vale a permissão granular marcada no cadastro do funcionário.
-  if (abaId === 'exame-medico') return ehMestre(loggedUser.login)
-    || ['clinica', 'selecao', 'dp', 'administracao'].includes(loggedUser.departamento)
-    || hasPermission('exame_medico', 'visualizar');
-  if (ehMestre(loggedUser.login)) return true;
-  const depto = loggedUser.departamento;
-  if (depto === 'administracao') return true;
-  // Usar permissões granulares se disponíveis
-  const area = ABA_PARA_AREA[abaId];
-  if (area && loggedUser.permissoes && loggedUser.permissoes[area]) {
-    return loggedUser.permissoes[area].visualizar === true;
-  }
-  // Fallback por departamento para contas antigas sem permissões definidas
-  if (depto === 'selecao') {
-    const temVinculo = state && state.recrutadores && state.recrutadores.some(r => (r.usuarioId && r.usuarioId === loggedUser.id) || (r.loginVinculado && r.loginVinculado === loggedUser.login));
-    if (temVinculo) return abaId === 'meu-painel';
-    return ['dashboard', 'vagas', 'banco-talentos', 'selecao', 'site', 'meu-painel'].includes(abaId);
-  }
-  if (depto === 'dp') return ['depto-pessoal', 'banco-talentos'].includes(abaId);
-  if (depto === 'comissao') return ['comissao'].includes(abaId);
-  return false;
+  if (!window.RTTelas) return true;   // sem o modulo, nao bloqueia nada aqui
+  const n = _telasDoUsuario()[abaId];
+  return n === 'ver' || n === 'editar';
 }
-
+// "So ver": a tela abre, mas nao grava. Quem garante e o SERVIDOR; aqui e so
+// para a interface nao oferecer botao que vai levar 403.
+function podeEditarTela(abaId) {
+  if (!loggedUser) return false;
+  if (!window.RTTelas) return true;
+  return _telasDoUsuario()[abaId] === 'editar';
+}
 function verificarPermissoesMenu() {
   try { if (typeof atualizarBadgeFluxoFinanceiro === 'function') atualizarBadgeFluxoFinanceiro(); } catch (e) {}
+  // Um laco so, para TODAS as abas. Os 5 blocos escritos a mao que existiam
+  // aqui (Funcionarios, Auditoria, Inaptos, Configuracoes e Exame Medico)
+  // foram removidos: eles repetiam -- e em parte contradiziam -- a regra do
+  // isAbaAutorizada. Agora a fonte e uma so, em js/telas.js.
   const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
   navItems.forEach(item => {
     const aba = item.getAttribute('data-aba');
-    // Ignorar itens especiais (funcionarios e auditoria têm controle próprio abaixo)
-    if (aba === 'funcionarios' || aba === 'auditoria') return;
     item.style.display = isAbaAutorizada(aba) ? '' : 'none';
   });
-
-  // Controle do menu Funcionários
-  const navFunc = document.getElementById('nav-item-funcionarios');
-  if (navFunc) {
-    const pode = loggedUser && (
-      ehMestre(loggedUser.login) ||
-      loggedUser.departamento === 'administracao' ||
-      loggedUser.permissoes?.funcionarios?.visualizar === true
-    );
-    navFunc.style.display = pode ? '' : 'none';
-  }
-
-  // Controle do menu Auditoria
-  const navAuditoria = document.getElementById('nav-item-auditoria');
-  if (navAuditoria) {
-    const pode = loggedUser && (
-      ehMestre(loggedUser.login) ||
-      loggedUser.departamento === 'administracao' ||
-      loggedUser.permissoes?.sistema?.visualizar === true
-    );
-    navAuditoria.style.display = pode ? '' : 'none';
-  }
-
-  // Controle do menu Inaptos (somente admin)
-  const navInaptos = document.getElementById('nav-item-inaptos');
-  if (navInaptos) {
-    const podeInaptos = loggedUser && (
-      ehMestre(loggedUser.login) ||
-      loggedUser.departamento === 'administracao'
-    );
-    navInaptos.style.display = podeInaptos ? '' : 'none';
-  }
-
-  // Controle do menu Configurações (somente admin)
-  const navConfig = document.getElementById('nav-item-configuracoes');
-  if (navConfig) {
-    const podeConfig = loggedUser && (
-      ehMestre(loggedUser.login) ||
-      loggedUser.departamento === 'administracao'
-    );
-    navConfig.style.display = podeConfig ? '' : 'none';
-  }
-
-  // Controle do menu Exame Médico
-  const navExame = document.getElementById('nav-item-exame-medico');
-  if (navExame) {
-    const podeExame = loggedUser && (
-      ehMestre(loggedUser.login) ||
-      ['clinica', 'selecao', 'administracao'].includes(loggedUser.departamento)
-    );
-    navExame.style.display = podeExame ? '' : 'none';
-  }
 
   if (!isAbaAutorizada(activeAba)) {
     let homeAba = 'dashboard';
@@ -7996,8 +7915,43 @@ window.abrirModalGerenciarFuncionario = function(funcId) {
   }
 
   renderPermissoesMatrix(func);
+  renderTelasMatrix(func);
   document.getElementById('modal-gerenciar-funcionario').classList.add('active');
 };
+
+// ── MATRIZ DE ACESSO POR TELA ──────────────────────────────────────────────
+// Uma linha por aba, tres niveis. Para quem ainda nao tem o mapa `telas`
+// salvo, as opcoes vem MARCADAS no nivel derivado das regras de hoje — ou
+// seja, a tela ja abre mostrando o acesso que a pessoa tem agora, e salvar
+// sem mexer em nada nao muda nada.
+function renderTelasMatrix(func) {
+  const tbody = document.getElementById('telas-matrix-body');
+  if (!tbody || !window.RTTelas) return;
+  const atual = RTTelas.telasDoFuncionario(func, state || {});
+  const mestre = RTTelas.ehMestreLogin(func.login);
+  tbody.innerHTML = RTTelas.TELAS.map(function (t) {
+    const nivel = mestre ? 'editar' : (atual[t.id] || 'nao');
+    const opcao = function (valor, rotulo) {
+      const marcado = nivel === valor ? 'checked' : '';
+      const travado = mestre ? 'disabled' : '';
+      return '<td class="text-center" style="text-align:center;">' +
+        '<input type="radio" name="tela-' + t.id + '" class="tela-radio" ' +
+        'data-tela="' + t.id + '" value="' + valor + '" ' + marcado + ' ' + travado +
+        ' title="' + rotulo + '" style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary);">' +
+        '</td>';
+    };
+    return '<tr>' +
+      '<td style="font-weight:600;white-space:nowrap;padding:6px 10px;">' + escapeHTML(t.nome) + '</td>' +
+      opcao('nao', 'Sem acesso') + opcao('ver', 'Só ver') + opcao('editar', 'Ver e editar') +
+      '</tr>';
+  }).join('');
+  if (mestre) {
+    tbody.insertAdjacentHTML('afterbegin',
+      '<tr><td colspan="4" style="padding:6px 10px;color:var(--text-secondary);font-size:11.5px;">' +
+      'Conta mestre: acesso total a todas as telas, não é configurável.' +
+      '</td></tr>');
+  }
+}
 
 function renderPermissoesMatrix(func) {
   const tbody = document.getElementById('permissoes-matrix-body');
@@ -8102,6 +8056,29 @@ function salvarPermissoesFuncionario() {
   func.representanteDepto = novoRep;
   func.podeVerSenhas = _chkVS ? _chkVS.checked : (func.podeVerSenhas || false);
   func.permissoes = novasPerms;
+
+  // ACESSO POR TELA. So grava se a matriz estiver na tela (um modal servido
+  // de cache antigo nao tem a tabela). E ninguem concede tela que ele mesmo
+  // nao tem: mesma regra que ja valia para a matriz de areas, agora tambem
+  // conferida no servidor.
+  const radiosTela = document.querySelectorAll('.tela-radio:checked');
+  if (radiosTela.length && window.RTTelas && !RTTelas.ehMestreLogin(func.login)) {
+    const minhas = RTTelas.telasDoFuncionario(loggedUser, state || {});
+    const souAdmin = RTTelas.ehAdmin(loggedUser) || ehMestre(loggedUser.login);
+    const novasTelas = {};
+    RTTelas.IDS.forEach(function (id) { novasTelas[id] = 'nao'; });
+    radiosTela.forEach(function (r) {
+      const tela = r.dataset.tela;
+      let nivel = r.value;
+      if (!souAdmin) {
+        const meu = minhas[tela] || 'nao';
+        if (meu === 'nao') nivel = 'nao';
+        else if (meu === 'ver' && nivel === 'editar') nivel = 'ver';
+      }
+      if (tela) novasTelas[tela] = nivel;
+    });
+    func.telas = novasTelas;
+  }
 
   // Papéis do Fluxo Financeiro (concessões individuais do admin)
   const gflx = id => document.getElementById(id);
