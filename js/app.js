@@ -761,9 +761,14 @@ async function ativarNuvem() {
 function garantirEstruturasBase() {
   if (!state) return false;
   let mudou = false;
+  // 'atividades' entrou nesta lista: vários pontos fazem
+  // state.atividades.unshift(...) direto, sem conferir. Num estado que não
+  // tivesse a chave, aquele unshift estourava e o saveState() logo abaixo
+  // NUNCA executava — a contratação (ou a ação da vez) simplesmente não
+  // gravava, sem erro visível na tela.
   ['candidatos', 'bancoTalentos', 'vagas', 'empresas', 'funcionarios', 'recrutadores',
    'contratacoes', 'logs', 'equipamentos', 'examesMedicos', 'fluxosFinanceiros',
-   'precificacao'].forEach(k => {
+   'precificacao', 'atividades'].forEach(k => {
     if (!Array.isArray(state[k])) { state[k] = []; mudou = true; }
 
     // ── LIXO NA LISTA DERRUBA A TELA INTEIRA ──────────────────────────────
@@ -1551,8 +1556,6 @@ function setupNavigation() {
       // Só renderiza a sub-aba ativa, sem recriar todos os gráficos do overview
       if (subtabId === 'visao-geral') {
         renderDashboardOverview();
-      } else if (subtabId === 'kanban') {
-        renderDashboardKanban();
       } else {
         renderCurrentAba();
       }
@@ -2654,12 +2657,9 @@ function renderDocumentos() {
 // 3. LISTENERS GLOBAIS
 function setupEventListeners() {
   // Busca em tempo real no Dashboard
-  const dashSearch = document.getElementById('dashboard-search');
-  if (dashSearch) {
-    dashSearch.addEventListener('input', () => {
-      renderDashboardKanban(dashSearch.value.trim());
-    });
-  }
+  // (A busca em tempo real do Dashboard saiu com o Kanban: o campo
+  //  #dashboard-search nao existe no index.html, entao este listener
+  //  nunca era ligado.)
 
   // Busca em tempo real no Banco
   const bancoSearch = document.getElementById('banco-search');
@@ -3067,7 +3067,7 @@ function setupEventListeners() {
       state.candidatos.push(novoCandidato);
       saveState();
       fecharModalAddCandidato();
-      renderDashboardKanban();
+      renderCurrentAba();
       alert('Candidato inserido com sucesso!');
     });
   }
@@ -3468,159 +3468,14 @@ function setupEventListeners() {
 
 // 4. RENDERS DAS ABAS DO SISTEMA
 
-// ABA 1: DASHBOARD (KANBAN DE CANDIDATOS COM DRAG & DROP)
-function renderDashboardKanban(filtroNome = '') {
-  // Limpa containers
-  const colunas = ['pendente', 'em_analise', 'entrevista', 'aprovado', 'reprovado'];
-  colunas.forEach(col => {
-    document.getElementById(`cards-${col}`).innerHTML = '';
-  });
-
-  // Filtra candidatos que não estão "contratados" (processo concluído)
-  const candidatosAtivos = state.candidatos.filter(c => {
-    const matchStatus = colunas.includes(c.status);
-    const matchFiltro = filtroNome === '' || c.nome.toLowerCase().includes(filtroNome.toLowerCase());
-    return matchStatus && matchFiltro && !c.excluido;
-  });
-
-  // Contadores
-  const counts = { pendente: 0, em_analise: 0, entrevista: 0, aprovado: 0, reprovado: 0 };
-
-  candidatosAtivos.forEach(c => {
-    counts[c.status]++;
-    const cardHtml = createKanbanCardHtml(c);
-    const container = document.getElementById(`cards-${c.status}`);
-    if (container) {
-      container.insertAdjacentHTML('beforeend', cardHtml);
-    }
-  });
-
-  // Atualiza indicadores numéricos das colunas
-  colunas.forEach(col => {
-    document.getElementById(`count-${col}`).textContent = counts[col];
-  });
-
-  // Atualiza KPIs do topo
-  document.getElementById('dash-kpi-total').textContent = state.candidatos.filter(c => c.status !== 'contratado').length;
-  document.getElementById('dash-kpi-analise').textContent = counts['em_analise'];
-  document.getElementById('dash-kpi-aprovados').textContent = counts['aprovado'];
-  document.getElementById('dash-kpi-reprovados').textContent = counts['reprovado'];
-
-  // Habilita eventos de Drag and Drop
-  setupDragAndDrop();
-}
-
-function createKanbanCardHtml(c) {
-  // Sanitizar campos de dados do candidato para prevenir XSS
-  const esc = typeof escapeHTML === 'function' ? escapeHTML : (v => String(v || ''));
-  const nomeSeguro = esc(c.nome);
-  const vagaSegura = esc(c.codigoVaga || 'Vaga Geral');
-
-  const initials = nomeSeguro.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
-  const recruiter = state.recrutadores.find(r => r.id === c.recrutadorId);
-  const recruiterNome = esc(recruiter ? recruiter.nome : 'Sem rec.');
-  
-  // Classe de cor para o avatar redondo
-  let avatarColorClass = 'c-yellow';
-  if (c.status === 'em_analise') avatarColorClass = 'c-blue';
-  if (c.status === 'entrevista') avatarColorClass = 'c-purple';
-  if (c.status === 'aprovado') avatarColorClass = 'c-green';
-  if (c.status === 'reprovado') avatarColorClass = 'c-red';
-
-  // Alerta de tempo na etapa
-  const isHighDuration = c.diasEtapa >= 10;
-  const timeBadgeClass = isHighDuration ? 'duration-badge high-duration' : 'duration-badge';
-
-  return `
-    <div class="kanban-card" draggable="true" data-id="${esc(c.id)}" onclick="abrirDrawerDetalhes('${esc(c.id)}')">
-      <div class="card-top">
-        <div class="avatar-circle ${avatarColorClass}">${initials}</div>
-        <div class="card-info" style="flex: 1;">
-          <span class="candidate-name" style="display: flex; align-items: center; justify-content: space-between; gap: 4px; width: 100%;">
-            <span style="display:flex; align-items:center; gap:5px;">
-              ${c.numeroFila ? `<span style="background:rgba(190,18,60,0.15); color:var(--primary); font-size:9px; font-weight:600; padding:1px 5px; border-radius:8px;">#${Number(c.numeroFila)}</span>` : ''}
-              ${nomeSeguro}
-            </span>
-            ${c.devolvidoDP ? `<span class="tag-devolvida" style="animation: pulse 1.5s infinite; font-size: 8px; padding: 1.5px 4px;"><i class="fa-solid fa-circle-exclamation"></i> DEVOLVIDO</span>` : ''}
-          </span>
-          <span class="candidate-job-tag">${vagaSegura}</span>
-        </div>
-      </div>
-      <div class="card-bottom">
-        <span class="recruiter-name-tag">Recrutador: ${recruiterNome}</span>
-        ${c.status !== 'reprovado' ? `
-          <span class="${timeBadgeClass}">
-            <i class="fa-regular fa-clock"></i> ${Number(c.diasEtapa)}d
-          </span>
-        ` : `
-          <span class="duration-badge badge-red" style="background-color: #fee2e2; color: #b91c1c;">
-            Reprovado
-          </span>
-        `}
-      </div>
-    </div>
-  `;
-}
-
-// Lógica de Drag & Drop Real — usa delegação de eventos no wrapper do Kanban
-// para evitar empilhar centenas de listeners a cada renderização dos cards.
-let _dndInitialized = false;
-function setupDragAndDrop() {
-  // Delegação nos containers de cards (reciclada — não empilha)
-  const colunas = ['pendente', 'em_analise', 'entrevista', 'aprovado', 'reprovado'];
-  colunas.forEach(col => {
-    const container = document.getElementById(`cards-${col}`);
-    if (!container || container.dataset.dndWired) return;
-    container.dataset.dndWired = '1';
-    container.addEventListener('dragstart', (e) => {
-      const card = e.target.closest('.kanban-card');
-      if (!card) return;
-      e.dataTransfer.setData('text/plain', card.getAttribute('data-id'));
-      card.style.opacity = '0.5';
-    });
-    container.addEventListener('dragend', (e) => {
-      const card = e.target.closest('.kanban-card');
-      if (card) card.style.opacity = '1';
-    });
-  });
-
-  // Listeners nas colunas (drop target) — também com guard
-  const columns = document.querySelectorAll('.kanban-column');
-  columns.forEach(col => {
-    if (col.dataset.dndWired) return;
-    col.dataset.dndWired = '1';
-    col.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      col.style.backgroundColor = '#e2e8f0';
-    });
-    col.addEventListener('dragleave', () => {
-      col.style.backgroundColor = '#f1f5f9';
-    });
-    col.addEventListener('drop', (e) => {
-      e.preventDefault();
-      col.style.backgroundColor = '#f1f5f9';
-      const candidateId = e.dataTransfer.getData('text/plain');
-      const targetStatus = col.getAttribute('data-status');
-      const cand = state.candidatos.find(c => c.id === candidateId);
-      if (cand && cand.status !== targetStatus) {
-        if (targetStatus === 'reprovado' && !cand.motivoReprovacao) {
-          cand.motivoReprovacao = 'Filtro e triagem rápida no Kanban.';
-        }
-        cand.status = targetStatus;
-        cand.diasEtapa = 1;
-        if (!loggedUser || !ehMestre(loggedUser.login)) {
-          state.atividades.unshift({
-            id: _novoId('act'),
-            descricao: `Candidato ${cand.nome} movido para etapa "${targetStatus.replace('_', ' ')}" no Kanban`,
-            data: 'Agora'
-          });
-        }
-        saveState();
-        renderDashboardKanban();
-      }
-    });
-  });
-}
+// ABA 1: DASHBOARD
+// (O Kanban de candidatos com arrastar-e-soltar que existia aqui foi
+//  REMOVIDO: era codigo morto. Ele desenhava em ids que nao existem no
+//  index.html -- cards-*, count-*, dash-kpi-total/analise/aprovados/
+//  reprovados -- e sem nenhuma guarda, entao a primeira linha estouraria e
+//  o Dashboard inteiro mostraria "Nao consegui montar esta tela" se alguem
+//  religasse a sub-aba. Saiam junto createKanbanCardHtml e setupDragAndDrop,
+//  usados so por ele.)
 
 // ABA 2: VAGAS (VITRINE DE VAGAS)
 // ── Horários da vaga (seção 4.6) — gerenciados em memória durante o cadastro ──
@@ -5736,13 +5591,9 @@ function gerarLinkContinuarPresencial(candidatoId) {
   return `${base}candidato.html?continuarPresencial=${candidatoId}`;
 }
 
-function gerarLinkCompletarFicha(btId) {
-  const base = window.location.origin + window.location.pathname.replace('index.html', '');
-  const cand = state.candidatos.find(c => c.id === btId) || (state.bancoTalentos || []).find(t => t.id === btId);
-  if (!cand) return `${base}candidato.html`;
-  const payload = btoa(unescape(encodeURIComponent(JSON.stringify({ id: btId, nome: cand.nome, cpf: cand.cpf || '', telefone: cand.telefone || '' }))));
-  return `${base}candidato.html?completar=${payload}`;
-}
+// (A segunda declaração de gerarLinkCompletarFicha que existia aqui foi
+//  removida: ela era código morto por hoisting. A versão única, que procura
+//  em candidatos E no banco de talentos, está mais abaixo no arquivo.)
 
 // Aprovação do CPF pela selecionadora (presencial)
 window.aprovarConsultaCPF = function(candidatoId) {
@@ -8833,8 +8684,15 @@ function gerarNumeroFila() {
 }
 
 // Gera link para o candidato completar a ficha (pré-preenchida com dados existentes)
+// Link para a pessoa completar a propria ficha.
+// Esta função estava DECLARADA DUAS VEZES no arquivo, no mesmo escopo. Por
+// hoisting, a de baixo (esta) vencia e a de cima era código morto — e a que
+// se perdia era justamente a que também procurava em state.bancoTalentos.
+// Resultado: para quem só existia no Banco de Talentos o link saía VAZIO.
+// Agora é uma só, procurando nas duas listas e mantendo o payload completo.
 function gerarLinkCompletarFicha(candidatoId) {
-  const cand = state.candidatos.find(c => c.id === candidatoId);
+  const cand = (state.candidatos || []).find(c => c && c.id === candidatoId)
+            || (state.bancoTalentos || []).find(t => t && t.id === candidatoId);
   if (!cand) return '';
   const base = window.location.origin + window.location.pathname.replace('index.html', '');
   const data = {

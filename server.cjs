@@ -382,7 +382,14 @@ function lerCorpo(req, cb) {
   req.on('end', function () {
     try {
       const data = Buffer.concat(partes).toString('utf8');
-      cb(null, data ? JSON.parse(data) : {});
+      const lido = data ? JSON.parse(data) : {};
+      // Corpo que NÃO é objeto (o literal `null`, um número, uma string) vira
+      // objeto vazio. Várias rotas — principalmente as do WhatsApp — fazem
+      // `body.campo` direto, sem o `(body && body.campo)` usado no resto do
+      // arquivo. Com `null` isso lançava DENTRO do callback do 'end', fora de
+      // qualquer try, e derrubava o processo inteiro. Resolver aqui cobre
+      // todas as rotas de uma vez, em vez de remendar dezenas de pontos.
+      cb(null, (lido && typeof lido === 'object') ? lido : {});
     } catch (e) { cb(e); }
   });
   req.on('error', function (e) { cb(e); });
@@ -2782,6 +2789,12 @@ http.createServer(function (req, res) {
   if (urlPath.indexOf('/api/whatsapp/') === 0) {
     if (!_waReady) { responderJson(res, 503, { ok: false, error: 'Módulo WhatsApp inicializando...' }); return; }
     if (!autenticado) { responderJson(res, 401, { ok: false, error: 'Não autenticado.' }); return; }
+    // As chamadas ao banco do WhatsApp (sql.js) sao SINCRONAS e ficam no
+    // caminho da requisicao. Sem este try/catch, banco corrompido ou
+    // arquivo truncado lancava e derrubava o PROCESSO INTEIRO: o sistema
+    // todo caia por causa de uma tela. Agora a falha fica registrada e so
+    // esta requisicao recebe 500.
+    try {
 
     // BLINDAGEM MULTI-CONTA: qualquer rota que age sobre UMA conversa específica
     // (/conversations/<id>...) só prossegue se o usuário puder acessar a conta
@@ -3235,6 +3248,11 @@ http.createServer(function (req, res) {
     // Rota WhatsApp não encontrada
     responderJson(res, 404, { ok: false, error: 'Rota WhatsApp não encontrada.' });
     return;
+    } catch (eWa) {
+      console.error('[WhatsApp] falha nao tratada na rota ' + urlPath + ':', (eWa && eWa.stack) || eWa);
+      if (!res.headersSent) responderJson(res, 500, { ok: false, error: 'Falha no módulo WhatsApp.' });
+      return;
+    }
   }
 
   // ---- Site estático ----
