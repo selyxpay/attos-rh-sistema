@@ -336,6 +336,66 @@ Outros três pontos da mesma tela:
 - **Texto da mensagem** usa a classe `texto-longo` (regra 15) e transforma
   endereço em link. O link é montado **depois** do escape, nunca antes.
 
+### 5.2 Bot de atendimento (`whatsapp-bot.cjs`)
+
+Responde sozinho quem chama no WhatsApp oficial e encaminha para o lugar certo,
+principalmente o link de cadastro nas vagas.
+
+**Onde cada coisa mora, e por quê:**
+
+| O que | Onde | Motivo |
+|---|---|---|
+| Configuração (ligado, modo, passos, textos) | `state.json`, chave `botWhatsapp` | usa o contrato de gravação (`setKeys`), a permissão por tela e a Auditoria |
+| Execução (quem já recebeu, fila, contagem do dia) | SQLite do WhatsApp | muda a cada mensagem; no `state.json` inflaria o arquivo |
+| Mídia dos passos | `DATA_DIR/bot-midia/` | **fora** de `/uploads/`, que é público (regra 7) |
+
+**A ordem de decisão é a parte mais importante.** Está em `decidir()`, que é uma
+função **pura** — dá para testar sozinha, e é o que a suíte `bot` faz. Nesta
+ordem:
+
+1. pediu para sair → nunca mais nada automático
+2. pediu atendente → avisa, marca a conversa e para
+3. contato pausado → não responde
+4. já está no meio de uma sequência → encerra o que falta, **não reinicia**
+5. regra do modo escolhido, respeitando o limite
+6. nada disso → não responde, deixa para o atendente
+
+Mudar essa ordem muda o comportamento do sistema. Mexa nela e nos testes juntos.
+
+**Garantias que o desenho dá:**
+
+- **Não duplica.** `whatsapp_bot_fila.wamid_gatilho` é `UNIQUE`: a mesma
+  mensagem recebida nunca enfileira duas vezes, nem se a Meta repetir o
+  webhook.
+- **Retoma depois de reinício.** A fila vive no banco, não em memória. E o
+  índice do passo **avança antes do envio**, de propósito: se o processo cair
+  no meio, o passo não é repetido na volta. Repetir mensagem para o cliente é
+  pior que perder uma.
+- **Falha num passo não trava os outros.** O erro é registrado e a sequência
+  segue.
+- **Controle de ritmo.** Um passo por vez, com espaçamento mínimo calculado a
+  partir de `ritmo.porMinuto`.
+- **Media id reaproveitado.** O arquivo sobe para a Meta uma vez; o id fica em
+  `whatsapp_bot_midia`. Quando a Meta expira o id (cerca de 30 dias), o envio
+  falha, o cache é descartado e o arquivo sobe de novo, uma vez só.
+- **Atendente respondendo para o bot na hora.** O envio manual chama
+  `aoAtendenteResponder`, que pausa aquele contato. Nota interna não conta: ela
+  não vai para o cliente.
+
+**O bot vem DESLIGADO.** `CONFIG_PADRAO.ligado = false`. Depois de um deploy
+ninguém é surpreendido por mensagem automática.
+
+**Áudio como mensagem de voz:** a Meta só mostra como voz se o arquivo for
+**OGG/Opus**. A imagem do container é `node:20-alpine` e **não tem ffmpeg**,
+então o sistema não converte: ele **confere os bytes** e recusa outro formato
+com uma mensagem dizendo o que fazer. Se um dia instalarem ffmpeg na imagem,
+dá para converter no upload.
+
+**Permissão:** a aba é a tela `bot` (26ª), e toda rota `/api/whatsapp/bot/` passa
+pelo portão — `GET` exige "só ver", o resto exige "ver e editar". A regra do bot
+vem **antes** da do WhatsApp em `ROTAS_POR_TELA`, porque `permitirRota` usa o
+primeiro padrão que casa.
+
 **WhatsApp (dois canais independentes)**
 - **WhatsApp Oficial** — API oficial da Meta (`whatsapp-api.cjs`,
   `whatsapp-webhook.cjs`). Dados em SQLite via `sql.js` (`whatsapp-db.cjs`) — é
@@ -514,6 +574,8 @@ index.html                   painel admin (as 25 abas)
 js/app.js                    frontend inteiro do painel
 js/vps-sync.js               sincronização com o servidor (window.RTCloud)
 js/telas.js                  permissão por tela — MESMO arquivo nas duas pontas
+whatsapp-bot.cjs             motor do bot (ordem de decisão, fila, envio)
+js/whatsapp-bot-ui.js        a aba Bot
 js/security.js               camadas extras de proteção no navegador
 js/data.js                   dados iniciais (NUNCA colocar senha aqui)
 css/                         estilos (style, design-system, por módulo)

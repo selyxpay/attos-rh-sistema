@@ -78,6 +78,8 @@ const SUITES = [
     titulo: 'Sincronizacao com DUAS pessoas ao mesmo tempo' },
   { nome: 'telas',     arquivo: 'permissao-telas.cjs', servidor: true, navegador: false, semente: sementeTelas,
     titulo: 'Permissao por tela, com bloqueio no servidor' },
+  { nome: 'bot',       arquivo: 'bot.cjs',            servidor: true,  navegador: false, semente: sementeAcesso,
+    titulo: 'Bot de atendimento: ordem de decisao, fila, permissao e midia' },
   { nome: 'wa-msgs',   arquivo: 'whatsapp-mensagens.cjs', servidor: true, navegador: true,
     titulo: 'WhatsApp: todo tipo de mensagem aparece, emoji certo, lista limpa' },
   { nome: 'whatsapp',  arquivo: 'whatsapp-layout.cjs', servidor: true, navegador: true,

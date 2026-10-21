@@ -43,6 +43,7 @@
     { id: 'margem',           nome: 'Controle ASO Repasse (Margem)' },
     { id: 'whatsapp',         nome: 'WhatsApp Oficial' },
     { id: 'whatsapp-qr',      nome: 'WhatsApp QR' },
+    { id: 'bot',              nome: 'Bot do WhatsApp' },
     { id: 'funcionarios',     nome: 'Funcionários' },
     { id: 'controle-acesso',  nome: 'Controle de Acesso (horários)' },
     { id: 'cadastros-exata',  nome: 'Cadastros Exata' },
@@ -91,6 +92,7 @@
     tiposPagamentoFluxo:  ['fluxo-financeiro', 'configuracoes'],
     ffWorkflow:           ['fluxo-financeiro', 'configuracoes'],
     ffSigiloLogins:       ['configuracoes'],
+    botWhatsapp:          ['bot'],
     ffEmpresas:           ['cadastros-exata', 'fluxo-financeiro'],
     ffTomadores:          ['cadastros-exata', 'fluxo-financeiro'],
     ffClientes:           ['cadastros-exata', 'fluxo-financeiro'],
@@ -176,6 +178,8 @@
     }
     if (aba === 'whatsapp') return ehAdmin(f) || _perm(f, 'whatsapp', 'visualizar');
     if (aba === 'whatsapp-qr') return ehAdmin(f) || _perm(f, 'whatsapp', 'aprovar');
+    // Tela NOVA: nasce fechada. Só admin vê, até alguém liberar na matriz.
+    if (aba === 'bot') return ehAdmin(f);
     if (aba === 'margem') {
       return ehMestreLogin(f.login)
         || ['administracao', 'financeiro', 'gestao'].indexOf(f.departamento) >= 0

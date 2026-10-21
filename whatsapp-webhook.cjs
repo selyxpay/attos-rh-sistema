@@ -76,7 +76,7 @@ function validateSignature(rawBody, signature, appSecret) {
  * @param {object} api - Instância do whatsapp-api.cjs
  * @param {function} notifyClients - Callback para notificar clientes SSE
  */
-async function processEvent(body, db, api, notifyClients) {
+async function processEvent(body, db, api, notifyClients, bot) {
   if (!body || !body.entry) return;
 
   for (const entry of body.entry) {
@@ -100,7 +100,7 @@ async function processEvent(body, db, api, notifyClients) {
       // Processa MENSAGENS recebidas
       if (value.messages && Array.isArray(value.messages)) {
         for (const msg of value.messages) {
-          await processIncomingMessage(msg, value.contacts, phoneNumberId, displayPhone, db, api, notifyClients);
+          await processIncomingMessage(msg, value.contacts, phoneNumberId, displayPhone, db, api, notifyClients, bot);
         }
       }
     }
@@ -159,7 +159,7 @@ async function processStatusUpdate(status, phoneNumberId, db, notifyClients) {
 // ==========================================================================
 // PROCESSA MENSAGEM RECEBIDA
 // ==========================================================================
-async function processIncomingMessage(msg, contacts, phoneNumberId, displayPhone, db, api, notifyClients) {
+async function processIncomingMessage(msg, contacts, phoneNumberId, displayPhone, db, api, notifyClients, bot) {
   try {
     const wamid = msg.id;
     if (!wamid) return;
@@ -364,6 +364,27 @@ async function processIncomingMessage(msg, contacts, phoneNumberId, displayPhone
 
     db.webhookEvents.markProcessed(eventId);
     console.log('[WhatsApp Webhook] Mensagem processada:', wamid, 'de', senderPhone);
+
+    // 10. BOT DE ATENDIMENTO.
+    // Fica no FIM de proposito: a mensagem ja esta gravada e a tela ja foi
+    // avisada antes de qualquer automacao acontecer. E nao bloqueia o
+    // webhook -- a Meta precisa do 200 rapido, senao reenvia o evento.
+    if (bot && typeof bot.aoReceberMensagem === 'function') {
+      setImmediate(function () {
+        bot.aoReceberMensagem({
+          wamid: wamid,
+          account_id: account.id,
+          conversation_id: conversation.id,
+          contact_id: contact.id,
+          telefone: senderPhone,
+          nome: contact.name || profileName || '',
+          texto: content,
+          tipo: msgType
+        }).catch(function (e) {
+          console.error('[Bot] falhou ao tratar a mensagem recebida:', e.message);
+        });
+      });
+    }
 
   } catch (e) {
     console.error('[WhatsApp Webhook] Erro ao processar mensagem:', e.message);

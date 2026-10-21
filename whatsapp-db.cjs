@@ -359,8 +359,92 @@ function criarTabelas() {
     created_at TEXT DEFAULT (datetime('now'))
   )`);
 
+  // Marca a mensagem que o BOT mandou, para a conversa mostrar a etiqueta e
+  // para a equipe distinguir do atendimento humano. ALTER falha em silencio
+  // se a coluna ja existe; mensagem antiga fica com 0, o que esta certo.
+  ['sent_by_bot INTEGER DEFAULT 0'].forEach(function (col) {
+    try { db.run('ALTER TABLE whatsapp_messages ADD COLUMN ' + col); } catch (e) {}
+  });
+
+  // ─── BOT DE ATENDIMENTO ─────────────────────────────────────────────────────
+  // A CONFIGURAÇÃO do bot (modo, passos, textos) NÃO mora aqui: fica no
+  // state.json, para usar o contrato de gravação do sistema
+  // (setKeys/upsertIds) e a permissão por tela. Aqui fica só o que muda a cada
+  // mensagem, que é muito e não pode inflar o state.json.
+
+  // Uma linha por contato: o que o bot já fez e o que ele não pode fazer.
+  db.run(`CREATE TABLE IF NOT EXISTS whatsapp_bot_contatos (
+    contact_id             INTEGER PRIMARY KEY,
+    optou_sair             INTEGER DEFAULT 0,
+    optou_sair_em          TEXT,
+    aguardando_atendente   INTEGER DEFAULT 0,
+    aguardando_desde       TEXT,
+    pausado                INTEGER DEFAULT 0,
+    pausado_em             TEXT,
+    pausado_por            TEXT DEFAULT '',
+    ultima_resposta_em     TEXT,
+    ultima_msg_recebida_em TEXT,
+    respostas_no_dia       INTEGER DEFAULT 0,
+    dia_da_contagem        TEXT DEFAULT '',
+    total_respostas        INTEGER DEFAULT 0,
+    atualizado_em          TEXT DEFAULT (datetime('now'))
+  )`);
+
+  // Fila de envio. É ela que dá: controle de ritmo, retomada depois de
+  // reinício (a linha pendente continua aqui) e a garantia de NÃO DUPLICAR --
+  // wamid_gatilho é UNIQUE, então a mesma mensagem recebida nunca enfileira
+  // duas vezes, mesmo se a Meta repetir o webhook.
+  db.run(`CREATE TABLE IF NOT EXISTS whatsapp_bot_fila (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    wamid_gatilho   TEXT UNIQUE,
+    account_id      INTEGER NOT NULL,
+    conversation_id INTEGER NOT NULL,
+    contact_id      INTEGER NOT NULL,
+    telefone        TEXT NOT NULL,
+    nome_contato    TEXT DEFAULT '',
+    passos_json     TEXT NOT NULL,
+    passo_atual     INTEGER DEFAULT 0,
+    total_passos    INTEGER DEFAULT 0,
+    enviar_em       TEXT,
+    status          TEXT DEFAULT 'pendente',
+    tentativas      INTEGER DEFAULT 0,
+    falhas          INTEGER DEFAULT 0,
+    ultimo_erro     TEXT DEFAULT '',
+    motivo          TEXT DEFAULT '',
+    criado_em       TEXT DEFAULT (datetime('now')),
+    terminado_em    TEXT
+  )`);
+
+  // Diário do bot, para o painel da aba e para investigar depois.
+  db.run(`CREATE TABLE IF NOT EXISTS whatsapp_bot_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    tipo        TEXT NOT NULL,
+    contact_id  INTEGER,
+    telefone    TEXT DEFAULT '',
+    detalhe     TEXT DEFAULT '',
+    criado_em   TEXT DEFAULT (datetime('now'))
+  )`);
+
+  // Cache do media id da Meta. O arquivo sobe UMA vez e o id é reaproveitado
+  // nos envios seguintes; quando a Meta expira o id (cerca de 30 dias), o
+  // envio falha e a linha é descartada para o arquivo subir de novo.
+  db.run(`CREATE TABLE IF NOT EXISTS whatsapp_bot_midia (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    arquivo       TEXT NOT NULL,
+    account_id    INTEGER NOT NULL,
+    media_id      TEXT DEFAULT '',
+    mime_type     TEXT DEFAULT '',
+    tamanho       INTEGER DEFAULT 0,
+    enviado_em    TEXT DEFAULT (datetime('now')),
+    UNIQUE (arquivo, account_id)
+  )`);
+
   // ─── ÍNDICES ────────────────────────────────────────────────────────────────
   const indices = [
+    'CREATE INDEX IF NOT EXISTS idx_bot_fila_status ON whatsapp_bot_fila(status, enviar_em)',
+    'CREATE INDEX IF NOT EXISTS idx_bot_fila_contato ON whatsapp_bot_fila(contact_id)',
+    'CREATE INDEX IF NOT EXISTS idx_bot_log_criado ON whatsapp_bot_log(criado_em DESC)',
+    'CREATE INDEX IF NOT EXISTS idx_bot_log_tipo ON whatsapp_bot_log(tipo)',
     'CREATE INDEX IF NOT EXISTS idx_contacts_phone ON whatsapp_contacts(phone)',
     'CREATE INDEX IF NOT EXISTS idx_conversations_account ON whatsapp_conversations(account_id)',
     'CREATE INDEX IF NOT EXISTS idx_conversations_contact ON whatsapp_conversations(contact_id)',
@@ -651,13 +735,14 @@ const messages = {
     return runInsert(
       `INSERT INTO whatsapp_messages
         (conversation_id, account_id, wamid, direction, type, content, media_url, media_mime_type, media_filename, media_id,
-         template_name, template_language, status, sender_phone, sender_name, is_internal_note, error_code, error_message)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         template_name, template_language, status, sender_phone, sender_name, is_internal_note, error_code, error_message, sent_by_bot)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [data.conversation_id, data.account_id, data.wamid || null, data.direction || 'incoming',
        data.type || 'text', data.content || '', data.media_url || '', data.media_mime_type || '',
        data.media_filename || '', data.media_id || '', data.template_name || '', data.template_language || '',
        data.status || 'sent', data.sender_phone || '', data.sender_name || '',
-       data.is_internal_note ? 1 : 0, data.error_code || '', data.error_message || '']
+       data.is_internal_note ? 1 : 0, data.error_code || '', data.error_message || '',
+       data.sent_by_bot ? 1 : 0]
     );
   },
 
@@ -851,8 +936,165 @@ function close() {
 // ==========================================================================
 // EXPORTS
 // ==========================================================================
+// ==========================================================================
+// BOT DE ATENDIMENTO — acesso às tabelas
+// ==========================================================================
+const _hoje = () => new Date().toISOString().slice(0, 10);
+
+const bot = {
+  // ── estado por contato ──────────────────────────────────────────────────
+  contato: function (contactId) {
+    const r = getOne('SELECT * FROM whatsapp_bot_contatos WHERE contact_id = ?', [contactId]);
+    if (r) return r;
+    // Linha que ainda não existe equivale a "nada aconteceu com este contato".
+    return {
+      contact_id: contactId, optou_sair: 0, aguardando_atendente: 0, pausado: 0,
+      ultima_resposta_em: null, ultima_msg_recebida_em: null,
+      respostas_no_dia: 0, dia_da_contagem: '', total_respostas: 0
+    };
+  },
+  gravarContato: function (contactId, campos) {
+    const atual = getOne('SELECT contact_id FROM whatsapp_bot_contatos WHERE contact_id = ?', [contactId]);
+    const permitidos = ['optou_sair', 'optou_sair_em', 'aguardando_atendente', 'aguardando_desde',
+      'pausado', 'pausado_em', 'pausado_por', 'ultima_resposta_em', 'ultima_msg_recebida_em',
+      'respostas_no_dia', 'dia_da_contagem', 'total_respostas'];
+    const cols = [], vals = [];
+    permitidos.forEach(function (c) {
+      if (campos[c] !== undefined) { cols.push(c); vals.push(campos[c]); }
+    });
+    if (!cols.length) return;
+    if (!atual) {
+      run('INSERT INTO whatsapp_bot_contatos (contact_id, ' + cols.join(', ') + ') VALUES (?' +
+          cols.map(function () { return ', ?'; }).join('') + ')', [contactId].concat(vals));
+    } else {
+      run('UPDATE whatsapp_bot_contatos SET ' + cols.map(function (c) { return c + ' = ?'; }).join(', ') +
+          ", atualizado_em = datetime('now') WHERE contact_id = ?", vals.concat([contactId]));
+    }
+  },
+  // Conta uma resposta do bot no dia (vira 1 quando o dia muda).
+  contarResposta: function (contactId) {
+    const c = bot.contato(contactId);
+    const hoje = _hoje();
+    const n = (c.dia_da_contagem === hoje) ? (c.respostas_no_dia || 0) + 1 : 1;
+    bot.gravarContato(contactId, {
+      respostas_no_dia: n, dia_da_contagem: hoje,
+      ultima_resposta_em: new Date().toISOString(),
+      total_respostas: (c.total_respostas || 0) + 1
+    });
+    return n;
+  },
+  respostasHoje: function (contactId) {
+    const c = bot.contato(contactId);
+    return (c.dia_da_contagem === _hoje()) ? (c.respostas_no_dia || 0) : 0;
+  },
+
+  // ── fila de envio ───────────────────────────────────────────────────────
+  // Devolve null quando o wamid já está na fila: é a trava contra duplicidade.
+  enfileirar: function (dados) {
+    try {
+      const id = runInsert(`INSERT INTO whatsapp_bot_fila
+        (wamid_gatilho, account_id, conversation_id, contact_id, telefone, nome_contato,
+         passos_json, passo_atual, total_passos, enviar_em, status, motivo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 'pendente', ?)`,
+        [dados.wamid || null, dados.account_id, dados.conversation_id, dados.contact_id,
+         dados.telefone, dados.nome_contato || '', JSON.stringify(dados.passos || []),
+         (dados.passos || []).length, dados.enviar_em || new Date().toISOString(), dados.motivo || '']);
+      return id;
+    } catch (e) {
+      // UNIQUE violado = webhook repetido. Não é erro: é a proteção agindo.
+      if (/UNIQUE/i.test(e.message || '')) return null;
+      throw e;
+    }
+  },
+  filaPendentes: function (limite) {
+    return getAll(`SELECT * FROM whatsapp_bot_fila
+      WHERE status = 'pendente' AND (enviar_em IS NULL OR enviar_em <= ?)
+      ORDER BY enviar_em ASC LIMIT ?`, [new Date().toISOString(), limite || 5]);
+  },
+  filaDoContato: function (contactId) {
+    return getOne(`SELECT * FROM whatsapp_bot_fila
+      WHERE contact_id = ? AND status = 'pendente' ORDER BY id DESC LIMIT 1`, [contactId]);
+  },
+  atualizarFila: function (id, campos) {
+    const permitidos = ['passo_atual', 'enviar_em', 'status', 'tentativas', 'falhas',
+                        'ultimo_erro', 'terminado_em'];
+    const cols = [], vals = [];
+    permitidos.forEach(function (c) {
+      if (campos[c] !== undefined) { cols.push(c + ' = ?'); vals.push(campos[c]); }
+    });
+    if (!cols.length) return;
+    run('UPDATE whatsapp_bot_fila SET ' + cols.join(', ') + ' WHERE id = ?', vals.concat([id]));
+  },
+  // Usado quando a pessoa responde no meio da sequência: termina o que falta
+  // sem reiniciar e sem mandar o resto.
+  encerrarFilaDoContato: function (contactId, motivo) {
+    run(`UPDATE whatsapp_bot_fila SET status = 'encerrada', ultimo_erro = ?,
+         terminado_em = datetime('now') WHERE contact_id = ? AND status = 'pendente'`,
+        [motivo || '', contactId]);
+  },
+
+  // ── diário ──────────────────────────────────────────────────────────────
+  registrar: function (tipo, contactId, telefone, detalhe) {
+    try {
+      run('INSERT INTO whatsapp_bot_log (tipo, contact_id, telefone, detalhe) VALUES (?, ?, ?, ?)',
+          [tipo, contactId || null, telefone || '', String(detalhe || '').slice(0, 500)]);
+    } catch (e) { console.error('[Bot] não consegui registrar no diário:', e.message); }
+  },
+  ultimosLogs: function (limite) {
+    return getAll('SELECT * FROM whatsapp_bot_log ORDER BY id DESC LIMIT ?', [limite || 50]);
+  },
+
+  // ── painel ──────────────────────────────────────────────────────────────
+  painel: function () {
+    // ATENÇÃO AO FORMATO DE DATA: as colunas criado_em usam o datetime('now')
+    // do SQLite, que grava "2026-10-21 11:45:00" -- com ESPAÇO, sem o "T" e
+    // sem o "Z". Comparar isso com um toISOString() do JavaScript dá errado
+    // por comparação de texto ('T' vem depois do espaço na tabela de
+    // caracteres), e o número de "hoje" saía ZERO enquanto o da semana vinha
+    // certo. Então a conta de data é feita toda DENTRO do SQL, com as funções
+    // do próprio SQLite.
+    const um = function (sql, params) {
+      const r = getOne(sql, params || []);
+      return (r && r.n) || 0;
+    };
+    return {
+      contatos_hoje: um(`SELECT COUNT(DISTINCT contact_id) AS n FROM whatsapp_bot_fila
+                         WHERE date(criado_em) = date('now')`),
+      contatos_semana: um(`SELECT COUNT(DISTINCT contact_id) AS n FROM whatsapp_bot_fila
+                           WHERE criado_em >= datetime('now', '-7 days')`),
+      contatos_mes: um(`SELECT COUNT(DISTINCT contact_id) AS n FROM whatsapp_bot_fila
+                        WHERE criado_em >= datetime('now', '-30 days')`),
+      sequencias_completas: um(`SELECT COUNT(*) AS n FROM whatsapp_bot_fila WHERE status = 'concluida'`),
+      com_falha: um(`SELECT COUNT(*) AS n FROM whatsapp_bot_fila WHERE falhas > 0`),
+      na_fila: um(`SELECT COUNT(*) AS n FROM whatsapp_bot_fila WHERE status = 'pendente'`),
+      pedidos_atendente_hoje: um(`SELECT COUNT(*) AS n FROM whatsapp_bot_log
+                                  WHERE tipo = 'atendente' AND date(criado_em) = date('now')`),
+      pedidos_atendente_semana: um(`SELECT COUNT(*) AS n FROM whatsapp_bot_log
+                                    WHERE tipo = 'atendente' AND criado_em >= datetime('now', '-7 days')`),
+      saidas: um(`SELECT COUNT(*) AS n FROM whatsapp_bot_log WHERE tipo = 'saida'`)
+    };
+  },
+
+  // ── cache do media id da Meta ───────────────────────────────────────────
+  midiaCache: function (arquivo, accountId) {
+    return getOne('SELECT * FROM whatsapp_bot_midia WHERE arquivo = ? AND account_id = ?', [arquivo, accountId]);
+  },
+  gravarMidiaCache: function (arquivo, accountId, mediaId, mime, tamanho) {
+    run(`INSERT INTO whatsapp_bot_midia (arquivo, account_id, media_id, mime_type, tamanho)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(arquivo, account_id) DO UPDATE SET
+           media_id = excluded.media_id, mime_type = excluded.mime_type,
+           tamanho = excluded.tamanho, enviado_em = datetime('now')`,
+        [arquivo, accountId, mediaId, mime || '', tamanho || 0]);
+  },
+  esquecerMidiaCache: function (arquivo, accountId) {
+    run('DELETE FROM whatsapp_bot_midia WHERE arquivo = ? AND account_id = ?', [arquivo, accountId]);
+  }
+};
+
 module.exports = {
   init, getDb, getDbPath, salvarImediato,
   accounts, contacts, conversations, messages, templates, tags, webhookEvents, audit,
+  bot,
   dashboardStats, backup, close
 };

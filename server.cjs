@@ -39,6 +39,9 @@ const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 // tudo dentro de UPLOADS_DIR é servido sem login nenhum (rota /uploads/..).
 // Documento pessoal só pode sair por rota autenticada — ver /api/diaria/admin/arquivo.
 const DIARIA_DOCS_DIR = path.join(DATA_DIR, 'diaria-docs');
+// Midia do bot: FORA de /uploads/ (que e publico, regra 7). So sai pela
+// rota autenticada /api/whatsapp/bot/midia/<arquivo>.
+const BOT_MIDIA_DIR = path.join(DATA_DIR, 'bot-midia');
 const LIMITE_CORPO = 160 * 1024 * 1024; // 160 MB. O corpo inteiro e montado na MEMORIA (data += chunk);
 // ATENCAO: ja aconteceu de o state.json passar de 48 MB (fotos gravadas DENTRO
 // do JSON) e TODO save comecar a ser recusado silenciosamente. O limite subiu
@@ -71,6 +74,7 @@ process.on('unhandledRejection', function (e) { _encerrarPorErroFatal('unhandled
 try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (e) {}
 try { fs.mkdirSync(BACKUP_DIR, { recursive: true }); } catch (e) {}
 try { fs.mkdirSync(DIARIA_DOCS_DIR, { recursive: true }); } catch (e) {}
+try { fs.mkdirSync(BOT_MIDIA_DIR, { recursive: true }); } catch (e) {}
 
 // ── BACKUP DA INICIALIZAÇÃO ────────────────────────────────────────────────
 // Guarda uma cópia do state.json ANTES de o sistema ler ou gravar qualquer
@@ -207,6 +211,38 @@ function backupDaInicializacao() {
   }
 }
 backupDaInicializacao();
+
+// ── LIMPEZA PONTUAL (outubro de 2026) ──────────────────────────────────────
+// Arquivo de 70 bytes que ficou órfão na pasta pública: foi um pixel subido
+// para CONFERIR, num deploy, que a validação de upload por conteúdo estava
+// valendo em produção. Nenhum cadastro aponta para ele.
+// Está aqui porque a pasta de uploads fica na VPS e não há rota para apagar
+// arquivo — então a remoção acontece na subida, uma vez, e depois esta função
+// não encontra mais nada e não faz nada.
+// PODE SER REMOVIDA desta vez em diante: ver o SISTEMA-VISAO-GERAL.md.
+function limparArquivosOrfaos() {
+  const orfaos = ['1792590980313_oa0fhz_verificacao_deploy.png'];
+  orfaos.forEach(function (nome) {
+    try {
+      // path.basename e conferência de pasta, como em qualquer caminho (regra 4)
+      const alvo = path.join(UPLOADS_DIR, path.basename(nome));
+      if (!path.resolve(alvo).startsWith(path.resolve(UPLOADS_DIR) + path.sep)) return;
+      if (!fs.existsSync(alvo)) return;
+      const tam = fs.statSync(alvo).size;
+      // Só apaga se for mesmo o arquivinho de teste. Um arquivo grande com
+      // esse nome seria outra coisa, e aí é melhor não encostar.
+      if (tam > 4096) {
+        console.warn('[Limpeza] ' + nome + ' tem ' + tam + ' bytes, maior que o esperado. NÃO apaguei.');
+        return;
+      }
+      fs.unlinkSync(alvo);
+      console.log('[Limpeza] arquivo órfão de teste removido: ' + nome + ' (' + tam + ' bytes)');
+    } catch (e) {
+      console.error('[Limpeza] não consegui remover ' + nome + ':', e.message);
+    }
+  });
+}
+limparArquivosOrfaos();
 
 // Rede de proteção dos dados críticos (Entrega/Devolução de Equipamentos).
 // Módulo isolado: se ele falhar, o sistema continua salvando normalmente.
@@ -1218,6 +1254,10 @@ const RTTelas = require('./js/telas.js');
 const ROTAS_POR_TELA = [
   { re: /^\/api\/diaria\/admin\//,                                      tela: 'diaria' },
   { re: /^\/api\/openwa\//,                                             tela: 'whatsapp-qr' },
+  // A DO BOT VEM ANTES da do WhatsApp: permitirRota usa o PRIMEIRO padrão que
+  // casa, e /api/whatsapp/bot/... também casa com /api/whatsapp/. Invertendo a
+  // ordem, a aba Bot passaria a ser liberada pela permissão do WhatsApp.
+  { re: /^\/api\/whatsapp\/bot\//,                                      tela: 'bot' },
   { re: /^\/api\/whatsapp\//,                                           tela: 'whatsapp' },
   { re: /^\/api\/(ver-senha|reset-senha|aprovar-senha|solicitacoes-senha)$/, tela: 'funcionarios' },
   { re: /^\/api\/relatorio-equip-admin\//,                              tela: 'equipamentos' }
@@ -1434,11 +1474,12 @@ function _openwaDetalhe(r) {
   const base = (r && r.erro) || 'O OpenWA recusou a chamada.';
   return msg ? base + ' Motivo: ' + msg : base;
 }
-let waDb = null, waApi = null, waWebhook = null, _waCarregado = false;
+let waDb = null, waApi = null, waWebhook = null, waBot = null, _waCarregado = false;
 try {
   waDb      = require('./whatsapp-db.cjs');
   waApi     = require('./whatsapp-api.cjs');
   waWebhook = require('./whatsapp-webhook.cjs');
+  waBot     = require('./whatsapp-bot.cjs');
   _waCarregado = true;
 } catch (e) {
   console.error('[WhatsApp] Módulo NÃO carregou (o resto do sistema segue normal):', e.message);
@@ -1468,6 +1509,29 @@ let _waReady = false;
     console.log('[WhatsApp] Banco de dados inicializado:', waDb.getDbPath());
     // Inicia limpeza periódica de eventos antigos do webhook
     waWebhook.startCleanup(waDb, 6 * 60 * 60 * 1000);
+
+    // ── BOT DE ATENDIMENTO ────────────────────────────────────────────────
+    // A configuração vem do state.json (chave `botWhatsapp`), para usar o
+    // contrato de gravação e a permissão por tela do sistema. O estado de
+    // execução fica no SQLite, que é o que muda a cada mensagem.
+    // A mídia do bot vai para DATA_DIR/bot-midia, FORA de /uploads/ (que é
+    // público, regra 7): só sai pela rota autenticada, igual aos documentos
+    // da Diária.
+    if (waBot) {
+      try {
+        waBot.iniciar({
+          db: waDb, api: waApi, notificar: notifySSEClients,
+          pastaMidia: BOT_MIDIA_DIR,
+          lerConfig: function () {
+            try { return (lerEstado().dados || {}).botWhatsapp || {}; }
+            catch (e) { return {}; }
+          }
+        });
+      } catch (e) {
+        console.error('[Bot] não iniciou (o WhatsApp segue funcionando):', e.message);
+        waBot = null;
+      }
+    }
   } catch (e) {
     console.error('[WhatsApp] Erro ao inicializar banco:', e.message);
   }
@@ -3076,7 +3140,7 @@ http.createServer(function (req, res) {
       if (_waReady) {
         try {
           var body = JSON.parse(rawBody.toString('utf8'));
-          waWebhook.processEvent(body, waDb, waApi, notifySSEClients).catch(function (e) {
+          waWebhook.processEvent(body, waDb, waApi, notifySSEClients, waBot).catch(function (e) {
             console.error('[WhatsApp Webhook] Erro ao processar evento:', e.message);
           });
         } catch (e) { console.error('[WhatsApp Webhook] JSON inválido:', e.message); }
@@ -3133,6 +3197,172 @@ http.createServer(function (req, res) {
       var u = waUsuarioTemPermissao(req, 'visualizar');
       if (!u) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
       responderJson(res, 200, { ok: true, stats: waDb.dashboardStats() });
+      return;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // BOT DE ATENDIMENTO
+    // A permissão da TELA ("bot") é conferida no portão geral, em
+    // permitirRota/ROTAS_POR_TELA: GET exige "só ver", POST exige "ver e
+    // editar". Aqui dentro a conferência é a do módulo WhatsApp.
+    // A CONFIGURAÇÃO não é gravada por estas rotas: ela vai pelo
+    // POST /api/state com setKeys:['botWhatsapp'], que é o contrato do
+    // sistema e o que faz remover e reordenar funcionarem com duas pessoas
+    // logadas.
+    // ══════════════════════════════════════════════════════════════════════
+
+    // Painel + situação do bot
+    if (urlPath === '/api/whatsapp/bot/painel' && req.method === 'GET') {
+      var uBp = waUsuarioTemPermissao(req, 'visualizar');
+      if (!uBp) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      if (!waBot) { responderJson(res, 200, { ok: true, disponivel: false }); return; }
+      responderJson(res, 200, {
+        ok: true, disponivel: true,
+        painel: waDb.bot.painel(),
+        config: waBot.configAtual(),
+        ultimos: waDb.bot.ultimosLogs(40)
+      });
+      return;
+    }
+
+    // Enviar a sequência de teste para um número digitado
+    if (urlPath === '/api/whatsapp/bot/teste' && req.method === 'POST') {
+      var uBt = waUsuarioTemPermissao(req, 'editar');
+      if (!uBt) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      if (!waBot) { responderJson(res, 503, { ok: false, error: 'Bot não disponível.' }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false, error: 'corpo inválido' }); return; }
+        var contaId = Number(body.account_id || 0);
+        if (!contaId) { responderJson(res, 400, { ok: false, error: 'Escolha a conta.' }); return; }
+        waBot.enviarTeste(contaId, body.telefone, body.nome || 'Teste')
+          .then(function (r) {
+            waDb.audit.log({
+              user_login: uBt.login, user_name: uBt.nome, action: 'Enviou teste do bot',
+              details: 'Para: ' + String(body.telefone || '').slice(0, 20), ip: waIpDaReq(req), account_id: contaId
+            });
+            responderJson(res, 200, r);
+          })
+          .catch(function (e) { responderJson(res, 200, { ok: false, error: e.message }); });
+      });
+      return;
+    }
+
+    // Pausar / devolver o bot num contato
+    var mBotPausa = urlPath.match(/^\/api\/whatsapp\/bot\/contato\/(\d+)\/(pausar|devolver)$/);
+    if (mBotPausa && req.method === 'POST') {
+      var uBc = waUsuarioTemPermissao(req, 'editar');
+      if (!uBc) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      if (!waBot) { responderJson(res, 503, { ok: false, error: 'Bot não disponível.' }); return; }
+      var alvoId = decodeSeguro(mBotPausa[1]);
+      if (alvoId === null) { responderJson(res, 400, { ok: false, error: 'identificador inválido' }); return; }
+      var pausar = mBotPausa[2] === 'pausar';
+      waDb.bot.gravarContato(Number(alvoId), pausar
+        ? { pausado: 1, pausado_em: new Date().toISOString(), pausado_por: uBc.login }
+        : { pausado: 0, pausado_em: null, pausado_por: '', aguardando_atendente: 0, optou_sair: 0 });
+      waDb.bot.registrar(pausar ? 'pausado' : 'devolvido', Number(alvoId), '', 'por ' + uBc.login);
+      waDb.audit.log({
+        user_login: uBc.login, user_name: uBc.nome,
+        action: pausar ? 'Pausou o bot num contato' : 'Devolveu o contato ao bot',
+        details: 'contato ' + alvoId, ip: waIpDaReq(req)
+      });
+      responderJson(res, 200, { ok: true, pausado: pausar });
+      return;
+    }
+
+    // Situação do bot naquele contato (para a conversa mostrar o botão certo)
+    var mBotSit = urlPath.match(/^\/api\/whatsapp\/bot\/contato\/(\d+)$/);
+    if (mBotSit && req.method === 'GET') {
+      var uBs = waUsuarioTemPermissao(req, 'visualizar');
+      if (!uBs) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      if (!waBot) { responderJson(res, 200, { ok: true, disponivel: false }); return; }
+      var sitId = decodeSeguro(mBotSit[1]);
+      if (sitId === null) { responderJson(res, 400, { ok: false, error: 'identificador inválido' }); return; }
+      responderJson(res, 200, { ok: true, disponivel: true, contato: waDb.bot.contato(Number(sitId)) });
+      return;
+    }
+
+    // Subir mídia para um passo (imagem, áudio OGG/Opus ou PDF)
+    if (urlPath === '/api/whatsapp/bot/midia' && req.method === 'POST') {
+      var uBm = waUsuarioTemPermissao(req, 'editar');
+      if (!uBm) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false, error: 'corpo inválido' }); return; }
+        var m = /^data:([^;]+);base64,([\s\S]*)$/.exec((body && body.dataUrl) || '');
+        if (!m) { responderJson(res, 400, { ok: false, error: 'arquivo inválido' }); return; }
+        var buf;
+        try { buf = Buffer.from(m[2], 'base64'); }
+        catch (e) { responderJson(res, 400, { ok: false, error: 'base64 inválido' }); return; }
+        if (!buf.length) { responderJson(res, 400, { ok: false, error: 'arquivo vazio' }); return; }
+
+        // TIPO PELO CONTEÚDO, nunca pela extensão nem pelo que o cliente diz
+        // (regra que já vale para o upload do sistema).
+        var tipoReal = detectarTipoReal(buf);
+        var destino = String(body.destino || '').toLowerCase();   // imagem | audio | documento
+        var PERMITIDO = {
+          imagem:     { tipos: ['png', 'jpeg', 'webp'], limite: 5 * 1024 * 1024, mime: { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp' } },
+          audio:      { tipos: ['ogg'],                 limite: 16 * 1024 * 1024, mime: { ogg: 'audio/ogg' } },
+          documento:  { tipos: ['pdf'],                 limite: 20 * 1024 * 1024, mime: { pdf: 'application/pdf' } }
+        };
+        var regra = PERMITIDO[destino];
+        if (!regra) { responderJson(res, 400, { ok: false, error: 'destino inválido' }); return; }
+        if (regra.tipos.indexOf(tipoReal) < 0) {
+          var aviso = destino === 'audio'
+            ? 'Para o áudio chegar como mensagem de voz, a Meta exige OGG/Opus. ' +
+              'Exporte o arquivo nesse formato e envie de novo. ' +
+              '(O arquivo enviado parece ser: ' + tipoReal + '.)'
+            : 'Tipo não aceito aqui. Esperado: ' + regra.tipos.join(', ') + '. Enviado: ' + tipoReal + '.';
+          responderJson(res, 400, { ok: false, error: aviso });
+          return;
+        }
+        if (buf.length > regra.limite) {
+          responderJson(res, 413, { ok: false, error: 'Arquivo acima de ' + Math.round(regra.limite / 1048576) + ' MB.' });
+          return;
+        }
+        var nome = 'bot_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + EXT_DO_TIPO[tipoReal];
+        try {
+          fs.writeFileSync(path.join(BOT_MIDIA_DIR, nome), buf);
+          waDb.audit.log({
+            user_login: uBm.login, user_name: uBm.nome, action: 'Subiu mídia do bot',
+            details: destino + ' · ' + tipoReal + ' · ' + Math.round(buf.length / 1024) + ' KB',
+            ip: waIpDaReq(req)
+          });
+          responderJson(res, 200, {
+            ok: true, arquivo: nome, tipo: tipoReal,
+            mime: regra.mime[tipoReal], tamanho: buf.length
+          });
+        } catch (e) {
+          console.error('[Bot] falha ao gravar a mídia:', e.message);
+          responderJson(res, 500, { ok: false, error: 'Falha ao gravar o arquivo.' });
+        }
+      });
+      return;
+    }
+
+    // Servir a mídia do bot — SÓ para quem tem sessão e permissão.
+    // A pasta fica fora de /uploads/ justamente para isto (regra 5 e 7).
+    var mBotArq = urlPath.match(/^\/api\/whatsapp\/bot\/midia\/([^\/]+)$/);
+    if (mBotArq && req.method === 'GET') {
+      var uBa = waUsuarioTemPermissao(req, 'visualizar');
+      if (!uBa) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      var nomeArq = decodeSeguro(mBotArq[1]);
+      if (nomeArq === null) { responderJson(res, 400, { ok: false, error: 'nome inválido' }); return; }
+      // path.basename E conferência de que o caminho final continua DENTRO da
+      // pasta (regra 4: cinto e suspensório).
+      var alvoArq = path.join(BOT_MIDIA_DIR, path.basename(nomeArq));
+      if (!path.resolve(alvoArq).startsWith(path.resolve(BOT_MIDIA_DIR) + path.sep)) {
+        responderJson(res, 400, { ok: false, error: 'caminho inválido' }); return;
+      }
+      fs.readFile(alvoArq, function (e, dados) {
+        if (e) { responderJson(res, 404, { ok: false, error: 'não encontrado' }); return; }
+        var t = detectarTipoReal(dados);
+        var ct = TIPOS_IMAGEM_SEGURA[t] || (t === 'pdf' ? 'application/pdf' : (t === 'ogg' ? 'audio/ogg' : 'application/octet-stream'));
+        res.writeHead(200, Object.assign({}, SECURITY_HEADERS, {
+          'Content-Type': ct,
+          'X-Content-Type-Options': 'nosniff',
+          'Cache-Control': 'private, max-age=3600'
+        }));
+        res.end(dados);
+      });
       return;
     }
 
@@ -3407,6 +3637,16 @@ http.createServer(function (req, res) {
             last_message_type: body.type || 'text',
             last_message_at: new Date().toISOString()
           });
+          // ATENDENTE RESPONDEU: o bot para naquele contato NA HORA.
+          // Nada pior que a pessoa estar falando com alguem de verdade e o
+          // bot continuar despejando mensagem automatica em cima.
+          // Nota interna nao conta: ela nao vai para o cliente.
+          if (waBot && !body.is_internal_note) {
+            try {
+              var _convBot = waDb.conversations.getById(convId);
+              if (_convBot && _convBot.contact_id) waBot.aoAtendenteResponder(_convBot.contact_id, u.login);
+            } catch (e) { console.error('[Bot] nao pausei no contato:', e.message); }
+          }
           waDb.audit.log({ user_login: u.login, user_name: u.nome, action: 'Enviou mensagem WhatsApp', details: 'Para: ' + toPhone + ' | Tipo: ' + (body.type || 'text'), ip: waIpDaReq(req), conversation_id: convId, message_id: msgId });
           notifySSEClients({ type: 'new_message', conversation_id: convId, message: { id: msgId, direction: 'outgoing', type: body.type || 'text', content: body.content || body.caption || '', status: result.ok ? 'sent' : 'failed', sender_name: u.nome || u.login, created_at: new Date().toISOString() } });
           if (result.ok) { responderJson(res, 200, { ok: true, message_id: msgId, wamid: result.wamid }); }
@@ -3591,7 +3831,7 @@ http.createServer(function (req, res) {
   // A tabela de precos (custo pago a clinica x repasse cobrado do cliente) e
   // informacao comercial da empresa: so vai para quem tem sessao valida.
   if ((rel === '/js/app.js' || rel === '/js/data.js' || rel === '/js/whatsapp.js' ||
-       rel === '/js/telas.js' || rel === '/precificacao-base.json') && !autenticado) {
+       rel === '/js/telas.js' || rel === '/js/whatsapp-bot-ui.js' || rel === '/precificacao-base.json') && !autenticado) {
     res.writeHead(404, Object.assign({ 'Content-Type': 'text/plain' }, SECURITY_HEADERS));
     res.end('404 Not Found');
     return;

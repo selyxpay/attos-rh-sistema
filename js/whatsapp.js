@@ -58,6 +58,10 @@ function renderWhatsApp() {
     { id: 'inbox',     ic: 'fa-comments',     label: 'Conversas' },
     { id: 'templates', ic: 'fa-file-lines',   label: 'Templates' }
   ];
+  // "Bot" — tem permissão de TELA própria ("bot"), conferida no servidor em
+  // toda rota /api/whatsapp/bot/. Aqui é só para não mostrar a aba a quem vai
+  // levar 403 de qualquer forma.
+  if (_botPodeVer()) abas.push({ id: 'bot', ic: 'fa-robot', label: 'Bot' });
   // "Conexões" (múltiplos números oficiais) — só para quem administra o WhatsApp.
   if (_waPode('aprovar')) abas.push({ id: 'conexoes', ic: 'fa-plug', label: 'Conexões' });
   subs.innerHTML = abas.map(a =>
@@ -78,6 +82,7 @@ function renderWhatsApp() {
   else if (_waSubAba === 'inbox')     _waRenderInbox(cont);
   else if (_waSubAba === 'templates') _waRenderTemplates(cont);
   else if (_waSubAba === 'conexoes')  _waRenderConexoes(cont);
+  else if (_waSubAba === 'bot')       _botRender(cont);
 }
 window.renderWhatsApp = renderWhatsApp;
 
@@ -434,7 +439,11 @@ window.waFiltroConta = function (id) { _waFiltroConta = id; _waCarregarConversas
 function _waRenderFiltrosConv() {
   const box = document.getElementById('wa-conv-filtros');
   if (!box) return;
-  const fs = [['', 'Todas'], ['open', 'Abertas'], ['unread', 'Não lidas'], ['closed', 'Fechadas']];
+  // "Aguardando atendente" usa o status 'pending', que é o que o bot grava
+  // na conversa quando a pessoa pede atendente. Fica logo depois de
+  // "Não lidas" porque é a fila que alguém precisa olhar primeiro.
+  const fs = [['', 'Todas'], ['unread', 'Não lidas'], ['pending', 'Aguardando atendente'],
+              ['open', 'Abertas'], ['closed', 'Fechadas']];
   box.innerHTML = fs.map(([v, l]) => `<button class="wa-fchip ${v === _waFiltroConv ? 'active' : ''}" onclick="waFiltroConversa('${v}')">${l}</button>`).join('');
 }
 window.waFiltroConversa = function (v) { _waFiltroConv = v; _waRenderFiltrosConv(); _waCarregarConversas(); };
@@ -447,6 +456,7 @@ async function _waCarregarConversas() {
   if (_waFiltroConv === 'open') qs += '&status=open';
   else if (_waFiltroConv === 'closed') qs += '&status=closed';
   else if (_waFiltroConv === 'unread') qs += '&unread_only=true';
+  else if (_waFiltroConv === 'pending') qs += '&status=pending';
   if (_waFiltroConta) qs += '&account_id=' + encodeURIComponent(_waFiltroConta);
   if (_waBuscaConv) qs += '&search=' + encodeURIComponent(_waBuscaConv);
   let r;
@@ -543,6 +553,7 @@ function _waRenderChat(conv, msgs) {
          ${podeEditar ? `<button class="wa-btn-mini" title="Atribuir atendente" onclick="waAtribuirConversa()"><i class="fa-solid fa-user-plus"></i></button>` : ''}
          ${podeEditar && !fechada ? `<button class="wa-btn-mini" title="Fechar conversa" onclick="waFecharConversa()"><i class="fa-solid fa-circle-check"></i></button>` : ''}
          ${podeEditar && fechada ? `<button class="wa-btn-mini" title="Reabrir conversa" onclick="waReabrirConversa()"><i class="fa-solid fa-rotate-left"></i></button>` : ''}
+         ${(podeEditar && conv.contact_id && _botPodeVer && _botPodeVer()) ? `<span id="wa-bot-ctrl" class="wa-bot-controle"></span>` : ''}
        </div>
      </header>
      <div class="wa-msgs" id="wa-msgs">${msgs.map(_waBolha).join('') || '<div class="wa-msgs-vazio">Sem mensagens ainda.</div>'}</div>
@@ -564,6 +575,10 @@ function _waRenderChat(conv, msgs) {
        ` : '<div class="wa-composer-somente">Você não tem permissão para enviar mensagens.</div>'}
      </div>`;
   _waScrollFim();
+  // Preenche o controle do bot no cabecalho (se a aba Bot for permitida).
+  if (conv && conv.contact_id && typeof botCarregarControle === 'function') {
+    botCarregarControle(conv.contact_id);
+  }
 }
 
 function _waBolha(m) {
