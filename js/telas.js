@@ -226,8 +226,15 @@
     var area = AREA[aba];
     var p = f && f.permissoes && area ? f.permissoes[area] : null;
     if (p && (p.criar === true || p.editar === true || p.excluir === true || p.aprovar === true)) return 'editar';
+    // ⚠️ PADRÃO PROVISÓRIO — ver SISTEMA-VISAO-GERAL.md, seção 4.1.
     // Sem matriz preenchida (conta antiga), quem enxergava a tela também
-    // trabalhava nela — era assim que o sistema funcionava.
+    // trabalhava nela — era assim que o sistema funcionava. O state.json de
+    // produção só tem 12 das 16 áreas, e há conta com `permissoes: {}`.
+    // Devolver 'nao' aqui tiraria o DP de Equipamentos e o Financeiro do
+    // Fluxo Financeiro no dia do deploy.
+    // O padrão CERTO é 'nao'. O caminho: completar as 16 áreas em todos os
+    // funcionários, conferir que nenhuma ficou em branco, e só então trocar a
+    // linha abaixo por `return 'nao'`. O documento tem o passo a passo.
     if (!p) return 'editar';
     return 'ver';
   }

@@ -178,6 +178,37 @@ entrar).
 regras antigas, reproduzindo o que o menu já mostrava — ninguém perde nem ganha
 acesso. Quando o admin salva `telas` daquela pessoa, o mapa passa a valer.
 
+#### ⚠️ Padrão provisório: área ausente vira "ver e editar"
+
+Na derivação, quando a matriz antiga de `permissoes` **não tem** a área daquela
+tela, o nível sai como **`'editar'`** (ver e editar), não como "sem acesso".
+
+**Por que está assim.** O `state.json` de produção só tem **12 das 16 áreas** —
+faltam `exame_medico`, `equipamentos`, `fluxo_financeiro` e `whatsapp` — e há
+conta com `permissoes: {}` (vazio). Nesses casos o acesso nunca veio da matriz:
+veio do **departamento**, e a pessoa trabalhava na tela normalmente. Quem for
+conservador aqui tira o DP de Equipamentos e o Financeiro do Fluxo Financeiro no
+dia do deploy, o que seria pior que o problema que se quer resolver.
+
+**Isto é TEMPORÁRIO.** O padrão certo é "sem acesso", e o caminho para chegar
+lá, nesta ordem:
+
+1. **Completar as 16 áreas** em todos os funcionários do `state.json`,
+   preenchendo-as com o que cada pessoa de fato usa hoje. Dá para fazer pela
+   tela de Funcionários, pessoa por pessoa, ou por um script que preencha a
+   partir do departamento.
+2. **Conferir** que ninguém ficou com área em branco — enquanto houver uma, o
+   padrão provisório continua sendo usado para ela.
+3. **Inverter o padrão** na função `_nivelPorRegraAntiga` de `js/telas.js`:
+   trocar o `if (!p) return 'editar'` por `return 'nao'`.
+4. Melhor ainda: depois do passo 1, salvar o mapa `telas` de cada pessoa pela
+   tela de Funcionários. A partir daí a derivação deixa de ser usada para quem
+   tem o mapa, e o padrão provisório perde o efeito naturalmente.
+
+Enquanto o passo 3 não acontecer, **toda tela cuja área falte na matriz fica
+aberta para quem já enxerga a tela** — o que é o comportamento de hoje, mas não
+é o que se quer no fim.
+
 **Três chaves com tratamento próprio:** `funcionarios` nunca vira lista vazia
 (outras telas mostram nome de autor), vai numa versão enxuta; `logs` é só de
 **acrescentar**, porque toda ação grava log mesmo de quem não abre a Auditoria;
