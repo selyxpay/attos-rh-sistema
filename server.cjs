@@ -3404,6 +3404,7 @@ http.createServer(function (req, res) {
           });
           waDb.conversations.update(convId, {
             last_message_text: (body.content || body.caption || body.template_name || '').slice(0, 200),
+            last_message_type: body.type || 'text',
             last_message_at: new Date().toISOString()
           });
           waDb.audit.log({ user_login: u.login, user_name: u.nome, action: 'Enviou mensagem WhatsApp', details: 'Para: ' + toPhone + ' | Tipo: ' + (body.type || 'text'), ip: waIpDaReq(req), conversation_id: convId, message_id: msgId });

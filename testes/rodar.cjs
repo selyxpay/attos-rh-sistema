@@ -78,6 +78,8 @@ const SUITES = [
     titulo: 'Sincronizacao com DUAS pessoas ao mesmo tempo' },
   { nome: 'telas',     arquivo: 'permissao-telas.cjs', servidor: true, navegador: false, semente: sementeTelas,
     titulo: 'Permissao por tela, com bloqueio no servidor' },
+  { nome: 'wa-msgs',   arquivo: 'whatsapp-mensagens.cjs', servidor: true, navegador: true,
+    titulo: 'WhatsApp: todo tipo de mensagem aparece, emoji certo, lista limpa' },
   { nome: 'whatsapp',  arquivo: 'whatsapp-layout.cjs', servidor: true, navegador: true,
     titulo: 'Layout do WhatsApp no computador, em 4 resolucoes' },
   { nome: 'limpeza',   arquivo: 'limpeza.cjs',        servidor: true,  navegador: false,

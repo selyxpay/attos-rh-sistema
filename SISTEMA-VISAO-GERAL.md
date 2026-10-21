@@ -308,6 +308,34 @@ configuração, nunca tocar em funcionários ou vagas.
 - **Funcionários**, **Controle de Acesso** (matriz de permissões),
   **Configurações**, **Auditoria** (log de ações), **Lixeira**, **Meu Painel**.
 
+### 5.1 Tela do WhatsApp Oficial — o que já foi arrumado
+
+Mensagem que **não é texto** não tem texto nenhum: áudio e figurinha nunca
+têm, e foto, vídeo e documento só têm se a pessoa escreveu legenda. O código
+caía num `content || ''`, então a conversa mostrava **balão vazio só com a
+hora** e a lista mostrava **"—"**. Ninguém sabia o que havia chegado.
+
+Hoje existe `WA_ROTULO_TIPO` em `js/whatsapp.js`, com rótulo e ícone para 16
+tipos. Ele serve a conversa (`_waBolha`) e a lista (`_waPrevia`). **Tipo novo
+que a Meta inventar entra nessa tabela** — sem ela, cai em "Mensagem não
+suportada", que já é melhor que balão vazio.
+
+A coluna `last_message_type` foi acrescentada à tabela de conversas por
+`ALTER TABLE` (padrão que o arquivo já usava). Conversa antiga fica com a
+coluna vazia e a tela cai no texto, como antes: nenhuma linha existente foi
+reescrita.
+
+Outros três pontos da mesma tela:
+
+- **Iniciais do avatar** usam `_waLetras`, que separa por caractere de verdade
+  (`Intl.Segmenter`, com `Array.from` como alternativa). `charAt(0)` cortava o
+  emoji pela metade e a metade solta virava "?" — era isso que aparecia no
+  avatar e no nome de quem usa emoji no WhatsApp.
+- **Estado da conversa** só aparece quando é diferente de "aberta". Antes toda
+  conversa levava "● Aberta", que não informava nada e tapava a prévia.
+- **Texto da mensagem** usa a classe `texto-longo` (regra 15) e transforma
+  endereço em link. O link é montado **depois** do escape, nunca antes.
+
 **WhatsApp (dois canais independentes)**
 - **WhatsApp Oficial** — API oficial da Meta (`whatsapp-api.cjs`,
   `whatsapp-webhook.cjs`). Dados em SQLite via `sql.js` (`whatsapp-db.cjs`) — é

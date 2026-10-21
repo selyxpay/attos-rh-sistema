@@ -259,6 +259,7 @@ function criarTabelas() {
       assigned_to_name    TEXT DEFAULT '',
       unread_count        INTEGER DEFAULT 0,
       last_message_text   TEXT DEFAULT '',
+      last_message_type   TEXT DEFAULT '',
       last_message_at     TEXT,
       created_at          TEXT DEFAULT (datetime('now')),
       updated_at          TEXT DEFAULT (datetime('now')),
@@ -267,6 +268,17 @@ function criarTabelas() {
       FOREIGN KEY (contact_id) REFERENCES whatsapp_contacts(id)
     )
   `);
+
+  // Migração: a lista de conversas mostrava "—" para toda mensagem que não é
+  // texto (áudio, figurinha, foto sem legenda), porque só existia o TEXTO da
+  // última mensagem e esses tipos não têm texto. Guardando o TIPO, a lista
+  // consegue mostrar "Áudio", "Figurinha", "Foto".
+  // ALTER falha em silêncio se a coluna já existe — seguro em qualquer caso.
+  // Conversa antiga fica com a coluna vazia e a tela cai no texto, como antes:
+  // nenhuma linha existente é reescrita.
+  ['last_message_type TEXT DEFAULT \'\''].forEach(function (col) {
+    try { db.run('ALTER TABLE whatsapp_conversations ADD COLUMN ' + col); } catch (e) {}
+  });
 
   db.run(`
     CREATE TABLE IF NOT EXISTS whatsapp_messages (
@@ -608,7 +620,7 @@ const conversations = {
   update(id, data) {
     const fields = [];
     const values = [];
-    ['status', 'assigned_to', 'assigned_to_name', 'unread_count', 'last_message_text', 'last_message_at', 'closed_at'].forEach(f => {
+    ['status', 'assigned_to', 'assigned_to_name', 'unread_count', 'last_message_text', 'last_message_type', 'last_message_at', 'closed_at'].forEach(f => {
       if (data[f] !== undefined) { fields.push(f + ' = ?'); values.push(data[f]); }
     });
     if (fields.length === 0) return;

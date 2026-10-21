@@ -292,6 +292,9 @@ async function processIncomingMessage(msg, contacts, phoneNumberId, displayPhone
     // 6. Atualiza a conversa
     db.conversations.update(conversation.id, {
       last_message_text: content.slice(0, 200),
+      // O TIPO vai junto: audio e figurinha nao tem texto, e sem isto a
+      // lista de conversas mostrava "—" para eles.
+      last_message_type: msgType || 'text',
       last_message_at: new Date().toISOString()
     });
     db.conversations.incrementUnread(conversation.id);

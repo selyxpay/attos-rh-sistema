@@ -136,7 +136,87 @@ function _waFmtTelefone(phone) {
   if (d.length === 12) return `+${d.slice(0, 2)} (${d.slice(2, 4)}) ${d.slice(4, 8)}-${d.slice(8)}`;
   return phone || '—';
 }
-function _waInicial(nome) { return (String(nome || '?').trim().charAt(0) || '?').toUpperCase(); }
+// ── INICIAIS DO AVATAR, SEM QUEBRAR EMOJI ──────────────────────────────────
+// charAt(0) corta pela METADE do caractere: emoji e acentuado composto ocupam
+// mais de uma unidade em JavaScript, e a metade solta vira "?" na tela. Era
+// por isso que o avatar e o nome apareciam com "?" para quem usa emoji no
+// nome do WhatsApp.
+// Agora separa por caractere de verdade (grapheme), com Intl.Segmenter quando
+// o navegador tem, e Array.from como alternativa — Array.from já respeita o
+// par de unidades do emoji, que resolve a maioria dos casos.
+function _waLetras(texto) {
+  const t = String(texto == null ? '' : texto);
+  try {
+    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+      const seg = new Intl.Segmenter('pt-BR', { granularity: 'grapheme' });
+      return Array.from(seg.segment(t), function (s) { return s.segment; });
+    }
+  } catch (e) { /* cai no Array.from */ }
+  return Array.from(t);
+}
+// Duas iniciais quando dá (primeiro e último nome), como no WhatsApp Web.
+function _waInicial(nome) {
+  const limpo = String(nome || '').trim();
+  if (!limpo) return '?';
+  const partes = limpo.split(/\s+/).filter(Boolean);
+  const primeira = _waLetras(partes[0])[0] || '';
+  // Se a primeira "letra" é emoji ou símbolo, ela sozinha já é o avatar.
+  if (primeira && !/[\p{L}\p{N}]/u.test(primeira)) return primeira;
+  if (partes.length > 1) {
+    const ultima = _waLetras(partes[partes.length - 1])[0] || '';
+    if (/[\p{L}\p{N}]/u.test(ultima)) return (primeira + ultima).toUpperCase();
+  }
+  return primeira.toUpperCase() || '?';
+}
+
+// ── O QUE ESTA MENSAGEM É, EM PORTUGUÊS ────────────────────────────────────
+// Mensagem que não é texto chegava SEM conteúdo nenhum: áudio e figurinha não
+// têm texto, e foto/vídeo/documento só têm se a pessoa escreveu legenda.
+// O resultado era balão vazio, só com a hora, e "—" na lista de conversas.
+// Aqui cada tipo ganha um rótulo. Vale para os dois lugares.
+const WA_ROTULO_TIPO = {
+  image:     { icone: 'fa-image',            texto: 'Foto' },
+  video:     { icone: 'fa-video',            texto: 'Vídeo' },
+  audio:     { icone: 'fa-microphone',       texto: 'Áudio' },
+  voice:     { icone: 'fa-microphone',       texto: 'Áudio' },
+  sticker:   { icone: 'fa-note-sticky',      texto: 'Figurinha' },
+  document:  { icone: 'fa-file-lines',       texto: 'Documento' },
+  location:  { icone: 'fa-location-dot',     texto: 'Localização' },
+  contacts:  { icone: 'fa-address-card',     texto: 'Contato' },
+  contact:   { icone: 'fa-address-card',     texto: 'Contato' },
+  reaction:  { icone: 'fa-face-smile',       texto: 'Reagiu' },
+  button:    { icone: 'fa-hand-pointer',     texto: 'Resposta de botão' },
+  interactive: { icone: 'fa-hand-pointer',   texto: 'Resposta de botão' },
+  template:  { icone: 'fa-file-contract',    texto: 'Modelo enviado' },
+  unsupported: { icone: 'fa-circle-question', texto: 'Mensagem não suportada' },
+  deleted:   { icone: 'fa-ban',              texto: 'Mensagem apagada' },
+  system:    { icone: 'fa-circle-info',      texto: 'Aviso do WhatsApp' }
+};
+function _waRotuloTipo(tipo) {
+  return WA_ROTULO_TIPO[String(tipo || '').toLowerCase()] || null;
+}
+// Duração em 0:12, quando o servidor souber. Sem isso, só "Áudio".
+function _waDuracao(seg) {
+  const n = Number(seg);
+  if (!n || isNaN(n) || n < 0) return '';
+  const m = Math.floor(n / 60), s = Math.floor(n % 60);
+  return m + ':' + String(s).padStart(2, '0');
+}
+// Prévia da conversa na lista: texto quando houver, senão o rótulo do tipo.
+function _waPrevia(c) {
+  const texto = String(c.last_message_text || '').trim();
+  const rot = _waRotuloTipo(c.last_message_type);
+  if (texto) {
+    // Foto COM legenda mostra o ícone e a legenda, como no WhatsApp.
+    if (rot && c.last_message_type !== 'text') {
+      return '<i class="fa-solid ' + rot.icone + ' wa-prev-icone"></i> ' + _waEsc(texto.slice(0, 38));
+    }
+    return _waEsc(texto.slice(0, 42));
+  }
+  if (rot) return '<i class="fa-solid ' + rot.icone + ' wa-prev-icone"></i> ' + _waEsc(rot.texto);
+  // Conversa antiga, de antes de o tipo passar a ser guardado.
+  return '<span class="wa-prev-vazia">Sem mensagens</span>';
+}
 // Cada pessoa com a sua cor, estavel (o hash do nome escolhe na paleta).
 // Antes disso a lista tinha um bug literal — style="background:cor;" sem o
 // ${} — e TODOS os avatares ficavam transparentes.
@@ -383,16 +463,35 @@ async function _waCarregarConversas() {
   box.innerHTML = _waConversas.map(_waItemConversa).join('');
 }
 
+// ── INDICADORES DA LISTA: SÓ QUANDO DIZEM ALGO ─────────────────────────────
+// Antes, TODA conversa levava "● Aberta" embaixo. Como quase toda conversa
+// está aberta, a etiqueta não informava nada e só poluía a lista — virava
+// ruído em cima da informação que importa, que é a prévia da mensagem.
+// Agora o estado só aparece quando é diferente do normal, e o nome do
+// atendente só quando existe um.
+function _waIndicadores(c, cor) {
+  const partes = [];
+  if (c.status && c.status !== 'open') {
+    partes.push('<span style="color:' + cor + ';">● ' + _waEsc(WA_STATUS_PT[c.status] || c.status) + '</span>');
+  }
+  if (c.assigned_to_name) {
+    partes.push('<span class="wa-ind-atendente"><i class="fa-solid fa-user-check"></i> ' + _waEsc(c.assigned_to_name) + '</span>');
+  }
+  if (!partes.length) return '';
+  return '<span class="wa-conv-status">' + partes.join(' · ') + '</span>';
+}
+
 function _waItemConversa(c) {
   const nome = c.contact_name || c.contact_profile_name || _waFmtTelefone(c.contact_phone) || 'Sem nome';
   const cor = WA_STATUS_COR[c.status] || '#94a3b8';
   const naoLidas = c.unread_count > 0 ? `<span class="wa-unread">${c.unread_count > 9 ? '9+' : c.unread_count}</span>` : '';
-  return `<div class="wa-conv-item ${c.id === _waConvAberta ? 'active' : ''}" onclick="waAbrirConversa(${c.id})">
+  const marcaNaoLida = c.unread_count > 0 ? ' wa-nao-lida' : '';
+  return `<div class="wa-conv-item ${c.id === _waConvAberta ? 'active' : ''}${marcaNaoLida}" onclick="waAbrirConversa(${c.id})">
     <span class="wa-avatar" style="background:${_waCorAvatar(nome)};">${_waEsc(_waInicial(nome))}</span>
     <div class="wa-conv-meio">
       <div class="wa-conv-topo"><b>${_waEsc(nome)}</b><span class="wa-conv-hora">${_waHora(c.last_message_at)}</span></div>
-      <div class="wa-conv-baixo"><span class="wa-conv-prev">${_waEsc((c.last_message_text || '').slice(0, 42) || '—')}</span>${naoLidas}</div>
-      <span class="wa-conv-status" style="color:${cor};">● ${WA_STATUS_PT[c.status] || c.status}${c.assigned_to_name ? ' · ' + _waEsc(c.assigned_to_name) : ''}</span>
+      <div class="wa-conv-baixo"><span class="wa-conv-prev">${_waPrevia(c)}</span>${naoLidas}</div>
+      ${_waIndicadores(c, cor)}
     </div>
   </div>`;
 }
@@ -472,14 +571,56 @@ function _waBolha(m) {
     return `<div class="wa-msg wa-msg-nota"><div class="wa-bolha"><div class="wa-nota-tag"><i class="fa-solid fa-note-sticky"></i> Nota interna · ${_waEsc(m.sender_name || '')}</div>${_waEsc(m.content)}<span class="wa-msg-hora">${_waHora(m.created_at)}</span></div></div>`;
   }
   const saida = m.direction === 'outgoing';
+  const tipo = String(m.type || 'text').toLowerCase();
+
+  // FIGURINHA: imagem solta, sem balão — é assim no WhatsApp.
+  if (tipo === 'sticker' && m.media_url) {
+    return `<div class="wa-msg ${saida ? 'wa-msg-out' : 'wa-msg-in'} wa-msg-figurinha">
+      <img class="wa-figurinha" src="${_waEsc(m.media_url)}" alt="figurinha">
+      <span class="wa-msg-hora wa-hora-fora">${_waHora(m.created_at)} ${saida ? _waTick(m.status) : ''}</span>
+    </div>`;
+  }
+
   let corpo = '';
-  if (m.type === 'image' && m.media_url) corpo = `<img class="wa-msg-img" src="${_waEsc(m.media_url)}" alt="imagem">${m.content ? '<div>' + _waEsc(m.content) + '</div>' : ''}`;
-  else if (m.type === 'audio' && m.media_url) corpo = _waPlayerAudio(m);
-  else if ((m.type === 'document' || m.type === 'video') && m.media_url) corpo = `<a class="wa-msg-doc" href="${_waEsc(m.media_url)}" target="_blank"><i class="fa-solid fa-file-arrow-down"></i> ${_waEsc(m.media_filename || m.type)}</a>${m.content ? '<div>' + _waEsc(m.content) + '</div>' : ''}`;
-  else corpo = _waEsc(m.content || '');
+  if (tipo === 'image' && m.media_url) {
+    corpo = `<img class="wa-msg-img" src="${_waEsc(m.media_url)}" alt="imagem">${m.content ? '<div class="wa-legenda texto-longo">' + _waEsc(m.content) + '</div>' : ''}`;
+  } else if ((tipo === 'audio' || tipo === 'voice') && m.media_url) {
+    corpo = _waPlayerAudio(m);
+  } else if ((tipo === 'document' || tipo === 'video') && m.media_url) {
+    corpo = `<a class="wa-msg-doc" href="${_waEsc(m.media_url)}" target="_blank" rel="noopener"><i class="fa-solid fa-file-arrow-down"></i> ${_waEsc(m.media_filename || m.type)}</a>${m.content ? '<div class="wa-legenda texto-longo">' + _waEsc(m.content) + '</div>' : ''}`;
+  } else if (m.content) {
+    // Texto: quebras de linha preservadas (classe texto-longo) e link clicável.
+    corpo = `<span class="texto-longo">${_waLinks(m.content)}</span>`;
+  } else {
+    // NUNCA MAIS BALÃO VAZIO.
+    // Mensagem sem conteúdo renderizável: áudio ou figurinha cuja mídia ainda
+    // não baixou, foto sem legenda, tipo que a conta não suporta. Antes isto
+    // virava um balão só com a hora, e ninguém sabia o que havia chegado.
+    const rot = _waRotuloTipo(tipo) || WA_ROTULO_TIPO.unsupported;
+    const dur = (tipo === 'audio' || tipo === 'voice') ? _waDuracao(m.media_duration) : '';
+    const baixando = (m.media_id && !m.media_url) ? ' <span class="wa-baixando">(baixando...)</span>' : '';
+    corpo = `<span class="wa-msg-tipo"><i class="fa-solid ${rot.icone}"></i> ${_waEsc(rot.texto)}${dur ? ' ' + dur : ''}${baixando}</span>`;
+  }
+
+  // REAÇÃO: emoji no cantinho, não um balão inteiro.
+  const reacao = m.reaction_emoji
+    ? `<span class="wa-reacao" title="Reação">${_waEsc(m.reaction_emoji)}</span>` : '';
+  // Marca de mensagem automática.
+  const etiquetaBot = (m.sent_by_bot || m.sender_name === 'bot')
+    ? '<span class="wa-tag-bot">bot</span>' : '';
+
   return `<div class="wa-msg ${saida ? 'wa-msg-out' : 'wa-msg-in'}">
-    <div class="wa-bolha">${corpo}<span class="wa-msg-hora">${_waHora(m.created_at)} ${saida ? _waTick(m.status) : ''}</span></div>
+    <div class="wa-bolha">${etiquetaBot}${corpo}${reacao}<span class="wa-msg-hora">${_waHora(m.created_at)} ${saida ? _waTick(m.status) : ''}</span></div>
   </div>`;
+}
+
+// Link clicável, em cima de texto JÁ ESCAPADO — a ordem importa: escapa
+// primeiro, só depois troca o endereço por <a>. Ao contrário, viraria injeção.
+function _waLinks(texto) {
+  const seguro = _waEsc(String(texto == null ? '' : texto));
+  return seguro.replace(/(https?:\/\/[^\s<]+)/g, function (url) {
+    return '<a href="' + url + '" target="_blank" rel="noopener">' + url + '</a>';
+  });
 }
 function _waTick(status) {
   if (status === 'read') return '<i class="fa-solid fa-check-double" style="color:#38bdf8;"></i>';
