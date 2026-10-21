@@ -62,7 +62,10 @@ function dataSP(d) {
 
 // O momento do evento, em UTC. Sem data, vale o PRÓXIMO horário igual: hoje,
 // se ainda não passou; amanhã, se já passou.
-function eventoEmUtc(data, horario, agora) {
+// `naoVirarODia` muda essa última parte: devolve null em vez de empurrar para
+// amanhã. É o que o BOT usa — quem chama o bot às 14h não pode receber
+// lembrete da entrevista do meio-dia de amanhã sem ninguém ter combinado isso.
+function eventoEmUtc(data, horario, agora, naoVirarODia) {
   const partes = String(horario || '').split(':');
   const h = Number(partes[0]), m = Number(partes[1] || 0);
   if (!isFinite(h) || h < 0 || h > 23 || !isFinite(m) || m < 0 || m > 59) return null;
@@ -76,7 +79,10 @@ function eventoEmUtc(data, horario, agora) {
     if (!isFinite(ano) || !isFinite(mes) || !isFinite(dia)) return null;
   }
   let alvo = Date.UTC(ano, mes - 1, dia, h, m, 0) + MIN_SP * 60000;   // Brasília -> UTC
-  if (!data && alvo <= base) alvo += 86400000;                        // já passou: amanhã
+  if (alvo <= base) {
+    if (naoVirarODia) return null;                                    // já passou: não agenda
+    if (!data) alvo += 86400000;                                      // já passou: amanhã
+  }
   return new Date(alvo);
 }
 
@@ -139,12 +145,12 @@ function configDoLembrete(resp) {
 
 // O que vai acontecer se mandar agora: usado pela tela (a linha acima da
 // caixa de escrever) e pelo agendamento. Função PURA.
-function previsao(resp, horarioEscolhido, dataEscolhida, agora) {
+function previsao(resp, horarioEscolhido, dataEscolhida, agora, naoVirarODia) {
   const cfg = configDoLembrete(resp);
   if (!cfg) return null;
   const horario = horarioEscolhido || cfg.horario;
   const data = dataEscolhida !== undefined && dataEscolhida !== null ? dataEscolhida : cfg.data;
-  const evento = eventoEmUtc(data, horario, agora);
+  const evento = eventoEmUtc(data, horario, agora, naoVirarODia);
   if (!evento) return null;
   const itens = cfg.lembretes.map(function (l) {
     const min = minutosAntes(l);
@@ -173,7 +179,7 @@ function chaveDoEvento(respostaId, eventoUtc) {
 // Chamado quando a mensagem pronta é enviada para alguém.
 function agendar(opcoes) {
   const resp = opcoes.resposta, conv = opcoes.conversa;
-  const prev = previsao(resp, opcoes.horario, opcoes.data, opcoes.agora);
+  const prev = previsao(resp, opcoes.horario, opcoes.data, opcoes.agora, opcoes.naoVirarODia);
   if (!prev) return null;
   const eventoSql = paraSql(prev.evento_em);
   const chave = chaveDoEvento(resp.id, prev.evento_em);

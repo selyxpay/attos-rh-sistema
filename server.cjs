@@ -1681,6 +1681,9 @@ let _waReady = false;
         waBot.iniciar({
           db: waDb, api: waApi, notificar: notifySSEClients,
           pastaMidia: BOT_MIDIA_DIR,
+          // O bot agenda lembrete reusando o MESMO motor das mensagens
+          // prontas. Se o motor nao carregou, o bot segue respondendo.
+          lembretes: waLembretes,
           lerConfig: function () {
             try { return (lerEstado().dados || {}).botWhatsapp || {}; }
             catch (e) { return {}; }
@@ -4343,6 +4346,7 @@ http.createServer(function (req, res) {
       if (qp.search) filters.search = qp.search;
       if (qp.assigned_to) filters.assigned_to = qp.assigned_to;
       if (qp.unread_only === 'true') filters.unread_only = true;
+      if (qp.bot_only === 'true') filters.bot_only = true;      // filtro "Bot" da lista
       if (qp.limit) filters.limit = parseInt(qp.limit);
       if (qp.offset) filters.offset = parseInt(qp.offset);
       // MULTI-CONTA: o funcionário comum vê só as conversas das contas em que ele

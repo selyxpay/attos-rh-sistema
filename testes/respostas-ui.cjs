@@ -109,7 +109,8 @@ const SEMEAR = `(async function(){
   ok(await cdp.eval(`typeof respostasAbrirLista === 'function'`), 'respostasAbrirLista existe');
   ok(await cdp.eval(`typeof respostasUsar === 'function' && typeof respostasEnviarDireto === 'function'`),
     'as duas acoes (por a caixa / enviar) existem');
-  ok(await cdp.eval(SEMEAR) === 4, 'catalogo de teste semeado');
+  const _sem = await cdp.eval(SEMEAR);
+  ok(_sem === 4, 'catalogo de teste semeado (' + JSON.stringify(_sem) + ')');
   // ESPERA O SERVIDOR CONFIRMAR antes de seguir. A sincronizacao busca o
   // estado do servidor a cada poucos segundos e substitui o da aba: se ela
   // passar antes do save chegar, a lista semeada desaparece no meio do teste
@@ -254,12 +255,21 @@ const SEMEAR = `(async function(){
     };
   })()`);
   console.log('  (diagnostico) ' + JSON.stringify(diag));
+  // A aba Bot agora edita em RASCUNHO: mexer no campo muda a tela, e so o
+  // botao "Salvar alteracoes" leva para o servidor. O teste prova os dois.
   const salvouBot = await cdp.eval(`(async function(){
     if (typeof botMudarCampo !== 'function') return { erro: 'botMudarCampo nao existe' };
-    await botMudarCampo('linkVagas', ${JSON.stringify(MARCA)});
-    return { naTela: (state.botWhatsapp || {}).linkVagas || '' };
+    switchAba('whatsapp');
+    waTrocarSubAba('bot');
+    await new Promise(function(r){ setTimeout(r, 400); });
+    botMudarCampo('linkVagas', ${JSON.stringify(MARCA)});
+    const rascunhoNaTela = /${'teste-de-gravacao'}/.test(document.getElementById('wa-content').innerHTML);
+    await botSalvarAlteracoes();
+    await new Promise(function(r){ setTimeout(r, 300); });
+    return { naTela: (state.botWhatsapp || {}).linkVagas || '', rascunhoNaTela: rascunhoNaTela };
   })()`);
-  ok(salvouBot && salvouBot.naTela === MARCA, 'a configuracao do bot mudou na tela');
+  ok(salvouBot && salvouBot.rascunhoNaTela === true, 'o rascunho aparece na tela na hora');
+  ok(salvouBot && salvouBot.naTela === MARCA, 'e depois de salvar, a configuracao do bot vale');
   // Espera por CONDICAO (regra 18): a gravacao passa por uma fila, e ler o
   // servidor na linha seguinte chega antes do POST.
   const chegouNoServidor = await esperarPor(cdp,
@@ -315,6 +325,172 @@ const SEMEAR = `(async function(){
   })()`);
   ok(depois && depois.bot === MARCA, 'a configuracao do bot continua la depois de recarregar ("' + (depois || {}).bot + '")');
   ok(depois && /isto e um teste/.test(depois.pronta || ''), 'e a mensagem pronta tambem');
+
+  // ────────────────────────────────────────────────────────────────────────
+  // 8) A ABA BOT: PASSOS, RASCUNHO E CONFIRMACAO
+  // ────────────────────────────────────────────────────────────────────────
+  console.log('\n=== 8) ABA BOT: PASSO A PASSO E RASCUNHO ===');
+  excecoes.length = 0;
+  const abriuBot = await cdp.eval(`(async function(){
+    switchAba('whatsapp');
+    waTrocarSubAba('bot');
+    await new Promise(function(r){ setTimeout(r, 400); });
+    const cont = document.getElementById('wa-content');
+    const txt = cont ? cont.textContent : '';
+    return {
+      passos: cont ? cont.querySelectorAll('.bot-passo').length : 0,
+      temNumeros: cont ? cont.querySelectorAll('.bot-cartao').length > 0 : false,
+      temDiario: !!document.querySelector('.bot-diario-bloco'),
+      diarioRecolhido: !!document.querySelector('.bot-diario-bloco:not([open])'),
+      temBoasVindas: /Mensagem de boas-vindas/i.test(txt),
+      temQuandoResponder: /Quando responder/i.test(txt),
+      temLink: /Link das vagas/i.test(txt),
+      temLembrete: /Lembrete/i.test(txt),
+      temAtendente: /Atendente e saida|Atendente e saída/i.test(txt),
+      temTestar: /Testar no meu numero|Testar no meu número/i.test(txt),
+      temBarraSalvar: !!document.querySelector('.bot-barra-salvar')
+    };
+  })()`);
+  ok(abriuBot && abriuBot.passos >= 6, 'a aba Bot mostra os 6 passos em cartoes (' + (abriuBot || {}).passos + ')');
+  ok(abriuBot && abriuBot.temBoasVindas && abriuBot.temQuandoResponder && abriuBot.temLink,
+    'com os titulos dos passos 1, 2 e 3');
+  ok(abriuBot && abriuBot.temLembrete && abriuBot.temAtendente && abriuBot.temTestar,
+    'e dos passos 4, 5 e 6');
+  ok(abriuBot && abriuBot.temNumeros, 'os numeros do bot aparecem em cartoes no topo');
+  ok(abriuBot && abriuBot.temDiario, 'o diario esta na tela');
+  ok(abriuBot && abriuBot.diarioRecolhido, 'e vem RECOLHIDO (nao polui a tela)');
+  ok(abriuBot && abriuBot.temBarraSalvar === false, 'sem alteracoes, nao ha barra de salvar');
+
+  const rascunho = await cdp.eval(`(async function(){
+    // Mexe num campo: NAO pode ir para o servidor ainda.
+    botMudarCampo('linkVagas', 'https://teste-rascunho/vagas');
+    await new Promise(function(r){ setTimeout(r, 300); });
+    const j = await fetch('/api/state', { credentials: 'same-origin' }).then(function(r){ return r.json(); });
+    const noServidor = (((j || {}).dados || {}).botWhatsapp || {}).linkVagas || '';
+    return {
+      naTela: !!document.querySelector('.bot-barra-salvar'),
+      noServidor: noServidor,
+      mostraNaTela: /teste-rascunho/.test(document.getElementById('wa-content').innerHTML)
+    };
+  })()`);
+  ok(rascunho && rascunho.naTela === true, 'mexendo num campo, aparece a barra "alteracoes nao salvas"');
+  ok(rascunho && rascunho.mostraNaTela === true, 'a tela ja mostra o valor novo');
+  ok(rascunho && rascunho.noServidor !== 'https://teste-rascunho/vagas',
+    'MAS o servidor ainda NAO tem a mudanca (so vale ao salvar): "' + ((rascunho || {}).noServidor || '') + '"');
+
+  const descartou = await cdp.eval(`(function(){
+    // O confirm e aceito automaticamente pelo teste.
+    botDescartar();
+    return { barra: !!document.querySelector('.bot-barra-salvar'),
+             aindaMostra: /teste-rascunho/.test(document.getElementById('wa-content').innerHTML) };
+  })()`);
+  ok(descartou && descartou.barra === false, 'descartar tira a barra');
+  ok(descartou && descartou.aindaMostra === false, 'e o valor volta ao que estava salvo');
+
+  const salvou = await cdp.eval(`(async function(){
+    botMudarCampo('linkVagas', 'https://salvo-de-verdade/vagas');
+    await botSalvarAlteracoes();
+    await new Promise(function(r){ setTimeout(r, 400); });
+    return { barra: !!document.querySelector('.bot-barra-salvar') };
+  })()`);
+  ok(salvou && salvou.barra === false, 'depois de salvar, a barra sai');
+  const chegouBot = await esperarPor(cdp,
+    `(async function(){
+       const j = await fetch('/api/state', { credentials: 'same-origin' }).then(function(r){ return r.json(); });
+       return (((j || {}).dados || {}).botWhatsapp || {}).linkVagas === 'https://salvo-de-verdade/vagas';
+     })()`,
+    20000, 'a alteracao do bot chegar no servidor');
+  ok(chegouBot === true, 'e a alteracao chegou no servidor');
+
+  console.log('\n=== 9) LIGAR E DESLIGAR PEDEM CONFIRMACAO ===');
+  const ligar = await cdp.eval(`(async function(){
+    // Sem passos, o bot nao pode ligar: o sistema avisa o que falta.
+    const antes = JSON.parse(JSON.stringify(state.botWhatsapp || {}));
+    state.botWhatsapp.passos = [];
+    _rascunhoFoiDescartado = true;
+    await botPedirLigar(true);
+    await new Promise(function(r){ setTimeout(r, 300); });
+    const naoLigou = (state.botWhatsapp || {}).ligado !== true;
+    // Agora com passo e mensagens, liga (o confirm e aceito pelo teste).
+    state.botWhatsapp.passos = [{ id: 'p-teste', tipo: 'texto', texto: 'Oi {nome}, tudo bem?' }];
+    state.botWhatsapp.atendente = Object.assign({}, state.botWhatsapp.atendente || {}, { mensagem: 'Ja chamei alguem' });
+    state.botWhatsapp.saida = Object.assign({}, state.botWhatsapp.saida || {}, { mensagem: 'Combinado' });
+    state.botWhatsapp.lembrete = { ligado: false, lembretes: [] };
+    await botPedirLigar(true);
+    await new Promise(function(r){ setTimeout(r, 400); });
+    return {
+      naoLigouSemPassos: naoLigou,
+      ligou: (state.botWhatsapp || {}).ligado === true,
+      temLigadoEm: !!(state.botWhatsapp || {}).ligadoEm,
+      faixa: !!document.querySelector('.bot-faixa-no-ar'),
+      antes: antes.ligado
+    };
+  })()`);
+  ok(ligar && ligar.naoLigouSemPassos === true, 'sem a sequencia, o bot NAO liga (avisa o que falta)');
+  ok(ligar && ligar.ligou === true, 'com tudo pronto e confirmando, o bot liga');
+  ok(ligar && ligar.temLigadoEm === true, 'guardando a hora em que foi ligado');
+  ok(ligar && ligar.faixa === true, 'e a faixa verde "Bot no ar" aparece');
+
+  const desligar = await cdp.eval(`(async function(){
+    await botPedirLigar(false);
+    await new Promise(function(r){ setTimeout(r, 400); });
+    return { ligado: (state.botWhatsapp || {}).ligado === true,
+             faixa: !!document.querySelector('.bot-faixa-no-ar') };
+  })()`);
+  ok(desligar && desligar.ligado === false, 'desligar (com confirmacao) desliga');
+  ok(desligar && desligar.faixa === false, 'e a faixa verde sai');
+  ok(excecoes.length === 0, 'sem erro de console na aba Bot (' + JSON.stringify(excecoes.slice(0, 2)) + ')');
+
+  console.log('\n=== 10) ROBOZINHO E SININHO NA LISTA DE CONVERSAS ===');
+  const sinais = await cdp.eval(`(function(){
+    const box = document.createElement('div');
+    box.id = 'wa-conv-list';
+    box.style.cssText = 'position:absolute;left:-9999px;width:330px;';
+    document.body.appendChild(box);
+    const conversas = [
+      { id: 91, contact_name: 'Com bot ativo', contact_phone: '5511900000091', status: 'open', unread_count: 0,
+        last_message_text: 'oi', last_message_at: '2026-10-21T10:00:00Z',
+        bot_em: '2026-10-21 10:00:00', bot_pausado: 0, bot_saiu: 0, lembretes_agendados: 2 },
+      { id: 92, contact_name: 'Bot pausado', contact_phone: '5511900000092', status: 'open', unread_count: 0,
+        last_message_text: 'oi', last_message_at: '2026-10-21T09:00:00Z',
+        bot_em: '2026-10-21 09:00:00', bot_pausado: 1, bot_saiu: 0, lembretes_agendados: 0 },
+      { id: 93, contact_name: 'Sem bot', contact_phone: '5511900000093', status: 'open', unread_count: 0,
+        last_message_text: 'oi', last_message_at: '2026-10-21T08:00:00Z' }
+    ];
+    _waPintarLista(box, conversas);
+    const it = function (id) { return box.querySelector('.wa-conv-item[data-conv="' + id + '"]'); };
+    return {
+      ativo: !!it(91).querySelector('.wa-sinal-bot.ativo'),
+      sininho: !!it(91).querySelector('.wa-sinal-lembrete'),
+      dica: (it(91).querySelector('.wa-sinal-bot') || {}).title || '',
+      pausado: !!it(92).querySelector('.wa-sinal-bot.pausado'),
+      semSininho: !it(92).querySelector('.wa-sinal-lembrete'),
+      semBot: !it(93).querySelector('.wa-sinal-bot'),
+      limpar: (function(){ box.remove(); return true; })()
+    };
+  })()`);
+  ok(sinais && sinais.ativo === true, 'quem o bot atendeu e esta ativo mostra o robozinho colorido');
+  ok(sinais && sinais.pausado === true, 'com o bot pausado, o robozinho fica apagado');
+  ok(sinais && sinais.semBot === true, 'quem o bot nunca atendeu nao mostra robozinho');
+  ok(sinais && sinais.sininho === true, 'com lembrete agendado, aparece o sininho');
+  ok(sinais && sinais.semSininho === true, 'e sem lembrete, nao aparece');
+  ok(sinais && /Atendido pelo bot/.test(sinais.dica || ''), 'a dica do mouse diz quando foi: "' + ((sinais || {}).dica || '') + '"');
+
+  const filtro = await cdp.eval(`(function(){
+    // A caixa dos filtros so existe quando o Inbox esta desenhado; aqui o
+    // teste cria uma, porque o que importa e QUAIS chips a funcao gera.
+    if (!document.getElementById('wa-conv-filtros')) {
+      const d = document.createElement('div');
+      d.id = 'wa-conv-filtros';
+      d.style.cssText = 'position:absolute;left:-9999px;';
+      document.body.appendChild(d);
+    }
+    _waRenderFiltrosConv();
+    const box = document.getElementById('wa-conv-filtros');
+    const nomes = box ? Array.from(box.querySelectorAll('.wa-fchip')).map(function(b){ return b.textContent.trim(); }) : [];
+    return { nomes: nomes, temBot: nomes.indexOf('Bot') >= 0 };
+  })()`);
+  ok(filtro && filtro.temBot === true, 'o filtro "Bot" esta na lista: ' + JSON.stringify((filtro || {}).nomes));
 
   console.log('\n' + (falhas === 0 ? 'MENSAGENS PRONTAS (tela): TODOS OS TESTES OK' : falhas + ' FALHA(S)'));
   process.exit(falhas ? 1 : 0);

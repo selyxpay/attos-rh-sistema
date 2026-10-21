@@ -82,6 +82,8 @@ const SUITES = [
     titulo: 'Permissao por tela, com bloqueio no servidor' },
   { nome: 'bot',       arquivo: 'bot.cjs',            servidor: true,  navegador: false, semente: sementeAcesso,
     titulo: 'Bot de atendimento: ordem de decisao, fila, permissao e midia' },
+  { nome: 'bot-lembrete', arquivo: 'bot-lembrete.cjs', servidor: true, navegador: false, semente: sementeAcesso,
+    titulo: 'Bot agendando lembrete: horario vencido, sem duplicar, sinais na lista' },
   { nome: 'midia',     arquivo: 'midia.cjs',          servidor: true,  navegador: false, semente: sementeAcesso,
     titulo: 'Midia que chega: tipo certo, rota com sessao, persistencia e nova tentativa' },
   { nome: 'lembretes', arquivo: 'lembretes.cjs',      servidor: true,  navegador: false, semente: sementeAcesso,

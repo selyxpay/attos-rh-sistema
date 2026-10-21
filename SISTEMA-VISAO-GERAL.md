@@ -402,6 +402,54 @@ pelo portão — `GET` exige "só ver", o resto exige "ver e editar". A regra do
 vem **antes** da do WhatsApp em `ROTAS_POR_TELA`, porque `permitirRota` usa o
 primeiro padrão que casa.
 
+#### A tela do bot: passo a passo, e nada grava sozinho
+
+Seis passos numerados, cada um dizendo **completo** ou o que falta:
+1. Mensagem de boas-vindas (sequência e prévia lado a lado) · 2. Quando
+responder · 3. Link das vagas · 4. Lembrete · 5. Atendente e saída ·
+6. Testar no meu número. Os números do bot ficam em cartões no topo e o diário
+num bloco recolhível no fim.
+
+**As mudanças ficam num rascunho** e só valem depois de **Salvar alterações**
+(com confirmação). Antes, cada campo gravava sozinho: trocar uma palavra já
+valia para quem estivesse escrevendo para o número naquele segundo.
+
+**Ligar e desligar pedem confirmação**, com o resumo do que vai valer (modo,
+quantos passos, lembrete e horário). Se faltar algo obrigatório, o sistema diz
+o que é e não liga. Com o bot no ar, uma faixa verde mostra **desde quando**
+(`botWhatsapp.ligadoEm`).
+
+#### Lembrete do bot
+
+O bot responde a sequência e, se o lembrete estiver ligado, **agenda os
+lembretes daquele contato** — mesma configuração (horário, data opcional,
+lista de lembretes com texto e anexo) e **mesmo motor e mesma fila** da seção
+5.6. Nada de texto fixo no código: tudo vem da tela.
+
+- `{horario}` vale **na sequência e no lembrete**, sempre o mesmo horário.
+- **Horário vencido não agenda nada**: o bot responde e pronto. Quem chama às
+  14h não recebe lembrete da entrevista do meio-dia (nem de amanhã, sem
+  ninguém ter combinado isso) — é o `naoVirarODia` do motor.
+- Chamar o bot de novo **atualiza** o agendamento, não duplica (a chave única
+  da tabela é a mesma).
+- No painel **Lembretes agendados** esses eventos aparecem com o selo **Bot**,
+  com cancelar e reagendar como os outros.
+
+#### Robozinho na lista de conversas
+
+A lista traz, sem abrir a conversa: 🤖 colorido (bot ativo naquele contato),
+apagado (pausado) ou bem apagado (a pessoa pediu para sair), com a dica
+"Atendido pelo bot às HH:MM"; e 🔔 quando há lembrete agendado. Um filtro
+**Bot** fica ao lado de Todas / Não lidas / Aguardando atendente. Os sinais
+entram na **assinatura** do item, então a lista continua atualizando em diff,
+sem piscar. As quatro informações saem de subconsultas na própria consulta da
+lista — o custo fica no tamanho da página, não do banco.
+
+**Testado por:** suíte `bot-lembrete` (bot agenda, horário vencido não agenda,
+não duplica, selo do painel, sinais da lista e filtro) e pela suíte
+`respostas-ui` (passos na tela, rascunho que só vale ao salvar, confirmação de
+ligar/desligar, robozinho e sininho).
+
 **WhatsApp (dois canais independentes)**
 - **WhatsApp Oficial** — API oficial da Meta (`whatsapp-api.cjs`,
   `whatsapp-webhook.cjs`). Dados em SQLite via `sql.js` (`whatsapp-db.cjs`) — é
@@ -775,6 +823,8 @@ tipo de erro que volta: se você mexer na área, confira que não reintroduziu.
 | Requisição que leva dezenas de segundos | Download de mídia dentro da requisição; agora responde 202 e baixa em segundo plano, no máximo 2 por vez |
 | Vírgula sozinha no começo da mensagem | `{nome}` vazio no início do texto: "{nome}, já começou" virava ", já começou" |
 | Lembrete/agendamento no horário errado | Comparar data do SQLite (UTC, com espaço) com hora de Brasília. Guardar sempre UTC no formato do SQLite e converter só na tela |
+| Mudança no bot valendo antes de confirmar | Campo que grava sozinho no `onchange`. A aba Bot agora edita em rascunho e só grava no "Salvar alterações" |
+| Lembrete de horário que já passou | Sem data, o cálculo empurrava o evento para amanhã. No bot isso é errado: usa-se `naoVirarODia` e não se agenda nada |
 | Mensagem velha passando na frente da nova | `ORDER BY` numa data gravada como texto: `"...T10:00"` é maior que `"... 23:00"` (o `T` vem depois do espaço). Ordene por `julianday(...)` |
 
 ---
@@ -831,9 +881,11 @@ docs/                        deploy no Coolify, WhatsApp, equipamentos
   piscava/apagava o que estava sendo digitado (seção 5.5).
 - Lembretes automáticos das mensagens prontas, com painel e regras de envio
   (seção 5.6), e o rótulo de quem mandou cada mensagem (seção 5.7).
+- Aba Bot em passo a passo, com rascunho e confirmação para ligar, lembrete
+  do bot na mesma fila e robozinho na lista de conversas (seção 5.2).
 - Testes automatizados **no repositório**: `node testes/rodar.cjs` sobe um
   servidor isolado numa porta livre (com pasta de dados descartável) por suíte,
-  e um Chrome sem janela nas suítes de tela. Hoje são 24 suítes, cobrindo
+  e um Chrome sem janela nas suítes de tela. Hoje são 25 suítes, cobrindo
   sincronização com duas sessões, segurança, permissão por tela, upload por
   conteúdo, bot, mensagens prontas e varredura das 25 abas no navegador.
   `node testes/rodar.cjs --lista` mostra todas; `node testes/rodar.cjs <nome>`

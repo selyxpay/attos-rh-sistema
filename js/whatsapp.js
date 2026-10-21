@@ -488,8 +488,10 @@ function _waRenderFiltrosConv() {
   // "Aguardando atendente" usa o status 'pending', que é o que o bot grava
   // na conversa quando a pessoa pede atendente. Fica logo depois de
   // "Não lidas" porque é a fila que alguém precisa olhar primeiro.
+  // "Bot" entra ao lado dessas: mostra as conversas em que o bot já falou,
+  // que é o que se quer olhar para saber se ele está ajudando ou atrapalhando.
   const fs = [['', 'Todas'], ['unread', 'Não lidas'], ['pending', 'Aguardando atendente'],
-              ['open', 'Abertas'], ['closed', 'Fechadas']];
+              ['bot', 'Bot'], ['open', 'Abertas'], ['closed', 'Fechadas']];
   box.innerHTML = fs.map(([v, l]) => `<button class="wa-fchip ${v === _waFiltroConv ? 'active' : ''}" onclick="waFiltroConversa('${v}')">${l}</button>`).join('');
 }
 window.waFiltroConversa = function (v) { _waFiltroConv = v; _waRenderFiltrosConv(); _waCarregarConversas(); };
@@ -503,6 +505,7 @@ async function _waCarregarConversas() {
   else if (_waFiltroConv === 'closed') qs += '&status=closed';
   else if (_waFiltroConv === 'unread') qs += '&unread_only=true';
   else if (_waFiltroConv === 'pending') qs += '&status=pending';
+  else if (_waFiltroConv === 'bot') qs += '&bot_only=true';
   if (_waFiltroConta) qs += '&account_id=' + encodeURIComponent(_waFiltroConta);
   if (_waBuscaConv) qs += '&search=' + encodeURIComponent(_waBuscaConv);
   const r = await waGet('/conversations' + qs);
@@ -581,6 +584,8 @@ function _waAssinaturaConversa(c) {
   return [c.contact_name || c.contact_profile_name || c.contact_phone || '',
           c.last_message_text || '', c.last_message_type || '', c.last_message_at || '',
           c.unread_count || 0, c.status || '', c.assigned_to_name || '',
+          // sinais do bot: sem eles na assinatura, o robozinho nao atualizaria
+          c.bot_em || '', c.bot_pausado || 0, c.bot_saiu || 0, c.lembretes_agendados || 0,
           c.id === _waConvAberta ? '1' : '0'].join('|');
 }
 
@@ -610,12 +615,35 @@ function _waItemConversa(c) {
   return `<div class="wa-conv-item ${c.id === _waConvAberta ? 'active' : ''}${marcaNaoLida}" data-conv="${c.id}" data-assin="${_waEsc(_waAssinaturaConversa(c))}" onclick="waAbrirConversa(${c.id})">
     <span class="wa-avatar" style="background:${_waCorAvatar(nome)};">${_waEsc(_waInicial(nome))}</span>
     <div class="wa-conv-meio">
-      <div class="wa-conv-topo"><b>${_waEsc(nome)}</b><span class="wa-conv-hora">${_waHora(c.last_message_at)}</span></div>
+      <div class="wa-conv-topo"><b>${_waEsc(nome)}</b>${_waSinaisDoBot(c)}<span class="wa-conv-hora">${_waHora(c.last_message_at)}</span></div>
       <div class="wa-conv-baixo"><span class="wa-conv-prev">${_waPrevia(c)}</span>${naoLidas}</div>
       ${_waIndicadores(c, cor)}
     </div>
   </div>`;
 }
+// ROBOZINHO E SININHO NA LISTA.
+// Da para saber, sem abrir a conversa, se o bot atendeu aquela pessoa, se ele
+// esta ativo ali e se tem lembrete agendado.
+function _waSinaisDoBot(c) {
+  let html = '';
+  if (c.bot_em) {
+    const pausado = Number(c.bot_pausado) === 1;
+    const saiu = Number(c.bot_saiu) === 1;
+    const classe = saiu ? 'saiu' : (pausado ? 'pausado' : 'ativo');
+    const quando = _waHora(c.bot_em);
+    const dica = saiu ? 'A pessoa pediu para sair do bot'
+      : (pausado ? 'Bot pausado neste contato · atendido pelo bot às ' + quando
+                 : 'Atendido pelo bot às ' + quando);
+    html += '<i class="fa-solid fa-robot wa-sinal-bot ' + classe + '" title="' + _waEsc(dica) + '"></i>';
+  }
+  if (Number(c.lembretes_agendados) > 0) {
+    const n = Number(c.lembretes_agendados);
+    html += '<i class="fa-solid fa-bell wa-sinal-lembrete" title="' +
+      (n === 1 ? '1 lembrete agendado' : n + ' lembretes agendados') + '"></i>';
+  }
+  return html;
+}
+
 function _waHora(iso) {
   if (!iso) return '';
   const norm = String(iso).replace(' ', 'T'); const d = new Date(norm.indexOf('Z') < 0 && norm.indexOf('+') < 0 ? norm + 'Z' : norm);

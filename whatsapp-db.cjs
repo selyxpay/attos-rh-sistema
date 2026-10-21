@@ -726,6 +726,11 @@ const conversations = {
       if (filters.status) { where += ' AND c.status = ?'; params.push(filters.status); }
       if (filters.assigned_to) { where += ' AND c.assigned_to = ?'; params.push(filters.assigned_to); }
       if (filters.unread_only) { where += ' AND c.unread_count > 0'; }
+      // Filtro "Bot": conversas em que o bot ja falou.
+      if (filters.bot_only) {
+        where += " AND EXISTS (SELECT 1 FROM whatsapp_messages m WHERE m.conversation_id = c.id" +
+                 " AND (m.origem = 'bot' OR m.sent_by_bot = 1))";
+      }
       if (filters.search) {
         where += " AND (ct.name LIKE ? OR ct.phone LIKE ? OR ct.profile_name LIKE ? OR c.last_message_text LIKE ?)";
         const s = '%' + filters.search + '%';
@@ -735,9 +740,20 @@ const conversations = {
     const limit = (filters && filters.limit) || 50;
     const offset = (filters && filters.offset) || 0;
     params.push(limit, offset);
+    // As tres colunas extras (bot_em, bot_pausado, bot_saiu, tem_lembrete) sao
+    // o que a lista precisa para mostrar o robozinho e o sininho SEM abrir a
+    // conversa. Subconsulta por linha, apoiada nos indices
+    // idx_messages_conversation e idx_lembretes_conversa: o custo fica no
+    // tamanho da PAGINA (50 conversas), nao no tamanho do banco.
     return getAll(`
       SELECT c.*, ct.phone as contact_phone, ct.name as contact_name, ct.profile_name as contact_profile_name,
-             a.display_phone as account_phone, a.business_name as account_name
+             a.display_phone as account_phone, a.business_name as account_name,
+             (SELECT MAX(m.created_at) FROM whatsapp_messages m
+               WHERE m.conversation_id = c.id AND (m.origem = 'bot' OR m.sent_by_bot = 1)) AS bot_em,
+             (SELECT bc.pausado FROM whatsapp_bot_contatos bc WHERE bc.contact_id = c.contact_id) AS bot_pausado,
+             (SELECT bc.optou_sair FROM whatsapp_bot_contatos bc WHERE bc.contact_id = c.contact_id) AS bot_saiu,
+             (SELECT COUNT(*) FROM whatsapp_lembretes l
+               WHERE l.conversation_id = c.id AND l.status = 'agendado') AS lembretes_agendados
       FROM whatsapp_conversations c
       LEFT JOIN whatsapp_contacts ct ON c.contact_id = ct.id
       LEFT JOIN whatsapp_accounts a ON c.account_id = a.id

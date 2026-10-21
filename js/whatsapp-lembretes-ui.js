@@ -130,6 +130,9 @@
           <span class="wa-lemb-hora">${esc(q.hora)}<small>${esc(q.dia || q.data)}</small></span>
           <div class="wa-lemb-evento-info">
             <strong>${esc(e.titulo || e.resposta_id)}</strong>
+            ${e.resposta_id === 'bot'
+              ? '<span class="wa-lemb-origem" title="Agendado pelo atendimento automatico"><i class="fa-solid fa-robot"></i> Bot</span>'
+              : ''}
             <div class="wa-lemb-conta">
               <span class="wa-lemb-pill ag">${Number(e.agendados) || 0} agendado(s)</span>
               <span class="wa-lemb-pill ok">${Number(e.enviados) || 0} enviado(s)</span>

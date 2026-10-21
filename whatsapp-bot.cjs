@@ -57,7 +57,13 @@ const CONFIG_PADRAO = {
     palavras: ['sair', 'parar', 'nao quero', 'não quero', 'descadastrar', 'remover'],
     mensagem: 'Tudo bem, não vou mais enviar mensagens automáticas. Se precisar, é só escrever aqui.'
   },
-  ritmo: { porMinuto: 20 }
+  ritmo: { porMinuto: 20 },
+  // LEMBRETE DO BOT. Mesma forma usada pelas mensagens prontas, e quem envia é
+  // o mesmo motor (whatsapp-lembretes.cjs). Nasce DESLIGADO e sem texto: tudo
+  // que vai para a pessoa é escrito na tela, nada fica fixo aqui.
+  lembrete: { ligado: false, titulo: '', horario: '', data: '', lembretes: [] },
+  // Momento em que o bot foi ligado, para a faixa "Bot no ar desde HH:MM".
+  ligadoEm: ''
 };
 
 function configAtual() {
@@ -137,6 +143,12 @@ function aplicarVariaveis(texto, dados) {
   }
   t = t.replace(/\{saudacao\}/gi, saudacao(dados && dados.agora));
   t = t.replace(/\{link_vagas\}/gi, link);
+  // {horario}: o horário do evento configurado no LEMBRETE do bot. Assim a
+  // mensagem da sequência e o lembrete falam sempre do mesmo horário — antes
+  // dava para escrever "meio-dia" na sequência e 13:00 no lembrete.
+  t = t.replace(/\{horario\}/gi, (dados && dados.horario) || '');
+  // {link} é o mesmo link das vagas, para quem escrever a forma curta.
+  t = t.replace(/\{link\}/gi, link);
   // Arruma espaço dobrado e espaço antes de pontuação, que sobram da troca.
   t = t.replace(/[ \t]{2,}/g, ' ').replace(/\s+([,.;!?])/g, '$1');
   // Vírgula ÓRFÃ NO COMEÇO da linha. "{nome}, a entrevista já começou" com
@@ -147,6 +159,52 @@ function aplicarVariaveis(texto, dados) {
     return antes + letra.toUpperCase();
   });
   return t.replace(/[ \t]+$/gm, '');
+}
+
+// ── LEMBRETE DO BOT ────────────────────────────────────────────────────────
+// A configuração é a MESMA forma usada pelas mensagens prontas
+// (ligado/horario/data/lembretes), e quem envia é o MESMO motor
+// (whatsapp-lembretes.cjs), na MESMA fila. Aqui só se decide se agenda.
+function horarioDoEvento(cfg) {
+  const l = cfg && cfg.lembrete;
+  return (l && l.ligado && l.horario) ? String(l.horario) : '';
+}
+
+// Agenda os lembretes deste contato. Chamado quando o bot começa a responder.
+// Devolve o resumo, ou null quando não há o que agendar.
+function agendarLembretesDoContato(cfg, ctx, contactId) {
+  const l = cfg && cfg.lembrete;
+  if (!l || !l.ligado) return null;
+  if (!_lembretes || typeof _lembretes.agendar !== 'function') return null;
+  try {
+    const conversa = {
+      id: ctx.conversation_id, account_id: ctx.account_id, contact_id: contactId,
+      contact_phone: ctx.telefone, contact_name: ctx.nome || ''
+    };
+    // O "evento" do bot usa o id fixo 'bot': é isso que faz o painel
+    // identificar a origem e, junto com a chave única da tabela, impede
+    // agendamento duplicado quando a pessoa chama o bot de novo.
+    const comoResposta = {
+      id: 'bot', titulo: 'Bot — ' + (l.titulo || 'atendimento automático'),
+      // O {link} do lembrete sai do link das vagas configurado no bot.
+      texto: String(cfg.linkVagas || ''),
+      lembrete: l
+    };
+    // naoVirarODia: horário vencido NÃO vira lembrete de amanhã. Quem chama o
+    // bot às 14h não pode receber lembrete da entrevista do meio-dia.
+    const r = _lembretes.agendar({
+      resposta: comoResposta, conversa: conversa,
+      usuario: 'bot', naoVirarODia: true
+    });
+    if (r && r.agendados) {
+      _db.bot.registrar('lembrete', contactId, ctx.telefone,
+        r.agendados + ' lembrete(s) agendado(s) para as ' + r.evento_horario);
+    }
+    return r;
+  } catch (e) {
+    console.error('[Bot] não agendei o lembrete:', e.message);
+    return null;
+  }
 }
 
 // ── A ORDEM DE DECISÃO ─────────────────────────────────────────────────────
@@ -298,8 +356,11 @@ async function aoReceberMensagem(ctx) {
       }
       _db.bot.contarResposta(contactId);
       _db.bot.registrar('inicio', contactId, ctx.telefone, d.motivo);
+      // LEMBRETES: agenda para este contato, se o lembrete do bot estiver
+      // ligado. Horário vencido não agenda nada — manda só a sequência.
+      const lemb = agendarLembretesDoContato(cfg, ctx, contactId);
       processarFila();   // não espera: a fila cuida do ritmo
-      return d;
+      return Object.assign({}, d, { lembretes: lemb ? lemb.agendados : 0 });
     }
   } catch (e) {
     console.error('[Bot] falha ao tratar a mensagem:', e.message);
@@ -410,7 +471,12 @@ async function enviarPasso(linha, passo, cfg) {
   const token = tokenDaConta(linha.account_id);
   if (!conta || !token) throw new Error('conta sem token');
 
-  const dados = { nome: linha.nome_contato, linkVagas: cfg.linkVagas };
+  // O horário do evento entra junto: é o que faz {horario} na sequência falar
+  // do mesmo horário que o lembrete.
+  const dados = {
+    nome: linha.nome_contato, linkVagas: cfg.linkVagas,
+    horario: horarioDoEvento(cfg)
+  };
 
   if (passo.tipo === 'texto' || passo.tipo === 'link') {
     let corpo = aplicarVariaveis(passo.texto || '', dados);
@@ -562,12 +628,18 @@ async function enviarTeste(accountId, telefone, nome) {
 }
 
 // ── INÍCIO ─────────────────────────────────────────────────────────────────
+// O motor de lembretes e opcional: se ele nao carregou, o bot continua
+// respondendo normalmente, so nao agenda lembrete.
+let _lembretes = null;
+
 function iniciar(opcoes) {
   _db = opcoes.db;
   _api = opcoes.api;
   _lerConfig = opcoes.lerConfig;
   _notificar = opcoes.notificar || null;
   _pastaMidia = opcoes.pastaMidia;
+  try { _lembretes = opcoes.lembretes || require('./whatsapp-lembretes.cjs'); }
+  catch (e) { _lembretes = null; }
   try { fs.mkdirSync(_pastaMidia, { recursive: true }); } catch (e) {}
 
   // RETOMADA DEPOIS DE REINÍCIO: nada a restaurar em memória, porque a fila
