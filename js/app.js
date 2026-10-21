@@ -2580,7 +2580,87 @@ function renderDocumentos() {
 }
 
 // 3. LISTENERS GLOBAIS
+// ── COLAR TEXTO DE FORA (Word, PDF, site, WhatsApp) ────────────────────────
+// O textarea já preserva as quebras de linha por conta própria. O que o texto
+// de fora traz de ruim é outra coisa, e é invisível na tela:
+//
+//   - CRLF do Windows e CR solto do Mac antigo, que depois contam como duas
+//     quebras onde deveria ter uma;
+//   - espaço que não quebra (U+00A0), que o Word usa aos montes. Ele PARECE
+//     espaço, mas não quebra linha nem casa com /\s/ em busca;
+//   - caracteres de largura zero e marca de direção (U+200B, U+FEFF...), que
+//     entram colados no texto e atrapalham busca e comparação;
+//   - marcador de lista em formato esquisito: o Word manda "·", o PDF manda
+//     "", e cada um com um espaço diferente depois;
+//   - montanha de linha em branco entre parágrafos.
+//
+// Esta função normaliza isso MANTENDO as quebras e os marcadores. Ela não
+// remove conteúdo: só padroniza. O texto continua texto puro — nada de HTML.
+function limparTextoColado(bruto) {
+  let t = String(bruto == null ? '' : bruto);
+
+  // 1) Fim de linha num padrão só.
+  t = t.replace(/\r\n?/g, '\n');
+
+  // 2) Espaço que não quebra e parentes viram espaço comum.
+  t = t.replace(/[   -   　]/g, ' ');
+
+  // 3) Largura zero, marca de ordenação e hífen opcional: fora.
+  t = t.replace(/[​-‍⁠﻿­]/g, '');
+
+  // 4) Aspas e travessão "inteligentes" do Word viram os comuns. Isso evita
+  //    aquele caractere estranho quando o texto vai para o WhatsApp.
+  t = t.replace(/[‘’‛]/g, "'")
+       .replace(/[“”‟]/g, '"')
+       .replace(/[–—]/g, '-')
+       .replace(/…/g, '...');
+
+  // 5) Marcador de lista: qualquer um dos usados por Word/PDF/site vira "• ",
+  //    preservando a indentação que vinha antes dele.
+  t = t.replace(/^([ \t]*)[•·●▪◦⁃∙‣*][ \t]*/gm, '$1• ');
+
+  // 6) Espaço sobrando no fim de cada linha (o Word deixa muito).
+  t = t.replace(/[ \t]+$/gm, '');
+
+  // 7) Mais de uma linha em branco seguida vira uma só. Parágrafo separado
+  //    continua separado; o excesso sai.
+  t = t.replace(/\n{3,}/g, '\n\n');
+
+  // 8) Linha em branco no começo e no fim.
+  return t.replace(/^\n+/, '').replace(/\n+$/, '');
+}
+window.limparTextoColado = limparTextoColado;
+
+// Pendura o tratamento em TODO campo de texto longo da tela, inclusive nos
+// que aparecem depois (modal montado na hora). Por isso o listener fica no
+// documento, não em cada campo.
+function ligarLimpezaDeColagem() {
+  if (document._rtColagemLigada) return;
+  document._rtColagemLigada = true;
+  document.addEventListener('paste', function (ev) {
+    const alvo = ev.target;
+    if (!alvo || alvo.tagName !== 'TEXTAREA') return;      // só texto longo
+    const dados = ev.clipboardData || window.clipboardData;
+    if (!dados) return;
+    const texto = dados.getData('text/plain');
+    if (!texto) return;                                     // imagem: deixa passar
+    const limpo = limparTextoColado(texto);
+    if (limpo === texto) return;                            // nada a corrigir
+    ev.preventDefault();
+    // insere no lugar do cursor, mantendo o desfazer do navegador funcionando
+    const ini = alvo.selectionStart, fim = alvo.selectionEnd;
+    if (document.execCommand) {
+      document.execCommand('insertText', false, limpo);
+    } else {
+      alvo.value = alvo.value.slice(0, ini) + limpo + alvo.value.slice(fim);
+      alvo.selectionStart = alvo.selectionEnd = ini + limpo.length;
+    }
+    alvo.dispatchEvent(new Event('input', { bubbles: true }));
+  }, true);
+}
+
 function setupEventListeners() {
+  ligarLimpezaDeColagem();
   // Busca em tempo real no Dashboard
   // (A busca em tempo real do Dashboard saiu com o Kanban: o campo
   //  #dashboard-search nao existe no index.html, entao este listener
@@ -4057,16 +4137,23 @@ function renderVagasGrid() {
         <div class="vaga-card-header">
           <div class="vaga-logo-badge" style="background:${cor};color:#fff;">${siglaDisplay}</div>
           <div class="vaga-title-area">
-            <span class="vaga-company">${v.empresaNome}</span>
-            <span class="vaga-cargo">${v.cargo}</span>
+            <span class="vaga-company">${escapeHTML(v.empresaNome)}</span>
+            <span class="vaga-cargo">${escapeHTML(v.cargo)}</span>
           </div>
           ${badgeQuente}
         </div>
-        <p class="vaga-desc">${v.descricao}</p>
+        <!-- texto-longo = white-space: pre-wrap. Sem isso o HTML junta as
+             quebras de linha num espaço só, e o descritivo colado pela pessoa
+             aparecia todo emendado. O dado SEMPRE esteve certo no banco (o
+             textarea preserva as quebras): quem perdia era a exibição. Por
+             isso as vagas antigas passam a aparecer certas sem redigitar.
+             E escapeHTML porque isto é texto que a pessoa escreve: antes ia
+             cru para dentro do HTML. -->
+        <p class="vaga-desc texto-longo">${escapeHTML(v.descricao)}</p>
         <span class="vaga-salario">R$ ${Number(v.salario).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         <div class="vaga-tags-benefits">${benefitsHtml}</div>
         <div class="vaga-details">
-          <div class="vaga-detail-row"><i class="fa-solid fa-location-dot"></i><span>Local: ${v.localTrabalho}</span></div>
+          <div class="vaga-detail-row"><i class="fa-solid fa-location-dot"></i><span>Local: ${escapeHTML(v.localTrabalho)}</span></div>
           <div class="vaga-detail-row"><i class="fa-solid fa-users"></i><span>${v.vagasDisponiveis} vagas disponíveis</span></div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
@@ -5204,10 +5291,10 @@ function abrirDrawerDetalhes(candidatoId) {
     if (alertBox) alertBox.style.display = 'block';
     if (alertReason) {
       alertReason.innerHTML = `
-        <strong>Devolvida por:</strong> ${cand.devolvidoPor || 'Departamento Pessoal'}
-        ${cand.dataDevolucaoDP ? `<span style="font-size:10px; opacity:.7;"> · ${cand.dataDevolucaoDP}</span>` : ''}<br>
-        <strong>Motivo:</strong> ${cand.motivoDevolucaoDP || 'Não informado'}
-        ${cand.corrigidoPor ? `<br><span style="color:#22c55e;"><strong>✓ Corrigida por:</strong> ${cand.corrigidoPor} · ${cand.dataCorrecao || ''}</span>` : ''}
+        <strong>Devolvida por:</strong> ${escapeHTML(cand.devolvidoPor || 'Departamento Pessoal')}
+        ${cand.dataDevolucaoDP ? `<span style="font-size:10px; opacity:.7;"> · ${escapeHTML(cand.dataDevolucaoDP)}</span>` : ''}<br>
+        <strong>Motivo:</strong> <span class="texto-longo">${escapeHTML(cand.motivoDevolucaoDP || 'Não informado')}</span>
+        ${cand.corrigidoPor ? `<br><span style="color:#22c55e;"><strong>✓ Corrigida por:</strong> ${escapeHTML(cand.corrigidoPor)} · ${escapeHTML(cand.dataCorrecao || '')}</span>` : ''}
       `;
     }
   } else {
@@ -5545,7 +5632,7 @@ window.abrirModalInapto = function(candidatoId, preSelectMotivoId) {
   if (select) {
     const motivos = state.motivosInaptidao || [];
     select.innerHTML = '<option value="">Selecione o motivo...</option>' +
-      motivos.map(m => `<option value="${m.id}">${m.descricao}</option>`).join('');
+      motivos.map(m => `<option value="${escapeHTML(m.id)}">${escapeHTML(m.descricao)}</option>`).join('');
     if (preSelectMotivoId) select.value = preSelectMotivoId;
   }
 
@@ -5732,7 +5819,7 @@ function renderInaptos() {
       ? '<p style="font-size:13px;color:var(--text-secondary);">Nenhum motivo cadastrado.</p>'
       : motivos.map(m => `
         <div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
-          <span style="font-size:13px;color:var(--text-primary);font-weight:500;">${m.descricao}</span>
+          <span class="texto-longo" style="font-size:13px;color:var(--text-primary);font-weight:500;">${escapeHTML(m.descricao)}</span>
           ${isAdmin ? `<button onclick="excluirMotivoInaptidao('${m.id}')" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;"><i class="fa-solid fa-trash"></i></button>` : ''}
         </div>
       `).join('');

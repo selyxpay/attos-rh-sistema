@@ -831,6 +831,28 @@ h1, h2, h3, h4, h5, h6 {
     line-height: 1.5;
 }
 
+/* ── TEXTO LONGO ESCRITO PELA PESSOA ──────────────────────────────────────
+   Use em TODO lugar que mostra texto de campo grande: descritivo de vaga,
+   observação, motivo, justificativa.
+
+   Por que existe: o HTML junta qualquer sequência de espaço, tabulação e
+   quebra de linha num espaço só. Então o descritivo que a pessoa colou com
+   parágrafos e listas aparecia emendado numa linha corrida — o dado estava
+   certo no banco desde sempre, quem perdia era a exibição.
+
+   pre-wrap preserva as quebras e as linhas em branco, e ainda quebra a linha
+   no fim do espaço disponível (ao contrário de "pre", que estouraria a
+   largura e criaria rolagem horizontal).
+   overflow-wrap cuida de palavra única gigante, tipo um link colado.
+
+   IMPORTANTE: isto NÃO substitui escapar o HTML. pre-wrap é só visual; quem
+   evita a injeção é o escapeHTML em volta do valor. Os dois andam juntos. */
+.texto-longo {
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
 .vaga-salario {
     font-size: 16px;
     font-weight: 600;

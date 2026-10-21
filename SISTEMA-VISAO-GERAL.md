@@ -433,6 +433,13 @@ montado continua dentro da pasta de documentos.
 14. **Toda rota deve responder.** Falha dentro do `comTrava` sem responder
     pendura o `fetch` do navegador para sempre e mata a sincronização daquela
     aba, em silêncio. Por isso o `comTrava` recebe o `res`.
+15. **Texto escrito pela pessoa, na exibição: `escapeHTML` + classe
+    `texto-longo`.** Os dois juntos, sempre. O `escapeHTML` evita a injeção;
+    a classe (`white-space: pre-wrap`) preserva as quebras de linha. Sem a
+    classe, o HTML junta quebra e espaço num espaço só e o texto colado
+    aparece todo emendado — foi o que acontecia com o descritivo da vaga. Sem
+    o `escapeHTML`, um descritivo com `<img onerror=...>` executava.
+    Para campo de ENTRADA (`textarea`) não precisa de nada: ele já preserva.
 
 ---
 

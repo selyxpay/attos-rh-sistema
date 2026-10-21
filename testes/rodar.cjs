@@ -68,6 +68,8 @@ const SUITES = [
     titulo: 'Upload — tipo pelo conteudo, SVG barrado' },
   { nome: 'upload-ui', arquivo: 'upload-ui.cjs',      servidor: true,  navegador: true,
     titulo: 'Upload no navegador — foto renderiza, SVG nao' },
+  { nome: 'texto',     arquivo: 'texto-longo.cjs',     servidor: true,  navegador: true,
+    titulo: 'Descritivo de vaga: quebras de linha preservadas e HTML escapado' },
   { nome: 'dados',     arquivo: 'dados.cjs',          servidor: true,  navegador: false,
     titulo: 'Dado que nao gravava ou voltava (fila, acento, sigilo, diaria, lista vazia)' },
   { nome: 'dados-ui',  arquivo: 'dados-ui.cjs',       servidor: true,  navegador: true,
