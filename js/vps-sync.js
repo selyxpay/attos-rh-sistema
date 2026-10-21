@@ -120,6 +120,17 @@ window.RTCloud = (function () {
   function _ehListaComId(v) {
     return Array.isArray(v) && v.length > 0 && v.every(function (x) { return x && x.id != null; });
   }
+  // Lista VAZIA não dá para classificar: pode virar lista de registros com id
+  // (candidatos, vagas...) ou lista de texto puro sem id (ffSigiloLogins).
+  // Antes ela era fotografada como "configuração", e aí o PRIMEIRO registro
+  // que entrasse subia como setKeys, SUBSTITUINDO a chave inteira no
+  // servidor: duas pessoas cadastrando o primeiro item quase ao mesmo tempo,
+  // e o segundo save apagava o registro do primeiro.
+  // Agora ela fica marcada como 'vazia' e o tipo é decidido na hora de
+  // salvar, olhando o que de fato entrou (ver _oQueMudou).
+  function _ehListaVazia(v) {
+    return Array.isArray(v) && v.length === 0;
+  }
   function _txt(v) { try { return JSON.stringify(v); } catch (e) { return null; } }
 
   function _tirarFoto(dados) {
@@ -131,6 +142,10 @@ window.RTCloud = (function () {
       if (_ehListaComId(v)) {
         tipos[k] = 'ids';
         v.forEach(function (x) { reg[String(x.id)] = _txt(x); });
+      } else if (_ehListaVazia(v)) {
+        // Indefinida de propósito: decidida na hora de salvar.
+        tipos[k] = 'vazia';
+        chaves[k] = _txt(v);
       } else {
         tipos[k] = 'bruto';
         chaves[k] = _txt(v);
@@ -149,7 +164,16 @@ window.RTCloud = (function () {
       const v = dados[k];
       // O tipo vem da foto: assim uma lista que ficou vazia não muda de
       // categoria no meio do caminho.
-      const tipo = _foto.tipos[k] || (_ehListaComId(v) ? 'ids' : 'bruto');
+      let tipo = _foto.tipos[k] || (_ehListaComId(v) ? 'ids' : 'bruto');
+      // A chave estava VAZIA no servidor. Agora dá para decidir olhando o que
+      // entrou: se são registros com id, vai como upsert (acrescenta, não
+      // substitui a chave inteira). Se for lista de texto puro ou outra
+      // coisa, segue como configuração.
+      if (tipo === 'vazia') {
+        if (_ehListaComId(v)) tipo = 'ids';
+        else if (_ehListaVazia(v)) return;   // continua vazia: nada mudou
+        else tipo = 'bruto';
+      }
       if (tipo === 'ids' && Array.isArray(v)) {
         v.forEach(function (x) {
           if (!x || x.id == null) return;

@@ -335,6 +335,11 @@ function responderJson(res, code, obj) {
 // um robô varrendo o site ou um link colado com "%" sobrando. Agora toda
 // decodificação passa por aqui: devolve null em vez de lançar, e quem chama
 // responde 400.
+// Regra 6: id de registro nunca pode ser so Date.now() -- duas acoes no
+// mesmo milissegundo geravam o mesmo id e uma sobrescrevia a outra.
+function _novoIdServidor(prefixo) {
+  return String(prefixo || 'id') + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+}
 function decodeSeguro(s) {
   try { return decodeURIComponent(String(s == null ? '' : s)); }
   catch (e) { return null; }
@@ -357,14 +362,29 @@ function queryParaMapa(query) {
   return qp;
 }
 function lerCorpo(req, cb) {
-  let data = '';
+  // ACENTO CORROMPIDO: antes isto era `let data = ''` com `data += chunk`.
+  // O chunk é Buffer, e `string += Buffer` converte CADA PEDAÇO sozinho para
+  // texto. Quando um caractere de 2 bytes (ã, ç, é) cai na fronteira entre
+  // dois pedaços, cada metade virava "�" — e o JSON.parse ACEITA isso, então
+  // "João" era gravado como "Jo��o" sem erro nenhum. O /api/state manda o
+  // estado inteiro, dezenas de pedaços, então a mina estava sempre armada.
+  // Em lista sem id o valor corrompido ainda era visto como item novo e
+  // DUPLICAVA o conteúdo a cada save (a armadilha de "lista cresce sem
+  // parar"). Agora junta os bytes primeiro e converte uma vez só, igual ao
+  // lerCorpoBruto já fazia.
+  const partes = [];
   let tamanho = 0;
   req.on('data', function (chunk) {
     tamanho += chunk.length;
     if (tamanho > LIMITE_CORPO) { cb(new Error('corpo muito grande')); req.destroy(); return; }
-    data += chunk;
+    partes.push(chunk);
   });
-  req.on('end', function () { try { cb(null, data ? JSON.parse(data) : {}); } catch (e) { cb(e); } });
+  req.on('end', function () {
+    try {
+      const data = Buffer.concat(partes).toString('utf8');
+      cb(null, data ? JSON.parse(data) : {});
+    } catch (e) { cb(e); }
+  });
   req.on('error', function (e) { cb(e); });
 }
 
@@ -1560,7 +1580,7 @@ http.createServer(function (req, res) {
         const pendentes = d.funcionarios.filter(function (f) { return f.status === 'aguardando_aprovacao'; }).length;
         if (pendentes >= 30) { responderJson(res, 429, { ok: false, motivo: 'limite' }); return; }
         d.funcionarios.push({
-          id: 'func-' + Date.now(), nome: nome, email: '', telefone: telefone, login: login,
+          id: _novoIdServidor('func'), nome: nome, email: '', telefone: telefone, login: login,
           senha: hashSenhaServer(senha), senhaVisivel: senha,
           departamento: depto, departamentoSolicitado: depto, cargo: 'Colaborador em Aprovação',
           instituicao: instituicao,
@@ -1741,7 +1761,7 @@ http.createServer(function (req, res) {
           const conferidos = Object.keys(limpos).filter(function (k) { return limpos[k].ok; }).length;
           if (!Array.isArray(rel.conferencias)) rel.conferencias = [];
           rel.conferencias.push({
-            id: 'conf-' + Date.now(),
+            id: _novoIdServidor('conf'),
             nome: nome, em: agora,
             itens: limpos,
             totalItens: total,

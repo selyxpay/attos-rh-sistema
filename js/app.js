@@ -4,6 +4,18 @@
 
 let state = null;
 let loggedUser = null;
+
+// ── ID DE REGISTRO ─────────────────────────────────────────────────────────
+// Regra 6 das inegociáveis: ID NÃO pode ser só Date.now(). Duas pessoas
+// agindo no mesmo milissegundo geravam o MESMO id, e aí o merge do servidor
+// trata os dois como o mesmo registro — uma das duas ações simplesmente
+// desaparece. Com o diff automático isso ficou mais sério ainda, porque a
+// foto do estado também é indexada por id.
+// O sufixo aleatório é o mesmo padrão que o servidor já usa nos uploads.
+function _novoId(prefixo) {
+  return String(prefixo || 'id') + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+}
+
 // Contas MESTRE: poder total no sistema e "fantasma" (sem deixar rastro em log/auditoria).
 function ehMestre(login) { return login === 'joaobalaf' || login === 'admin'; }
 // Garante a conta MESTRE "admin": existe, ativa, administração e senha mestre.
@@ -1887,8 +1899,38 @@ async function _diariaApi(rota, opcoes) {
   if (!r.ok) throw new Error((dados && dados.error) || ('Erro ' + r.status));
   return dados;
 }
-function _diariaPost(rota, corpo) {
-  return _diariaApi(rota, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) });
+// ── AÇÃO DE ADMIN DA DIÁRIA ────────────────────────────────────────────────
+// Estas rotas gravam DIRETO no state.json do servidor (trabalhador, diária e
+// presença moram no estado). O navegador não sabia disso na hora: ele só
+// refazia o fetch da própria rota da Diária e seguia com o `state` antigo em
+// memória. Se qualquer save comum do painel saísse nessa janela, o registro
+// velho que o navegador ainda tinha era EMPURRADO DE VOLTA pelo merge — o
+// trabalhador excluído reaparecia na lista, agora sem documento nenhum,
+// porque os arquivos já tinham sido apagados do disco.
+// Agora, depois de cada ação, recarregamos o estado inteiro do servidor:
+// assim o `state` e a foto da sincronização voltam a ficar alinhados antes do
+// próximo save.
+async function _diariaPost(rota, corpo) {
+  const resposta = await _diariaApi(rota, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {})
+  });
+  await _diariaResincronizarEstado();
+  return resposta;
+}
+async function _diariaResincronizarEstado() {
+  try {
+    if (!(window.RTCloud && RTCloud.configured && typeof RTCloud.loadState === 'function')) return;
+    const novo = await RTCloud.loadState();
+    // `funcionarios` só vem no estado COMPLETO (autenticado). Sem ele é o
+    // subconjunto público, que não serve para substituir o estado do painel.
+    if (novo && novo.funcionarios) {
+      state = novo;
+      if (typeof garantirEstruturasBase === 'function') garantirEstruturasBase();
+    }
+  } catch (e) {
+    // Falhar aqui não pode derrubar a ação, que já foi gravada no servidor.
+    console.error('[Diária] não consegui recarregar o estado depois da ação:', e);
+  }
 }
 function _diariaFmtHora(iso) {
   try { return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return '—'; }
@@ -2774,7 +2816,7 @@ function setupEventListeners() {
       // Log activity
       if (!loggedUser || !ehMestre(loggedUser.login)) {
         state.atividades.unshift({
-          id: `act-${Date.now()}`,
+          id: _novoId('act'),
           descricao: `Ficha cadastral de ${cand.nome} enviada com sucesso para o Departamento Pessoal`,
           data: 'Agora'
         });
@@ -2844,7 +2886,7 @@ function setupEventListeners() {
       }
 
       const novaVaga = {
-        id: `vaga-${Date.now()}`,
+        id: _novoId('vaga'),
         empresaId,
         empresaNome: empresa.nome || '',
         empresaCnpj: empresa.cnpj || '',
@@ -2955,7 +2997,7 @@ function setupEventListeners() {
       }
 
       const novaEmpresa = {
-        id: 'emp-' + Date.now(),
+        id: _novoId('emp'),
         nome, cnpj, sigla, cor,
         idEmpresaExata: (document.getElementById('cli-id-exata')?.value || '').trim(),
         status: 'ativo',
@@ -2986,9 +3028,20 @@ function setupEventListeners() {
       const recrutadorId = document.getElementById('add-recrutador').value;
       
       const vaga = state.vagas.find(v => v.id === vagaId);
+      // A vaga pode ter DEIXADO DE EXISTIR entre abrir o modal e enviar:
+      // outra pessoa apagou e o estado foi trocado por baixo. Sem esta
+      // conferência o código acessava vaga.empresaId e estourava — o modal
+      // ficava aberto, nada era salvo e ninguém era avisado. A pessoa achava
+      // que havia cadastrado o candidato.
+      if (!vaga) {
+        alert('A vaga escolhida não existe mais — outra pessoa pode ter apagado agora.\n\n' +
+              'Escolha a vaga de novo na lista. Nada foi perdido do que você digitou.');
+        abrirModalAddCandidato(coluna);
+        return;
+      }
 
       const novoCandidato = {
-        id: `candidato-${Date.now()}`,
+        id: _novoId('candidato'),
         numeroFila: gerarNumeroFila(),
         nome,
         cpf,
@@ -3036,7 +3089,7 @@ function setupEventListeners() {
         // Log de atividade
         if (!loggedUser || !ehMestre(loggedUser.login)) {
           state.atividades.unshift({
-            id: `act-${Date.now()}`,
+            id: _novoId('act'),
             descricao: `DP reprovou a contratação de ${cand.nome} por: "${motivo}"`,
             data: 'Agora'
           });
@@ -3391,7 +3444,7 @@ function setupEventListeners() {
       const senhaFinal = (typeof hashSenha === 'function') ? await hashSenha(senhaVal) : senhaVal;
 
       const newFunc = {
-        id: `func-${Date.now()}`,
+        id: _novoId('func'),
         nome,
         email,
         login: loginVal.toLowerCase(),
@@ -3557,7 +3610,7 @@ function setupDragAndDrop() {
         cand.diasEtapa = 1;
         if (!loggedUser || !ehMestre(loggedUser.login)) {
           state.atividades.unshift({
-            id: `act-${Date.now()}`,
+            id: _novoId('act'),
             descricao: `Candidato ${cand.nome} movido para etapa "${targetStatus.replace('_', ' ')}" no Kanban`,
             data: 'Agora'
           });
@@ -3609,7 +3662,7 @@ function renderHorariosVaga() {
     </div>`).join('');
 }
 window.adicionarHorarioVaga = function () {
-  _vagaHorarios.push({ id: 'hor-' + Date.now() + '-' + _vagaHorarios.length, descricao: '', entrada: '', saida: '', intervalo: '', escala: '', dias: [], cargaSemanal: '', cargaMensal: '', adicionalNoturno: false, obs: '' });
+  _vagaHorarios.push({ id: _novoId('hor'), descricao: '', entrada: '', saida: '', intervalo: '', escala: '', dias: [], cargaSemanal: '', cargaMensal: '', adicionalNoturno: false, obs: '' });
   renderHorariosVaga();
 };
 window.removerHorarioVaga = function (i) { _vagaHorarios.splice(i, 1); renderHorariosVaga(); };
@@ -4133,7 +4186,7 @@ function migrarOperacionalClientesParaVagas() {
   });
   state.migracaoOperacionalFeita = true;
   if (!state.logs) state.logs = [];
-  state.logs.unshift({ id: 'log-' + Date.now(), data: new Date().toLocaleString('pt-BR'), usuario: 'Sistema R&T', acao: `Migração de dados operacionais: ${copiados} vaga(s) atualizada(s)${marcados ? ` · ${marcados} empresa(s) com várias vagas marcadas p/ revisão` : ''}.`, categoria: 'migracao' });
+  state.logs.unshift({ id: _novoId('log'), data: new Date().toLocaleString('pt-BR'), usuario: 'Sistema R&T', acao: `Migração de dados operacionais: ${copiados} vaga(s) atualizada(s)${marcados ? ` · ${marcados} empresa(s) com várias vagas marcadas p/ revisão` : ''}.`, categoria: 'migracao' });
   saveState();
 }
 
@@ -4641,7 +4694,7 @@ function finalizarContratacao(candidatoId) {
     const empresaNome = vaga ? vaga.empresaNome : 'Empresa Geral';
 
     const novaContratacao = {
-      id: `c-${Date.now()}`,
+      id: _novoId('c'),
       recrutadorId: cand.recrutadorId,
       candidatoId: cand.id,
       candidatoNome: cand.nome,
@@ -4664,7 +4717,7 @@ function finalizarContratacao(candidatoId) {
     // Log de atividade no feed
     if (!loggedUser || !ehMestre(loggedUser.login)) {
       state.atividades.unshift({
-        id: `act-${Date.now()}`,
+        id: _novoId('act'),
         descricao: `DP finalizou a contratação de ${cand.nome} para a empresa ${empresaNome}`,
         data: 'Agora'
       });
@@ -5756,7 +5809,7 @@ window.confirmarInapto = function() {
   const jaExiste = state.inaptos.find(i => i.cpf.replace(/\D/g, '') === cpfLimpo);
   if (!jaExiste) {
     state.inaptos.push({
-      id: 'inapto-' + Date.now(),
+      id: _novoId('inapto'),
       candidatoId: cand.id,
       nome: cand.nome,
       cpf: cand.cpf,
@@ -5941,7 +5994,7 @@ window.salvarMotivoInaptidao = function() {
 
   if (!state.motivosInaptidao) state.motivosInaptidao = [];
   state.motivosInaptidao.push({
-    id: 'mot-' + Date.now(),
+    id: _novoId('mot'),
     descricao,
     criadoPor: loggedUser ? loggedUser.nome : 'Admin',
     dataCriacao: new Date().toLocaleDateString('pt-BR')
@@ -6106,7 +6159,7 @@ function salvarDetalhesCandidato() {
     if (!conf) return;
 
     state.contratacoes.push({
-      id: `c-${Date.now()}`,
+      id: _novoId('c'),
       recrutadorId: recrutadorId,
       candidatoId: cand.id,
       candidatoNome: nome,
@@ -7474,14 +7527,18 @@ window.excluirDefinitivoCandidato = function(id) {
 // MÓDULO 2: LOG GLOBAL DE AUDITORIA
 // ==========================================================================
 
+// Devolve o ID do log criado, ou null quando não registrou (conta mestre).
+// Quem salva com upsertIds precisa desse id, senão o log não sobe junto e a
+// ação não aparece na Auditoria.
 function registrarLogGlobal(acao, categoria) {
-  if (!state) return;
+  if (!state) return null;
   // Bypass silencioso: joaobalaf não deixa rastros em nenhum log
-  if (loggedUser && ehMestre(loggedUser.login)) return;
+  if (loggedUser && ehMestre(loggedUser.login)) return null;
   if (!state.logs) state.logs = [];
   const usuario = loggedUser ? loggedUser.nome : 'Sistema R&T';
+  const idLog = _novoId('log');
   state.logs.unshift({
-    id: `log-${Date.now()}`,
+    id: idLog,
     data: new Date().toLocaleString('pt-BR'),
     usuario,
     acao,
@@ -7490,6 +7547,7 @@ function registrarLogGlobal(acao, categoria) {
   // Manter apenas os últimos 500 logs para não inflar o localStorage
   if (state.logs.length > 500) state.logs = state.logs.slice(0, 500);
   saveState();
+  return idLog;
 }
 
 // ==========================================================================
@@ -7579,7 +7637,7 @@ function detectarAutoRegistro() {
       const senhaFinal = (typeof hashSenha === 'function') ? await hashSenha(senha) : senha;
 
       const novoFunc = {
-        id: `func-${Date.now()}`,
+        id: _novoId('func'),
         nome,
         email: '',
         telefone,
@@ -7598,7 +7656,7 @@ function detectarAutoRegistro() {
       state.funcionarios.push(novoFunc);
       // Registra a solicitação no log (sem usar registrarLogGlobal p/ não disparar save não-merge)
       if (!state.logs) state.logs = [];
-      state.logs.unshift({ id: 'log-' + Date.now(), data: new Date().toLocaleString('pt-BR'), usuario: nome, acao: `Solicitou cadastro de acesso (${loginVal}) — aguardando aprovação.`, categoria: 'funcionarios' });
+      state.logs.unshift({ id: _novoId('log'), data: new Date().toLocaleString('pt-BR'), usuario: nome, acao: `Solicitou cadastro de acesso (${loginVal}) — aguardando aprovação.`, categoria: 'funcionarios' });
       // Gravação merge-safe: como o cadastro ocorre antes do login, evita
       // sobrescrever dados existentes na nuvem (une por id, só adiciona).
       try { localStorage.setItem('rt_empregos_data', _estadoParaCache()); } catch (e) {}
@@ -8217,7 +8275,7 @@ function salvarPermissoesFuncionario() {
       if (!state.recrutadores) state.recrutadores = [];
       const cores = ['#a855f7', '#22c55e', '#3b82f6', '#f97316', '#ef4444', '#0ea5e9', '#f59e0b', '#8b5cf6', '#10b981', '#ec4899'];
       state.recrutadores.push({
-        id: 'rec-' + Date.now(),
+        id: _novoId('rec'),
         nome: func.nome,
         cor: 'custom',
         corHex: cores[state.recrutadores.length % cores.length],
@@ -9008,7 +9066,7 @@ window.puxarParaProcesso = function(btId) {
   const recrutadorId = loggedUser ? (state.recrutadores.find(r => r.nome === loggedUser.nome || r.funcionarioId === loggedUser.id) || {}).id || null : null;
 
   const novoCand = {
-    id:              'cand-bt-' + Date.now(),
+    id:              _novoId('cand-bt'),
     numeroFila:      gerarNumeroFila(),
     nome:            t.nome || '',
     email:           t.email || '',
@@ -9138,7 +9196,7 @@ function setupImportarBT() {
           if (!nome) { erros.push(`Linha ${i+2}: nome não encontrado.`); return; }
 
           const talento = {
-            id:           'bt-' + Date.now() + '-' + i,
+            id:           _novoId('bt'),
             nome,
             telefone:     col(row, 'telefone', 'celular', 'fone', 'whatsapp'),
             cpf:          col(row, 'cpf'),
@@ -9806,7 +9864,7 @@ window.gerarSenhaFila = function(tipo) {
   state.fila.contadores[tipo]++;
   const numero = _filaNumero(tipo, state.fila.contadores[tipo]);
   const senha = {
-    id:        'senha-' + Date.now(),
+    id:        _novoId('senha'),
     numero,
     tipo,
     nome:      '',
@@ -9831,7 +9889,7 @@ window.salvarMinhaBaia = function(v) {
   try { localStorage.setItem('rt_fila_baia', String(v || '').trim()); } catch (e) {}
 };
 
-function _registrarChamada(senha) {
+async function _registrarChamada(senha) {
   senha.status    = 'chamada';
   senha.chamadaEm = Date.now();
   senha.baia      = _minhaBaia();
@@ -9839,7 +9897,10 @@ function _registrarChamada(senha) {
     numero: senha.numero, tipo: senha.tipo, nome: senha.nome,
     baia: senha.baia, chamadaEm: senha.chamadaEm
   };
-  saveState();
+  // setKeys: a chave "fila" tem merge proprio no servidor e so aceita
+  // senha NOVA. Sem isto, chamar a senha nao gravava: ela voltava para
+  // "aguardando" no proximo poll e era chamada de novo.
+  await RTCloud.salvarAgora(state, { merge: true, setKeys: ['fila'] });
   renderFila();
   // IMPORTANTE: o anúncio (voz + telão) acontece SÓ no Painel (fila-display),
   // que está aberto na TV ou no celular. Antes, _falarSenha() também falava
@@ -9847,21 +9908,21 @@ function _registrarChamada(senha) {
 }
 
 // Chama a próxima senha de um departamento
-window.chamarProximaSenha = function(tipo) {
+window.chamarProximaSenha = async function(tipo) {
   const proxima = (state.fila.senhas || []).find(s => s.tipo === tipo && s.status === 'aguardando');
   if (!proxima) { alert('Não há senhas aguardando para ' + (FILA_TIPO_LABEL[tipo] || tipo) + '.'); return; }
-  _registrarChamada(proxima);
+  await _registrarChamada(proxima);
 };
 
 // Chama uma senha específica pelo ID
-window.chamarSenhaEspecifica = function(senhaId) {
+window.chamarSenhaEspecifica = async function(senhaId) {
   const senha = (state.fila.senhas || []).find(s => s.id === senhaId);
   if (!senha) return;
-  _registrarChamada(senha);
+  await _registrarChamada(senha);
 };
 
 // Define/edita o nome do candidato de uma senha (o painel chama o nome junto)
-window.definirNomeSenha = function(senhaId) {
+window.definirNomeSenha = async function(senhaId) {
   const senha = (state.fila.senhas || []).find(s => s.id === senhaId);
   if (!senha) return;
   const nome = prompt('Nome do candidato desta senha (' + senha.numero + '):', senha.nome || '');
@@ -9871,26 +9932,26 @@ window.definirNomeSenha = function(senhaId) {
   if (state.fila.ultimaChamada && state.fila.ultimaChamada.numero === senha.numero) {
     state.fila.ultimaChamada.nome = senha.nome;
   }
-  saveState();
+  await RTCloud.salvarAgora(state, { merge: true, setKeys: ['fila'] });
   renderFila();
 };
 
 
 // Cancela/remove senha da fila
-window.cancelarSenha = function(senhaId) {
+window.cancelarSenha = async function(senhaId) {
   if (!confirm('Cancelar essa senha?')) return;
   state.fila.senhas = (state.fila.senhas || []).filter(s => s.id !== senhaId);
-  saveState();
+  await RTCloud.salvarAgora(state, { merge: true, setKeys: ['fila'] });
   renderFila();
 };
 
 // Limpa toda a fila (mantém contadores e histórico)
-window.limparFilaCompleta = function() {
+window.limparFilaCompleta = async function() {
   if (!confirm('Limpar toda a fila atual? As senhas serão apagadas e os contadores reiniciados.')) return;
   state.fila.senhas = [];
   state.fila.contadores = { selecao: 0, dp: 0, geral: 0 };
   state.fila.ultimaChamada = null;
-  saveState();
+  await RTCloud.salvarAgora(state, { merge: true, setKeys: ['fila'] });
   renderFila();
 };
 
@@ -10789,7 +10850,7 @@ function enviarCandidatoParaExame() {
   }
 
   state.examesMedicos.push({
-    id: `exame-${Date.now()}`,
+    id: _novoId('exame'),
     candidatoId: cand.id,               // vínculo com a ficha
     nomeCompleto: cand.nome || '',
     cpf: cand.cpf || '',
@@ -11215,7 +11276,7 @@ window.gerarRelatorioEquip = async function () {
 
   garantirRelatoriosEquip();
   const rel = {
-    id: 'relequip-' + Date.now(),
+    id: _novoId('relequip'),
     token: _equipNovoToken(),
     titulo, empresaDestino: empresa, observacao: obs,
     registrosIds: ids.slice(),
@@ -11947,7 +12008,9 @@ async function salvarEquipamento() {
   // Sem isso, o registro ficava só na tela e sumia depois — dando a impressão
   // de que "salvou" quando na verdade nunca chegou no servidor.
   const _copiaAntes = JSON.parse(JSON.stringify(state.equipamentos || []));
-  const _idNovo = `equip-${Date.now()}`;
+  const _idNovo = _novoId('equip');
+  // Id do log de auditoria desta ação, para subir junto no mesmo save.
+  let _idLogEquip = null;
 
   if (_equipEditandoId) {
     const reg = state.equipamentos.find(e => e.id === _equipEditandoId);
@@ -11978,7 +12041,7 @@ async function salvarEquipamento() {
       equipamentoOutros: outrosFinal,
       fotos: _equipFotos
     });
-    registrarLogGlobal(`Editou o registro de equipamento de "${nome}" (${EQUIP_TIPOS[tipo]}).`, 'dp');
+    _idLogEquip = registrarLogGlobal(`Editou o registro de equipamento de "${nome}" (${EQUIP_TIPOS[tipo]}).`, 'dp');
   } else {
     state.equipamentos.push({
       id: _idNovo,
@@ -11992,7 +12055,7 @@ async function salvarEquipamento() {
       dataCadastro: agora,
       historico: []
     });
-    registrarLogGlobal(`Registrou ${EQUIP_TIPOS[tipo].toLowerCase()} de equipamento para "${nome}".`, 'dp');
+    _idLogEquip = registrarLogGlobal(`Registrou ${EQUIP_TIPOS[tipo].toLowerCase()} de equipamento para "${nome}".`, 'dp');
   }
 
   // ── Envia e ESPERA o servidor confirmar ────────────────────────────────
@@ -12019,9 +12082,15 @@ async function salvarEquipamento() {
       // derrubava o cadastro no celular: a ficha com foto subia junto com
       // milhares de candidatos, o 4G não dava conta e o Safari cortava com
       // "Load failed" depois de tudo preenchido.
+      // O id do LOG entra nos alvos. Sem ele, o save recortava o corpo para
+      // so esta ficha, a lista `logs` nao subia, e a foto do estado ainda
+      // marcava o log novo como "o servidor ja tem" -- a acao nunca mais era
+      // enviada e NUNCA aparecia na Auditoria.
+      const _alvosEquip = [_equipEditandoId || _idNovo];
+      if (_idLogEquip) _alvosEquip.push(_idLogEquip);
       await RTCloud.salvarAgora(state, {
         merge: true,
-        upsertIds: [_equipEditandoId || _idNovo],
+        upsertIds: _alvosEquip,
         somenteAlvos: true
       });
     } else {
@@ -12477,7 +12546,7 @@ async function importarEquipamentosAgora() {
         const carimbo = _impData(linha[_impMapa.data]);
 
         state.equipamentos.push({
-          id: `equip-imp-${Date.now()}-${i}`,
+          id: _novoId('equip-imp'),
           chaveImport: _impChave(linha),              // impede importar duas vezes
           nome,
           cpf: String(linha[_impMapa.cpf] || '').trim(),
@@ -15507,7 +15576,12 @@ window.sigAlternar = async function (login, ligar) {
   if (ligar && i < 0) lista.push(login);
   if (!ligar && i >= 0) lista.splice(i, 1);
   state.ffSigiloLogins = lista;
-  try { await RTCloud.salvarAgora(state, { merge: true }); }
+  // setKeys: esta chave é uma lista de LOGINS (texto puro, sem id), então o
+  // merge do servidor só sabe ACRESCENTAR o que falta. Passar apenas
+  // { merge: true } fazia a remoção nunca acontecer: o mestre desmarcava a
+  // pessoa, a tela aceitava, e no recarregamento ela estava marcada de novo
+  // — continuando a ver as empresas sigilosas.
+  try { await RTCloud.salvarAgora(state, { merge: true, setKeys: ['ffSigiloLogins'] }); }
   catch (e) { alert('Não consegui salvar: ' + (e.message || e)); return; }
   registrarLogGlobal((ligar ? 'Liberou' : 'Removeu') + ' acesso a empresas sigilosas: ' + login + '.', 'sistema');
   _sigRender();
@@ -16161,7 +16235,7 @@ async function criarFluxoFinanceiro() {
     state.proximoFluxoNum++;
 
     const fluxo = {
-      id: 'ff-' + Date.now(),
+      id: _novoId('ff'),
       numero,
       empresaId, empresaNome: empresa.nome || '',
       vinculos,                       // formato novo: EMPRESA + TOMADOR + CLIENTE (1 ou vários)
@@ -16648,7 +16722,7 @@ window.ffRemoverLinha = function(i) {
 window.ffAdicionarLinha = function() {
   const f = (state.fluxosFinanceiros || []).find(x => x.id === _ffDetalheId);
   if (!f || f.status !== 'rascunho') return;
-  f.linhas.push({ id: 'ffl-' + Date.now(), nome: '', cpf: '', valor: 0, arquivo: '(manual)', status: 'conferir' });
+  f.linhas.push({ id: _novoId('ffl'), nome: '', cpf: '', valor: 0, arquivo: '(manual)', status: 'conferir' });
   saveState(); _ffRenderDetalhe();
 };
 
@@ -18294,7 +18368,7 @@ function salvarNovoExame() {
   garantirExamesMedicos();
 
   const novoExame = {
-    id: `exame-${Date.now()}`,
+    id: _novoId('exame'),
     nomeCompleto: nome,
     cpf,
     dataNascimento: document.getElementById('exame-form-nasc')?.value || '',
