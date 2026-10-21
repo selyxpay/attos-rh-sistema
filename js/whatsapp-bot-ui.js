@@ -17,16 +17,21 @@
     return (typeof escapeHTML === 'function') ? escapeHTML(v) : String(v == null ? '' : v);
   };
 
+  // O estado global e declarado com `let state` no js/app.js, e `let` NAO
+  // cria propriedade no window: `window.state` e sempre undefined. Por isso a
+  // leitura e pelo nome, nao pelo window.
+  function _est() { return (typeof state !== 'undefined' && state) ? state : null; }
+
   // Mesmo padrão das outras telas: só admin e mestre, e o servidor confirma.
   function _botPodeVer() {
     if (!window.loggedUser) return false;
     if (!window.RTTelas) return false;
-    const n = RTTelas.telasDoFuncionario(loggedUser, window.state || {})['bot'];
+    const n = RTTelas.telasDoFuncionario(loggedUser, _est() || {})['bot'];
     return n === 'ver' || n === 'editar';
   }
   function _botPodeEditar() {
     if (!window.loggedUser || !window.RTTelas) return false;
-    return RTTelas.telasDoFuncionario(loggedUser, window.state || {})['bot'] === 'editar';
+    return RTTelas.telasDoFuncionario(loggedUser, _est() || {})['bot'] === 'editar';
   }
   window._botPodeVer = _botPodeVer;
 
@@ -47,7 +52,8 @@
   };
 
   function cfg() {
-    if (!window.state) return JSON.parse(JSON.stringify(PADRAO));
+    // Sem estado carregado, devolve o padrao (copia): a tela ainda desenha.
+    if (!_est()) return JSON.parse(JSON.stringify(PADRAO));
     if (!state.botWhatsapp || typeof state.botWhatsapp !== 'object') {
       state.botWhatsapp = JSON.parse(JSON.stringify(PADRAO));
     }

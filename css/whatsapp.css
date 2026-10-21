@@ -774,3 +774,111 @@ body.wa-tela-cheia { overflow: hidden; }
 .wa-bot-estado { padding: 2px 8px; border-radius: 9999px; font-size: 10.5px; font-weight: 700; }
 .wa-bot-estado.ligado { background: rgba(37,211,102,.16); color: #047857; }
 .wa-bot-estado.pausado { background: rgba(100,116,139,.16); color: #475569; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MENSAGENS PRONTAS
+   A fileira fica DENTRO do composer, acima da pílula de escrever, e rola de
+   lado no celular — é a única forma de caber vários botões numa tela estreita
+   sem empurrar a caixa de escrever para fora da tela.
+   ══════════════════════════════════════════════════════════════════════════ */
+.wa-prontas { margin-bottom: 7px; }
+.wa-prontas:empty { display: none; margin: 0; }
+.wa-prontas-fila {
+  display: flex; align-items: center; gap: 6px;
+  overflow-x: auto; overflow-y: hidden; padding-bottom: 2px;
+  scrollbar-width: thin; -webkit-overflow-scrolling: touch;
+}
+.wa-prontas-fila::-webkit-scrollbar { height: 5px; }
+.wa-prontas-fila::-webkit-scrollbar-thumb { background: rgba(100,116,139,.35); border-radius: 9999px; }
+
+.wa-pronta { display: inline-flex; align-items: stretch; flex: 0 0 auto; border-radius: 9999px; overflow: hidden; box-shadow: 0 1px 1px rgba(11,20,26,.06); }
+.wa-pronta button { border: none; cursor: pointer; background: #fff; color: #0f172a; font-family: inherit; }
+.wa-pronta-usar {
+  max-width: 190px; padding: 6px 12px; font-size: 12.5px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wa-pronta-usar:hover:not(:disabled) { background: #e7f7ef; color: #047857; }
+.wa-pronta-anexo { margin-right: 5px; color: #64748b; font-size: 11px; }
+.wa-pronta-ja {
+  padding: 6px 10px; font-size: 11.5px; color: #047857;
+  border-left: 1px solid var(--border-color, #e2e8f0) !important;
+}
+.wa-pronta-ja:hover:not(:disabled) { background: #047857; color: #fff; }
+.wa-pronta.off { opacity: .45; }
+.wa-pronta.off button { cursor: not-allowed; }
+
+.wa-pronta-mais, .wa-pronta-vazio {
+  flex: 0 0 auto; border: 1px dashed var(--border-color, #cbd5e1); background: transparent;
+  color: var(--text-secondary, #64748b); border-radius: 9999px; cursor: pointer;
+  padding: 6px 11px; font-size: 12px; font-family: inherit;
+}
+.wa-pronta-mais:hover, .wa-pronta-vazio:hover { border-color: #059669; color: #059669; }
+.wa-pronta-fechada {
+  display: flex; align-items: flex-start; gap: 7px;
+  background: rgba(234,179,8,.14); color: #92400e; border-radius: 8px;
+  padding: 7px 10px; font-size: 11.5px; line-height: 1.4; margin-bottom: 6px;
+}
+
+/* A lista que a barra de atalho abre. Fica no fluxo, acima da fileira: assim
+   ela nunca escapa da tela no celular nem cobre a caixa de escrever. */
+.wa-prontas-lista {
+  background: var(--card-bg, #fff); border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px; box-shadow: 0 6px 18px rgba(11,20,26,.14);
+  margin-bottom: 7px; overflow: hidden;
+}
+.wa-prontas-lista-topo { display: flex; align-items: center; gap: 7px; padding: 7px 10px; border-bottom: 1px solid var(--border-color, #f1f5f9); color: var(--text-secondary, #64748b); }
+.wa-prontas-lista-topo input { flex: 1; border: none; outline: none; background: transparent; font-size: 13px; font-family: inherit; color: var(--text-main, #0f172a); }
+.wa-pronta-fechar { border: none; background: transparent; cursor: pointer; color: var(--text-secondary, #64748b); font-size: 13px; }
+.wa-prontas-lista-itens { max-height: 230px; overflow-y: auto; }
+.wa-prontas-item {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left;
+  border: none; background: transparent; cursor: pointer; font-family: inherit;
+  padding: 8px 11px; border-bottom: 1px solid var(--border-color, #f8fafc);
+}
+.wa-prontas-item:hover:not(:disabled), .wa-prontas-item.alvo { background: #e7f7ef; }
+.wa-prontas-item:disabled { opacity: .45; cursor: not-allowed; }
+.wa-prontas-item-tit { font-size: 12.5px; font-weight: 700; color: #0f172a; }
+.wa-prontas-item-txt { font-size: 11.5px; color: var(--text-secondary, #64748b); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-prontas-lista-vazio { padding: 12px; font-size: 12px; color: var(--text-secondary, #64748b); text-align: center; }
+
+/* ── A tela de cadastro ─────────────────────────────────────────────────── */
+.wa-prontas-tela { display: flex; flex-direction: column; gap: 14px; }
+.wa-prontas-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.wa-prontas-cab h3 { margin: 0 0 3px; font-size: 15px; }
+.wa-prontas-sub { margin: 0; font-size: 12px; color: var(--text-secondary, #64748b); max-width: 560px; line-height: 1.45; }
+.wa-prontas-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.wa-prontas-card { border: 1px solid var(--border-color, #e2e8f0); border-radius: 10px; padding: 11px 12px; background: var(--card-bg, #fff); display: flex; flex-direction: column; gap: 8px; }
+.wa-prontas-card-cab { display: flex; align-items: center; gap: 8px; }
+.wa-prontas-card-cab strong { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-prontas-ordem { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 9999px; background: var(--surface-subtle, #f1f5f9); color: #475569; font-size: 10.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.wa-prontas-acoes { display: inline-flex; gap: 4px; }
+.wa-prontas-card-txt { font-size: 12.5px; line-height: 1.45; color: var(--text-main, #0f172a); background: var(--surface-subtle, #f8fafc); border-radius: 8px; padding: 8px 10px; max-height: 120px; overflow: auto; }
+.wa-prontas-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #047857; text-decoration: none; border: 1px solid rgba(5,150,105,.3); border-radius: 9999px; padding: 3px 9px; align-self: flex-start; }
+.wa-prontas-chip:hover { background: rgba(5,150,105,.1); }
+
+.wa-prontas-form { border: 1px solid #059669; border-radius: 10px; padding: 13px; background: var(--card-bg, #fff); display: flex; flex-direction: column; gap: 11px; }
+.wa-prontas-form-linha { display: flex; flex-direction: column; gap: 5px; }
+.wa-prontas-form-linha label { font-size: 11.5px; font-weight: 700; color: var(--text-secondary, #475569); }
+.wa-prontas-form-linha input[type=text], .wa-prontas-form-linha input[type=number], .wa-prontas-form-linha textarea {
+  border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; padding: 8px 10px;
+  font-size: 13px; font-family: inherit; background: var(--card-bg, #fff); color: var(--text-main, #0f172a);
+}
+.wa-prontas-form-linha textarea { resize: vertical; line-height: 1.45; }
+.wa-prontas-form-linha input:focus, .wa-prontas-form-linha textarea:focus { outline: none; border-color: #059669; }
+.wa-prontas-form-cols { display: grid; grid-template-columns: minmax(0, 1fr) 110px; gap: 11px; align-items: start; }
+.wa-prontas-form-linha.curta input { width: 100%; }
+.wa-prontas-hint { font-weight: 500; color: var(--text-secondary, #94a3b8); }
+.wa-prontas-vars { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11px; color: var(--text-secondary, #64748b); }
+.wa-prontas-var { border: 1px solid var(--border-color, #e2e8f0); background: var(--surface-subtle, #f8fafc); border-radius: 9999px; padding: 2px 8px; font-size: 11px; font-family: inherit; cursor: pointer; color: #475569; }
+.wa-prontas-var:hover { border-color: #059669; color: #059669; }
+.wa-prontas-anexo-atual { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #047857; }
+.wa-prontas-anexo-vazio { font-size: 12px; color: var(--text-secondary, #94a3b8); font-style: italic; }
+.wa-prontas-form-botoes { display: flex; justify-content: flex-end; gap: 8px; }
+
+@media (max-width: 760px) {
+  .wa-pronta-usar { max-width: 140px; padding: 7px 12px; }
+  .wa-pronta-ja { padding: 7px 11px; }
+  .wa-prontas-cards { grid-template-columns: 1fr; }
+  .wa-prontas-form-cols { grid-template-columns: 1fr; }
+  .wa-prontas-lista-itens { max-height: 180px; }
+}

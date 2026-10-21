@@ -62,6 +62,10 @@ function renderWhatsApp() {
   // toda rota /api/whatsapp/bot/. Aqui é só para não mostrar a aba a quem vai
   // levar 403 de qualquer forma.
   if (_botPodeVer()) abas.push({ id: 'bot', ic: 'fa-robot', label: 'Bot' });
+  // Cadastro das mensagens prontas. Segue a permissao da tela 'whatsapp':
+  // quem atende precisa ver as mensagens para usar, e quem edita conversa
+  // tambem pode cuidar do catalogo -- ele nao guarda nada sensivel.
+  if (_waPode('editar')) abas.push({ id: 'prontas', ic: 'fa-comment-dots', label: 'Mensagens prontas' });
   // "Conexões" (múltiplos números oficiais) — só para quem administra o WhatsApp.
   if (_waPode('aprovar')) abas.push({ id: 'conexoes', ic: 'fa-plug', label: 'Conexões' });
   subs.innerHTML = abas.map(a =>
@@ -83,6 +87,7 @@ function renderWhatsApp() {
   else if (_waSubAba === 'templates') _waRenderTemplates(cont);
   else if (_waSubAba === 'conexoes')  _waRenderConexoes(cont);
   else if (_waSubAba === 'bot')       _botRender(cont);
+  else if (_waSubAba === 'prontas')   _respostasRender(cont);
 }
 window.renderWhatsApp = renderWhatsApp;
 
@@ -563,6 +568,10 @@ function _waRenderChat(conv, msgs) {
            <button class="wa-modo-btn ${!_waModoNota ? 'active' : ''}" onclick="waSetModo(false)"><i class="fa-solid fa-paper-plane"></i> Resposta</button>
            <button class="wa-modo-btn wa-modo-nota ${_waModoNota ? 'active' : ''}" onclick="waSetModo(true)"><i class="fa-solid fa-note-sticky"></i> Nota interna</button>
          </div>
+         <!-- Mensagens prontas: fica ACIMA da caixa, para o atendente ver as
+              opções antes de começar a escrever. O conteúdo é montado por
+              js/whatsapp-respostas-ui.js, que também cuida do atalho "/". -->
+         <div class="wa-prontas" id="wa-prontas"></div>
          <div class="wa-composer-linha">
            <button class="wa-anexo" title="Anexar mídia" onclick="document.getElementById('wa-file').click()" ${_waModoNota ? 'disabled' : ''}><i class="fa-solid fa-paperclip"></i></button>
            <button class="wa-anexo" title="Enviar template aprovado" onclick="waAbrirTemplatePicker()" ${_waModoNota ? 'disabled' : ''}><i class="fa-regular fa-file-lines"></i></button>
@@ -579,6 +588,9 @@ function _waRenderChat(conv, msgs) {
   if (conv && conv.contact_id && typeof botCarregarControle === 'function') {
     botCarregarControle(conv.contact_id);
   }
+  // Mensagens prontas: a fileira precisa saber se a janela de 24h está
+  // aberta, e isso vem do servidor.
+  if (typeof respostasDesenharFileira === 'function') respostasDesenharFileira(conv);
 }
 
 function _waBolha(m) {
@@ -648,7 +660,21 @@ function _waScrollFim() { const m = document.getElementById('wa-msgs'); if (m) m
 
 window.waVoltarLista = function () { const i = document.getElementById('wa-inbox'); if (i) i.classList.remove('wa-chat-aberto'); _waConvAberta = null; };
 window.waSetModo = function (nota) { _waModoNota = !!nota; if (_waConvAbertaObj) _waRenderChat(_waConvAbertaObj, _waMsgsCache || []); };
-window.waComposerKey = function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); waEnviarMensagem(); } };
+window.waComposerKey = function (e) {
+  // A barra abre a lista de mensagens prontas, como no atendimento de
+  // qualquer ferramenta do tipo. Só quando o campo está VAZIO: no meio de
+  // uma frase a barra é só uma barra.
+  if (e.key === '/' && !_waModoNota) {
+    const campo = e.target;
+    if (campo && !String(campo.value || '').trim() && typeof respostasAbrirLista === 'function') {
+      e.preventDefault();
+      respostasAbrirLista();
+      return;
+    }
+  }
+  if (e.key === 'Escape' && typeof respostasFecharLista === 'function') respostasFecharLista();
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); waEnviarMensagem(); }
+};
 // Como no WhatsApp: campo vazio oferece o microfone; começou a digitar, vira
 // o botão de enviar. (No modo nota o áudio fica desligado — nota é texto
 // interno, áudio iria para o cliente.)
@@ -755,6 +781,14 @@ function _waConectarSSE() {
       let d; try { d = JSON.parse(ev.data); } catch (e) { return; }
       if (d.type === 'new_message') {
         if (d.conversation_id === _waConvAberta && d.message) { _waMsgsCache.push(d.message); _waAppendBolha(d.message); }
+        // Mensagem RECEBIDA reabre a janela de 24 horas: a fileira de mensagens
+        // prontas precisa voltar a ficar habilitada sem o atendente reabrir a
+        // conversa.
+        if (d.conversation_id === _waConvAberta && d.message && d.message.direction === 'incoming' &&
+            typeof respostasDesenharFileira === 'function') {
+          const _c = _waConversas.find(function (c) { return c.id === _waConvAberta; });
+          respostasDesenharFileira(_c || { id: _waConvAberta });
+        }
         if (_waSubAba === 'inbox') _waCarregarConversas();
       } else if (d.type === 'message_status') {
         if (d.conversation_id === _waConvAberta && _waSubAba === 'inbox') waAbrirConversa(_waConvAberta);

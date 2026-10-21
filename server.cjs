@@ -1661,6 +1661,115 @@ function waUsuarioLogado(req) {
 function waIpDaReq(req) {
   return String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
 }
+
+// ── JANELA DE 24 HORAS ─────────────────────────────────────────────────────
+// A Meta só aceita mensagem escrita à mão nas 24 horas seguintes à ÚLTIMA
+// mensagem que a pessoa mandou. Fora disso, só modelo aprovado.
+// Na dúvida fica FECHADA: mandar fora da janela volta como erro da Meta e
+// mancha a qualidade do número, então o certo é não tentar.
+function _waJanela24h(convId) {
+  var fechada = { aberta: false, horas: null, restam: 0, ultima: '' };
+  if (!_waReady || !waDb) return fechada;
+  try {
+    var r = waDb.messages.ultimaRecebida(convId);
+    if (!r || r.horas === null || r.horas === undefined) return fechada;   // nunca recebeu nada
+    var horas = Number(r.horas);
+    if (!isFinite(horas)) return fechada;
+    return {
+      aberta: horas < 24,
+      horas: Math.round(horas * 10) / 10,
+      restam: Math.max(0, Math.round((24 - horas) * 10) / 10),
+      ultima: r.created_at || ''
+    };
+  } catch (e) {
+    console.error('[Prontas] não consegui ver a janela de 24h:', e.message);
+    return fechada;
+  }
+}
+
+// Troca de variáveis para quando o módulo do bot não está carregado (ele é um
+// extra e pode faltar). É a versão simples de propósito: a boa, que arruma a
+// vírgula órfã de um {nome} vazio, é a do bot — esta só não deixa a mensagem
+// pronta sair com as chaves cruas no lugar do nome.
+function _waVariaveisSimples(texto, dados) {
+  var h;
+  try {
+    h = Number(new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false
+    }).format(new Date()));
+  } catch (e) { h = (new Date().getUTCHours() - 3 + 24) % 24; }
+  var saud = (h >= 5 && h < 12) ? 'bom dia' : (h >= 12 && h < 18 ? 'boa tarde' : 'boa noite');
+  var nome = String((dados && dados.nome) || '').trim().split(/\s+/)[0] || '';
+  if (/^\d+$/.test(nome)) nome = '';                      // telefone não é nome
+  return String(texto == null ? '' : texto)
+    .replace(/\{nome\}/gi, nome)
+    .replace(/\{saudacao\}/gi, saud)
+    .replace(/\{link_vagas\}/gi, String((dados && dados.linkVagas) || ''))
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\s+([,.;!?])/g, '$1')
+    .replace(/(^|\n)\s*([a-zà-ú])/g, function (_m, antes, letra) { return antes + letra.toUpperCase(); })
+    .replace(/[ \t]+$/gm, '');
+}
+
+// A mensagem pronta pelo id. O catálogo mora no state.json.
+function _waProntaPorId(id) {
+  try {
+    var lista = ((lerEstado().dados || {}).respostasRapidas) || [];
+    if (!Array.isArray(lista)) return null;
+    return lista.find(function (r) { return r && String(r.id) === String(id); }) || null;
+  } catch (e) { return null; }
+}
+
+// O texto final de uma mensagem pronta, com as variáveis já trocadas.
+// Um lugar só, usado pela PRÉVIA (o que cai na caixa de escrever) e pelo
+// ENVIO: é isso que garante que o atendente mande exatamente o texto que viu.
+function _waTextoDaPronta(resp, conv) {
+  var cfgBot = {};
+  try { cfgBot = (lerEstado().dados || {}).botWhatsapp || {}; } catch (e) { cfgBot = {}; }
+  var dados = {
+    nome: (conv && (conv.contact_name || conv.contact_profile_name)) || '',
+    linkVagas: cfgBot.linkVagas || ''
+  };
+  return waBot
+    ? waBot.aplicarVariaveis(resp.texto || '', dados)
+    : _waVariaveisSimples(resp.texto || '', dados);
+}
+
+// Envia o anexo de uma mensagem pronta (imagem ou PDF).
+// Reaproveita o media id que já está no banco — a Meta guarda o arquivo por
+// cerca de 30 dias, e subir o mesmo PDF a cada envio seria desperdício. Se o
+// id expirou, sobe de novo UMA vez e repete o envio.
+function _waEnviarMidiaPronta(conta, token, telefone, resp, legenda) {
+  var nomeArq = path.basename(String(resp.arquivo || ''));
+  var caminho = path.join(BOT_MIDIA_DIR, nomeArq);
+  var ehDoc   = resp.tipoAnexo === 'documento';
+  var mime    = resp.mime || (ehDoc ? 'application/pdf' : 'image/jpeg');
+  var tipoMeta = ehDoc ? 'document' : 'image';
+  if (!nomeArq || !fs.existsSync(caminho)) {
+    return Promise.resolve({ ok: false, error: 'O anexo desta mensagem não está mais no servidor.' });
+  }
+  var subir = function () {
+    return waApi.uploadMedia(conta.phone_number_id, caminho, mime, token).then(function (r) {
+      if (!r || !r.ok || !r.media_id) throw new Error((r && r.error) || 'falha ao subir o anexo');
+      try { waDb.bot.gravarMidiaCache(nomeArq, conta.id, r.media_id, mime, fs.statSync(caminho).size); } catch (e) {}
+      return r.media_id;
+    });
+  };
+  var mandar = function (mediaId) {
+    var envio = { id: mediaId };
+    if (ehDoc) envio.filename = resp.nomeArquivo || nomeArq;
+    return waApi.sendMediaMessage(conta.phone_number_id, telefone, tipoMeta, envio, legenda, token);
+  };
+  var cache = null;
+  try { cache = waDb.bot.midiaCache(nomeArq, conta.id); } catch (e) { cache = null; }
+  var primeira = (cache && cache.media_id) ? Promise.resolve(cache.media_id) : subir();
+  return primeira.then(mandar).then(function (r) {
+    if (r && r.ok) return r;
+    if (!cache || !cache.media_id) return r;              // já era upload novo: o erro é outro
+    try { waDb.bot.esquecerMidiaCache(nomeArq, conta.id); } catch (e) {}
+    return subir().then(mandar);
+  }).catch(function (e) { return { ok: false, error: e.message }; });
+}
 // Lê corpo como texto puro (para validar assinatura do webhook)
 function lerCorpoBruto(req, cb) {
   var data = [];
@@ -3305,6 +3414,235 @@ http.createServer(function (req, res) {
     // logadas.
     // ══════════════════════════════════════════════════════════════════════
 
+    // ══════════════════════════════════════════════════════════════════════
+    // MENSAGENS PRONTAS
+    // O catálogo (título, texto, anexo, ordem) mora no state.json, na chave
+    // `respostasRapidas` — uma LISTA de registros com id, gravada com
+    // upsertIds/deleteIds, que é o contrato do sistema.
+    // A permissão é a da tela `whatsapp`: quem atende precisa VER as
+    // mensagens para usar, e quem edita conversa também cuida do catálogo.
+    // O catálogo não guarda nada sensível.
+    // ══════════════════════════════════════════════════════════════════════
+
+    // Situação da conversa para a fileira: janela de 24h aberta?
+    var mRespSit = urlPath.match(/^\/api\/whatsapp\/respostas\/conversa\/(\d+)$/);
+    if (mRespSit && req.method === 'GET') {
+      var uRs = waUsuarioTemPermissao(req, 'visualizar');
+      if (!uRs) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      var convRs = decodeSeguro(mRespSit[1]);
+      if (convRs === null) { responderJson(res, 400, { ok: false, error: 'identificador inválido' }); return; }
+      var jan = _waJanela24h(Number(convRs));
+      responderJson(res, 200, { ok: true, janela: jan });
+      return;
+    }
+
+    // Prévia: o texto já com as variáveis trocadas, para cair na caixa de
+    // escrever. Vem do servidor de propósito — assim o que o atendente vê e
+    // ajusta é exatamente o que o envio direto mandaria.
+    if (urlPath === '/api/whatsapp/respostas/previa' && req.method === 'POST') {
+      var uRp = waUsuarioTemPermissao(req, 'visualizar');
+      if (!uRp) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false, error: 'corpo inválido' }); return; }
+        var resp = _waProntaPorId((body && body.resposta_id) || '');
+        if (!resp) { responderJson(res, 404, { ok: false, error: 'Mensagem pronta não encontrada.' }); return; }
+        var cv = null;
+        try { cv = waDb.conversations.getById(Number(body.conversation_id || 0)); } catch (e) { cv = null; }
+        if (cv && !waPodeAcessarConta(uRp, cv.account_id)) {
+          responderJson(res, 403, { ok: false, error: 'Conversa de outra conta.' }); return;
+        }
+        responderJson(res, 200, { ok: true, texto: _waTextoDaPronta(resp, cv) });
+      });
+      return;
+    }
+
+    // Enviar uma mensagem pronta.
+    // Centralizado no servidor de propósito: é aqui que as variáveis são
+    // resolvidas com o nome REAL do contato, a mídia é enviada com o media id
+    // reaproveitado, o bot é pausado naquele contato e a Auditoria registra.
+    // Fazer isso no navegador deixaria cada uma dessas partes opcional.
+    if (urlPath === '/api/whatsapp/respostas/enviar' && req.method === 'POST') {
+      var uRe = waUsuarioTemPermissao(req, 'criar');
+      if (!uRe) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false, error: 'corpo inválido' }); return; }
+        var convId = Number(body.conversation_id || 0);
+        var respId = String(body.resposta_id || '');
+        if (!convId || !respId) { responderJson(res, 400, { ok: false, error: 'faltou a conversa ou a mensagem' }); return; }
+
+        var conv = null;
+        try { conv = waDb.conversations.getById(convId); } catch (e) { conv = null; }
+        if (!conv) { responderJson(res, 404, { ok: false, error: 'Conversa não encontrada.' }); return; }
+        // MULTI-CONTA: a mesma trava do envio normal — ninguém manda por uma
+        // conta que não é dele.
+        if (!waPodeAcessarConta(uRe, conv.account_id)) {
+          responderJson(res, 403, { ok: false, error: 'Você não pode enviar por esta conta.' }); return;
+        }
+        if (!conv.contact_phone) { responderJson(res, 400, { ok: false, error: 'Contato sem telefone.' }); return; }
+
+        // JANELA DE 24 HORAS: a Meta só aceita mensagem livre dentro dela.
+        // Bloquear aqui, e não só na tela, é o que garante que um clique
+        // atrasado não vire erro feio da API.
+        var janela = _waJanela24h(convId);
+        if (!janela.aberta) {
+          responderJson(res, 409, {
+            ok: false, janela_fechada: true,
+            error: 'A janela de 24 horas desta conversa fechou. Só modelo aprovado pode ser enviado agora.'
+          });
+          return;
+        }
+
+        var resp = _waProntaPorId(respId);
+        if (!resp) { responderJson(res, 404, { ok: false, error: 'Mensagem pronta não encontrada.' }); return; }
+
+        var conta = null, token = '';
+        try {
+          conta = waDb.accounts.getById(conv.account_id);
+          token = (conta && conta.access_token_enc) || '';
+        } catch (e) { conta = null; }
+        if (!conta || !token) { responderJson(res, 200, { ok: false, error: 'A conta deste número não está conectada.' }); return; }
+        if (conta.ativo === 0) { responderJson(res, 200, { ok: false, error: 'Esta conexão está desativada.' }); return; }
+
+        // Variáveis resolvidas com o nome REAL do contato.
+        var texto = _waTextoDaPronta(resp, conv);
+        if (!texto.trim() && !resp.arquivo) {
+          responderJson(res, 400, { ok: false, error: 'Esta mensagem pronta está sem texto.' }); return;
+        }
+
+        var pausarBot = function () {
+          // Mandar mensagem pronta é atendimento humano: o bot para naquele
+          // contato, igual a quando alguém responde à mão.
+          if (waBot && conv.contact_id) {
+            try { waBot.aoAtendenteResponder(conv.contact_id, uRe.login); } catch (e) {}
+          }
+        };
+        var registrar = function (tipo, conteudo, wamid, urlMidia) {
+          try {
+            var msgId = waDb.messages.create({
+              conversation_id: convId, account_id: conv.account_id,
+              wamid: wamid || null, direction: 'outgoing', type: tipo,
+              content: conteudo || '', media_url: urlMidia || '',
+              status: wamid ? 'sent' : 'failed',
+              sender_name: uRe.nome || uRe.login
+            });
+            waDb.conversations.update(convId, {
+              last_message_text: String(conteudo || '').slice(0, 200),
+              last_message_type: tipo,
+              last_message_at: new Date().toISOString()
+            });
+            notifySSEClients({
+              type: 'new_message', conversation_id: convId,
+              message: {
+                id: msgId, direction: 'outgoing', type: tipo, content: conteudo || '',
+                media_url: urlMidia || '', status: wamid ? 'sent' : 'failed',
+                sender_name: uRe.nome || uRe.login, created_at: new Date().toISOString()
+              }
+            });
+          } catch (e) { console.error('[Prontas] não gravei na conversa:', e.message); }
+        };
+        var auditar = function (resultado) {
+          waDb.audit.log({
+            user_login: uRe.login, user_name: uRe.nome,
+            action: 'Enviou mensagem pronta',
+            details: '"' + String(resp.titulo || '').slice(0, 40) + '" para ' + (conv.contact_phone || '') + ' · ' + resultado,
+            ip: waIpDaReq(req), account_id: conv.account_id, conversation_id: convId
+          });
+        };
+
+        var temAnexo = !!resp.arquivo;
+        var enviar = temAnexo
+          ? _waEnviarMidiaPronta(conta, token, conv.contact_phone, resp, texto)
+          : waApi.sendTextMessage(conta.phone_number_id, conv.contact_phone, texto, token);
+
+        enviar.then(function (r) {
+          var tipo = temAnexo ? (resp.tipoAnexo === 'documento' ? 'document' : 'image') : 'text';
+          registrar(tipo, texto, r && r.ok ? r.wamid : null,
+            temAnexo ? '/api/whatsapp/respostas/midia/' + encodeURIComponent(resp.arquivo) : '');
+          pausarBot();
+          auditar(r && r.ok ? 'enviada' : 'FALHOU: ' + ((r && r.error) || 'erro'));
+          if (r && r.ok) responderJson(res, 200, { ok: true, wamid: r.wamid, texto: texto });
+          else responderJson(res, 200, { ok: false, error: (r && r.error) || 'Falha no envio.' });
+        }).catch(function (e) {
+          auditar('FALHOU: ' + e.message);
+          responderJson(res, 200, { ok: false, error: e.message });
+        });
+      });
+      return;
+    }
+
+    // Subir anexo de uma mensagem pronta (imagem ou PDF)
+    if (urlPath === '/api/whatsapp/respostas/midia' && req.method === 'POST') {
+      var uRm = waUsuarioTemPermissao(req, 'editar');
+      if (!uRm) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false, error: 'corpo inválido' }); return; }
+        var m = /^data:([^;]+);base64,([\s\S]*)$/.exec((body && body.dataUrl) || '');
+        if (!m) { responderJson(res, 400, { ok: false, error: 'arquivo inválido' }); return; }
+        var buf;
+        try { buf = Buffer.from(m[2], 'base64'); }
+        catch (e) { responderJson(res, 400, { ok: false, error: 'base64 inválido' }); return; }
+        if (!buf.length) { responderJson(res, 400, { ok: false, error: 'arquivo vazio' }); return; }
+        // Tipo pelo CONTEÚDO, como em todo upload do sistema.
+        var t = detectarTipoReal(buf);
+        var aceitos = { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp', pdf: 'application/pdf' };
+        if (!aceitos[t]) {
+          responderJson(res, 400, { ok: false, error: 'Aceito aqui: imagem (PNG, JPEG, WEBP) ou PDF. Enviado: ' + t + '.' });
+          return;
+        }
+        var limite = t === 'pdf' ? 20 * 1024 * 1024 : 5 * 1024 * 1024;
+        if (buf.length > limite) {
+          responderJson(res, 413, { ok: false, error: 'Arquivo acima de ' + Math.round(limite / 1048576) + ' MB.' });
+          return;
+        }
+        var nome = 'pronta_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + EXT_DO_TIPO[t];
+        try {
+          fs.writeFileSync(path.join(BOT_MIDIA_DIR, nome), buf);
+          waDb.audit.log({
+            user_login: uRm.login, user_name: uRm.nome, action: 'Subiu anexo de mensagem pronta',
+            details: t + ' · ' + Math.round(buf.length / 1024) + ' KB', ip: waIpDaReq(req)
+          });
+          responderJson(res, 200, {
+            ok: true, arquivo: nome, tipo: t, mime: aceitos[t],
+            tipoAnexo: t === 'pdf' ? 'documento' : 'imagem', tamanho: buf.length
+          });
+        } catch (e) {
+          console.error('[Prontas] falha ao gravar o anexo:', e.message);
+          responderJson(res, 500, { ok: false, error: 'Falha ao gravar o arquivo.' });
+        }
+      });
+      return;
+    }
+
+    // Servir o anexo — só com sessão e permissão (a pasta é fora de /uploads/)
+    var mRespArq = urlPath.match(/^\/api\/whatsapp\/respostas\/midia\/([^\/]+)$/);
+    if (mRespArq && req.method === 'GET') {
+      var uRa = waUsuarioTemPermissao(req, 'visualizar');
+      if (!uRa) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      var nomeRa = decodeSeguro(mRespArq[1]);
+      if (nomeRa === null) { responderJson(res, 400, { ok: false, error: 'nome inválido' }); return; }
+      // Só os arquivos DAS MENSAGENS PRONTAS. A pasta é a mesma da mídia do
+      // bot (que tem portão próprio, a tela 'bot'), e esta rota não serve de
+      // atalho para ler aquela — todo anexo subido aqui nasce com "pronta_".
+      if (!/^pronta_/.test(path.basename(nomeRa))) {
+        responderJson(res, 404, { ok: false, error: 'não encontrado' }); return;
+      }
+      var alvoRa = path.join(BOT_MIDIA_DIR, path.basename(nomeRa));
+      if (!path.resolve(alvoRa).startsWith(path.resolve(BOT_MIDIA_DIR) + path.sep)) {
+        responderJson(res, 400, { ok: false, error: 'caminho inválido' }); return;
+      }
+      fs.readFile(alvoRa, function (e, dados) {
+        if (e) { responderJson(res, 404, { ok: false, error: 'não encontrado' }); return; }
+        var t = detectarTipoReal(dados);
+        var ct = TIPOS_IMAGEM_SEGURA[t] || (t === 'pdf' ? 'application/pdf' : 'application/octet-stream');
+        res.writeHead(200, Object.assign({}, SECURITY_HEADERS, {
+          'Content-Type': ct, 'X-Content-Type-Options': 'nosniff',
+          'Cache-Control': 'private, max-age=3600'
+        }));
+        res.end(dados);
+      });
+      return;
+    }
+
     // Painel + situação do bot
     if (urlPath === '/api/whatsapp/bot/painel' && req.method === 'GET') {
       var uBp = waUsuarioTemPermissao(req, 'visualizar');
@@ -3925,7 +4263,8 @@ http.createServer(function (req, res) {
   // A tabela de precos (custo pago a clinica x repasse cobrado do cliente) e
   // informacao comercial da empresa: so vai para quem tem sessao valida.
   if ((rel === '/js/app.js' || rel === '/js/data.js' || rel === '/js/whatsapp.js' ||
-       rel === '/js/telas.js' || rel === '/js/whatsapp-bot-ui.js' || rel === '/precificacao-base.json') && !autenticado) {
+       rel === '/js/telas.js' || rel === '/js/whatsapp-bot-ui.js' ||
+       rel === '/js/whatsapp-respostas-ui.js' || rel === '/precificacao-base.json') && !autenticado) {
     res.writeHead(404, Object.assign({ 'Content-Type': 'text/plain' }, SECURITY_HEADERS));
     res.end('404 Not Found');
     return;

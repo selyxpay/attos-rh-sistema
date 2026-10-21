@@ -93,6 +93,7 @@
     ffWorkflow:           ['fluxo-financeiro', 'configuracoes'],
     ffSigiloLogins:       ['configuracoes'],
     botWhatsapp:          ['bot'],
+    respostasRapidas:     ['whatsapp'],
     ffEmpresas:           ['cadastros-exata', 'fluxo-financeiro'],
     ffTomadores:          ['cadastros-exata', 'fluxo-financeiro'],
     ffClientes:           ['cadastros-exata', 'fluxo-financeiro'],

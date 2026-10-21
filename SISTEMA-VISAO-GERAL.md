@@ -408,6 +408,41 @@ primeiro padrão que casa.
   a **única** parte do sistema que não usa o `state.json`.
 - **WhatsApp QR** — ponte com OpenWA (segundo número, por QR Code).
 
+### 5.3 Mensagens prontas (`js/whatsapp-respostas-ui.js`)
+
+As frases que a equipe repete o dia todo, a um clique, dentro da conversa.
+
+**Onde cada coisa mora, e por quê:**
+
+| O que | Onde | Motivo |
+|---|---|---|
+| Catálogo (título, texto, anexo, ordem) | `state.json`, chave `respostasRapidas` | lista com `id`: usa o contrato de gravação (`upsertIds`/`deleteIds`), a permissão por tela e a Auditoria |
+| Anexo (imagem ou PDF) | `DATA_DIR/bot-midia/` | **fora** de `/uploads/`, que é público (regra 7). Mesma pasta da mídia do bot, e o mesmo cache de `media id` da Meta |
+| Texto final (variáveis trocadas) | servidor, `_waTextoDaPronta` | um lugar só: a prévia que cai na caixa e o envio direto usam a MESMA função |
+
+**Como o atendente usa:** uma fileira de botões acima da caixa de escrever.
+Clicar põe o texto na caixa (para ajustar antes de mandar); o avião ao lado
+manda na hora. Na caixa vazia, a barra `/` abre a lista com busca.
+
+**Janela de 24 horas.** A Meta só aceita mensagem escrita à mão nas 24 horas
+seguintes à última mensagem **recebida**. Fora disso, os botões aparecem
+desligados com o aviso do motivo, e a rota de envio recusa com `409` **antes**
+de chamar a Meta. Na dúvida (banco indisponível, conversa sem nenhuma mensagem
+recebida) a janela conta como **fechada**: tentar enviar fora dela volta como
+erro da Meta e mancha a qualidade do número.
+
+**Mandar mensagem pronta pausa o bot naquele contato** — é atendimento humano,
+igual a responder à mão (`aoAtendenteResponder`).
+
+**Permissão:** é a tela `whatsapp`. As rotas `/api/whatsapp/respostas/` passam
+pelo portão normal (`GET` exige "só ver", `POST` exige "ver e editar") e a chave
+`respostasRapidas` está em `CHAVES_POR_TELA` — sem a tela, o `/api/state`
+devolve o catálogo como estava.
+
+**Testado por:** suíte `respostas` (janela de 24h no banco, catálogo, permissão,
+anexo, prévia) e `respostas-ui` (fileira com a janela fechada, lista do `/`,
+cadastro com HTML no título, celular).
+
 ---
 
 ## 6. Fluxo Financeiro em detalhe
@@ -584,6 +619,8 @@ tipo de erro que volta: se você mexer na área, confira que não reintroduziu.
 | Arquivo anônimo hospedado no domínio | `/api/upload` sem checagem e `/uploads/` servindo `.html` como página |
 | WhatsApp preso em "inicializando" e Conexões vazia | Arquivo `.cjs` novo fora do `COPY` do Dockerfile: o `require` falha e, por estar no mesmo `try` dos módulos essenciais, desliga o canal todo. **Nada havia sumido** |
 | Suíte de tela falhando só na execução completa | Espera por tempo fixo em vez de por condição, com a máquina ocupada |
+| Tela nova aparecendo sempre vazia | Ler o estado por `window.state`: o `state` é declarado com `let` no `js/app.js`, e `let` **não** cria propriedade no `window` — leia pelo nome (`typeof state !== 'undefined'`) |
+| Mensagem velha passando na frente da nova | `ORDER BY` numa data gravada como texto: `"...T10:00"` é maior que `"... 23:00"` (o `T` vem depois do espaço). Ordene por `julianday(...)` |
 
 ---
 
@@ -601,6 +638,7 @@ js/vps-sync.js               sincronização com o servidor (window.RTCloud)
 js/telas.js                  permissão por tela — MESMO arquivo nas duas pontas
 whatsapp-bot.cjs             motor do bot (ordem de decisão, fila, envio)
 js/whatsapp-bot-ui.js        a aba Bot
+js/whatsapp-respostas-ui.js  mensagens prontas (fileira na conversa + cadastro)
 js/security.js               camadas extras de proteção no navegador
 js/data.js                   dados iniciais (NUNCA colocar senha aqui)
 css/                         estilos (style, design-system, por módulo)
@@ -627,18 +665,23 @@ docs/                        deploy no Coolify, WhatsApp, equipamentos
   candidato, equipamento, sigilo, Diária, ids, lista vazia).
 - Layout do WhatsApp no computador (busca roubando metade da lista).
 - Permissão por tela com bloqueio no servidor (seção 4.1).
-- Testes automatizados: há suítes por etapa no diretório de trabalho temporário,
-  cobrindo sincronização com duas sessões, segurança, permissão por tela e
-  varredura das 25 abas no navegador. **Elas não estão no repositório** — é o
-  próximo passo óbvio, ver abaixo.
+- Bot de atendimento no WhatsApp oficial, nascendo desligado (seção 5.2).
+- Mensagens prontas na conversa, com janela de 24 horas respeitada (seção 5.3).
+- Testes automatizados **no repositório**: `node testes/rodar.cjs` sobe um
+  servidor isolado numa porta livre (com pasta de dados descartável) por suíte,
+  e um Chrome sem janela nas suítes de tela. Hoje são 20 suítes, cobrindo
+  sincronização com duas sessões, segurança, permissão por tela, upload por
+  conteúdo, bot, mensagens prontas e varredura das 25 abas no navegador.
+  `node testes/rodar.cjs --lista` mostra todas; `node testes/rodar.cjs <nome>`
+  roda uma.
 
 ### O que falta
 
 Sugestões que **cabem** na arquitetura atual:
 
-1. **Levar os testes para o repositório.** Hoje as suítes vivem fora dele, então
-   ninguém além de quem as escreveu consegue rodar. Uma pasta `testes/` com um
-   `node testes/rodar.cjs` resolveria, sem framework.
+1. **Rodar as suítes no deploy.** Elas já estão no repositório
+   (`node testes/rodar.cjs`), mas ninguém as roda automaticamente: hoje depende
+   de quem está mexendo lembrar.
 2. **Divergência de total no Fluxo Financeiro** hoje é só aviso. Avaliar
    bloquear o envio para aprovação quando a diferença passar de um limite.
 3. **Exclusão some da tela antes do servidor confirmar** em algumas telas.

@@ -762,6 +762,26 @@ const messages = {
     return row ? row.total : 0;
   },
 
+  // Última mensagem que a PESSOA mandou. É ela que abre a janela de 24 horas
+  // da Meta, dentro da qual se pode escrever à mão; depois, só modelo
+  // aprovado. As horas são contadas dentro do SQL de propósito: as datas aqui
+  // são UTC no formato do SQLite, e comparar isso em JavaScript já deu
+  // problema antes (o painel do bot mostrava zero contato "hoje").
+  // A ordenação é por julianday, não pelo texto da data: "2026-10-21T10:00"
+  // é MAIOR que "2026-10-21 23:00" na comparação de texto (o "T" vem depois
+  // do espaço), e aí a mensagem mais velha passaria na frente da mais nova.
+  ultimaRecebida(conversationId) {
+    return getOne(
+      `SELECT created_at,
+              (julianday('now') - julianday(created_at)) * 24.0 AS horas
+         FROM whatsapp_messages
+        WHERE conversation_id = ? AND direction = 'incoming'
+        ORDER BY julianday(created_at) DESC, id DESC
+        LIMIT 1`,
+      [conversationId]
+    );
+  },
+
   updateStatus(wamid, status, errorCode, errorMessage) {
     run(
       "UPDATE whatsapp_messages SET status = ?, error_code = ?, error_message = ?, status_updated_at = datetime('now') WHERE wamid = ?",
