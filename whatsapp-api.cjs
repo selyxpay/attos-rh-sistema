@@ -112,7 +112,10 @@ function downloadFile(url, accessToken, destPath) {
     });
 
     req.on('error', reject);
-    req.setTimeout(60000, () => { req.destroy(); reject(new Error('Timeout no download de mídia.')); });
+    // 25s: tempo de sobra para um arquivo de WhatsApp (limite de 16 MB na
+    // Meta) e curto o bastante para a tentativa seguinte não ficar pendurada.
+    // Com 60s, três tentativas davam três minutos de download preso.
+    req.setTimeout(25000, () => { req.destroy(); reject(new Error('Tempo esgotado no download da mídia.')); });
     req.end();
   });
 }

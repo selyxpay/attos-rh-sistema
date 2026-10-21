@@ -462,6 +462,13 @@ function criarTabelas() {
     'CREATE INDEX IF NOT EXISTS idx_messages_wamid ON whatsapp_messages(wamid)',
     'CREATE INDEX IF NOT EXISTS idx_messages_created ON whatsapp_messages(created_at DESC)',
     'CREATE INDEX IF NOT EXISTS idx_messages_status ON whatsapp_messages(status)',
+    // Compostos, para as duas consultas quentes da tela: a janela de 24h
+    // (última RECEBIDA de uma conversa) e a busca incremental de "o que há de
+    // novo desde a mensagem X". Sem eles, cada abertura de conversa varria a
+    // tabela inteira de mensagens.
+    'CREATE INDEX IF NOT EXISTS idx_messages_conv_dir ON whatsapp_messages(conversation_id, direction)',
+    'CREATE INDEX IF NOT EXISTS idx_messages_conv_id ON whatsapp_messages(conversation_id, id)',
+    'CREATE INDEX IF NOT EXISTS idx_media_message ON whatsapp_media(message_id)',
     'CREATE INDEX IF NOT EXISTS idx_webhook_events_eid ON whatsapp_webhook_events(event_id)',
     'CREATE INDEX IF NOT EXISTS idx_audit_created ON whatsapp_audit_logs(created_at DESC)',
     'CREATE INDEX IF NOT EXISTS idx_audit_user ON whatsapp_audit_logs(user_login)'
@@ -762,6 +769,32 @@ const messages = {
       'SELECT * FROM whatsapp_messages WHERE conversation_id = ? ORDER BY created_at ASC LIMIT ? OFFSET ?',
       [conversationId, limit || 50, offset || 0]
     );
+  },
+
+  // ── ATUALIZAÇÃO INCREMENTAL ─────────────────────────────────────────────
+  // Só o que é NOVO desde a última mensagem que a tela já tem. É o que
+  // permite atualizar a conversa sem redesenhá-la inteira (e sem apagar o que
+  // a pessoa está digitando).
+  listNovas(conversationId, desdeId, limite) {
+    return getAll(
+      `SELECT * FROM whatsapp_messages
+        WHERE conversation_id = ? AND id > ?
+        ORDER BY id ASC LIMIT ?`,
+      [conversationId, Number(desdeId) || 0, limite || 200]
+    );
+  },
+
+  // As ANTERIORES a uma mensagem, para quando a pessoa sobe a rolagem.
+  // Por id, não por deslocamento: com mensagem nova chegando, o deslocamento
+  // escorrega e a tela repetiria ou pularia mensagem.
+  listAntigas(conversationId, antesId, limite) {
+    const linhas = getAll(
+      `SELECT * FROM whatsapp_messages
+        WHERE conversation_id = ? AND id < ?
+        ORDER BY id DESC LIMIT ?`,
+      [conversationId, Number(antesId) || 0, limite || 50]
+    );
+    return linhas.reverse();            // devolve na ordem de leitura
   },
 
   countByConversation(conversationId) {

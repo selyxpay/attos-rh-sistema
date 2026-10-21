@@ -280,13 +280,25 @@ async function testarTentarDeNovo(adm) {
   ok(r1.status === 200 && j1.ok === false, 'tentar de novo responde sem quebrar, com ok=false (' + r1.status + ')');
   ok(/token|conta/i.test(j1.error || ''), 'e explica o motivo: "' + (j1.error || '') + '"');
 
-  // Tentar de novo a CONVERSA inteira.
+  // Tentar de novo a CONVERSA inteira. O CONTRATO E RESPONDER NA HORA (202) e
+  // baixar em segundo plano: segurar a resposta ate o download terminar era o
+  // que fazia o proxy devolver 502 ("Bad Gateway") na tela.
+  const t0 = Date.now();
   const r2 = await fetch(BASE + '/api/whatsapp/conversations/' + conv.id + '/midia-pendente',
     { method: 'POST', headers: { Cookie: adm.cookie } });
   const j2 = await r2.json().catch(function () { return {}; });
-  ok(r2.status === 200 && j2.ok === true, 'a varredura da conversa responde ok (' + r2.status + ')');
-  ok(Number(j2.pendentes) >= 1, 'e diz quantas estavam pendentes (' + j2.pendentes + ')');
-  ok(Number(j2.baixadas) === 0, 'sem token, nenhuma baixou — e ninguem quebrou');
+  const demorou = Date.now() - t0;
+  ok(r2.status === 202 && j2.ok === true, 'a varredura da conversa aceita o pedido (' + r2.status + ')');
+  ok(j2.em_segundo_plano === true, 'e diz que o trabalho vai em segundo plano');
+  ok(Number(j2.pendentes) >= 1, 'dizendo quantas estavam pendentes (' + j2.pendentes + ')');
+  ok(demorou < 2000, 'E RESPONDE RAPIDO, sem esperar download nenhum (' + demorou + 'ms)');
+
+  // Pedir de novo na sequencia nao empilha fila: a resposta continua rapida.
+  const t1 = Date.now();
+  const r2b = await fetch(BASE + '/api/whatsapp/conversations/' + conv.id + '/midia-pendente',
+    { method: 'POST', headers: { Cookie: adm.cookie } });
+  await r2b.json().catch(function () { return {}; });
+  ok(r2b.status === 202 && (Date.now() - t1) < 2000, 'pedir de novo tambem responde na hora (' + (Date.now() - t1) + 'ms)');
 
   // Mensagem que nao existe.
   const r3 = await fetch(BASE + '/api/whatsapp/mensagens/999999/midia',

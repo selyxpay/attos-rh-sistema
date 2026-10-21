@@ -23,17 +23,55 @@ function _waPode(acao) {
 }
 
 // ── Cliente HTTP para o backend (sempre com o cookie de sessão) ──────────────
+// ── CLIENTE HTTP QUE NÃO DERRUBA A TELA ─────────────────────────────────────
+// A tela sumia com 'Unexpected token "B", "Bad Gateway" is not valid JSON':
+// quando o servidor engasgava, o proxy devolvia uma PÁGINA HTML de erro e o
+// `r.json()` estourava. O erro subia e cada chamador trocava a lista pela
+// mensagem de erro.
+// Agora: confere o tipo do conteúdo ANTES de interpretar, nunca estoura, e
+// marca `_rede: true` no que é problema de conexão/servidor — é esse sinal que
+// diz "mantenha o que está na tela e tente de novo", em vez de apagar tudo.
+async function _waBuscar(caminho, opcoes) {
+  let r;
+  try {
+    r = await fetch('/api/whatsapp' + caminho, Object.assign({ credentials: 'same-origin' }, opcoes || {}));
+  } catch (e) {
+    return { ok: false, _rede: true, error: 'sem conexão com o servidor' };
+  }
+  // 502/503/504 são o proxy dizendo que o servidor não respondeu.
+  if (r.status === 502 || r.status === 503 || r.status === 504) {
+    return { ok: false, _rede: true, _status: r.status, error: 'o servidor está ocupado (' + r.status + ')' };
+  }
+  if (r.status === 401) {
+    return { ok: false, _sessao: true, _status: 401, error: 'sessão expirada' };
+  }
+  const tipo = String(r.headers.get('content-type') || '').toLowerCase();
+  if (tipo.indexOf('application/json') < 0) {
+    // Resposta que NÃO é JSON (página de erro do proxy, HTML de login).
+    let amostra = '';
+    try { amostra = (await r.text()).slice(0, 80); } catch (e) {}
+    return {
+      ok: false, _rede: true, _status: r.status,
+      error: 'resposta inesperada do servidor' + (amostra ? ' (' + amostra.replace(/<[^>]*>/g, ' ').trim().slice(0, 40) + ')' : '')
+    };
+  }
+  try {
+    const j = await r.json();
+    if (j && typeof j === 'object') return j;
+    return { ok: false, _rede: true, error: 'resposta vazia do servidor' };
+  } catch (e) {
+    return { ok: false, _rede: true, _status: r.status, error: 'resposta ilegível do servidor' };
+  }
+}
 async function waGet(path) {
-  const r = await fetch('/api/whatsapp' + path, { credentials: 'same-origin' });
-  return r.json();
+  return _waBuscar(path);
 }
 async function waSend(path, method, body) {
-  const r = await fetch('/api/whatsapp' + path, {
-    method: method, credentials: 'same-origin',
+  return _waBuscar(path, {
+    method: method,
     headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined
   });
-  return r.json();
 }
 
 // ── Helpers de UI ────────────────────────────────────────────────────────────
@@ -464,18 +502,83 @@ async function _waCarregarConversas() {
   else if (_waFiltroConv === 'pending') qs += '&status=pending';
   if (_waFiltroConta) qs += '&account_id=' + encodeURIComponent(_waFiltroConta);
   if (_waBuscaConv) qs += '&search=' + encodeURIComponent(_waBuscaConv);
-  let r;
-  try { r = await waGet('/conversations' + qs); }
-  catch (e) { if (_waSubAba === 'inbox') box.innerHTML = _waErro(e.message); return; }
+  const r = await waGet('/conversations' + qs);
   if (_waSubAba !== 'inbox') return;
-  if (!r || !r.ok) { box.innerHTML = _waErro((r && r.error) || 'Erro ao carregar conversas.'); return; }
+
+  // FALHA DE REDE OU DO SERVIDOR: a tela NÃO muda. Fica o que já estava,
+  // aparece a faixa de "reconectando" e tenta de novo sozinho, esperando mais
+  // a cada tentativa. Era aqui que a lista sumia e dava lugar ao erro.
+  if (!r || !r.ok) {
+    if (r && (r._rede || r._sessao)) { _waRedeCaiu(r); return; }
+    // Erro de verdade do servidor (ex.: 403). Só avisa se não há nada na tela.
+    if (!_waConversas.length) box.innerHTML = _waErro((r && r.error) || 'Erro ao carregar conversas.');
+    else _waToast((r && r.error) || 'Não consegui atualizar a lista.', true);
+    return;
+  }
+  _waRedeVoltou();
+
   _waConversas = r.conversations || [];
   _waAtualizarBadge();
   if (!_waConversas.length) {
     box.innerHTML = `<div class="wa-empty" style="padding:32px 16px;"><i class="fa-solid fa-comments"></i><p>${_waBuscaConv || _waFiltroConv ? 'Nenhuma conversa nesse filtro.' : 'Nenhuma conversa ainda. Elas aparecem aqui quando alguém enviar mensagem para o número conectado.'}</p></div>`;
     return;
   }
-  box.innerHTML = _waConversas.map(_waItemConversa).join('');
+  _waPintarLista(box, _waConversas);
+}
+
+// ── LISTA DE CONVERSAS: ATUALIZA O QUE MUDOU, NÃO A LISTA INTEIRA ───────────
+// Trocar o `innerHTML` da lista inteira a cada atualização era o "pisca":
+// a rolagem saltava, a conversa selecionada perdia o destaque por um instante
+// e o hover sumia debaixo do mouse. Agora cada item é comparado por uma
+// ASSINATURA (o que a tela mostra dele) e só é redesenhado se mudou; a ordem é
+// ajustada movendo os elementos que já existem.
+function _waPintarLista(box, conversas) {
+  const existentes = {};
+  Array.from(box.querySelectorAll('.wa-conv-item')).forEach(function (el) {
+    const id = el.getAttribute('data-conv');
+    if (id) existentes[id] = el; else el.remove();      // resto de estado vazio
+  });
+  // Estado vazio/erro que estava na caixa antes.
+  Array.from(box.children).forEach(function (el) {
+    if (!el.classList || !el.classList.contains('wa-conv-item')) el.remove();
+  });
+
+  let anterior = null;
+  conversas.forEach(function (c) {
+    const chave = String(c.id);
+    const assinatura = _waAssinaturaConversa(c);
+    let el = existentes[chave];
+    if (el) {
+      if (el.getAttribute('data-assin') !== assinatura) {
+        el.outerHTML = _waItemConversa(c);
+        el = box.querySelector('.wa-conv-item[data-conv="' + chave + '"]');
+      }
+      delete existentes[chave];
+    } else {
+      box.insertAdjacentHTML('beforeend', _waItemConversa(c));
+      el = box.querySelector('.wa-conv-item[data-conv="' + chave + '"]');
+    }
+    if (!el) return;
+    // Coloca na posição certa SEM redesenhar: mover um nó preserva o
+    // destaque, o hover e a rolagem.
+    const esperado = anterior ? anterior.nextElementSibling : box.firstElementChild;
+    if (esperado !== el) {
+      if (anterior) anterior.insertAdjacentElement('afterend', el);
+      else box.insertAdjacentElement('afterbegin', el);
+    }
+    anterior = el;
+  });
+  // O que saiu do filtro sai da tela.
+  Object.keys(existentes).forEach(function (k) { existentes[k].remove(); });
+}
+
+// Tudo que aparece do item na tela. Se isto não mudou, não há por que
+// redesenhar.
+function _waAssinaturaConversa(c) {
+  return [c.contact_name || c.contact_profile_name || c.contact_phone || '',
+          c.last_message_text || '', c.last_message_type || '', c.last_message_at || '',
+          c.unread_count || 0, c.status || '', c.assigned_to_name || '',
+          c.id === _waConvAberta ? '1' : '0'].join('|');
 }
 
 // ── INDICADORES DA LISTA: SÓ QUANDO DIZEM ALGO ─────────────────────────────
@@ -501,7 +604,7 @@ function _waItemConversa(c) {
   const cor = WA_STATUS_COR[c.status] || '#94a3b8';
   const naoLidas = c.unread_count > 0 ? `<span class="wa-unread">${c.unread_count > 9 ? '9+' : c.unread_count}</span>` : '';
   const marcaNaoLida = c.unread_count > 0 ? ' wa-nao-lida' : '';
-  return `<div class="wa-conv-item ${c.id === _waConvAberta ? 'active' : ''}${marcaNaoLida}" onclick="waAbrirConversa(${c.id})">
+  return `<div class="wa-conv-item ${c.id === _waConvAberta ? 'active' : ''}${marcaNaoLida}" data-conv="${c.id}" data-assin="${_waEsc(_waAssinaturaConversa(c))}" onclick="waAbrirConversa(${c.id})">
     <span class="wa-avatar" style="background:${_waCorAvatar(nome)};">${_waEsc(_waInicial(nome))}</span>
     <div class="wa-conv-meio">
       <div class="wa-conv-topo"><b>${_waEsc(nome)}</b><span class="wa-conv-hora">${_waHora(c.last_message_at)}</span></div>
@@ -521,22 +624,41 @@ function _waHora(iso) {
 
 // ── Abrir uma conversa ───────────────────────────────────────────────────────
 window.waAbrirConversa = async function (id) {
+  const mesmaConversa = (_waConvAberta === id);
   _waConvAberta = id;
   const chat = document.getElementById('wa-col-chat');
   const inbox = document.getElementById('wa-inbox');
   if (inbox) inbox.classList.add('wa-chat-aberto');   // mobile: mostra o chat
-  if (chat) chat.innerHTML = '<div class="wa-loading" style="margin:auto;"><i class="fa-solid fa-spinner fa-spin"></i></div>';
+  // "Carregando" SÓ na primeira vez que esta conversa abre. Reabrir a mesma
+  // (atualização, volta do tempo real) mantém a conversa na tela: era isso que
+  // fazia tudo sumir e voltar, inclusive no meio da digitação.
+  if (chat && !mesmaConversa) {
+    chat.innerHTML = '<div class="wa-loading" style="margin:auto;"><i class="fa-solid fa-spinner fa-spin"></i></div>';
+  }
   document.querySelectorAll('.wa-conv-item').forEach(el => el.classList.remove('active'));
-  let r;
-  try { r = await waGet('/conversations/' + id); } catch (e) { if (chat) chat.innerHTML = _waErro(e.message); return; }
+  const r = await waGet('/conversations/' + id);
   if (_waConvAberta !== id) return;
-  if (!r || !r.ok) { if (chat) chat.innerHTML = _waErro((r && r.error) || 'Erro ao abrir a conversa.'); return; }
+  if (!r || !r.ok) {
+    // Problema de rede/servidor: NÃO apaga nada. Mantém o que está na tela,
+    // mostra a faixa e tenta de novo sozinho.
+    if (r && (r._rede || r._sessao)) {
+      if (chat && !mesmaConversa && !_waMsgsCache.length) {
+        chat.innerHTML = '<div class="wa-chat-vazio"><i class="fa-solid fa-plug-circle-exclamation"></i><p>Sem conexão com o servidor. Tentando de novo…</p></div>';
+      }
+      _waRedeCaiu(r);
+      return;
+    }
+    if (chat && !mesmaConversa) chat.innerHTML = _waErro((r && r.error) || 'Erro ao abrir a conversa.');
+    else _waToast((r && r.error) || 'Não consegui atualizar a conversa.', true);
+    return;
+  }
+  _waRedeVoltou();
   _waConvAbertaObj = r.conversation;
   _waRenderChat(r.conversation, r.messages || []);
   _waRenderInfoConv(r.conversation);
   // zera não-lidas no item da lista
   const cItem = _waConversas.find(c => c.id === id); if (cItem) { cItem.unread_count = 0; }
-  const li = [...document.querySelectorAll('.wa-conv-item')].find(el => el.getAttribute('onclick') === `waAbrirConversa(${id})`);
+  const li = document.querySelector('.wa-conv-item[data-conv="' + id + '"]');
   if (li) li.classList.add('active');
   _waAtualizarBadge();
   // Mídia que ficou sem arquivo (download falhou na hora, servidor reiniciado
@@ -547,23 +669,39 @@ window.waAbrirConversa = async function (id) {
 };
 
 function _waTentarMidiaPendente(convId) {
-  fetch('/api/whatsapp/conversations/' + encodeURIComponent(convId) + '/midia-pendente',
-        { method: 'POST', credentials: 'same-origin' })
-    .then(function (r) { return r.json(); })
+  // O servidor responde na hora (202) e baixa em segundo plano; cada arquivo
+  // que chega avisa pelo tempo real e troca so aquele balao. Sem tempo real,
+  // uma busca incremental alguns segundos depois pega o que baixou.
+  waSend('/conversations/' + convId + '/midia-pendente', 'POST')
     .then(function (j) {
-      // Sem tempo real (aba antiga, SSE caído): redesenha o que baixou.
-      if (j && j.ok && j.baixadas > 0 && _waConvAberta === convId &&
-          (!_waSSE || _waSSE.readyState === 2)) {
-        waAbrirConversa(convId);
-      }
+      if (!j || !j.ok || !j.pendentes) return;
+      if (_waSSE && _waSSE.readyState !== 2) return;      // tempo real cuida
+      setTimeout(function () {
+        if (_waConvAberta === convId) _waRecarregarMidiaDaConversa(convId);
+      }, 6000);
     })
     .catch(function () { /* sem permissão ou sem módulo: a tela segue igual */ });
+}
+
+// Sem tempo real: busca o endereço novo das mídias e troca SÓ os balões que
+// ganharam arquivo. Não redesenha a conversa.
+async function _waRecarregarMidiaDaConversa(convId) {
+  const r = await waGet('/conversations/' + convId + '?limit=50');
+  if (!r || !r.ok || _waConvAberta !== convId) return;
+  (r.messages || []).forEach(function (m) {
+    if (!m.id || !m.media_url) return;
+    const atual = (_waMsgsCache || []).find(function (x) { return Number(x.id) === Number(m.id); });
+    if (atual && !atual.media_url) _waTrocarMidiaNoBalao(m.id, m.media_url);
+  });
 }
 
 function _waRenderChat(conv, msgs) {
   _waMsgsCache = msgs || [];
   const chat = document.getElementById('wa-col-chat');
   if (!chat) return;
+  // Guarda o que esta sendo digitado ANTES de trocar o HTML. Redesenhar o chat
+  // apagava a caixa, o cursor e o foco no meio da frase.
+  const _composer = _waGuardarComposer();
   const nome = conv.contact_name || conv.contact_profile_name || _waFmtTelefone(conv.contact_phone) || 'Sem nome';
   const podeCriar = _waPode('criar'), podeEditar = _waPode('editar');
   const fechada = (conv.status === 'closed' || conv.status === 'archived');
@@ -602,7 +740,12 @@ function _waRenderChat(conv, msgs) {
          ${_waModoNota ? '<div class="wa-nota-aviso"><i class="fa-solid fa-lock"></i> Nota interna: só a equipe vê, o cliente NUNCA recebe.</div>' : ''}
        ` : '<div class="wa-composer-somente">Você não tem permissão para enviar mensagens.</div>'}
      </div>`;
+  _waPresoNoFim = true;
+  _waNaoVistas = 0;
+  _waPinoNovas();
   _waScrollFim();
+  _waLigarRolagem();
+  _waRestaurarComposer(_composer);
   // Preenche o controle do bot no cabecalho (se a aba Bot for permitida).
   if (conv && conv.contact_id && typeof botCarregarControle === 'function') {
     botCarregarControle(conv.contact_id);
@@ -706,6 +849,25 @@ window.waTentarMidia = async function (id) {
   }
 };
 
+// Troca só a marca de entrega (✓, ✓✓) de um balão.
+function _waTrocarStatusNoBalao(d) {
+  const msgs = _waMsgsCache || [];
+  let alvo = null;
+  if (d.message_id) alvo = msgs.find(function (m) { return Number(m.id) === Number(d.message_id); });
+  if (!alvo && d.wamid) alvo = msgs.find(function (m) { return m.wamid === d.wamid; });
+  // Sem identificação, a última que saiu é a que recebeu a confirmação.
+  if (!alvo) {
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].direction === 'outgoing') { alvo = msgs[i]; break; }
+    }
+  }
+  if (!alvo || !d.status) return;
+  alvo.status = d.status;
+  if (!alvo.id) return;
+  const el = document.querySelector('[data-msg="' + alvo.id + '"]');
+  if (el) el.outerHTML = _waBolha(alvo);
+}
+
 // Troca a mídia de um balão no lugar, sem redesenhar a conversa.
 function _waTrocarMidiaNoBalao(id, url) {
   const m = (_waMsgsCache || []).find(function (x) { return Number(x.id) === Number(id); });
@@ -730,6 +892,146 @@ function _waTick(status) {
   return '<i class="fa-regular fa-clock"></i>';
 }
 function _waScrollFim() { const m = document.getElementById('wa-msgs'); if (m) m.scrollTop = m.scrollHeight; }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONVERSA ABERTA: ATUALIZAÇÃO INCREMENTAL E ROLAGEM COMO NO WHATSAPP
+// ══════════════════════════════════════════════════════════════════════════════
+let _waPresoNoFim = true;        // a pessoa está no fim da conversa?
+let _waNaoVistas = 0;            // mensagens que chegaram enquanto ela lia acima
+let _waBuscandoNovas = false;
+let _waBuscandoAntigas = false;
+
+// Está a menos de 80px do fim? Então é "está lendo o que chega agora".
+function _waNoFim(box) {
+  if (!box) return true;
+  return (box.scrollHeight - box.scrollTop - box.clientHeight) < 80;
+}
+
+// Liga a vigilância da rolagem da conversa. Chamado a cada desenho do chat.
+function _waLigarRolagem() {
+  const box = document.getElementById('wa-msgs');
+  if (!box || box._waLigado) return;
+  box._waLigado = true;
+  box.addEventListener('scroll', function () {
+    _waPresoNoFim = _waNoFim(box);
+    if (_waPresoNoFim && _waNaoVistas) { _waNaoVistas = 0; _waPinoNovas(); }
+    // Subiu até o topo: carrega as anteriores sem mexer no que está lendo.
+    if (box.scrollTop < 60) _waCarregarAntigas();
+  }, { passive: true });
+}
+
+// Pino "novas mensagens ↓". Só aparece quando a pessoa subiu para ler.
+function _waPinoNovas() {
+  const chat = document.getElementById('wa-col-chat');
+  if (!chat) return;
+  let p = document.getElementById('wa-pino-novas');
+  if (!_waNaoVistas) { if (p) p.remove(); return; }
+  if (!p) {
+    p = document.createElement('button');
+    p.id = 'wa-pino-novas';
+    p.className = 'wa-pino-novas';
+    p.onclick = function () { _waNaoVistas = 0; _waPresoNoFim = true; _waScrollFim(); _waPinoNovas(); };
+    chat.appendChild(p);
+  }
+  p.innerHTML = '<i class="fa-solid fa-arrow-down"></i> ' +
+    (_waNaoVistas === 1 ? '1 mensagem nova' : _waNaoVistas + ' mensagens novas');
+}
+
+// O maior e o menor id que a tela já tem.
+function _waUltimoId() {
+  let max = 0;
+  (_waMsgsCache || []).forEach(function (m) { if (Number(m.id) > max) max = Number(m.id); });
+  return max;
+}
+function _waPrimeiroId() {
+  let min = 0;
+  (_waMsgsCache || []).forEach(function (m) {
+    const n = Number(m.id);
+    if (n && (!min || n < min)) min = n;
+  });
+  return min;
+}
+
+// Busca SÓ o que chegou depois da última mensagem que a tela tem e acrescenta.
+// Nunca redesenha a conversa: é isto que não deixa o texto digitado se perder.
+async function _waBuscarNovasDaConversa() {
+  if (!_waConvAberta || _waBuscandoNovas) return;
+  const desde = _waUltimoId();
+  if (!desde) return;                      // conversa ainda não carregada
+  _waBuscandoNovas = true;
+  const conv = _waConvAberta;
+  try {
+    const r = await waGet('/conversations/' + conv + '?since=' + desde + '&limit=200');
+    if (conv !== _waConvAberta) return;    // trocou de conversa no meio
+    if (!r || !r.ok) { if (r && (r._rede || r._sessao)) _waRedeCaiu(r); return; }
+    _waRedeVoltou();
+    const novas = r.messages || [];
+    if (!novas.length) return;
+    const jaTem = {};
+    (_waMsgsCache || []).forEach(function (m) { if (m.id) jaTem[m.id] = true; });
+    novas.forEach(function (m) {
+      if (m.id && jaTem[m.id]) return;
+      _waMsgsCache.push(m);
+      _waAppendBolha(m);
+    });
+  } finally {
+    _waBuscandoNovas = false;
+  }
+}
+
+// Rolagem para cima: carrega as ANTERIORES e mantém a posição de leitura.
+async function _waCarregarAntigas() {
+  if (!_waConvAberta || _waBuscandoAntigas) return;
+  const antes = _waPrimeiroId();
+  if (!antes || antes <= 1) return;
+  const box = document.getElementById('wa-msgs');
+  if (!box) return;
+  _waBuscandoAntigas = true;
+  const conv = _waConvAberta;
+  const alturaAntes = box.scrollHeight;
+  const posicaoAntes = box.scrollTop;
+  try {
+    const r = await waGet('/conversations/' + conv + '?antes=' + antes + '&limit=30');
+    if (conv !== _waConvAberta) return;
+    if (!r || !r.ok) { if (r && r._rede) _waRedeCaiu(r); return; }
+    _waRedeVoltou();
+    const antigas = r.messages || [];
+    if (!antigas.length) { box._waAcabou = true; return; }
+    const html = antigas.map(_waBolha).join('');
+    box.insertAdjacentHTML('afterbegin', html);
+    _waMsgsCache = antigas.concat(_waMsgsCache || []);
+    // Mantém EXATAMENTE o que a pessoa estava lendo: o conteúdo cresceu para
+    // cima, então a posição desce o mesmo tanto.
+    box.scrollTop = posicaoAntes + (box.scrollHeight - alturaAntes);
+  } finally {
+    _waBuscandoAntigas = false;
+  }
+}
+
+// ── O QUE ESTÁ SENDO DIGITADO NÃO SE PERDE ──────────────────────────────────
+// Toda vez que o chat é redesenhado (abrir conversa, trocar para nota
+// interna), o texto, a posição do cursor e o foco voltam para onde estavam.
+function _waGuardarComposer() {
+  const c = document.getElementById('wa-msg-input');
+  if (!c) return null;
+  return {
+    texto: c.value || '',
+    ini: c.selectionStart, fim: c.selectionEnd,
+    focado: document.activeElement === c
+  };
+}
+function _waRestaurarComposer(g) {
+  if (!g || !g.texto && !g.focado) return;
+  const c = document.getElementById('wa-msg-input');
+  if (!c) return;
+  if (g.texto) {
+    c.value = g.texto;
+    if (typeof waComposerDigitou === 'function') waComposerDigitou(c);
+  }
+  if (g.focado) {
+    try { c.focus(); c.setSelectionRange(g.ini || 0, g.fim || 0); } catch (e) {}
+  }
+}
 
 window.waVoltarLista = function () { const i = document.getElementById('wa-inbox'); if (i) i.classList.remove('wa-chat-aberto'); _waConvAberta = null; };
 window.waSetModo = function (nota) { _waModoNota = !!nota; if (_waConvAbertaObj) _waRenderChat(_waConvAbertaObj, _waMsgsCache || []); };
@@ -782,7 +1084,28 @@ window.waEnviarMensagem = async function () {
     _waToast((r && r.error) || 'Falha ao enviar. Verifique se o número está conectado à Meta.', true);
   }
 };
-function _waAppendBolha(m) { const box = document.getElementById('wa-msgs'); if (!box) return; const vazio = box.querySelector('.wa-msgs-vazio'); if (vazio) vazio.remove(); box.insertAdjacentHTML('beforeend', _waBolha(m)); _waScrollFim(); }
+// Acrescenta um balão. A ROLAGEM SEGUE A REGRA DO WHATSAPP: se a pessoa está
+// no fim, acompanha a mensagem nova; se subiu para ler, não mexe na rolagem e
+// mostra o pino "novas mensagens ↓". Antes, toda mensagem puxava a tela para
+// baixo e tirava do lugar quem estava lendo o histórico.
+function _waAppendBolha(m) {
+  const box = document.getElementById('wa-msgs');
+  if (!box) return;
+  const vazio = box.querySelector('.wa-msgs-vazio');
+  if (vazio) vazio.remove();
+  const estavaNoFim = _waNoFim(box);
+  box.insertAdjacentHTML('beforeend', _waBolha(m));
+  const minha = m && m.direction === 'outgoing';
+  if (estavaNoFim || minha) {
+    _waPresoNoFim = true;
+    _waNaoVistas = 0;
+    _waPinoNovas();
+    _waScrollFim();
+  } else {
+    _waNaoVistas++;
+    _waPinoNovas();
+  }
+}
 
 window.waAnexarMidia = async function (input) {
   const file = input.files && input.files[0]; input.value = '';
@@ -845,11 +1168,101 @@ function _waRenderInfoConv(conv) {
      </div>`;
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// RECONEXÃO: FAIXA DISCRETA, NUNCA TELA EM BRANCO
+// ──────────────────────────────────────────────────────────────────────────────
+// Quando o servidor engasga (502) ou a rede cai, a tela mantém exatamente o
+// que está mostrando — lista, conversa aberta e o que está sendo digitado — e
+// avisa numa faixa fina. A nova tentativa espera mais a cada vez (1s, 2s, 4s…
+// até 30s), para não martelar um servidor que já está sofrendo.
+let _waTentativa = 0;
+let _waTimerVolta = null;
+let _waOffline = false;
+
+function _waEsperaDaTentativa() {
+  const escada = [1000, 2000, 4000, 8000, 15000, 30000];
+  return escada[Math.min(_waTentativa, escada.length - 1)];
+}
+
+function _waRedeCaiu(resp) {
+  _waOffline = true;
+  const sessao = !!(resp && resp._sessao);
+  _waMostrarFaixa(sessao
+    ? 'Sessão expirada. Recarregue a página para entrar de novo.'
+    : 'Reconectando…', sessao);
+  if (sessao) return;                       // não insiste sem sessão
+  _waTentativa++;
+  clearTimeout(_waTimerVolta);
+  const espera = _waEsperaDaTentativa();
+  _waTimerVolta = setTimeout(function () {
+    _waAtualizarTudoDeLeve();
+  }, espera);
+}
+
+function _waRedeVoltou() {
+  if (!_waOffline && _waTentativa === 0) return;
+  _waOffline = false;
+  _waTentativa = 0;
+  clearTimeout(_waTimerVolta);
+  _waEsconderFaixa();
+}
+
+function _waMostrarFaixa(texto, grave) {
+  let f = document.getElementById('wa-faixa-rede');
+  if (!f) {
+    const inbox = document.getElementById('wa-inbox') || document.getElementById('wa-content');
+    if (!inbox) return;
+    f = document.createElement('div');
+    f.id = 'wa-faixa-rede';
+    f.className = 'wa-faixa-rede';
+    inbox.insertAdjacentElement('afterbegin', f);
+  }
+  f.className = 'wa-faixa-rede' + (grave ? ' grave' : '');
+  f.innerHTML = '<i class="fa-solid ' + (grave ? 'fa-triangle-exclamation' : 'fa-rotate fa-spin') + '"></i> ' + _waEsc(texto);
+  f.style.display = '';
+}
+function _waEsconderFaixa() {
+  const f = document.getElementById('wa-faixa-rede');
+  if (f) f.remove();
+}
+
+// Atualização leve: a lista e só o que é NOVO na conversa aberta. Nunca
+// redesenha a conversa, nunca mostra "carregando".
+async function _waAtualizarTudoDeLeve() {
+  if (_waSubAba !== 'inbox') return;
+  await _waCarregarConversas();
+  if (_waConvAberta) await _waBuscarNovasDaConversa();
+}
+
 // ── SSE (tempo real) ─────────────────────────────────────────────────────────
+// Polling de RESERVA: só roda quando o tempo real está fora. Busca a lista e
+// o que é novo na conversa aberta — nunca redesenha nada inteiro.
+let _waTimerReserva = null;
+function _waLigarReserva() {
+  if (_waTimerReserva) return;
+  _waTimerReserva = setInterval(function () {
+    if (_waSSE && _waSSE.readyState === 1) { _waDesligarReserva(); return; }
+    if (_waSubAba !== 'inbox') return;
+    _waAtualizarTudoDeLeve();
+  }, 8000);
+}
+function _waDesligarReserva() {
+  if (!_waTimerReserva) return;
+  clearInterval(_waTimerReserva);
+  _waTimerReserva = null;
+}
+
 function _waConectarSSE() {
   if (_waSSE && _waSSE.readyState !== 2) return;   // já conectado
   try {
     _waSSE = new EventSource('/api/whatsapp/events');
+    _waSSE.onopen = function () {
+      // Voltou o tempo real: tira a faixa, desliga a reserva e busca o que
+      // perdeu enquanto estava fora (sem redesenhar a conversa).
+      _waRedeVoltou();
+      _waDesligarReserva();
+      _waAtualizarTudoDeLeve();
+    };
     _waSSE.onmessage = function (ev) {
       let d; try { d = JSON.parse(ev.data); } catch (e) { return; }
       if (d.type === 'new_message') {
@@ -869,13 +1282,28 @@ function _waConectarSSE() {
           _waTrocarMidiaNoBalao(d.message_id, d.media_url);
         }
       } else if (d.type === 'message_status') {
-        if (d.conversation_id === _waConvAberta && _waSubAba === 'inbox') waAbrirConversa(_waConvAberta);
+        // Só a MARCA de entrega muda. Antes isto reabria a conversa inteira a
+        // cada confirmação da Meta — era a maior fonte do "pisca", e apagava o
+        // que estava sendo digitado.
+        if (d.conversation_id === _waConvAberta) _waTrocarStatusNoBalao(d);
       } else if (d.type === 'conversation_updated') {
         if (_waSubAba === 'inbox') _waCarregarConversas();
       }
     };
-    _waSSE.onerror = function () { /* EventSource reconecta sozinho */ };
-  } catch (e) { /* navegador sem SSE: cai no polling manual (botão atualizar) */ }
+    _waSSE.onerror = function () {
+      // O EventSource reconecta sozinho, mas pode demorar. Enquanto isso, a
+      // reserva mantém a tela viva e a faixa avisa — sem apagar nada.
+      if (_waSSE && _waSSE.readyState === 2) {
+        _waMostrarFaixa('Reconectando…');
+        _waLigarReserva();
+        clearTimeout(_waTimerVolta);
+        _waTimerVolta = setTimeout(function () { _waSSE = null; _waConectarSSE(); }, 5000);
+      }
+    };
+  } catch (e) {
+    // Navegador sem tempo real: a reserva assume.
+    _waLigarReserva();
+  }
 }
 
 // ── Badge de não-lidas no menu lateral ───────────────────────────────────────

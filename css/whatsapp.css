@@ -907,3 +907,35 @@ body.wa-tela-cheia { overflow: hidden; }
   display: inline-flex; align-items: center; gap: 5px; font-weight: 600;
   border: 1px solid var(--border-color, #cbd5e1); border-radius: 9999px; padding: 3px 10px;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TELA ESTÁVEL: faixa de reconexão e pino de mensagem nova
+   A faixa é FINA e discreta de propósito — ela substitui a tela de erro que
+   apagava a lista inteira quando o servidor engasgava.
+   ══════════════════════════════════════════════════════════════════════════ */
+.wa-faixa-rede {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 30;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: rgba(234,179,8,.95); color: #422006;
+  font-size: 11.5px; font-weight: 600; padding: 4px 10px;
+  box-shadow: 0 1px 4px rgba(11,20,26,.18);
+}
+.wa-faixa-rede.grave { background: rgba(239,68,68,.95); color: #fff; }
+
+.wa-pino-novas {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: 96px; z-index: 25;
+  display: inline-flex; align-items: center; gap: 7px;
+  border: none; border-radius: 9999px; cursor: pointer; font-family: inherit;
+  background: var(--wa-verde-escuro, #047857); color: #fff;
+  font-size: 12px; font-weight: 700; padding: 7px 14px;
+  box-shadow: 0 3px 10px rgba(11,20,26,.25);
+}
+.wa-pino-novas:hover { filter: brightness(1.08); }
+@media (max-width: 760px) { .wa-pino-novas { bottom: 110px; } }
+
+/* A faixa de reconexao e o pino de mensagem nova sao posicionados: precisam
+   de uma ancora. Fica aqui, no fim, para nao mexer nos blocos de layout que
+   ja foram ajustados com cuidado. */
+.wa-inbox { position: relative; }
+.wa-col-chat { position: relative; }

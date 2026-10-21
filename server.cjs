@@ -304,7 +304,13 @@ function limparArquivosOrfaos() {
     }
   });
 }
-limparArquivosOrfaos();
+// FORA DO CAMINHO DA SUBIDA: varrer a pasta de uploads e' trabalho de disco e
+// nao tem nada de urgente. Rodando antes do `listen`, atrasava o momento em
+// que a porta comeca a responder — e o healthcheck do Coolify derruba o
+// container quando o /api/time nao responde em 5 segundos.
+setTimeout(function () {
+  try { limparArquivosOrfaos(); } catch (e) { console.error('[Limpeza]', e.message); }
+}, 2000);
 
 // Rede de proteção dos dados críticos (Entrega/Devolução de Equipamentos).
 // Módulo isolado: se ele falhar, o sistema continua salvando normalmente.
@@ -470,13 +476,67 @@ function mesclarFila(servidor, local) {
 // ==========================================================================
 // ESTADO em arquivo (com trava simples para não corromper em gravações juntas)
 // ==========================================================================
+// ── LEITURA DO ESTADO, COM CÓPIA NA MEMÓRIA ────────────────────────────────
+// ISTO ERA A CAUSA DO "Bad Gateway" (502) INTERMITENTE.
+// `lerEstado()` lia e interpretava o state.json INTEIRO, de forma SÍNCRONA, a
+// cada chamada — e o portão de permissão chama duas vezes por requisição da
+// API (uma em permitirRota, outra em waUsuarioTemPermissao). Com o arquivo em
+// 16 MB, cada chamada era ~100-300 ms de CPU travada e dezenas de MB de lixo
+// para o coletor. Três pessoas atendendo, com a tela consultando a cada poucos
+// segundos, bastavam para o Node parar de responder: o proxy devolvia 502 e o
+// healthcheck derrubava o container.
+//
+// Agora o conteúdo fica na memória e só é lido do disco quando o ARQUIVO muda
+// (data de modificação + tamanho). Quem grava passa por `gravarEstado`, que
+// atualiza a cópia na hora, e qualquer escrita de fora (script de restauração,
+// outra ferramenta) também é percebida.
+//
+// ATENÇÃO, REGRA NOVA: o objeto devolvido é COMPARTILHADO. Quem vai MUDAR o
+// estado para gravar deve usar `lerEstadoParaGravar()`, que devolve cópia
+// própria. Mudar o que vem de `lerEstado()` sem gravar envenena a memória de
+// todas as próximas requisições.
+// Quando o processo subiu e quanto o event loop está atrasado. Os dois saem no
+// /api/saude: é o que permite ver de fora se o container reiniciou e se o Node
+// está travando (o 502 do proxy é o sintoma disso).
+const _SUBIU_EM = Date.now();
+let _lagEventLoop = 0;
+(function medirLag() {
+  const alvo = 500;
+  const t0 = Date.now();
+  const t = setTimeout(function () {
+    _lagEventLoop = Math.max(0, Date.now() - t0 - alvo);
+    medirLag();
+  }, alvo);
+  if (t.unref) t.unref();                 // nunca segura o processo de pé
+})();
+
+let _estadoMem = null;        // { chave, valor }
+function _chaveDoEstado() {
+  try {
+    const st = fs.statSync(STATE_FILE);
+    return String(st.mtimeMs) + ':' + String(st.size);
+  } catch (e) { return ''; }
+}
 function lerEstado() {
+  const chave = _chaveDoEstado();
+  if (chave && _estadoMem && _estadoMem.chave === chave) return _estadoMem.valor;
   try {
     const j = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-    return { dados: j.dados || null, version: j.version || 0, atualizadoEm: j.atualizadoEm || 0 };
+    const valor = { dados: j.dados || null, version: j.version || 0, atualizadoEm: j.atualizadoEm || 0 };
+    if (chave) _estadoMem = { chave: chave, valor: valor };
+    return valor;
   } catch (e) {
+    _estadoMem = null;
     return { dados: null, version: 0, atualizadoEm: 0 };
   }
+}
+// Cópia própria, para quem vai alterar e gravar.
+function lerEstadoParaGravar() {
+  const s = lerEstado();
+  return {
+    dados: s.dados ? JSON.parse(JSON.stringify(s.dados)) : null,
+    version: s.version, atualizadoEm: s.atualizadoEm
+  };
 }
 // Versão atual guardada na memória, para responder /api/state/version sem
 // precisar ler e interpretar o state.json inteiro a cada consulta.
@@ -1043,7 +1103,7 @@ function diariaSalvarDocumento(trabalhadorId, campo, dataUrl) {
 
 function migrarDiariaFase2() {
   comTrava(function () {
-    const st = lerEstado();
+    const st = lerEstadoParaGravar();
     const d = st.dados || {};
     let mudou = false;
     if (Array.isArray(d.diarias)) {
@@ -1093,7 +1153,7 @@ function garantirCadastrosFinanceiro() {
       return;   // sem arquivo base: nada a fazer (não é erro)
     }
 
-    const st = lerEstado();
+    const st = lerEstadoParaGravar();
     const d = st.dados || {};
     let mudou = false;
 
@@ -1166,7 +1226,7 @@ function garantirCadastrosFinanceiro() {
 // Nunca sobrescreve um admin já existente (preserva a senha atual).
 function garantirAdminServidor() {
   comTrava(function () {
-    const st = lerEstado();
+    const st = lerEstadoParaGravar();
     let d = st.dados || {};
     let mudou = false;
 
@@ -1420,11 +1480,16 @@ function _reporCamposDeAcesso(dados, antes, requester) {
   return dados;
 }
 // Funcionário dono da sessão da requisição
+// Devolve uma COPIA RASA do funcionario. O estado agora fica na memoria e e
+// compartilhado: entregar o objeto de dentro dele deixaria qualquer rota mudar
+// o cadastro sem querer, e a mudanca valeria para todas as requisicoes
+// seguintes sem nunca ser gravada.
 function usuarioDaReq(req) {
   const s = sessaoValida(tokenDaReq(req));
   if (!s) return null;
   const st = lerEstado();
-  return ((st.dados && st.dados.funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === s.login; }) || null;
+  const f = ((st.dados && st.dados.funcionarios) || []).find(function (x) { return (x.login || '').toLowerCase() === s.login; });
+  return f ? Object.assign({}, f) : null;
 }
 // Visibilidade da SENHA VISÍVEL: mestre vê todas; representante vê só do próprio
 // departamento; os demais não veem nenhuma. (Aplicado no servidor, não dá pra burlar.)
@@ -1457,9 +1522,15 @@ function limparPedidos() {
   pedidos = pedidos.filter(function (p) { return (agora - (p.criadoEm || 0)) < TTL_PEDIDO; });
 }
 
+// NÃO altera o que recebe: devolve uma cópia rasa com a lista de funcionários
+// já filtrada. Antes isto fazia `dados.funcionarios = ...` no próprio objeto —
+// inofensivo quando cada requisição relia o arquivo, mas veneno agora que o
+// estado fica na memória: apagava a senha da cópia compartilhada e o login
+// seguinte não encontrava mais o hash.
 function filtrarSenhaVisivel(dados) {
   if (!dados || !Array.isArray(dados.funcionarios)) return dados;
-  dados.funcionarios = dados.funcionarios.map(function (f) {
+  const saida = Object.assign({}, dados);
+  saida.funcionarios = dados.funcionarios.map(function (f) {
     if (!f) return f;
     const c = Object.assign({}, f);
     // A senha em si NUNCA sai junto com o estado — só pelo /api/ver-senha (que audita).
@@ -1477,7 +1548,7 @@ function filtrarSenhaVisivel(dados) {
     delete c.senha;
     return c;
   });
-  return dados;
+  return saida;
 }
 
 // ==========================================================================
@@ -1632,8 +1703,9 @@ function waUsuarioTemPermissao(req, acao) {
   var s = sessaoValida(tokenDaReq(req));
   if (!s) return null;
   var st = lerEstado();
-  var u = ((st.dados && st.dados.funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === s.login; });
-  if (!u) return null;
+  var _f = ((st.dados && st.dados.funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === s.login; });
+  if (!_f) return null;
+  var u = Object.assign({}, _f);               // copia: ver usuarioDaReq
   if (ehMestreLogin(u.login)) return u;
   if (u.departamento === 'administracao') return u;
   if (u.permissoes && u.permissoes.whatsapp && u.permissoes.whatsapp[acao] === true) return u;
@@ -1663,11 +1735,16 @@ function waUsuarioLogado(req) {
   var s = sessaoValida(tokenDaReq(req));
   if (!s) return null;
   var st = lerEstado();
-  return ((st.dados && st.dados.funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === s.login; }) || null;
+  var f = ((st.dados && st.dados.funcionarios) || []).find(function (x) { return (x.login || '').toLowerCase() === s.login; });
+  return f ? Object.assign({}, f) : null;      // copia: ver usuarioDaReq
 }
 function waIpDaReq(req) {
   return String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
 }
+
+// Conversas com varredura de mídia em andamento. Evita que cada abertura de
+// conversa empilhe uma fila nova de downloads para os mesmos arquivos.
+var _waVarrendoMidia = {};
 
 // ── JANELA DE 24 HORAS ─────────────────────────────────────────────────────
 // A Meta só aceita mensagem escrita à mão nas 24 horas seguintes à ÚLTIMA
@@ -1814,7 +1891,7 @@ http.createServer(function (req, res) {
       const senha = String((body && body.senha) || '');
       if (!login) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
       if (!podeTentarLogin(login)) { responderJson(res, 429, { ok: false, motivo: 'bloqueado' }); return; }
-      const st = lerEstado();
+      const st = lerEstadoParaGravar();
       const u = ((st.dados && st.dados.funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === login; });
       if (!u || !senhaConfere(senha, u.senha)) { registrarFalhaLogin(login); responderJson(res, 401, { ok: false, motivo: 'credenciais' }); return; }
       // Contas MESTRE (joaobalaf/admin) NUNCA são bloqueadas por status — sempre entram para administrar.
@@ -1830,7 +1907,7 @@ http.createServer(function (req, res) {
       // o admin conseguir consultar depois. A pessoa NÃO precisa trocar de senha.
       if (!u.senhaVisivel) {
         comTrava(function () {
-          const st2 = lerEstado();
+          const st2 = lerEstadoParaGravar();
           const d2 = st2.dados || {};
           const alvo = (d2.funcionarios || []).find(function (f) { return (f.login || '').toLowerCase() === login; });
           if (alvo && !alvo.senhaVisivel) {
@@ -1868,7 +1945,7 @@ http.createServer(function (req, res) {
   if (urlPath === '/api/me' && req.method === 'GET') {
     const s = sessaoValida(tokenDaReq(req));
     if (!s) { responderJson(res, 401, { ok: false }); return; }
-    const st = lerEstado();
+    const st = lerEstadoParaGravar();
     const u = ((st.dados && st.dados.funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === s.login; });
     if (!u) { responderJson(res, 401, { ok: false }); return; }
     const semSenha = Object.assign({}, u); delete semSenha.senha;
@@ -1889,7 +1966,7 @@ http.createServer(function (req, res) {
       if (!atual || nova.length < 6) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
 
       comTrava(function () {
-        const st = lerEstado(); const d = st.dados || {};
+        const st = lerEstadoParaGravar(); const d = st.dados || {};
         const u = (d.funcionarios || []).find(function (f) {
           return (f.login || '').toLowerCase() === (requester.login || '').toLowerCase();
         });
@@ -1927,7 +2004,7 @@ http.createServer(function (req, res) {
       if (err) { responderJson(res, 400, { ok: false }); return; }
       const nomeExibicao = String((body && body.nomeExibicao) || '').trim().slice(0, 60);
       comTrava(function () {
-        const st = lerEstado(); const d = st.dados || {};
+        const st = lerEstadoParaGravar(); const d = st.dados || {};
         const u = (d.funcionarios || []).find(function (f) {
           return (f.login || '').toLowerCase() === (requester.login || '').toLowerCase();
         });
@@ -1950,7 +2027,7 @@ http.createServer(function (req, res) {
 
       limparPedidos();
       const token = crypto.randomBytes(24).toString('hex');
-      const st = lerEstado();
+      const st = lerEstadoParaGravar();
       const u = (((st.dados || {}).funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === login; });
 
       // Contas MESTRE não usam este fluxo (são justamente quem aprova).
@@ -2004,7 +2081,7 @@ http.createServer(function (req, res) {
       salvarPedidos();
 
       comTrava(function () {
-        const st = lerEstado(); const d = st.dados || {};
+        const st = lerEstadoParaGravar(); const d = st.dados || {};
         if (!Array.isArray(d.logs)) d.logs = [];
         d.logs.unshift({
           id: 'log-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
@@ -2051,7 +2128,7 @@ http.createServer(function (req, res) {
       if (p.status !== 'aprovada') { responderJson(res, 403, { ok: false, motivo: 'nao_aprovada' }); return; }
 
       comTrava(function () {
-        const st = lerEstado(); const d = st.dados || {};
+        const st = lerEstadoParaGravar(); const d = st.dados || {};
         const u = ((d.funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === p.login; });
         if (!u) { responderJson(res, 404, { ok: false }); return; }
 
@@ -2092,7 +2169,7 @@ http.createServer(function (req, res) {
       if (!nome || !login || senha.length < 6) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
       if (depto === 'clinica' && !instituicao) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
       comTrava(function () {
-        const st = lerEstado();
+        const st = lerEstadoParaGravar();
         const d = st.dados || {};
         if (!Array.isArray(d.funcionarios)) d.funcionarios = [];
         if (d.funcionarios.some(function (f) { return (f.login || '').toLowerCase() === login; })) { responderJson(res, 409, { ok: false, motivo: 'login_existe' }); return; }
@@ -2123,7 +2200,7 @@ http.createServer(function (req, res) {
       const nova = String((body && body.novaSenha) || '');
       if (!funcId || nova.length < 4) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
       comTrava(function () {
-        const st = lerEstado(); const d = st.dados || {};
+        const st = lerEstadoParaGravar(); const d = st.dados || {};
         const alvo = (d.funcionarios || []).find(function (f) { return f.id === funcId; });
         if (!alvo) { responderJson(res, 404, { ok: false }); return; }
         if (!podeVerSenhaDe(requester, alvo)) { responderJson(res, 403, { ok: false, motivo: 'sem_permissao' }); return; }
@@ -2145,7 +2222,7 @@ http.createServer(function (req, res) {
       if (err) { responderJson(res, 400, { ok: false }); return; }
       const funcId = String((body && body.funcId) || '');
       comTrava(function () {
-        const st = lerEstado(); const d = st.dados || {};
+        const st = lerEstadoParaGravar(); const d = st.dados || {};
         const alvo = (d.funcionarios || []).find(function (f) { return f.id === funcId; });
         if (!alvo) { responderJson(res, 404, { ok: false }); return; }
         if (!podeVerSenhaDe(requester, alvo)) { responderJson(res, 403, { ok: false, motivo: 'sem_permissao' }); return; }
@@ -2215,9 +2292,24 @@ http.createServer(function (req, res) {
   // nome de conta, nenhum caminho de arquivo: nada que ajude quem não deveria
   // estar olhando.
   if (urlPath === '/api/saude' && req.method === 'GET') {
+    // DIAGNÓSTICO DE FORA, SEM LOGIN. Era impossível saber, de fora, se o
+    // container estava reiniciando: "uptime" perto de zero em duas consultas
+    // seguidas é reinício; "lag_ms" alto é event loop travado (que é o que o
+    // proxy vê como 502); "rss_mb" subindo sem parar é vazamento ou arquivo
+    // grande sendo lido a cada requisição.
+    var _mem = process.memoryUsage();
+    var _estadoMb = 0;
+    try { _estadoMb = Math.round(fs.statSync(STATE_FILE).size / 1048576 * 10) / 10; } catch (e) {}
     responderJson(res, 200, {
       ok: true,
       epoch: Date.now(),
+      subiu_em: new Date(_SUBIU_EM).toISOString(),
+      uptime_s: Math.round(process.uptime()),
+      rss_mb: Math.round(_mem.rss / 1048576),
+      heap_mb: Math.round(_mem.heapUsed / 1048576),
+      lag_ms: _lagEventLoop,
+      estado_mb: _estadoMb,
+      estado_na_memoria: !!_estadoMem,
       whatsapp: {
         modulos_carregados: !!_waCarregado,   // os require funcionaram
         banco_pronto: !!_waReady              // o SQLite abriu
@@ -2274,7 +2366,7 @@ http.createServer(function (req, res) {
       if (nome.length < 2) { responderJson(res, 400, { error: 'Informe seu nome.' }); return; }
 
       comTrava(function () {
-        const st = lerEstado();
+        const st = lerEstadoParaGravar();
         const d = st.dados || {};
         const lista = Array.isArray(d.relatoriosEquip) ? d.relatoriosEquip : [];
         const rel = lista.find(function (r) { return r && r.token === token; });
@@ -2450,7 +2542,7 @@ http.createServer(function (req, res) {
       if (!b.rgFrente || !b.rgVerso || !b.comprovante) { responderJson(res, 400, { error: 'Envie as três imagens: RG frente, RG verso e comprovante de residência.' }); return; }
 
       comTrava(function () {
-        const st = lerEstado();
+        const st = lerEstadoParaGravar();
         const d = st.dados || {};
         if (!Array.isArray(d.trabalhadoresDiaria)) d.trabalhadoresDiaria = [];
         if (d.trabalhadoresDiaria.some(function (x) { return x && diariaNormalizarTelefone(x.telefone) === telefone; })) {
@@ -2510,7 +2602,7 @@ http.createServer(function (req, res) {
     const qs = new URLSearchParams(qIdx >= 0 ? req.url.slice(qIdx + 1) : '');
     const token = String(qs.get('token') || '').trim();
     if (!token || token.length < 20) { responderJson(res, 404, { error: 'Não encontrado.' }); return; }
-    const st = lerEstado();
+    const st = lerEstadoParaGravar();
     const d = st.dados || {};
     const t = (d.trabalhadoresDiaria || []).find(function (x) { return Array.isArray(x.tokens) && x.tokens.indexOf(token) >= 0; });
     if (!t) { responderJson(res, 404, { error: 'Cadastro não encontrado.' }); return; }
@@ -2536,7 +2628,7 @@ http.createServer(function (req, res) {
         return;
       }
       comTrava(function () {
-        const st = lerEstado();
+        const st = lerEstadoParaGravar();
         const d = st.dados || {};
         // Normaliza também o telefone já salvo: cadastros antigos podem ter
         // ficado gravados com +55 na frente (era antes desse ajuste).
@@ -2579,7 +2671,7 @@ http.createServer(function (req, res) {
       const token = String((body && body.token) || '').trim();
       if (!token || token.length < 20) { responderJson(res, 404, { error: 'Não encontrado.' }); return; }
       comTrava(function () {
-        const st = lerEstado();
+        const st = lerEstadoParaGravar();
         const d = st.dados || {};
         const t = (d.trabalhadoresDiaria || []).find(function (x) { return Array.isArray(x.tokens) && x.tokens.indexOf(token) >= 0; });
         if (!t) { responderJson(res, 404, { error: 'Cadastro não encontrado.' }); return; }
@@ -2626,7 +2718,7 @@ http.createServer(function (req, res) {
     // ---- Pausar/retomar cadastros novos (não mexe em quem já tem conta) ----
     if (urlPath === '/api/diaria/admin/cadastros/pausar' && req.method === 'POST') {
       comTrava(function () {
-        const st = lerEstado();
+        const st = lerEstadoParaGravar();
         const d = st.dados || {};
         if (!d.diariaConfig) d.diariaConfig = {};
         d.diariaConfig.cadastrosAbertos = false;
@@ -2639,7 +2731,7 @@ http.createServer(function (req, res) {
     }
     if (urlPath === '/api/diaria/admin/cadastros/retomar' && req.method === 'POST') {
       comTrava(function () {
-        const st = lerEstado();
+        const st = lerEstadoParaGravar();
         const d = st.dados || {};
         if (!d.diariaConfig) d.diariaConfig = {};
         d.diariaConfig.cadastrosAbertos = true;
@@ -2719,7 +2811,7 @@ http.createServer(function (req, res) {
         if (!diariaPixValida(pixTipo, pixChave)) { responderJson(res, 400, { error: 'Chave Pix inválida pro tipo escolhido.' }); return; }
 
         comTrava(function () {
-          const st = lerEstado();
+          const st = lerEstadoParaGravar();
           const d = st.dados || {};
           const t = (d.trabalhadoresDiaria || []).find(function (x) { return x.id === alvoId; });
           if (!t) { responderJson(res, 404, { error: 'Trabalhador não encontrado.' }); return; }
@@ -2756,7 +2848,7 @@ http.createServer(function (req, res) {
         if (!CAMPOS_VALIDOS[campo]) { responderJson(res, 400, { error: 'Campo de documento inválido.' }); return; }
         if (!b.arquivo) { responderJson(res, 400, { error: 'Envie o novo arquivo.' }); return; }
         comTrava(function () {
-          const st = lerEstado();
+          const st = lerEstadoParaGravar();
           const d = st.dados || {};
           const t = (d.trabalhadoresDiaria || []).find(function (x) { return x.id === alvoId; });
           if (!t) { responderJson(res, 404, { error: 'Trabalhador não encontrado.' }); return; }
@@ -2787,7 +2879,7 @@ http.createServer(function (req, res) {
       const qIdx = req.url.indexOf('?');
       const qs = new URLSearchParams(qIdx >= 0 ? req.url.slice(qIdx + 1) : '');
       const filtroStatus = qs.get('status') || '';
-      const st = lerEstado();
+      const st = lerEstadoParaGravar();
       const d = st.dados || {};
       let lista = Array.isArray(d.trabalhadoresDiaria) ? d.trabalhadoresDiaria.slice() : [];
       if (filtroStatus) lista = lista.filter(function (t) { return t.status === filtroStatus; });
@@ -2805,7 +2897,7 @@ http.createServer(function (req, res) {
         if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
         const observacao = String((body && body.observacao) || '').trim().slice(0, 500);
         comTrava(function () {
-          const st = lerEstado();
+          const st = lerEstadoParaGravar();
           const d = st.dados || {};
           const t = (d.trabalhadoresDiaria || []).find(function (x) { return x.id === alvoId; });
           if (!t) { responderJson(res, 404, { error: 'Trabalhador não encontrado.' }); return; }
@@ -2831,7 +2923,7 @@ http.createServer(function (req, res) {
       const alvoId = decodeSeguro(m[1]);
       if (alvoId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
       comTrava(function () {
-        const st = lerEstado();
+        const st = lerEstadoParaGravar();
         const d = st.dados || {};
         const idx = (d.trabalhadoresDiaria || []).findIndex(function (x) { return x.id === alvoId; });
         if (idx < 0) { responderJson(res, 404, { error: 'Trabalhador não encontrado.' }); return; }
@@ -2846,7 +2938,7 @@ http.createServer(function (req, res) {
     }
 
     if (urlPath === '/api/diaria/admin/diarias' && req.method === 'GET') {
-      const st = lerEstado();
+      const st = lerEstadoParaGravar();
       const d = st.dados || {};
       const lista = (Array.isArray(d.diarias) ? d.diarias : []).slice()
         .sort(function (a, b) { return (b.criadaEm || '').localeCompare(a.criadaEm || ''); });
@@ -2862,7 +2954,7 @@ http.createServer(function (req, res) {
         if (!titulo) { responderJson(res, 400, { error: 'Dê um título pra diária.' }); return; }
         if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) { responderJson(res, 400, { error: 'Data inválida.' }); return; }
         comTrava(function () {
-          const st = lerEstado();
+          const st = lerEstadoParaGravar();
           const d = st.dados || {};
           if (!Array.isArray(d.diarias)) d.diarias = [];
           const nova = {
@@ -2888,7 +2980,7 @@ http.createServer(function (req, res) {
       if (diariaId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
       const acao = m[2];
       comTrava(function () {
-        const st = lerEstado();
+        const st = lerEstadoParaGravar();
         const d = st.dados || {};
         const diaria = (d.diarias || []).find(function (x) { return x.id === diariaId; });
         if (!diaria) { responderJson(res, 404, { error: 'Diária não encontrada.' }); return; }
@@ -2921,7 +3013,7 @@ http.createServer(function (req, res) {
     if (m && req.method === 'GET') {
       const diariaId = decodeSeguro(m[1]);
       if (diariaId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
-      const st = lerEstado();
+      const st = lerEstadoParaGravar();
       const d = st.dados || {};
       const trabs = {};
       (d.trabalhadoresDiaria || []).forEach(function (t) { trabs[t.id] = t; });
@@ -2945,7 +3037,7 @@ http.createServer(function (req, res) {
       if (presId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
       const acao = m[2];
       comTrava(function () {
-        const st = lerEstado();
+        const st = lerEstadoParaGravar();
         const d = st.dados || {};
         const p = (d.presencasDiaria || []).find(function (x) { return x.id === presId; });
         if (!p) { responderJson(res, 404, { error: 'Presença não encontrada.' }); return; }
@@ -2993,7 +3085,7 @@ http.createServer(function (req, res) {
     lerCorpo(req, function (err, body) {
       if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
       comTrava(function () {
-        const atual = lerEstado();
+        const atual = lerEstadoParaGravar();
         let dados;
         if (autenticado) {
           // Staff logado: comportamento normal (merge ou substituição total)
@@ -3520,24 +3612,27 @@ http.createServer(function (req, res) {
       }
       var pendentes = [];
       try { pendentes = waDb.messages.pendentesDeMidia(convWc.id, 10) || []; } catch (e) { pendentes = []; }
-      if (!pendentes.length) { responderJson(res, 200, { ok: true, baixadas: 0, pendentes: 0 }); return; }
+      // RESPONDE NA HORA. O download é trabalho de rede que pode levar dezenas
+      // de segundos; segurar a resposta até terminar era pedir 502 do proxy
+      // (foi exatamente o que apareceu como 'Bad Gateway' na tela). Cada
+      // arquivo que chega avisa a tela pelo tempo real.
+      responderJson(res, 202, { ok: true, pendentes: pendentes.length, em_segundo_plano: true });
+      if (!pendentes.length) return;
+      if (_waVarrendoMidia[convWc.id]) return;        // já tem uma varredura desta conversa
+      _waVarrendoMidia[convWc.id] = true;
       var contaWc = null;
       try { contaWc = waDb.accounts.getById(convWc.account_id); } catch (e) { contaWc = null; }
       // Uma por vez, em fila: dez downloads simultâneos tomariam limite da
       // Meta e atrapalhariam o envio de mensagem, que é mais importante.
-      var baixadas = 0;
       var proxima = function (i) {
-        if (i >= pendentes.length) {
-          responderJson(res, 200, { ok: true, baixadas: baixadas, pendentes: pendentes.length });
-          return;
-        }
+        if (i >= pendentes.length) { delete _waVarrendoMidia[convWc.id]; return; }
         var m = pendentes[i];
         m.conversation_id = convWc.id;
         waWebhook.baixarMidiaDaMensagem(waDb, waApi, contaWc, m, notifySSEClients)
-          .then(function (r) { if (r && r.ok) baixadas++; proxima(i + 1); })
-          .catch(function () { proxima(i + 1); });
+          .then(function () { setImmediate(function () { proxima(i + 1); }); })
+          .catch(function () { setImmediate(function () { proxima(i + 1); }); });
       };
-      proxima(0);
+      setImmediate(function () { proxima(0); });
       return;
     }
 
@@ -4049,11 +4144,30 @@ http.createServer(function (req, res) {
       var query = req.url.indexOf('?') >= 0 ? req.url.slice(req.url.indexOf('?') + 1) : '';
       var qp = queryParaMapa(query);
       if (qp === null) { responderJson(res, 400, { error: 'parâmetros inválidos' }); return; }
-      var msgs = waDb.messages.listByConversation(convId, parseInt(qp.limit) || 50, parseInt(qp.offset) || 0);
-      var totalMsgs = waDb.messages.countByConversation(convId);
-      // Marca como lido ao abrir
-      waDb.conversations.resetUnread(convId);
-      responderJson(res, 200, { ok: true, conversation: conv, messages: msgs, total_messages: totalMsgs });
+      // ATUALIZAÇÃO INCREMENTAL (tela estável):
+      //   ?since=<id>  -> só as mensagens novas depois dessa (a tela não
+      //                   redesenha nada do que já está na conversa)
+      //   ?antes=<id>  -> as anteriores a essa (rolagem para cima)
+      // Sem nenhum dos dois, é a abertura normal da conversa.
+      var msgs, totalMsgs = 0, parcial = false;
+      if (qp.since !== undefined && qp.since !== '') {
+        msgs = waDb.messages.listNovas(convId, parseInt(qp.since) || 0, parseInt(qp.limit) || 200);
+        parcial = true;
+      } else if (qp.antes !== undefined && qp.antes !== '') {
+        msgs = waDb.messages.listAntigas(convId, parseInt(qp.antes) || 0, parseInt(qp.limit) || 50);
+        parcial = true;
+      } else {
+        msgs = waDb.messages.listByConversation(convId, parseInt(qp.limit) || 50, parseInt(qp.offset) || 0);
+        totalMsgs = waDb.messages.countByConversation(convId);
+      }
+      // Marca como lido ao abrir. Numa atualização incremental NÃO: a pessoa
+      // pode estar lendo outra conversa, e zerar o contador aqui fazia a
+      // marca de não-lida piscar e desaparecer sozinha.
+      if (!parcial) waDb.conversations.resetUnread(convId);
+      responderJson(res, 200, {
+        ok: true, conversation: conv, messages: msgs,
+        total_messages: totalMsgs, parcial: parcial
+      });
       return;
     }
     // Atribuir conversa
@@ -4436,13 +4550,28 @@ http.createServer(function (req, res) {
 }).listen(PORT, '0.0.0.0', function () {
   console.log('Servidor R&T em: http://localhost:' + PORT);
   console.log('Dados na VPS ativos (state.json + uploads). Login exigido no servidor.');
-  try { garantirAdminServidor(); } catch (e) { console.error('garantirAdminServidor:', e); }
-  try { garantirCadastrosFinanceiro(); } catch (e) { console.error('garantirCadastrosFinanceiro:', e); }
-  try { migrarDiariaFase2(); } catch (e) { console.error('migrarDiariaFase2:', e); }
-  // O resumo entra na MESMA fila do garantirAdminServidor (comTrava), então
-  // só roda depois que a carga inicial terminou — senão mostraria zero em tudo.
-  comTrava(function () {
-    try { resumoDosDados(); } catch (e) { console.error('resumoDosDados:', e); }
+  // AS TAREFAS DE SUBIDA SAO SINCRONAS E PESADAS (carga inicial, migracao,
+  // resumo). Rodando aqui, direto, elas travam o event loop logo depois do
+  // listen: a porta esta aberta mas nada responde, e o healthcheck do Coolify
+  // (5s) falha justamente na subida. Com setImmediate, a primeira resposta
+  // sai antes delas. O tempo de cada uma vai para o log, para dar para ver
+  // no Coolify qual esta pesada.
+  const _fase = function (nome, fn) {
+    const t0 = Date.now();
+    try { fn(); } catch (e) { console.error('[Subida] ' + nome + ' falhou:', e.message); }
+    const ms = Date.now() - t0;
+    if (ms > 200) console.log('[Subida] ' + nome + ': ' + ms + ' ms');
+  };
+  setImmediate(function () {
+    _fase('garantirAdminServidor', garantirAdminServidor);
+    _fase('garantirCadastrosFinanceiro', garantirCadastrosFinanceiro);
+    _fase('migrarDiariaFase2', migrarDiariaFase2);
+    // O resumo entra na MESMA fila do garantirAdminServidor (comTrava), então
+    // só roda depois que a carga inicial terminou — senão mostraria zero em tudo.
+    comTrava(function () {
+      _fase('resumoDosDados', resumoDosDados);
+      console.log('[Subida] pronto em ' + Math.round((Date.now() - _SUBIU_EM) / 100) / 10 + 's');
+    });
   });
 });
 

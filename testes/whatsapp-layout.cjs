@@ -105,9 +105,17 @@ const MEDIR = `(function(){
   // substituia o conteudo da aba — inclusive o esqueleto que este teste
   // injeta mais abaixo. Resultado: media de 0px em tudo, e a suite falhava so
   // na execucao completa.
+  // Espera a ABA ESTAR ATIVA, nao so o conteudo existir: enquanto a aba nao e
+  // a ativa, a subarvore inteira fica com display:none e TODA medida sai 0px.
+  // Era isso que fazia a suite falhar so na execucao completa (a maquina
+  // ocupada atrasa o switchAba, que busca dados antes de desenhar).
   await esperarPor(cdp,
-    "(function(){ var a = document.getElementById('wa-content'); return !!a && a.innerHTML.length > 200; })()",
-    30000, 'a aba do WhatsApp desenhar');
+    `(function(){
+       var aba = document.getElementById('aba-whatsapp');
+       var cont = document.getElementById('wa-content');
+       return !!aba && aba.classList.contains('active') && !!cont && cont.offsetParent !== null;
+     })()`,
+    40000, 'a aba do WhatsApp ficar ativa e visivel');
   const temInbox = await cdp.eval(`!!document.querySelector('.wa-inbox')`);
   console.log('inbox presente na tela?', temInbox);
   if (!temInbox) {

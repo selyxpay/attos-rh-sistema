@@ -32,6 +32,26 @@ const WA_MIDIA_URL = '/api/whatsapp/midia/';
 // novo é mídia que a Meta já apagou.
 const MIDIA_TENTATIVAS = 3;
 const MIDIA_ESPERA_MS = [1500, 5000];
+// NO MÁXIMO DOIS DOWNLOADS AO MESMO TEMPO, no servidor inteiro.
+// Numa rajada (grupo mandando fotos, ou várias conversas abertas de uma vez) o
+// servidor abria um download por mensagem: a rede e a memória iam para a
+// mídia, o envio de mensagem — que é o que o atendente está esperando — ficava
+// atrás na fila, e o proxy devolvia 502. Quem passa do limite espera a vez.
+const MIDIA_SIMULTANEAS = 2;
+let _baixandoAgora = 0;
+const _filaDeEspera = [];
+function _pegarVaga() {
+  if (_baixandoAgora < MIDIA_SIMULTANEAS) {
+    _baixandoAgora++;
+    return Promise.resolve();
+  }
+  return new Promise(function (libera) { _filaDeEspera.push(libera); });
+}
+function _devolverVaga() {
+  const proximo = _filaDeEspera.shift();
+  if (proximo) { proximo(); return; }        // passa a vaga para quem esperava
+  _baixandoAgora = Math.max(0, _baixandoAgora - 1);
+}
 
 // Baixa a mídia de UMA mensagem e grava o endereço nela. Devolve
 // { ok, media_url } ou { ok:false, error, expirada }.
@@ -45,13 +65,18 @@ async function baixarMidiaDaMensagem(db, api, conta, msg, notifyClients) {
   }
 
   let ultimo = { ok: false, error: 'não tentou' };
-  for (let i = 0; i < MIDIA_TENTATIVAS; i++) {
-    ultimo = await api.downloadMedia(mediaId, conta.access_token_enc, WA_MIDIA_DIR, WA_MIDIA_URL);
-    if (ultimo.ok) break;
-    // Mídia que a Meta apagou (ela guarda ~30 dias) não melhora tentando.
-    if (ultimo.expirada) break;
-    const espera = MIDIA_ESPERA_MS[i];
-    if (espera) await new Promise(function (r) { setTimeout(r, espera); });
+  await _pegarVaga();
+  try {
+    for (let i = 0; i < MIDIA_TENTATIVAS; i++) {
+      ultimo = await api.downloadMedia(mediaId, conta.access_token_enc, WA_MIDIA_DIR, WA_MIDIA_URL);
+      if (ultimo.ok) break;
+      // Mídia que a Meta apagou (ela guarda ~30 dias) não melhora tentando.
+      if (ultimo.expirada) break;
+      const espera = MIDIA_ESPERA_MS[i];
+      if (espera) await new Promise(function (r) { setTimeout(r, espera); });
+    }
+  } finally {
+    _devolverVaga();
   }
 
   if (!ultimo.ok) {

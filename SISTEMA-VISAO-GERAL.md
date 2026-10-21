@@ -478,6 +478,55 @@ aparecendo — a rota nova procura lá também. Nada foi movido nem apagado.
 
 **Testado por:** suíte `midia`.
 
+### 5.5 Por que dava "Bad Gateway" (502), e a tela estável
+
+**A causa.** `lerEstado()` lia e interpretava o `state.json` **inteiro, de
+forma síncrona, a cada chamada** — e o portão de permissão chama duas vezes por
+requisição da API (`permitirRota` e `waUsuarioTemPermissao`). Com o arquivo em
+16 MB, cada chamada custava ~100-300 ms de CPU travada e dezenas de MB de lixo
+para o coletor. Três pessoas atendendo, com a tela consultando a cada poucos
+segundos, bastavam para o Node parar de responder: o proxy devolvia **502** e o
+healthcheck derrubava o container.
+
+**O que mudou no servidor:**
+
+| Mudança | Efeito |
+|---|---|
+| `lerEstado()` guarda o conteúdo na memória e só relê quando o ARQUIVO muda (data + tamanho) | o custo por requisição vai de centenas de milissegundos para ~zero |
+| `lerEstadoParaGravar()` para quem vai ALTERAR | o objeto na memória é compartilhado; quem muda precisa de cópia própria |
+| `usuarioDaReq` / `waUsuarioTemPermissao` devolvem **cópia** do funcionário | nenhuma rota altera o cadastro sem querer |
+| `filtrarSenhaVisivel` não altera mais o que recebe | antes apagava a senha da cópia compartilhada |
+| Varredura de mídia responde `202` e baixa em segundo plano | nenhuma requisição fica presa esperando download |
+| No máximo **2 downloads de mídia** ao mesmo tempo, 25 s cada | rajada de fotos não rouba a vez do envio de mensagem |
+| Tarefas de subida (carga inicial, migração, resumo) saem do caminho da primeira resposta | o healthcheck (5 s) não falha na subida |
+| Índices compostos novos em `whatsapp_messages` | a janela de 24 h e a busca incremental não varrem a tabela |
+
+**O `/api/saude` agora mostra de fora:** `subiu_em`, `uptime_s`, `rss_mb`,
+`heap_mb`, `lag_ms` (atraso do event loop) e `estado_mb`. Dois `uptime_s`
+baixos em consultas seguidas significam **reinício**; `lag_ms` alto é event
+loop travado, que é o que o proxy enxerga como 502.
+
+**A tela ficou estável como o WhatsApp Web:**
+
+- **Nunca apaga por erro.** 502, rede caída ou resposta em HTML mantêm lista e
+  conversa na tela; aparece uma faixa fina "Reconectando…" e a nova tentativa
+  espera mais a cada vez (1 s → 30 s). O `JSON.parse` só roda depois de
+  conferir o `content-type` — era ele que estourava com a página de erro do
+  proxy e virava `Unexpected token "B"`.
+- **Atualização incremental.** A conversa busca só o que é novo
+  (`?since=<id>`); a rolagem para cima busca as anteriores (`?antes=<id>`). A
+  lista é comparada item por item por uma assinatura e só o que mudou é
+  redesenhado — a conversa com mensagem nova **sobe movendo o elemento**, sem
+  piscar e sem perder a seleção.
+- **O que está sendo digitado não se perde:** texto, cursor e foco são
+  guardados antes de qualquer redesenho e devolvidos depois.
+- **Rolagem do WhatsApp:** no fim, acompanha a mensagem nova; se a pessoa subiu
+  para ler, a rolagem não se move e aparece o pino "N mensagens novas ↓".
+- **Tempo real primeiro** (SSE), com o polling de 8 s só de reserva, e
+  **nenhum "carregando"** depois da primeira carga.
+
+**Testado por:** suíte `estavel`.
+
 ---
 
 ## 6. Fluxo Financeiro em detalhe
@@ -658,6 +707,10 @@ tipo de erro que volta: se você mexer na área, confira que não reintroduziu.
 | Aba que não aparece, ou que diz "sem permissão" para quem tem | Mesmo caso com `window.loggedUser`: também é `let` no `js/app.js`. A aba Bot ficava invisível e o salvar recusava calado |
 | Foto recebida "desaparece" depois de um deploy | Gravar o endereço do arquivo com `getDb().prepare(...).run(...)`: muda só a memória. Toda escrita no SQLite do WhatsApp tem que passar pelo helper `run` do módulo, que salva em disco |
 | Áudio de voz que não toca | Tipo da Meta vem com parâmetro (`audio/ogg; codecs=opus`); comparar a string inteira com a tabela dava `.bin` e `octet-stream` |
+| 502 "Bad Gateway" de vez em quando | `lerEstado()` lendo e interpretando o `state.json` inteiro, síncrono, em CADA requisição (duas vezes por chamada da API, por causa do portão de permissão) |
+| `Unexpected token "B", "Bad Gateway" is not valid JSON` na tela | `JSON.parse` sem conferir o `content-type`: o proxy devolve HTML quando o Node não responde |
+| Tela que pisca e apaga o que está sendo digitado | Redesenhar lista e conversa inteiras a cada atualização (e a cada confirmação de entrega da Meta) |
+| Requisição que leva dezenas de segundos | Download de mídia dentro da requisição; agora responde 202 e baixa em segundo plano, no máximo 2 por vez |
 | Mensagem velha passando na frente da nova | `ORDER BY` numa data gravada como texto: `"...T10:00"` é maior que `"... 23:00"` (o `T` vem depois do espaço). Ordene por `julianday(...)` |
 
 ---
@@ -708,9 +761,11 @@ docs/                        deploy no Coolify, WhatsApp, equipamentos
 - Mensagens prontas na conversa, com janela de 24 horas respeitada (seção 5.3).
 - Mídia recebida: download que persiste, tipo certo no áudio de voz e rota
   com sessão em vez da pasta pública (seção 5.4).
+- 502 intermitente (state.json relido do zero em cada requisição) e tela que
+  piscava/apagava o que estava sendo digitado (seção 5.5).
 - Testes automatizados **no repositório**: `node testes/rodar.cjs` sobe um
   servidor isolado numa porta livre (com pasta de dados descartável) por suíte,
-  e um Chrome sem janela nas suítes de tela. Hoje são 21 suítes, cobrindo
+  e um Chrome sem janela nas suítes de tela. Hoje são 23 suítes, cobrindo
   sincronização com duas sessões, segurança, permissão por tela, upload por
   conteúdo, bot, mensagens prontas e varredura das 25 abas no navegador.
   `node testes/rodar.cjs --lista` mostra todas; `node testes/rodar.cjs <nome>`

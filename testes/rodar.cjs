@@ -88,6 +88,8 @@ const SUITES = [
     titulo: 'Mensagens prontas: janela de 24h, catalogo, permissao, anexo e previa' },
   { nome: 'respostas-ui', arquivo: 'respostas-ui.cjs',  servidor: true,  navegador: true,
     titulo: 'Mensagens prontas na tela — fileira, lista do "/", cadastro e celular' },
+  { nome: 'estavel',   arquivo: 'tela-estavel.cjs',    servidor: true,  navegador: true,
+    titulo: 'Tela estavel: 502 nao apaga a tela, digitacao preservada, rolagem mantida' },
   { nome: 'wa-msgs',   arquivo: 'whatsapp-mensagens.cjs', servidor: true, navegador: true,
     titulo: 'WhatsApp: todo tipo de mensagem aparece, emoji certo, lista limpa' },
   { nome: 'whatsapp',  arquivo: 'whatsapp-layout.cjs', servidor: true, navegador: true,
