@@ -241,14 +241,61 @@
       <h3 class="bot-titulo">Últimas ações do bot</h3>
       <div class="bot-diario">
         ${_painel.ultimos.slice(0, 25).map(function (l) {
-          return '<div class="bot-diario-linha"><span class="bot-tag bot-tag-' + esc(l.tipo) + '">' + esc(l.tipo) +
-                 '</span><span>' + esc(l.telefone || '—') + '</span><span class="bot-diario-det">' +
-                 esc(l.detalhe || '') + '</span><span class="bot-diario-hora">' + esc(l.criado_em || '') + '</span></div>';
+          // CADA LINHA CONTA A HISTÓRIA: quem, o que o bot fez e por quê.
+          // Antes aparecia só o telefone e a etiqueta do tipo — ninguém
+          // entendia o que tinha acontecido.
+          const quem = l.contato_nome || l.contato_perfil || l.telefone || '—';
+          return '<div class="bot-diario-linha">' +
+                 '<span class="bot-tag bot-tag-' + esc(l.tipo) + '">' + esc(_botOQueFez(l.tipo)) + '</span>' +
+                 '<span title="' + esc(l.telefone || '') + '">' + esc(quem) + '</span>' +
+                 '<span class="bot-diario-det">' + esc(_botPorQue(l)) + '</span>' +
+                 '<span class="bot-diario-hora">' + esc(_botHoraCurta(l.criado_em)) + '</span></div>';
         }).join('')}
       </div>` : ''}
     `;
   }
   window._botRender = _botRender;
+
+  // O que o bot fez, em palavras de gente.
+  const O_QUE_FEZ = {
+    inicio: 'começou a responder',
+    concluida: 'terminou a sequência',
+    atendente: 'chamou atendente',
+    saida: 'parou por pedido',
+    erro: 'deu erro',
+    pausado: 'foi pausado',
+    devolvido: 'voltou ao bot',
+    teste: 'envio de teste',
+    encerrada: 'encerrou',
+    lembrete: 'lembrete automático'
+  };
+  function _botOQueFez(tipo) { return O_QUE_FEZ[tipo] || String(tipo || ''); }
+  // E por quê. O detalhe do diário já traz o motivo; aqui só completa quando
+  // ele veio vazio, para nenhuma linha ficar sem explicação.
+  const POR_QUE = {
+    inicio: 'a pessoa mandou mensagem e estava liberada para receber',
+    concluida: 'todos os passos foram enviados',
+    atendente: 'a pessoa pediu para falar com alguém',
+    saida: 'a pessoa pediu para não receber mais',
+    pausado: 'o atendente respondeu na conversa',
+    devolvido: 'o atendente devolveu o contato ao bot',
+    encerrada: 'a pessoa respondeu no meio da sequência'
+  };
+  function _botPorQue(l) {
+    const d = String(l.detalhe || '').trim();
+    if (d) return d;
+    return POR_QUE[l.tipo] || '';
+  }
+  function _botHoraCurta(iso) {
+    if (!iso) return '';
+    const t = String(iso).replace(' ', 'T');
+    const d = new Date(t.indexOf('Z') < 0 && t.indexOf('+') < 0 ? t + 'Z' : t);
+    if (isNaN(d)) return String(iso);
+    const p = function (n) { return String(n).padStart(2, '0'); };
+    const hoje = new Date();
+    const hora = p(d.getHours()) + ':' + p(d.getMinutes());
+    return d.toDateString() === hoje.toDateString() ? hora : p(d.getDate()) + '/' + p(d.getMonth() + 1) + ' ' + hora;
+  }
 
   const ROTULO_PASSO = { texto: 'Texto', imagem: 'Imagem', audio: 'Áudio', documento: 'PDF', link: 'Link' };
   const ICONE_PASSO = { texto: 'fa-font', imagem: 'fa-image', audio: 'fa-microphone', documento: 'fa-file-pdf', link: 'fa-link' };
@@ -438,6 +485,34 @@
   // Preenche o espaço que o cabeçalho da conversa reservou, mostrando se o
   // bot está ativo naquele contato e o botão certo. Pausar é por contato, não
   // geral: o interruptor da aba continua ligado para todos os outros.
+  // Em que pé está o bot NESTE contato, e por quê. Uma função só, para a
+  // conversa e o diário contarem a mesma história.
+  function _botEstadoDoContato(ct, resp) {
+    if (ct.optou_sair) {
+      return { classe: 'saiu', icone: 'fa-ban', rotulo: 'bot encerrado', pausado: true,
+               motivo: 'a pessoa pediu para sair' };
+    }
+    if (ct.aguardando_atendente) {
+      return { classe: 'pausado', icone: 'fa-hand', rotulo: 'bot pausado', pausado: true,
+               motivo: 'a pessoa pediu atendente' };
+    }
+    if (ct.pausado) {
+      return { classe: 'pausado', icone: 'fa-pause', rotulo: 'bot pausado', pausado: true,
+               motivo: ct.pausado_por
+                 ? 'o atendente respondeu (' + ct.pausado_por + ')'
+                 : 'pausado neste contato' };
+    }
+    if (resp && resp.config && resp.config.ligado === false) {
+      return { classe: 'pausado', icone: 'fa-power-off', rotulo: 'bot desligado', pausado: false,
+               motivo: 'o interruptor geral está desligado' };
+    }
+    if (ct.total_respostas > 0) {
+      return { classe: 'ligado', icone: 'fa-robot', rotulo: 'bot ativo', pausado: false,
+               motivo: 'já respondeu ' + ct.total_respostas + 'x neste contato' };
+    }
+    return { classe: 'ligado', icone: 'fa-robot', rotulo: 'bot ativo', pausado: false, motivo: '' };
+  }
+
   window.botCarregarControle = async function (contactId) {
     const alvo = document.getElementById('wa-bot-ctrl');
     if (!alvo || !contactId) return;
@@ -446,20 +521,19 @@
       const j = await r.json().catch(function () { return {}; });
       if (!j.ok || !j.disponivel) { alvo.innerHTML = ''; return; }
       const ct = j.contato || {};
-      const pausado = !!(ct.pausado || ct.optou_sair);
-      const motivo = ct.optou_sair ? 'a pessoa pediu para sair' :
-                     (ct.pausado ? 'pausado' + (ct.pausado_por ? ' por ' + esc(ct.pausado_por) : '') : '');
+      // ESTADO E MOTIVO, ESCRITOS NA TELA. Antes o motivo ficava só no "title"
+      // (aparecia ao parar o mouse em cima) e ninguém via: a pessoa não sabia
+      // por que o bot tinha parado naquele contato.
+      const est = _botEstadoDoContato(ct, j);
       alvo.innerHTML =
-        '<span class="wa-bot-estado ' + (pausado ? 'pausado' : 'ligado') + '" title="' + esc(motivo) + '">' +
-          '<i class="fa-solid fa-robot"></i> ' + (pausado ? 'bot pausado' : 'bot ativo') +
+        '<span class="wa-bot-estado ' + est.classe + '" title="' + esc(est.motivo || est.rotulo) + '">' +
+          '<i class="fa-solid ' + est.icone + '"></i> ' + esc(est.rotulo) +
         '</span>' +
+        (est.motivo ? '<span class="wa-bot-motivo">' + esc(est.motivo) + '</span>' : '') +
         (_botPodeEditar()
-          ? '<button class="wa-btn-mini" title="' + (pausado ? 'Devolver ao bot' : 'Pausar o bot neste contato') +
-            '" onclick="botAlternarContato(' + Number(contactId) + ',' + (pausado ? 'false' : 'true') + ')">' +
-            '<i class="fa-solid ' + (pausado ? 'fa-rotate-left' : 'fa-pause') + '"></i></button>'
-          : '') +
-        (ct.aguardando_atendente
-          ? '<span class="wa-bot-estado pausado" title="A pessoa pediu atendente"><i class="fa-solid fa-hand"></i> aguardando atendente</span>'
+          ? '<button class="wa-btn-mini" title="' + (est.pausado ? 'Devolver ao bot' : 'Pausar o bot neste contato') +
+            '" onclick="botAlternarContato(' + Number(contactId) + ',' + (est.pausado ? 'false' : 'true') + ')">' +
+            '<i class="fa-solid ' + (est.pausado ? 'fa-rotate-left' : 'fa-pause') + '"></i></button>'
           : '');
     } catch (e) { alvo.innerHTML = ''; }
   };

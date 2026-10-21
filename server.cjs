@@ -1607,7 +1607,7 @@ function _openwaDetalhe(r) {
   const base = (r && r.erro) || 'O OpenWA recusou a chamada.';
   return msg ? base + ' Motivo: ' + msg : base;
 }
-let waDb = null, waApi = null, waWebhook = null, waBot = null, _waCarregado = false;
+let waDb = null, waApi = null, waWebhook = null, waBot = null, waLembretes = null, _waCarregado = false;
 try {
   waDb      = require('./whatsapp-db.cjs');
   waApi     = require('./whatsapp-api.cjs');
@@ -1632,6 +1632,17 @@ try {
 } catch (e) {
   console.error('[Bot] módulo NÃO carregou — o WhatsApp segue funcionando SEM o bot:', e.message);
   waBot = null;
+}
+
+// Lembretes automáticos das mensagens prontas: também EXTRA, também no try
+// dele (regra 17). Se faltar, as mensagens prontas continuam funcionando —
+// só não agendam lembrete.
+// ATENÇÃO: este arquivo PRECISA estar no COPY do Dockerfile (regra 16).
+try {
+  waLembretes = require('./whatsapp-lembretes.cjs');
+} catch (e) {
+  console.error('[Lembretes] módulo NÃO carregou — mensagens prontas seguem sem lembrete:', e.message);
+  waLembretes = null;
 }
 
 // Variáveis de ambiente do WhatsApp
@@ -1678,6 +1689,17 @@ let _waReady = false;
       } catch (e) {
         console.error('[Bot] não iniciou (o WhatsApp segue funcionando):', e.message);
         waBot = null;
+      }
+    }
+    if (waLembretes) {
+      try {
+        waLembretes.init({
+          db: waDb, api: waApi, notificar: notifySSEClients,
+          pastaMidia: BOT_MIDIA_DIR          // mesma pasta segura das mensagens prontas
+        });
+      } catch (e) {
+        console.error('[Lembretes] não iniciou (o resto segue funcionando):', e.message);
+        waLembretes = null;
       }
     }
   } catch (e) {
@@ -2316,6 +2338,9 @@ http.createServer(function (req, res) {
       },
       bot: {
         modulo_carregado: !!waBot             // extra: pode estar off sem afetar o resto
+      },
+      lembretes: {
+        modulo_carregado: !!waLembretes       // extra: idem
       }
     });
     return;
@@ -3658,6 +3683,158 @@ http.createServer(function (req, res) {
       return;
     }
 
+    // ══════════════════════════════════════════════════════════════════════
+    // LEMBRETES AUTOMÁTICOS
+    // A configuração mora na própria mensagem pronta (state.json). Aqui ficam
+    // o agendamento e o painel. A permissão é a da tela `whatsapp`.
+    // ══════════════════════════════════════════════════════════════════════
+
+    // O que vai acontecer se eu mandar esta mensagem pronta agora: a linha
+    // que aparece acima da caixa de escrever.
+    if (urlPath === '/api/whatsapp/lembretes/previsao' && req.method === 'POST') {
+      var uLp = waUsuarioTemPermissao(req, 'visualizar');
+      if (!uLp) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false, error: 'corpo inválido' }); return; }
+        if (!waLembretes) { responderJson(res, 200, { ok: true, previsao: null }); return; }
+        var respLp = _waProntaPorId((body && body.resposta_id) || '');
+        if (!respLp) { responderJson(res, 404, { ok: false, error: 'Mensagem pronta não encontrada.' }); return; }
+        var prev = null;
+        try { prev = waLembretes.previsao(respLp, body.horario || '', body.data); } catch (e) { prev = null; }
+        responderJson(res, 200, { ok: true, previsao: prev });
+      });
+      return;
+    }
+
+    // Painel: um grupo por evento (mensagem pronta + horário).
+    if (urlPath.indexOf('/api/whatsapp/lembretes/painel') === 0 && req.method === 'GET') {
+      var uLpa = waUsuarioTemPermissao(req, 'visualizar');
+      if (!uLpa) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      var qLp = queryParaMapa(req.url.indexOf('?') >= 0 ? req.url.slice(req.url.indexOf('?') + 1) : '');
+      if (qLp === null) { responderJson(res, 400, { ok: false, error: 'parâmetros inválidos' }); return; }
+      var dia = qLp.dia === 'hoje' || qLp.dia === 'amanha' ? qLp.dia : 'todos';
+      var saidaLp = { ok: true, dia: dia, disponivel: !!waLembretes, eventos: [], itens: [] };
+      try {
+        saidaLp.eventos = waDb.lembretes.eventos(dia) || [];
+        if (qLp.evento) saidaLp.itens = waDb.lembretes.doEvento(qLp.evento) || [];
+      } catch (e) { saidaLp.error = e.message; }
+      responderJson(res, 200, saidaLp);
+      return;
+    }
+
+    // O que está agendado para uma conversa (o aviso discreto no chat).
+    var mLpConv = urlPath.match(/^\/api\/whatsapp\/lembretes\/conversa\/(\d+)$/);
+    if (mLpConv && req.method === 'GET') {
+      var uLc = waUsuarioTemPermissao(req, 'visualizar');
+      if (!uLc) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      var listaLc = [];
+      try { listaLc = waDb.lembretes.daConversa(Number(mLpConv[1])) || []; } catch (e) { listaLc = []; }
+      responderJson(res, 200, { ok: true, lembretes: listaLc });
+      return;
+    }
+
+    // Cancelar UM agendamento
+    var mLpCan = urlPath.match(/^\/api\/whatsapp\/lembretes\/(\d+)\/cancelar$/);
+    if (mLpCan && req.method === 'POST') {
+      var uLcan = waUsuarioTemPermissao(req, 'criar');
+      if (!uLcan) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      try {
+        var alvoLc = waDb.lembretes.getById(Number(mLpCan[1]));
+        if (!alvoLc) { responderJson(res, 404, { ok: false, error: 'Agendamento não encontrado.' }); return; }
+        if (!waPodeAcessarConta(uLcan, alvoLc.account_id)) {
+          responderJson(res, 403, { ok: false, error: 'Agendamento de outra conta.' }); return;
+        }
+        waDb.lembretes.cancelarUm(alvoLc.id, uLcan.login);
+        waDb.audit.log({
+          user_login: uLcan.login, user_name: uLcan.nome, action: 'Cancelou lembrete',
+          details: '"' + String(alvoLc.titulo || '') + '" (' + alvoLc.rotulo + ') de ' +
+                   (alvoLc.nome_contato || alvoLc.telefone), ip: waIpDaReq(req),
+          conversation_id: alvoLc.conversation_id
+        });
+        responderJson(res, 200, { ok: true });
+      } catch (e) { responderJson(res, 500, { ok: false, error: e.message }); }
+      return;
+    }
+
+    // Enviar UM agora
+    var mLpAgora = urlPath.match(/^\/api\/whatsapp\/lembretes\/(\d+)\/enviar-agora$/);
+    if (mLpAgora && req.method === 'POST') {
+      var uLag = waUsuarioTemPermissao(req, 'criar');
+      if (!uLag) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      if (!waLembretes) { responderJson(res, 200, { ok: false, error: 'Módulo de lembretes indisponível.' }); return; }
+      var alvoLa = null;
+      try { alvoLa = waDb.lembretes.getById(Number(mLpAgora[1])); } catch (e) {}
+      if (!alvoLa) { responderJson(res, 404, { ok: false, error: 'Agendamento não encontrado.' }); return; }
+      if (!waPodeAcessarConta(uLag, alvoLa.account_id)) {
+        responderJson(res, 403, { ok: false, error: 'Agendamento de outra conta.' }); return;
+      }
+      // RESPONDE NA HORA e manda em segundo plano: envio é trabalho de rede.
+      responderJson(res, 202, { ok: true, em_segundo_plano: true });
+      try { waDb.lembretes.adiantarParaAgora(alvoLa.id); } catch (e) {}
+      setImmediate(function () {
+        var linha = null;
+        try { linha = waDb.lembretes.getById(alvoLa.id); } catch (e) {}
+        if (!linha) return;
+        waLembretes.enviarUm(linha).catch(function (e) {
+          console.error('[Lembretes] envio manual falhou:', e.message);
+        });
+      });
+      return;
+    }
+
+    // Cancelar o EVENTO inteiro
+    if (urlPath === '/api/whatsapp/lembretes/evento/cancelar' && req.method === 'POST') {
+      var uLev = waUsuarioTemPermissao(req, 'criar');
+      if (!uLev) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false, error: 'corpo inválido' }); return; }
+        var chave = String((body && body.evento_chave) || '');
+        if (!chave) { responderJson(res, 400, { ok: false, error: 'faltou o evento' }); return; }
+        try {
+          var antes = waDb.lembretes.doEvento(chave) || [];
+          waDb.lembretes.cancelarEvento(chave, uLev.login);
+          waDb.audit.log({
+            user_login: uLev.login, user_name: uLev.nome, action: 'Cancelou evento de lembretes',
+            details: chave + ' · ' + antes.length + ' agendamento(s)', ip: waIpDaReq(req)
+          });
+          responderJson(res, 200, { ok: true, cancelados: antes.filter(function (x) { return x.status === 'agendado'; }).length });
+        } catch (e) { responderJson(res, 500, { ok: false, error: e.message }); }
+      });
+      return;
+    }
+
+    // Mudar o HORÁRIO do evento: reagenda todos de uma vez, mantendo a
+    // distância de cada lembrete até o evento.
+    if (urlPath === '/api/whatsapp/lembretes/evento/horario' && req.method === 'POST') {
+      var uLh = waUsuarioTemPermissao(req, 'criar');
+      if (!uLh) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false, error: 'corpo inválido' }); return; }
+        if (!waLembretes) { responderJson(res, 200, { ok: false, error: 'Módulo de lembretes indisponível.' }); return; }
+        var chaveLh = String((body && body.evento_chave) || '');
+        var horaLh = String((body && body.horario) || '');
+        if (!chaveLh || !horaLh) { responderJson(res, 400, { ok: false, error: 'faltou o evento ou o horário' }); return; }
+        try {
+          var itens = waDb.lembretes.doEvento(chaveLh) || [];
+          if (!itens.length) { responderJson(res, 404, { ok: false, error: 'Evento não encontrado.' }); return; }
+          var novo = waLembretes.eventoEmUtc(body.data || '', horaLh);
+          if (!novo) { responderJson(res, 400, { ok: false, error: 'Horário inválido.' }); return; }
+          var novoSql = waLembretes.paraSql(novo);
+          var novaChave = String(itens[0].resposta_id) + '|' + novoSql;
+          waDb.lembretes.reagendarEvento(chaveLh, novoSql, novaChave);
+          waDb.audit.log({
+            user_login: uLh.login, user_name: uLh.nome, action: 'Mudou o horário de lembretes',
+            details: chaveLh + ' → ' + novoSql + ' (' + itens.length + ' agendamento(s))', ip: waIpDaReq(req)
+          });
+          responderJson(res, 200, {
+            ok: true, evento_chave: novaChave, evento_em: novo.toISOString(),
+            horario: waLembretes.horarioSP(novo), reagendados: itens.length
+          });
+        } catch (e) { responderJson(res, 500, { ok: false, error: e.message }); }
+      });
+      return;
+    }
+
     // Prévia: o texto já com as variáveis trocadas, para cair na caixa de
     // escrever. Vem do servidor de propósito — assim o que o atendente vê e
     // ajusta é exatamente o que o envio direto mandaria.
@@ -3745,7 +3922,8 @@ http.createServer(function (req, res) {
               wamid: wamid || null, direction: 'outgoing', type: tipo,
               content: conteudo || '', media_url: urlMidia || '',
               status: wamid ? 'sent' : 'failed',
-              sender_name: uRe.nome || uRe.login
+              sender_name: uRe.nome || uRe.login,
+              origem: 'atendente'
             });
             waDb.conversations.update(convId, {
               last_message_text: String(conteudo || '').slice(0, 200),
@@ -3757,7 +3935,8 @@ http.createServer(function (req, res) {
               message: {
                 id: msgId, direction: 'outgoing', type: tipo, content: conteudo || '',
                 media_url: urlMidia || '', status: wamid ? 'sent' : 'failed',
-                sender_name: uRe.nome || uRe.login, created_at: new Date().toISOString()
+                sender_name: uRe.nome || uRe.login, origem: 'atendente',
+                created_at: new Date().toISOString()
               }
             });
           } catch (e) { console.error('[Prontas] não gravei na conversa:', e.message); }
@@ -3771,10 +3950,37 @@ http.createServer(function (req, res) {
           });
         };
 
+        // LEMBRETES: agenda para este contato o que a mensagem pronta pede.
+        // Fica ANTES do envio de propósito: se a Meta recusar, o agendamento
+        // é cancelado logo abaixo — o contrário (agendar depois) perderia o
+        // lembrete quando o atendente fecha a tela na hora do envio.
+        var agendamento = null;
+        if (waLembretes) {
+          try {
+            agendamento = waLembretes.agendar({
+              resposta: resp, conversa: conv, usuario: uRe.login,
+              horario: body.lembrete_horario || '', data: body.lembrete_data
+            });
+          } catch (e) { console.error('[Lembretes] não agendei:', e.message); }
+        }
+
         var temAnexo = !!resp.arquivo;
         var enviar = temAnexo
           ? _waEnviarMidiaPronta(conta, token, conv.contact_phone, resp, texto)
           : waApi.sendTextMessage(conta.phone_number_id, conv.contact_phone, texto, token);
+
+        // Se o envio falhar, o lembrete agendado nao faz sentido: a pessoa
+        // nunca recebeu o convite.
+        var desfazerAgendamento = function () {
+          if (!agendamento || !agendamento.evento_chave) return;
+          try {
+            (waDb.lembretes.doEvento(agendamento.evento_chave) || []).forEach(function (x) {
+              if (x.contact_id === conv.contact_id && x.status === 'agendado') {
+                waDb.lembretes.cancelarUm(x.id, 'envio falhou');
+              }
+            });
+          } catch (e) {}
+        };
 
         enviar.then(function (r) {
           var tipo = temAnexo ? (resp.tipoAnexo === 'documento' ? 'document' : 'image') : 'text';
@@ -3782,10 +3988,22 @@ http.createServer(function (req, res) {
             temAnexo ? '/api/whatsapp/respostas/midia/' + encodeURIComponent(resp.arquivo) : '');
           pausarBot();
           auditar(r && r.ok ? 'enviada' : 'FALHOU: ' + ((r && r.error) || 'erro'));
-          if (r && r.ok) responderJson(res, 200, { ok: true, wamid: r.wamid, texto: texto });
-          else responderJson(res, 200, { ok: false, error: (r && r.error) || 'Falha no envio.' });
+          if (r && r.ok) {
+            responderJson(res, 200, {
+              ok: true, wamid: r.wamid, texto: texto,
+              lembretes: agendamento ? {
+                evento_chave: agendamento.evento_chave, evento_horario: agendamento.evento_horario,
+                agendados: agendamento.agendados,
+                horarios: agendamento.lembretes.map(function (x) { return x.horario_envio; })
+              } : null
+            });
+          } else {
+            desfazerAgendamento();
+            responderJson(res, 200, { ok: false, error: (r && r.error) || 'Falha no envio.' });
+          }
         }).catch(function (e) {
           auditar('FALHOU: ' + e.message);
+          desfazerAgendamento();
           responderJson(res, 200, { ok: false, error: e.message });
         });
       });
@@ -3931,7 +4149,16 @@ http.createServer(function (req, res) {
       if (!waBot) { responderJson(res, 200, { ok: true, disponivel: false }); return; }
       var sitId = decodeSeguro(mBotSit[1]);
       if (sitId === null) { responderJson(res, 400, { ok: false, error: 'identificador inválido' }); return; }
-      responderJson(res, 200, { ok: true, disponivel: true, contato: waDb.bot.contato(Number(sitId)) });
+      // Vai junto se o INTERRUPTOR GERAL está ligado: o cabeçalho da conversa
+      // precisa dizer "bot desligado" quando é esse o motivo, em vez de
+      // mostrar "bot ativo" para um bot que não vai responder nada.
+      var cfgBs = {};
+      try { cfgBs = (lerEstado().dados || {}).botWhatsapp || {}; } catch (e) { cfgBs = {}; }
+      responderJson(res, 200, {
+        ok: true, disponivel: true,
+        contato: waDb.bot.contato(Number(sitId)),
+        config: { ligado: cfgBs.ligado === true }
+      });
       return;
     }
 
@@ -4303,6 +4530,7 @@ http.createServer(function (req, res) {
             media_filename: body.filename || '',
             status: result.ok ? 'sent' : 'failed',
             sender_name: u.nome || u.login,
+            origem: body.is_internal_note ? '' : 'atendente',
             error_code: result.error_code || '', error_message: result.error || ''
           });
           waDb.conversations.update(convId, {
@@ -4321,8 +4549,30 @@ http.createServer(function (req, res) {
             } catch (e) { console.error('[Bot] nao pausei no contato:', e.message); }
           }
           waDb.audit.log({ user_login: u.login, user_name: u.nome, action: 'Enviou mensagem WhatsApp', details: 'Para: ' + toPhone + ' | Tipo: ' + (body.type || 'text'), ip: waIpDaReq(req), conversation_id: convId, message_id: msgId });
-          notifySSEClients({ type: 'new_message', conversation_id: convId, message: { id: msgId, direction: 'outgoing', type: body.type || 'text', content: body.content || body.caption || '', status: result.ok ? 'sent' : 'failed', sender_name: u.nome || u.login, created_at: new Date().toISOString() } });
-          if (result.ok) { responderJson(res, 200, { ok: true, message_id: msgId, wamid: result.wamid }); }
+          notifySSEClients({ type: 'new_message', conversation_id: convId, message: { id: msgId, direction: 'outgoing', type: body.type || 'text', content: body.content || body.caption || '', status: result.ok ? 'sent' : 'failed', sender_name: u.nome || u.login, origem: body.is_internal_note ? '' : 'atendente', created_at: new Date().toISOString() } });
+          // LEMBRETES: a tela diz de qual mensagem pronta veio o texto que
+          // esta sendo enviado (o atendente clicou nela, ajustou e mandou pelo
+          // aviao). Sem isso, so o envio direto agendaria lembrete.
+          var lembretesDoEnvio = null;
+          if (result.ok && waLembretes && body.resposta_id) {
+            try {
+              var respEnv = _waProntaPorId(String(body.resposta_id));
+              if (respEnv) {
+                var agEnv = waLembretes.agendar({
+                  resposta: respEnv, conversa: conv, usuario: u.login,
+                  horario: body.lembrete_horario || '', data: body.lembrete_data
+                });
+                if (agEnv) {
+                  lembretesDoEnvio = {
+                    evento_chave: agEnv.evento_chave, evento_horario: agEnv.evento_horario,
+                    agendados: agEnv.agendados,
+                    horarios: agEnv.lembretes.map(function (x) { return x.horario_envio; })
+                  };
+                }
+              }
+            } catch (e) { console.error('[Lembretes] nao agendei no envio normal:', e.message); }
+          }
+          if (result.ok) { responderJson(res, 200, { ok: true, message_id: msgId, wamid: result.wamid, lembretes: lembretesDoEnvio }); }
           else { responderJson(res, 200, { ok: false, error: result.error, error_code: result.error_code, message_id: msgId }); }
         }).catch(function (e) {
           responderJson(res, 500, { ok: false, error: 'Erro ao enviar: ' + e.message });
@@ -4505,7 +4755,8 @@ http.createServer(function (req, res) {
   // informacao comercial da empresa: so vai para quem tem sessao valida.
   if ((rel === '/js/app.js' || rel === '/js/data.js' || rel === '/js/whatsapp.js' ||
        rel === '/js/telas.js' || rel === '/js/whatsapp-bot-ui.js' ||
-       rel === '/js/whatsapp-respostas-ui.js' || rel === '/precificacao-base.json') && !autenticado) {
+       rel === '/js/whatsapp-respostas-ui.js' || rel === '/js/whatsapp-lembretes-ui.js' ||
+       rel === '/precificacao-base.json') && !autenticado) {
     res.writeHead(404, Object.assign({ 'Content-Type': 'text/plain' }, SECURITY_HEADERS));
     res.end('404 Not Found');
     return;

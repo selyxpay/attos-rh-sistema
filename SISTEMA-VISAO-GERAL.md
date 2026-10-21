@@ -527,6 +527,68 @@ loop travado, que é o que o proxy enxerga como 502.
 
 **Testado por:** suíte `estavel`.
 
+### 5.6 Lembretes automáticos das mensagens prontas
+
+O caso de uso: o atendente manda a mensagem pronta com o link da entrevista do
+meio-dia para várias pessoas. Perto da hora, o sistema manda sozinho — **só
+para quem recebeu aquela mensagem** — o lembrete que o atendente escreveu. E na
+hora, outro ("já começou, estou te esperando").
+
+**Onde cada coisa mora, e por quê:**
+
+| O que | Onde | Motivo |
+|---|---|---|
+| Configuração (horário, textos, anexos) | `state.json`, **dentro** da mensagem pronta | vai pelo mesmo `upsertIds`, a mesma permissão e a mesma Auditoria da mensagem pronta |
+| Agendamento (uma linha por contato × lembrete) | SQLite, `whatsapp_lembretes` | muda a toda hora e tem que sobreviver a reinício |
+| Motor | `whatsapp-lembretes.cjs` | módulo EXTRA, no `try` dele (regra 17) e no `COPY` do Dockerfile (regra 16) |
+| Painel | aba **Lembretes agendados** (`js/whatsapp-lembretes-ui.js`) | acompanhamento e correção de rumo |
+
+**Não duplica.** A chave única é `(contact_id, resposta_id, lembrete_id,
+evento_em)`: mandar a mesma mensagem pronta duas vezes para a mesma pessoa no
+mesmo evento **atualiza** o agendamento. Mudar o horário daquele envio cancela
+o agendamento anterior daquela pessoa antes de criar o novo.
+
+**As regras de envio** (`America/Sao_Paulo`, fixo em -3h — o Brasil não tem mais
+horário de verão):
+
+- **Atraso tolerado: 10 minutos.** Servidor fora do ar e o horário passou há
+  menos que isso? Manda — a pessoa está indo para a entrevista. Mais que isso,
+  marca **perdido** e não manda.
+- **Janela de 24 horas fechada:** não manda texto livre. Marca
+  **janela_fechada** e mostra no painel. O lugar de entrar um modelo aprovado,
+  no futuro, está marcado no código.
+- **Quem pediu para sair não recebe** — nem com "enviar agora".
+- Ritmo controlado (1,2 s entre envios, 10 por rodada, verificação a cada 20 s)
+  e **uma** tentativa extra em caso de falha.
+- **O lembrete não pausa o bot** e **não muda o status da conversa**: ele não é
+  atendimento humano.
+- Se o envio da mensagem pronta falhar, o agendamento é **desfeito**: ninguém
+  recebe lembrete de um convite que não chegou.
+- Cada envio (e cada falha, com o motivo) vai para a **Auditoria** e para o
+  diário do bot.
+
+**Variáveis do lembrete:** `{nome}`, `{saudacao}`, `{horario}` (o horário do
+evento) e `{link}` (o primeiro endereço que estiver no texto da própria
+mensagem pronta).
+
+**Testado por:** suíte `lembretes` — contas de horário com relógio simulado,
+fila na hora certa, nada duplicado, reinício no meio, atraso de 40 min
+(perdido) e de 5 min (enviado), janela fechada, pedido de saída, cancelar um,
+cancelar o evento e mudar o horário reagendando todos.
+
+### 5.7 Quem mandou cada mensagem
+
+Toda mensagem que SAI guarda em `whatsapp_messages.origem` quem a mandou:
+`bot`, `lembrete` ou `atendente` (com o nome em `sender_name`). O balão mostra
+isso em letra pequena. **Mensagem antiga fica sem rótulo** — não dá para
+adivinhar depois quem foi.
+
+No cabeçalho da conversa, o estado do bot **naquele contato** vem com o motivo
+escrito na tela: "o atendente respondeu", "a pessoa pediu atendente", "a pessoa
+pediu para sair" ou "o interruptor geral está desligado". Antes o motivo só
+existia no `title` (aparecia parando o mouse em cima) e ninguém via. O diário do
+bot passou a mostrar o **nome** do contato, o que o bot fez e por quê.
+
 ---
 
 ## 6. Fluxo Financeiro em detalhe
@@ -711,6 +773,8 @@ tipo de erro que volta: se você mexer na área, confira que não reintroduziu.
 | `Unexpected token "B", "Bad Gateway" is not valid JSON` na tela | `JSON.parse` sem conferir o `content-type`: o proxy devolve HTML quando o Node não responde |
 | Tela que pisca e apaga o que está sendo digitado | Redesenhar lista e conversa inteiras a cada atualização (e a cada confirmação de entrega da Meta) |
 | Requisição que leva dezenas de segundos | Download de mídia dentro da requisição; agora responde 202 e baixa em segundo plano, no máximo 2 por vez |
+| Vírgula sozinha no começo da mensagem | `{nome}` vazio no início do texto: "{nome}, já começou" virava ", já começou" |
+| Lembrete/agendamento no horário errado | Comparar data do SQLite (UTC, com espaço) com hora de Brasília. Guardar sempre UTC no formato do SQLite e converter só na tela |
 | Mensagem velha passando na frente da nova | `ORDER BY` numa data gravada como texto: `"...T10:00"` é maior que `"... 23:00"` (o `T` vem depois do espaço). Ordene por `julianday(...)` |
 
 ---
@@ -730,6 +794,8 @@ js/telas.js                  permissão por tela — MESMO arquivo nas duas pont
 whatsapp-bot.cjs             motor do bot (ordem de decisão, fila, envio)
 js/whatsapp-bot-ui.js        a aba Bot
 js/whatsapp-respostas-ui.js  mensagens prontas (fileira na conversa + cadastro)
+whatsapp-lembretes.cjs       motor dos lembretes automaticos (fila, fuso, regras)
+js/whatsapp-lembretes-ui.js  painel "Lembretes agendados"
 DATA_DIR/wa-midia/          midia que CHEGA do contato (fora da pasta publica)
 js/security.js               camadas extras de proteção no navegador
 js/data.js                   dados iniciais (NUNCA colocar senha aqui)
@@ -763,9 +829,11 @@ docs/                        deploy no Coolify, WhatsApp, equipamentos
   com sessão em vez da pasta pública (seção 5.4).
 - 502 intermitente (state.json relido do zero em cada requisição) e tela que
   piscava/apagava o que estava sendo digitado (seção 5.5).
+- Lembretes automáticos das mensagens prontas, com painel e regras de envio
+  (seção 5.6), e o rótulo de quem mandou cada mensagem (seção 5.7).
 - Testes automatizados **no repositório**: `node testes/rodar.cjs` sobe um
   servidor isolado numa porta livre (com pasta de dados descartável) por suíte,
-  e um Chrome sem janela nas suítes de tela. Hoje são 23 suítes, cobrindo
+  e um Chrome sem janela nas suítes de tela. Hoje são 24 suítes, cobrindo
   sincronização com duas sessões, segurança, permissão por tela, upload por
   conteúdo, bot, mensagens prontas e varredura das 25 abas no navegador.
   `node testes/rodar.cjs --lista` mostra todas; `node testes/rodar.cjs <nome>`

@@ -366,10 +366,14 @@ function criarTabelas() {
   // Sem isso, mídia que falhou ficava para sempre em "(baixando...)" e o
   // sistema tentava de novo sem limite — ou nunca mais tentava. Mensagem
   // antiga fica com 0, o que está certo: ninguém tentou ainda.
+  // origem: QUEM mandou a mensagem — 'bot', 'lembrete' ou 'atendente'. O
+  // balão mostra isso em letra pequena. Mensagem antiga fica com vazio e não
+  // recebe rótulo, o que está certo: não dá para adivinhar depois.
   ['sent_by_bot INTEGER DEFAULT 0',
    'media_tentativas INTEGER DEFAULT 0',
    'media_falhou INTEGER DEFAULT 0',
-   'media_erro TEXT DEFAULT \'\''].forEach(function (col) {
+   'media_erro TEXT DEFAULT \'\'',
+   'origem TEXT DEFAULT \'\''].forEach(function (col) {
     try { db.run('ALTER TABLE whatsapp_messages ADD COLUMN ' + col); } catch (e) {}
   });
 
@@ -446,6 +450,47 @@ function criarTabelas() {
     UNIQUE (arquivo, account_id)
   )`);
 
+  // ─── LEMBRETES AUTOMÁTICOS DAS MENSAGENS PRONTAS ───────────────────────────
+  // A CONFIGURAÇÃO (horário do evento, textos, anexos) mora no state.json,
+  // dentro da própria mensagem pronta. Aqui fica só o AGENDAMENTO: uma linha
+  // por contato × lembrete, que é o que muda a toda hora.
+  //
+  // UNIQUE (contact_id, resposta_id, lembrete_id, evento_em) é o que garante
+  // "mandei duas vezes para a mesma pessoa no mesmo evento, não duplica":
+  // a segunda vez ATUALIZA a linha. Mudança de horário do envio vira outro
+  // `evento_em`, e aí o agendamento antigo daquela pessoa é cancelado na hora
+  // de agendar o novo (quem faz isso é o whatsapp-lembretes.cjs).
+  db.run(`CREATE TABLE IF NOT EXISTS whatsapp_lembretes (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    resposta_id      TEXT NOT NULL,
+    titulo           TEXT DEFAULT '',
+    evento_em        TEXT NOT NULL,
+    evento_chave     TEXT NOT NULL,
+    lembrete_id      TEXT NOT NULL,
+    rotulo           TEXT DEFAULT '',
+    enviar_em        TEXT NOT NULL,
+    account_id       INTEGER NOT NULL,
+    conversation_id  INTEGER NOT NULL,
+    contact_id       INTEGER NOT NULL,
+    telefone         TEXT NOT NULL,
+    nome_contato     TEXT DEFAULT '',
+    texto            TEXT DEFAULT '',
+    link             TEXT DEFAULT '',
+    arquivo          TEXT DEFAULT '',
+    tipo_anexo       TEXT DEFAULT '',
+    mime             TEXT DEFAULT '',
+    nome_arquivo     TEXT DEFAULT '',
+    status           TEXT DEFAULT 'agendado',
+    tentativas       INTEGER DEFAULT 0,
+    erro             TEXT DEFAULT '',
+    wamid            TEXT DEFAULT '',
+    criado_por       TEXT DEFAULT '',
+    criado_em        TEXT DEFAULT (datetime('now')),
+    atualizado_em    TEXT DEFAULT (datetime('now')),
+    enviado_em       TEXT,
+    UNIQUE (contact_id, resposta_id, lembrete_id, evento_em)
+  )`);
+
   // ─── ÍNDICES ────────────────────────────────────────────────────────────────
   const indices = [
     'CREATE INDEX IF NOT EXISTS idx_bot_fila_status ON whatsapp_bot_fila(status, enviar_em)',
@@ -469,6 +514,10 @@ function criarTabelas() {
     'CREATE INDEX IF NOT EXISTS idx_messages_conv_dir ON whatsapp_messages(conversation_id, direction)',
     'CREATE INDEX IF NOT EXISTS idx_messages_conv_id ON whatsapp_messages(conversation_id, id)',
     'CREATE INDEX IF NOT EXISTS idx_media_message ON whatsapp_media(message_id)',
+    'CREATE INDEX IF NOT EXISTS idx_lembretes_pendentes ON whatsapp_lembretes(status, enviar_em)',
+    'CREATE INDEX IF NOT EXISTS idx_lembretes_evento ON whatsapp_lembretes(evento_chave)',
+    'CREATE INDEX IF NOT EXISTS idx_lembretes_contato ON whatsapp_lembretes(contact_id, status)',
+    'CREATE INDEX IF NOT EXISTS idx_lembretes_conversa ON whatsapp_lembretes(conversation_id, status)',
     'CREATE INDEX IF NOT EXISTS idx_webhook_events_eid ON whatsapp_webhook_events(event_id)',
     'CREATE INDEX IF NOT EXISTS idx_audit_created ON whatsapp_audit_logs(created_at DESC)',
     'CREATE INDEX IF NOT EXISTS idx_audit_user ON whatsapp_audit_logs(user_login)'
@@ -749,14 +798,17 @@ const messages = {
     return runInsert(
       `INSERT INTO whatsapp_messages
         (conversation_id, account_id, wamid, direction, type, content, media_url, media_mime_type, media_filename, media_id,
-         template_name, template_language, status, sender_phone, sender_name, is_internal_note, error_code, error_message, sent_by_bot)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         template_name, template_language, status, sender_phone, sender_name, is_internal_note, error_code, error_message, sent_by_bot, origem)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [data.conversation_id, data.account_id, data.wamid || null, data.direction || 'incoming',
        data.type || 'text', data.content || '', data.media_url || '', data.media_mime_type || '',
        data.media_filename || '', data.media_id || '', data.template_name || '', data.template_language || '',
        data.status || 'sent', data.sender_phone || '', data.sender_name || '',
        data.is_internal_note ? 1 : 0, data.error_code || '', data.error_message || '',
-       data.sent_by_bot ? 1 : 0]
+       data.sent_by_bot ? 1 : 0,
+       // QUEM mandou: 'bot', 'lembrete' ou 'atendente'. Quem nao diz e
+       // tratado pelo sent_by_bot, para nao rotular errado o que ja existe.
+       data.origem || (data.sent_by_bot ? 'bot' : '')]
     );
   },
 
@@ -899,6 +951,148 @@ const media = {
 
   doMessage(messageId) {
     return getOne('SELECT * FROM whatsapp_media WHERE message_id = ? ORDER BY id DESC LIMIT 1', [messageId]);
+  }
+};
+
+// ==========================================================================
+// OPERAÇÕES: LEMBRETES AUTOMÁTICOS
+// Tudo pelo helper `run`/`getAll`, que salvam e leem com o banco em disco.
+// ==========================================================================
+const lembretes = {
+  // Agenda (ou ATUALIZA, se já existia para o mesmo contato/mensagem/evento).
+  agendar(d) {
+    run(
+      `INSERT INTO whatsapp_lembretes
+         (resposta_id, titulo, evento_em, evento_chave, lembrete_id, rotulo, enviar_em,
+          account_id, conversation_id, contact_id, telefone, nome_contato,
+          texto, link, arquivo, tipo_anexo, mime, nome_arquivo, criado_por, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'agendado')
+       ON CONFLICT(contact_id, resposta_id, lembrete_id, evento_em) DO UPDATE SET
+          enviar_em = excluded.enviar_em, rotulo = excluded.rotulo,
+          texto = excluded.texto, link = excluded.link,
+          arquivo = excluded.arquivo, tipo_anexo = excluded.tipo_anexo,
+          mime = excluded.mime, nome_arquivo = excluded.nome_arquivo,
+          titulo = excluded.titulo, conversation_id = excluded.conversation_id,
+          criado_por = excluded.criado_por,
+          -- Reenviar a mesma mensagem pronta REABRE o agendamento: quem já
+          -- tinha sido enviado continua enviado, o resto volta para a fila.
+          status = CASE WHEN whatsapp_lembretes.status = 'enviado' THEN 'enviado' ELSE 'agendado' END,
+          tentativas = 0, erro = '', atualizado_em = datetime('now')`,
+      [d.resposta_id, d.titulo || '', d.evento_em, d.evento_chave, d.lembrete_id, d.rotulo || '',
+       d.enviar_em, d.account_id, d.conversation_id, d.contact_id, d.telefone, d.nome_contato || '',
+       d.texto || '', d.link || '', d.arquivo || '', d.tipo_anexo || '', d.mime || '',
+       d.nome_arquivo || '', d.criado_por || '']
+    );
+  },
+
+  // Cancela o que esta pendente DESTE contato para esta mensagem pronta em
+  // OUTRO horário. É o que faz "mudei o horário deste envio" não deixar dois
+  // agendamentos de pé para a mesma pessoa.
+  cancelarOutrosEventos(contactId, respostaId, eventoEm, porQuem) {
+    run(`UPDATE whatsapp_lembretes
+            SET status = 'cancelado', erro = 'horário trocado', criado_por = ?,
+                atualizado_em = datetime('now')
+          WHERE contact_id = ? AND resposta_id = ? AND evento_em <> ? AND status = 'agendado'`,
+      [porQuem || '', contactId, respostaId, eventoEm]);
+  },
+
+  pendentes(limite) {
+    return getAll(
+      `SELECT * FROM whatsapp_lembretes
+        WHERE status = 'agendado' AND enviar_em <= datetime('now')
+        ORDER BY enviar_em ASC LIMIT ?`,
+      [limite || 20]
+    );
+  },
+
+  getById(id) {
+    return getOne('SELECT * FROM whatsapp_lembretes WHERE id = ?', [id]);
+  },
+
+  marcar(id, status, extra) {
+    const e = extra || {};
+    run(`UPDATE whatsapp_lembretes
+            SET status = ?, erro = ?, wamid = ?, tentativas = tentativas + ?,
+                enviado_em = CASE WHEN ? = 'enviado' THEN datetime('now') ELSE enviado_em END,
+                atualizado_em = datetime('now')
+          WHERE id = ?`,
+      [status, String(e.erro || '').slice(0, 200), e.wamid || '', e.tentou ? 1 : 0, status, id]);
+  },
+
+  // Painel: um grupo por evento (mensagem pronta + horário).
+  eventos(filtro) {
+    // "Hoje" é o dia em BRASÍLIA, não no container (que roda em UTC): às 22h
+    // de Brasília já é o dia seguinte em UTC, e o painel mostraria o evento de
+    // hoje como se fosse de amanhã. -3 horas é fixo: o Brasil não tem mais
+    // horário de verão desde 2019.
+    let onde = '';
+    if (filtro === 'hoje') onde = " WHERE date(evento_em, '-3 hours') = date('now', '-3 hours')";
+    else if (filtro === 'amanha') onde = " WHERE date(evento_em, '-3 hours') = date('now', '-3 hours', '+1 day')";
+    return getAll(
+      `SELECT evento_chave, resposta_id, titulo, evento_em,
+              COUNT(*) AS total,
+              SUM(CASE WHEN status = 'agendado' THEN 1 ELSE 0 END) AS agendados,
+              SUM(CASE WHEN status = 'enviado' THEN 1 ELSE 0 END) AS enviados,
+              SUM(CASE WHEN status IN ('falhou','janela_fechada') THEN 1 ELSE 0 END) AS falhos,
+              SUM(CASE WHEN status = 'cancelado' THEN 1 ELSE 0 END) AS cancelados,
+              SUM(CASE WHEN status = 'perdido' THEN 1 ELSE 0 END) AS perdidos,
+              MIN(enviar_em) AS primeiro_envio
+         FROM whatsapp_lembretes` + onde + `
+        GROUP BY evento_chave
+        ORDER BY evento_em DESC
+        LIMIT 100`
+    );
+  },
+
+  doEvento(chave) {
+    return getAll(
+      `SELECT l.*, c.name AS contato_nome, c.phone AS contato_telefone
+         FROM whatsapp_lembretes l
+         LEFT JOIN whatsapp_contacts c ON c.id = l.contact_id
+        WHERE l.evento_chave = ?
+        ORDER BY l.enviar_em ASC, l.nome_contato ASC
+        LIMIT 500`,
+      [chave]
+    );
+  },
+
+  // O que está agendado para uma conversa (o aviso discreto no chat).
+  daConversa(conversationId) {
+    return getAll(
+      `SELECT * FROM whatsapp_lembretes
+        WHERE conversation_id = ? AND status = 'agendado'
+        ORDER BY enviar_em ASC LIMIT 20`,
+      [conversationId]
+    );
+  },
+
+  cancelarUm(id, porQuem) {
+    run(`UPDATE whatsapp_lembretes
+            SET status = 'cancelado', criado_por = ?, atualizado_em = datetime('now')
+          WHERE id = ? AND status = 'agendado'`, [porQuem || '', id]);
+  },
+
+  cancelarEvento(chave, porQuem) {
+    run(`UPDATE whatsapp_lembretes
+            SET status = 'cancelado', criado_por = ?, atualizado_em = datetime('now')
+          WHERE evento_chave = ? AND status = 'agendado'`, [porQuem || '', chave]);
+  },
+
+  // Muda o horário do evento inteiro: desloca TODOS os pendentes pelo mesmo
+  // tanto, preservando a distância de cada lembrete até o evento.
+  reagendarEvento(chave, novoEventoEm, novaChave) {
+    run(`UPDATE whatsapp_lembretes
+            SET enviar_em = datetime(enviar_em, '+' || CAST(ROUND((julianday(?) - julianday(evento_em)) * 86400) AS INTEGER) || ' seconds'),
+                evento_em = ?, evento_chave = ?, atualizado_em = datetime('now'),
+                status = CASE WHEN status IN ('perdido','janela_fechada','falhou') THEN 'agendado' ELSE status END,
+                tentativas = 0, erro = ''
+          WHERE evento_chave = ? AND status <> 'enviado' AND status <> 'cancelado'`,
+      [novoEventoEm, novoEventoEm, novaChave, chave]);
+  },
+
+  // Para o teste e para o "enviar agora": joga o horário para trás.
+  adiantarParaAgora(id) {
+    run("UPDATE whatsapp_lembretes SET enviar_em = datetime('now'), status = 'agendado', atualizado_em = datetime('now') WHERE id = ?", [id]);
   }
 };
 
@@ -1172,8 +1366,14 @@ const bot = {
           [tipo, contactId || null, telefone || '', String(detalhe || '').slice(0, 500)]);
     } catch (e) { console.error('[Bot] não consegui registrar no diário:', e.message); }
   },
+  // O diario traz o NOME do contato junto: "5511..." nao diz nada para quem
+  // esta lendo o que o bot fez.
   ultimosLogs: function (limite) {
-    return getAll('SELECT * FROM whatsapp_bot_log ORDER BY id DESC LIMIT ?', [limite || 50]);
+    return getAll(
+      `SELECT l.*, c.name AS contato_nome, c.profile_name AS contato_perfil
+         FROM whatsapp_bot_log l
+         LEFT JOIN whatsapp_contacts c ON c.id = l.contact_id
+        ORDER BY l.id DESC LIMIT ?`, [limite || 50]);
   },
 
   // ── painel ──────────────────────────────────────────────────────────────
@@ -1227,6 +1427,7 @@ const bot = {
 module.exports = {
   init, getDb, getDbPath, salvarImediato,
   accounts, contacts, conversations, messages, media, templates, tags, webhookEvents, audit,
+  lembretes,
   bot,
   dashboardStats, backup, close
 };

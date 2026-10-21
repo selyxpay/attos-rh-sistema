@@ -104,6 +104,8 @@ function renderWhatsApp() {
   // quem atende precisa ver as mensagens para usar, e quem edita conversa
   // tambem pode cuidar do catalogo -- ele nao guarda nada sensivel.
   if (_waPode('editar')) abas.push({ id: 'prontas', ic: 'fa-comment-dots', label: 'Mensagens prontas' });
+  // Lembretes agendados: quem atende precisa ver o que vai sair sozinho.
+  if (_waPode('criar')) abas.push({ id: 'lembretes', ic: 'fa-bell', label: 'Lembretes agendados' });
   // "Conexões" (múltiplos números oficiais) — só para quem administra o WhatsApp.
   if (_waPode('aprovar')) abas.push({ id: 'conexoes', ic: 'fa-plug', label: 'Conexões' });
   subs.innerHTML = abas.map(a =>
@@ -126,6 +128,7 @@ function renderWhatsApp() {
   else if (_waSubAba === 'conexoes')  _waRenderConexoes(cont);
   else if (_waSubAba === 'bot')       _botRender(cont);
   else if (_waSubAba === 'prontas')   _respostasRender(cont);
+  else if (_waSubAba === 'lembretes') _lembretesRender(cont);
 }
 window.renderWhatsApp = renderWhatsApp;
 
@@ -753,6 +756,8 @@ function _waRenderChat(conv, msgs) {
   // Mensagens prontas: a fileira precisa saber se a janela de 24h está
   // aberta, e isso vem do servidor.
   if (typeof respostasDesenharFileira === 'function') respostasDesenharFileira(conv);
+  // E o que já está agendado de lembrete nesta conversa.
+  if (conv && conv.id && typeof respostasAvisoAgendado === 'function') respostasAvisoAgendado(conv.id);
 }
 
 function _waBolha(m) {
@@ -806,13 +811,30 @@ function _waBolha(m) {
   // REAÇÃO: emoji no cantinho, não um balão inteiro.
   const reacao = m.reaction_emoji
     ? `<span class="wa-reacao" title="Reação">${_waEsc(m.reaction_emoji)}</span>` : '';
-  // Marca de mensagem automática.
-  const etiquetaBot = (m.sent_by_bot || m.sender_name === 'bot')
-    ? '<span class="wa-tag-bot">bot</span>' : '';
+  // QUEM MANDOU, em letra pequena dentro do balão. Mensagem antiga (antes da
+  // coluna `origem`) fica sem rótulo: não dá para adivinhar depois quem foi.
+  const etiquetaBot = _waQuemMandou(m);
 
   return `<div class="wa-msg ${saida ? 'wa-msg-out' : 'wa-msg-in'}"${idAttr}>
     <div class="wa-bolha">${etiquetaBot}${corpo}${reacao}<span class="wa-msg-hora">${_waHora(m.created_at)} ${saida ? _waTick(m.status) : ''}</span></div>
   </div>`;
+}
+
+// Rótulo de quem mandou a mensagem: "Bot", "Lembrete automático" ou o nome do
+// atendente. Só para mensagem que SAIU, e só quando o sistema sabe de verdade.
+function _waQuemMandou(m) {
+  if (!m || m.direction !== 'outgoing') return '';
+  const origem = String(m.origem || '').toLowerCase();
+  if (origem === 'bot' || (!origem && (m.sent_by_bot || m.sender_name === 'bot'))) {
+    return '<span class="wa-quem wa-quem-bot"><i class="fa-solid fa-robot"></i> Bot</span>';
+  }
+  if (origem === 'lembrete') {
+    return '<span class="wa-quem wa-quem-lembrete"><i class="fa-solid fa-clock"></i> Lembrete automático</span>';
+  }
+  if (origem === 'atendente' && m.sender_name) {
+    return '<span class="wa-quem">' + _waEsc(m.sender_name) + '</span>';
+  }
+  return '';
 }
 
 // Mídia que o contato mandou e que não está no servidor.
@@ -1074,11 +1096,29 @@ window.waEnviarMensagem = async function () {
     if (r && r.ok) { _waMsgsCache.push({ is_internal_note: true, content: texto, sender_name: (loggedUser && (loggedUser.nomeExibicao || loggedUser.nome)) || '', created_at: new Date().toISOString() }); _waAppendBolha(_waMsgsCache[_waMsgsCache.length - 1]); }
     return;
   }
-  const r = await waSend('/messages/send', 'POST', { conversation_id: _waConvAberta, type: 'text', content: texto });
+  // LEMBRETE: se o texto veio de uma mensagem pronta que tem lembrete, o
+  // servidor precisa saber qual — e assim o envio pelo aviao tambem agenda.
+  const _pronta = (typeof respostasProntaDaCaixa === 'function') ? respostasProntaDaCaixa() : null;
+  const r = await waSend('/messages/send', 'POST', {
+    conversation_id: _waConvAberta, type: 'text', content: texto,
+    resposta_id: _pronta ? _pronta.id : undefined,
+    lembrete_horario: _pronta ? _pronta.horario : undefined,
+    lembrete_data: _pronta ? _pronta.data : undefined
+  });
   if (r && r.ok) {
-    const nova = { direction: 'outgoing', type: 'text', content: texto, status: 'sent', created_at: new Date().toISOString() };
+    const nova = { direction: 'outgoing', type: 'text', content: texto, status: 'sent',
+                   sender_name: (loggedUser && (loggedUser.nomeExibicao || loggedUser.nome)) || '',
+                   origem: 'atendente', created_at: new Date().toISOString() };
     _waMsgsCache.push(nova); _waAppendBolha(nova);
     _waCarregarConversas();
+    // Mandou: a mensagem pronta sai da caixa e o aviso do que foi agendado
+    // aparece na conversa.
+    if (typeof respostasSemLembrete === 'function') respostasSemLembrete();
+    if (r.lembretes && r.lembretes.agendados && typeof respostasAvisoAgendado === 'function') {
+      _waToast(r.lembretes.agendados === 1 ? 'Enviada. 1 lembrete agendado.'
+                                           : 'Enviada. ' + r.lembretes.agendados + ' lembretes agendados.');
+      respostasAvisoAgendado(_waConvAberta);
+    }
   } else {
     _waAppendBolha({ direction: 'outgoing', type: 'text', content: texto, status: 'failed', created_at: new Date().toISOString() });
     _waToast((r && r.error) || 'Falha ao enviar. Verifique se o número está conectado à Meta.', true);

@@ -939,3 +939,103 @@ body.wa-tela-cheia { overflow: hidden; }
    ja foram ajustados com cuidado. */
 .wa-inbox { position: relative; }
 .wa-col-chat { position: relative; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LEMBRETES AUTOMÁTICOS
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Quem mandou, dentro do balão */
+.wa-quem { display: block; font-size: 10.5px; font-weight: 700; color: #64748b; margin-bottom: 2px; }
+.wa-quem-bot { color: #7e22ce; }
+.wa-quem-lembrete { color: #b45309; }
+.wa-msg-out .wa-quem { color: #047857; }
+.wa-msg-out .wa-quem-bot { color: #7e22ce; }
+.wa-msg-out .wa-quem-lembrete { color: #b45309; }
+
+/* Motivo do estado do bot, no cabeçalho da conversa */
+.wa-bot-motivo { font-size: 10.5px; color: var(--text-secondary, #64748b); }
+.wa-bot-estado.saiu { background: rgba(239,68,68,.14); color: #b91c1c; }
+
+/* ── Cadastro do lembrete (dentro da mensagem pronta) ───────────────────── */
+.wa-lembrete-bloco { border: 1px solid var(--border-color, #e2e8f0); border-radius: 10px; padding: 11px; background: var(--surface-subtle, #f8fafc); }
+.wa-lembrete-chave { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--text-main, #0f172a); }
+.wa-lembrete-chave small { font-weight: 500; color: var(--text-secondary, #64748b); }
+.wa-lembrete-corpo { display: flex; flex-direction: column; gap: 10px; margin-top: 11px; }
+.wa-lembrete-quando { display: grid; grid-template-columns: 130px 150px; gap: 10px; align-items: end; }
+.wa-lembrete-dica { grid-column: 1 / -1; margin: 0; font-size: 11px; color: var(--text-secondary, #64748b); }
+.wa-lembrete-lista { display: flex; flex-direction: column; gap: 8px; }
+.wa-lembrete-vazio { font-size: 12px; color: var(--text-secondary, #94a3b8); font-style: italic; }
+.wa-lembrete-item { border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; padding: 8px; background: var(--card-bg, #fff); display: flex; flex-direction: column; gap: 6px; }
+.wa-lembrete-item-topo { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.wa-lembrete-item select, .wa-lembrete-item input[type=number], .wa-lembrete-item textarea {
+  border: 1px solid var(--border-color, #e2e8f0); border-radius: 7px; padding: 5px 8px;
+  font-size: 12.5px; font-family: inherit; background: var(--card-bg, #fff); color: var(--text-main, #0f172a);
+}
+.wa-lembrete-item textarea { resize: vertical; line-height: 1.45; }
+.wa-lembrete-num { width: 70px; }
+.wa-btn-arq-mini { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border-color, #e2e8f0); border-radius: 7px; padding: 4px 9px; font-size: 11.5px; cursor: pointer; color: #475569; }
+.wa-btn-arq-mini:hover { border-color: #059669; color: #059669; }
+.wa-lembrete-add { align-self: flex-start; border: 1px dashed var(--border-color, #cbd5e1); background: transparent; color: #475569; border-radius: 9999px; padding: 5px 12px; font-size: 12px; font-family: inherit; cursor: pointer; }
+.wa-lembrete-add:hover { border-color: #059669; color: #059669; }
+.wa-chip-lembrete { color: #b45309; border-color: rgba(180,83,9,.3); }
+
+.wa-lembrete-previa { border-top: 1px dashed var(--border-color, #e2e8f0); padding-top: 9px; display: flex; flex-direction: column; gap: 8px; }
+.wa-lembrete-previa-tit { font-size: 11.5px; font-weight: 700; color: var(--text-secondary, #475569); }
+.wa-lembrete-previa-item { display: grid; grid-template-columns: 52px 110px minmax(0, 1fr); gap: 8px; align-items: start; }
+.wa-lembrete-previa-hora { font-size: 12px; font-weight: 700; color: #047857; font-variant-numeric: tabular-nums; }
+.wa-lembrete-previa-rot { font-size: 11px; color: var(--text-secondary, #64748b); }
+
+/* ── Linha do lembrete acima da caixa de escrever ───────────────────────── */
+.wa-lembrete-linha, .wa-lembrete-agendado {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: rgba(234,179,8,.14); color: #78350f;
+  border-radius: 8px; padding: 5px 10px; font-size: 11.5px; margin-bottom: 6px;
+}
+.wa-lembrete-agendado { background: rgba(5,150,105,.12); color: #065f46; }
+.wa-lembrete-ag-item { display: inline-flex; align-items: center; gap: 6px; }
+.wa-lembrete-trocar {
+  display: inline-flex; align-items: center; gap: 4px;
+  border: 1px solid currentColor; background: transparent; color: inherit;
+  border-radius: 9999px; padding: 1px 8px; font-size: 10.5px; font-family: inherit; cursor: pointer; opacity: .8;
+}
+.wa-lembrete-trocar:hover { opacity: 1; }
+
+/* ── Painel "Lembretes agendados" ───────────────────────────────────────── */
+.wa-lemb-tela { display: flex; flex-direction: column; gap: 14px; }
+.wa-lemb-filtros { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.wa-lemb-eventos { display: flex; flex-direction: column; gap: 9px; }
+.wa-lemb-evento { border: 1px solid var(--border-color, #e2e8f0); border-radius: 10px; background: var(--card-bg, #fff); overflow: hidden; }
+.wa-lemb-evento.aberto { border-color: #059669; }
+.wa-lemb-evento-cab { display: flex; align-items: center; gap: 12px; padding: 10px 12px; cursor: pointer; }
+.wa-lemb-evento-cab:hover { background: var(--surface-subtle, #f8fafc); }
+.wa-lemb-hora { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; font-size: 15px; font-weight: 800; color: #047857; font-variant-numeric: tabular-nums; }
+.wa-lemb-hora small { font-size: 10px; font-weight: 600; color: var(--text-secondary, #64748b); }
+.wa-lemb-evento-info { flex: 1; min-width: 0; }
+.wa-lemb-evento-info strong { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-lemb-conta { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 3px; }
+.wa-lemb-pill { display: inline-block; padding: 1px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700; background: var(--surface-subtle, #f1f5f9); color: #475569; }
+.wa-lemb-pill.ag { background: rgba(234,179,8,.18); color: #92400e; }
+.wa-lemb-pill.ok { background: rgba(37,211,102,.18); color: #047857; }
+.wa-lemb-pill.erro { background: rgba(239,68,68,.14); color: #b91c1c; }
+.wa-lemb-pill.alerta { background: rgba(249,115,22,.16); color: #9a3412; }
+.wa-lemb-pill.cinza { background: rgba(100,116,139,.14); color: #475569; }
+.wa-lemb-corpo { border-top: 1px solid var(--border-color, #f1f5f9); padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+.wa-lemb-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+.wa-lemb-acoes .perigo:hover { border-color: #ef4444; color: #ef4444; }
+.wa-lemb-itens { display: flex; flex-direction: column; }
+.wa-lemb-item { display: grid; grid-template-columns: 52px minmax(0, 1.4fr) 120px 92px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 2px; border-bottom: 1px solid var(--border-color, #f8fafc); font-size: 12px; }
+.wa-lemb-item:last-child { border-bottom: none; }
+.wa-lemb-item-hora { font-weight: 700; color: #047857; font-variant-numeric: tabular-nums; }
+.wa-lemb-item-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-lemb-item-rot { font-size: 11px; color: var(--text-secondary, #64748b); }
+.wa-lemb-item-erro { font-size: 10.5px; color: #b91c1c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-lemb-item-acoes { display: inline-flex; gap: 4px; }
+.wa-lemb-vazio { font-size: 12px; color: var(--text-secondary, #94a3b8); font-style: italic; }
+
+@media (max-width: 760px) {
+  .wa-lembrete-quando { grid-template-columns: 1fr 1fr; }
+  .wa-lembrete-previa-item { grid-template-columns: 46px minmax(0, 1fr); }
+  .wa-lembrete-previa-rot { display: none; }
+  .wa-lemb-item { grid-template-columns: 46px minmax(0, 1fr) auto; }
+  .wa-lemb-item-rot, .wa-lemb-item-erro { display: none; }
+}

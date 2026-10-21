@@ -139,6 +139,9 @@ function aplicarVariaveis(texto, dados) {
   t = t.replace(/\{link_vagas\}/gi, link);
   // Arruma espaço dobrado e espaço antes de pontuação, que sobram da troca.
   t = t.replace(/[ \t]{2,}/g, ' ').replace(/\s+([,.;!?])/g, '$1');
+  // Vírgula ÓRFÃ NO COMEÇO da linha. "{nome}, a entrevista já começou" com
+  // nome vazio virava ", a entrevista já começou" — com a vírgula na frente.
+  t = t.replace(/(^|\n)[ \t]*,[ \t]*/g, '$1');
   // Primeira letra maiúscula quando a frase começou com {saudacao}.
   t = t.replace(/(^|\n)\s*([a-zà-ú])/g, function (_m, antes, letra) {
     return antes + letra.toUpperCase();
@@ -338,7 +341,8 @@ function registrarNaConversa(ctx, tipo, conteudo, wamid, mediaUrl) {
       conversation_id: ctx.conversation_id, account_id: ctx.account_id,
       wamid: wamid || null, direction: 'outgoing', type: tipo,
       content: conteudo || '', media_url: mediaUrl || '',
-      status: wamid ? 'sent' : 'failed', sender_name: 'bot', sent_by_bot: 1
+      status: wamid ? 'sent' : 'failed', sender_name: 'bot', sent_by_bot: 1,
+      origem: 'bot'            // o balao mostra "Bot" em letra pequena
     });
     _db.conversations.update(ctx.conversation_id, {
       last_message_text: String(conteudo || '').slice(0, 200),
@@ -351,7 +355,7 @@ function registrarNaConversa(ctx, tipo, conteudo, wamid, mediaUrl) {
         message: {
           id: msgId, direction: 'outgoing', type: tipo, content: conteudo || '',
           media_url: mediaUrl || '', status: wamid ? 'sent' : 'failed',
-          sender_name: 'bot', sent_by_bot: 1, created_at: new Date().toISOString()
+          sender_name: 'bot', sent_by_bot: 1, origem: 'bot', created_at: new Date().toISOString()
         }
       });
     }

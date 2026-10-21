@@ -84,6 +84,8 @@ const SUITES = [
     titulo: 'Bot de atendimento: ordem de decisao, fila, permissao e midia' },
   { nome: 'midia',     arquivo: 'midia.cjs',          servidor: true,  navegador: false, semente: sementeAcesso,
     titulo: 'Midia que chega: tipo certo, rota com sessao, persistencia e nova tentativa' },
+  { nome: 'lembretes', arquivo: 'lembretes.cjs',      servidor: true,  navegador: false, semente: sementeAcesso,
+    titulo: 'Lembretes automaticos: horario, fila, cancelar, reagendar, janela e atraso' },
   { nome: 'respostas', arquivo: 'respostas.cjs',       servidor: true,  navegador: false, semente: sementeAcesso,
     titulo: 'Mensagens prontas: janela de 24h, catalogo, permissao, anexo e previa' },
   { nome: 'respostas-ui', arquivo: 'respostas-ui.cjs',  servidor: true,  navegador: true,

@@ -157,6 +157,114 @@
       '</div>';
   };
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // LEMBRETE NA HORA DO ENVIO
+  // Quando a mensagem pronta tem lembrete, a conversa mostra uma linha
+  // pequena acima da caixa: "Entrevista às 12:00, lembretes às 11:45 e às
+  // 12:00", com a opção de mudar o horário SÓ deste envio.
+  // ══════════════════════════════════════════════════════════════════════════
+  let _prontaNaCaixa = null;     // { id, horario, data } da pronta que caiu na caixa
+
+  function listaDeHorarios(prev) {
+    const hs = (prev.lembretes || []).map(function (x) { return x.horario_envio; });
+    if (hs.length <= 1) return hs.join('');
+    return hs.slice(0, -1).join(', ') + ' e às ' + hs[hs.length - 1];
+  }
+
+  async function mostrarLinhaDoLembrete(resposta_id, horario, data) {
+    const alvo = document.getElementById('wa-prontas');
+    if (!alvo) return null;
+    let prev = null;
+    try {
+      const r = await fetch('/api/whatsapp/lembretes/previsao', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resposta_id: resposta_id, horario: horario || '', data: data })
+      });
+      const j = await r.json().catch(function () { return {}; });
+      prev = (j && j.ok) ? j.previsao : null;
+    } catch (e) { prev = null; }
+    const velha = document.getElementById('wa-lembrete-linha');
+    if (velha) velha.remove();
+    if (!prev) { _prontaNaCaixa = null; return null; }
+    _prontaNaCaixa = { id: resposta_id, horario: horario || prev.evento_horario, data: data };
+    const linha = document.createElement('div');
+    linha.id = 'wa-lembrete-linha';
+    linha.className = 'wa-lembrete-linha';
+    linha.innerHTML =
+      '<i class="fa-solid fa-clock"></i> <b>' + esc(prev.evento_horario) + '</b>' +
+      ', lembretes às ' + esc(listaDeHorarios(prev)) +
+      ' <button class="wa-lembrete-trocar" title="Mudar o horário só deste envio" ' +
+      'onclick="respostasTrocarHorarioDoEnvio()"><i class="fa-solid fa-pen"></i> mudar</button>' +
+      '<button class="wa-lembrete-trocar" title="Não agendar lembrete neste envio" ' +
+      'onclick="respostasSemLembrete()"><i class="fa-solid fa-xmark"></i> sem lembrete</button>';
+    alvo.insertAdjacentElement('beforebegin', linha);
+    return prev;
+  }
+
+  window.respostasTrocarHorarioDoEnvio = async function () {
+    if (!_prontaNaCaixa) return;
+    const novo = prompt('Horário do evento para ESTE envio (ex.: 14:30):', _prontaNaCaixa.horario || '');
+    if (novo === null) return;
+    if (!/^\d{1,2}:\d{2}$/.test(String(novo).trim())) { aviso('Horário no formato 14:30.', true); return; }
+    await mostrarLinhaDoLembrete(_prontaNaCaixa.id, String(novo).trim(), _prontaNaCaixa.data);
+  };
+  window.respostasSemLembrete = function () {
+    _prontaNaCaixa = null;
+    const l = document.getElementById('wa-lembrete-linha');
+    if (l) l.remove();
+  };
+  // O js/whatsapp.js pergunta isto ao mandar pelo avião: é assim que o envio
+  // normal também agenda o lembrete.
+  window.respostasProntaDaCaixa = function () { return _prontaNaCaixa; };
+
+  // ── AVISO DO QUE ESTÁ AGENDADO NESTA CONVERSA ───────────────────────────
+  window.respostasAvisoAgendado = async function (convId) {
+    const alvo = document.getElementById('wa-prontas');
+    if (!alvo || !convId) return;
+    let lista = [];
+    try {
+      const r = await fetch('/api/whatsapp/lembretes/conversa/' + encodeURIComponent(convId), { credentials: 'same-origin' });
+      const j = await r.json().catch(function () { return {}; });
+      lista = (j && j.ok && j.lembretes) || [];
+    } catch (e) { lista = []; }
+    const velho = document.getElementById('wa-lembrete-agendado');
+    if (velho) velho.remove();
+    if (!lista.length) return;
+    const caixa = document.createElement('div');
+    caixa.id = 'wa-lembrete-agendado';
+    caixa.className = 'wa-lembrete-agendado';
+    caixa.innerHTML = lista.map(function (l) {
+      return '<span class="wa-lembrete-ag-item">' +
+        '<i class="fa-solid fa-bell"></i> Lembrete agendado para <b>' + esc(_hhmmDeSql(l.enviar_em)) + '</b>' +
+        ' <button class="wa-lembrete-trocar" title="Cancelar este lembrete" ' +
+        'onclick="respostasCancelarAgendado(' + Number(l.id) + ',' + Number(convId) + ')">' +
+        '<i class="fa-solid fa-xmark"></i> cancelar</button></span>';
+    }).join('');
+    alvo.insertAdjacentElement('beforebegin', caixa);
+  };
+
+  window.respostasCancelarAgendado = async function (id, convId) {
+    try {
+      const r = await fetch('/api/whatsapp/lembretes/' + encodeURIComponent(id) + '/cancelar',
+                            { method: 'POST', credentials: 'same-origin' });
+      const j = await r.json().catch(function () { return {}; });
+      if (!j.ok) { aviso(j.error || 'Não consegui cancelar.', true); return; }
+      aviso('Lembrete cancelado.');
+      respostasAvisoAgendado(convId);
+    } catch (e) { aviso('Falha: ' + (e.message || e), true); }
+  };
+
+  // Hora (em Brasília) de uma data guardada no formato do SQLite (UTC).
+  function _hhmmDeSql(txt) {
+    const s = String(txt || '').trim().replace(' ', 'T');
+    const d = new Date(s.length <= 19 ? s + 'Z' : s);
+    if (isNaN(d)) return String(txt || '');
+    const sp = new Date(d.getTime() - 180 * 60000);
+    const dois = function (n) { return String(n).padStart(2, '0'); };
+    return dois(sp.getUTCHours()) + ':' + dois(sp.getUTCMinutes());
+  }
+
   // Texto na caixa, para o atendente ajustar antes de mandar.
   window.respostasUsar = async function (id) {
     const r = porId(id);
@@ -217,6 +325,13 @@
         // O bot acabou de ser pausado neste contato: o cabeçalho mostra isso.
         if (typeof botCarregarControle === 'function' && _convObj && _convObj.contact_id) {
           botCarregarControle(_convObj.contact_id);
+        }
+        // Lembretes agendados neste envio: a conversa avisa, com cancelar.
+        if (j.lembretes && j.lembretes.agendados) {
+          aviso(j.lembretes.agendados === 1
+            ? 'Enviada. 1 lembrete agendado.'
+            : 'Enviada. ' + j.lembretes.agendados + ' lembretes agendados.');
+          respostasAvisoAgendado(_convDaFileira);
         }
       } else if (j && j.janela_fechada) {
         aviso(j.error || 'A janela de 24 horas fechou.', true);
@@ -386,8 +501,237 @@
             </span>` : ''}
         </div>
         <div class="wa-prontas-card-txt texto-longo">${esc(r.texto || '')}</div>
+        ${(r.lembrete && r.lembrete.ligado)
+          ? `<span class="wa-prontas-chip wa-chip-lembrete" title="Lembretes automáticos">
+               <i class="fa-solid fa-clock"></i> ${esc(r.lembrete.horario || '')} ·
+               ${(r.lembrete.lembretes || []).length} lembrete${(r.lembrete.lembretes || []).length === 1 ? '' : 's'}</span>`
+          : ''}
         ${anexo}
       </div>`;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // LEMBRETE AUTOMÁTICO (dentro da mensagem pronta)
+  // A configuração vive DENTRO do registro da mensagem pronta, então ela é
+  // gravada pelo mesmo caminho (upsertIds) e aparece na Auditoria junto.
+  // ══════════════════════════════════════════════════════════════════════════
+  const VARIAVEIS_LEMBRETE = [
+    { v: '{nome}', d: 'primeiro nome do contato' },
+    { v: '{saudacao}', d: 'bom dia / boa tarde / boa noite' },
+    { v: '{horario}', d: 'horário do evento (ex.: 12:00)' },
+    { v: '{link}', d: 'o link que está no texto da mensagem pronta' }
+  ];
+
+  function lembreteDoForm(f) {
+    if (!f.lembrete || typeof f.lembrete !== 'object') {
+      f.lembrete = { ligado: false, horario: '12:00', data: '', lembretes: [] };
+    }
+    if (!Array.isArray(f.lembrete.lembretes)) f.lembrete.lembretes = [];
+    return f.lembrete;
+  }
+
+  function lembreteHTML(f) {
+    const L = lembreteDoForm(f);
+    const vars = VARIAVEIS_LEMBRETE.map(function (x) {
+      return '<span class="wa-prontas-var" title="' + esc(x.d) + '">' + esc(x.v) + '</span>';
+    }).join('');
+    return `
+      <div class="wa-lembrete-bloco">
+        <label class="wa-lembrete-chave">
+          <input type="checkbox" id="resp-lembrete-ligado" ${L.ligado ? 'checked' : ''} onchange="respostasLembreteLigar(this.checked)">
+          <span><i class="fa-solid fa-clock"></i> Adicionar lembrete</span>
+          <small>manda sozinho, perto da hora, só para quem recebeu esta mensagem</small>
+        </label>
+
+        ${!L.ligado ? '' : `
+        <div class="wa-lembrete-corpo">
+          <div class="wa-lembrete-quando">
+            <div class="wa-prontas-form-linha curta">
+              <label>Horário do evento</label>
+              <input type="time" id="resp-lembrete-horario" value="${esc(L.horario || '12:00')}" onchange="respostasLembreteCampo('horario', this.value)">
+            </div>
+            <div class="wa-prontas-form-linha curta">
+              <label>Data <span class="wa-prontas-hint">(opcional)</span></label>
+              <input type="date" id="resp-lembrete-data" value="${esc(L.data || '')}" onchange="respostasLembreteCampo('data', this.value)">
+            </div>
+            <p class="wa-lembrete-dica">${L.data
+              ? 'Vale só nessa data.'
+              : 'Sem data, vale o próximo ' + esc(L.horario || '12:00') + ': hoje, se ainda não passou; amanhã, se já passou.'}</p>
+          </div>
+
+          <div class="wa-lembrete-lista">
+            ${L.lembretes.length === 0
+              ? '<div class="wa-lembrete-vazio">Nenhum lembrete ainda. Clique em <b>+ adicionar lembrete</b>.</div>'
+              : L.lembretes.map(function (l, i) { return lembreteItemHTML(l, i); }).join('')}
+          </div>
+          <button class="wa-lembrete-add" onclick="respostasLembreteNovo()">
+            <i class="fa-solid fa-plus"></i> adicionar lembrete</button>
+          <div class="wa-prontas-vars">Variáveis: ${vars}</div>
+
+          ${lembretePreviaHTML(f, L)}
+        </div>`}
+      </div>`;
+  }
+
+  function lembreteItemHTML(l, i) {
+    const tipo = l.tipo || 'minutos';
+    const anexo = l.arquivo
+      ? `<span class="wa-prontas-chip"><i class="fa-solid ${l.tipoAnexo === 'documento' ? 'fa-file-pdf' : 'fa-image'}"></i>
+           ${esc(l.nomeArquivo || l.arquivo)}
+           <button class="wa-btn-mini perigo" title="Tirar o anexo" onclick="respostasLembreteTirarAnexo(${i})"><i class="fa-solid fa-xmark"></i></button></span>`
+      : `<label class="wa-btn-arq-mini"><i class="fa-solid fa-paperclip"></i> anexo
+           <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" style="display:none" onchange="respostasLembreteAnexar(${i}, this)"></label>`;
+    return `
+      <div class="wa-lembrete-item">
+        <div class="wa-lembrete-item-topo">
+          <select onchange="respostasLembreteItem(${i}, 'tipo', this.value)">
+            <option value="minutos" ${tipo === 'minutos' ? 'selected' : ''}>minutos antes</option>
+            <option value="horas" ${tipo === 'horas' ? 'selected' : ''}>horas antes</option>
+            <option value="na_hora" ${tipo === 'na_hora' ? 'selected' : ''}>na hora do evento</option>
+          </select>
+          ${tipo === 'na_hora' ? '' : `<input type="number" min="1" max="999" class="wa-lembrete-num"
+             value="${Number(l.valor) || 15}" onchange="respostasLembreteItem(${i}, 'valor', this.value)">`}
+          ${anexo}
+          <button class="wa-btn-mini perigo" title="Remover este lembrete" onclick="respostasLembreteRemover(${i})"><i class="fa-solid fa-trash"></i></button>
+        </div>
+        <textarea rows="2" placeholder="Ex.: {saudacao} {nome}! Sua entrevista é às {horario}. Link: {link}"
+          oninput="respostasLembreteItem(${i}, 'texto', this.value)">${esc(l.texto || '')}</textarea>
+      </div>`;
+  }
+
+  // PRÉVIA: como cada lembrete vai chegar, com um nome de exemplo. É o que
+  // evita descobrir o erro de texto depois de mandar para 30 pessoas.
+  function lembretePreviaHTML(f, L) {
+    const validos = L.lembretes.filter(function (l) { return String(l.texto || '').trim(); });
+    if (!validos.length) return '';
+    const horario = L.horario || '12:00';
+    const link = (String(f.texto || '').match(/https?:\/\/[^\s<>"]+/) || [''])[0];
+    const itens = validos.map(function (l) {
+      const quanto = l.tipo === 'na_hora' ? 0
+        : (l.tipo === 'horas' ? (Number(l.valor) || 0) * 60 : (Number(l.valor) || 0));
+      return {
+        rotulo: quanto === 0 ? 'na hora do evento'
+          : (quanto % 60 === 0 ? (quanto / 60) + (quanto === 60 ? ' hora antes' : ' horas antes')
+                               : quanto + (quanto === 1 ? ' minuto antes' : ' minutos antes')),
+        sai: horarioMenos(horario, quanto),
+        texto: previaTexto(l.texto, horario, link)
+      };
+    }).sort(function (a, b) { return a.sai < b.sai ? -1 : 1; });
+    return `
+      <div class="wa-lembrete-previa">
+        <div class="wa-lembrete-previa-tit"><i class="fa-regular fa-eye"></i> Como vai chegar</div>
+        ${itens.map(function (x) {
+          return `<div class="wa-lembrete-previa-item">
+            <span class="wa-lembrete-previa-hora">${esc(x.sai)}</span>
+            <span class="wa-lembrete-previa-rot">${esc(x.rotulo)}</span>
+            <div class="bot-previa-bolha texto-longo">${esc(x.texto)}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+  }
+
+  function horarioMenos(hhmm, minutos) {
+    const p = String(hhmm || '12:00').split(':');
+    let total = (Number(p[0]) || 0) * 60 + (Number(p[1]) || 0) - (Number(minutos) || 0);
+    while (total < 0) total += 1440;
+    const dois = function (n) { return String(n).padStart(2, '0'); };
+    return dois(Math.floor(total / 60) % 24) + ':' + dois(total % 60);
+  }
+  // Troca das variáveis só para a PRÉVIA. O texto que sai de verdade é
+  // resolvido no servidor, na hora do envio.
+  function previaTexto(texto, horario, link) {
+    const h = new Date().getHours();
+    const saud = (h >= 5 && h < 12) ? 'bom dia' : (h >= 12 && h < 18 ? 'boa tarde' : 'boa noite');
+    return String(texto || '')
+      .replace(/\{nome\}/gi, 'Maria')
+      .replace(/\{saudacao\}/gi, saud)
+      .replace(/\{horario\}/gi, horario)
+      .replace(/\{link\}/gi, link || '(o link da mensagem)')
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/(^|\n)\s*([a-zà-ú])/g, function (_m, a, c) { return a + c.toUpperCase(); });
+  }
+
+  // ── handlers do cadastro do lembrete ─────────────────────────────────────
+  window.respostasLembreteLigar = function (ligado) {
+    if (!_form) return;
+    lerForm();
+    const L = lembreteDoForm(_form);
+    L.ligado = !!ligado;
+    if (L.ligado && !L.lembretes.length) {
+      // Começa com o par que o atendimento usa todo dia.
+      L.lembretes = [
+        { id: novoIdLembrete(), tipo: 'minutos', valor: 15, texto: '{saudacao} {nome}! Sua entrevista é às {horario}. O link é este: {link}' },
+        { id: novoIdLembrete(), tipo: 'na_hora', valor: 0, texto: '{nome}, a entrevista já começou. Estou te esperando: {link}' }
+      ];
+    }
+    redesenhar();
+  };
+  window.respostasLembreteCampo = function (campo, valor) {
+    if (!_form) return;
+    lerForm();
+    lembreteDoForm(_form)[campo] = String(valor || '');
+    redesenhar();
+  };
+  window.respostasLembreteNovo = function () {
+    if (!_form) return;
+    lerForm();
+    lembreteDoForm(_form).lembretes.push({ id: novoIdLembrete(), tipo: 'minutos', valor: 30, texto: '' });
+    redesenhar();
+  };
+  window.respostasLembreteRemover = function (i) {
+    if (!_form) return;
+    lerForm();
+    lembreteDoForm(_form).lembretes.splice(i, 1);
+    redesenhar();
+  };
+  window.respostasLembreteItem = function (i, campo, valor) {
+    if (!_form) return;
+    const L = lembreteDoForm(_form);
+    if (!L.lembretes[i]) return;
+    L.lembretes[i][campo] = campo === 'valor' ? Math.max(0, Number(valor) || 0) : String(valor || '');
+    // Texto não redesenha a cada tecla (perderia o cursor); os outros sim,
+    // porque mudam o que a tela mostra.
+    if (campo !== 'texto') redesenhar();
+  };
+  window.respostasLembreteAnexar = function (i, input) {
+    if (!_form) return;
+    const arq = input && input.files && input.files[0];
+    if (!arq) return;
+    if (arq.size > 20 * 1024 * 1024) { aviso('Arquivo muito grande (máximo 20 MB).', true); input.value = ''; return; }
+    lerForm();
+    const leitor = new FileReader();
+    leitor.onload = async function () {
+      try {
+        const r = await fetch('/api/whatsapp/respostas/midia', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dataUrl: leitor.result })
+        });
+        const j = await r.json().catch(function () { return {}; });
+        if (!j.ok) { aviso(j.error || 'Não consegui enviar o arquivo.', true); return; }
+        const L = lembreteDoForm(_form);
+        if (!L.lembretes[i]) return;
+        L.lembretes[i].arquivo = j.arquivo;
+        L.lembretes[i].nomeArquivo = arq.name;
+        L.lembretes[i].mime = j.mime;
+        L.lembretes[i].tipoAnexo = j.tipoAnexo;
+        aviso('Anexo do lembrete pronto. Clique em Salvar.');
+        redesenhar();
+      } catch (e) { aviso('Falha no envio: ' + (e.message || e), true); }
+    };
+    leitor.readAsDataURL(arq);
+  };
+  window.respostasLembreteTirarAnexo = function (i) {
+    if (!_form) return;
+    lerForm();
+    const L = lembreteDoForm(_form);
+    if (!L.lembretes[i]) return;
+    L.lembretes[i].arquivo = ''; L.lembretes[i].nomeArquivo = '';
+    L.lembretes[i].mime = ''; L.lembretes[i].tipoAnexo = '';
+    redesenhar();
+  };
+  function novoIdLembrete() {
+    return 'lem-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   }
 
   function formHTML(f) {
@@ -423,6 +767,7 @@
             <input type="number" id="resp-ordem" min="1" max="99" value="${Number(f.ordem) || 1}">
           </div>
         </div>
+        ${lembreteHTML(f)}
         <div class="wa-prontas-form-botoes">
           <button class="mod-btn-secondary" onclick="respostasCancelarForm()">Cancelar</button>
           <button class="mod-btn-primary" onclick="respostasSalvarForm()"><i class="fa-solid fa-check"></i> Salvar</button>
@@ -488,6 +833,31 @@
       criadoEm: _form.criadoEm || new Date().toISOString(),
       atualizadoEm: new Date().toISOString()
     };
+    // O lembrete vai DENTRO do registro: mesma gravacao, mesma Auditoria,
+    // mesma permissao. So entra se estiver ligado e tiver texto, para nao
+    // guardar lixo no state.json.
+    const Lcfg = _form.lembrete;
+    if (Lcfg && Lcfg.ligado) {
+      const limpos = (Array.isArray(Lcfg.lembretes) ? Lcfg.lembretes : [])
+        .filter(function (l) { return l && String(l.texto || '').trim(); })
+        .map(function (l) {
+          return {
+            id: l.id || novoIdLembrete(), tipo: l.tipo || 'minutos',
+            valor: l.tipo === 'na_hora' ? 0 : Math.max(0, Number(l.valor) || 0),
+            texto: String(l.texto || '').trim(),
+            arquivo: l.arquivo || '', nomeArquivo: l.nomeArquivo || '',
+            mime: l.mime || '', tipoAnexo: l.tipoAnexo || ''
+          };
+        });
+      if (!limpos.length) {
+        aviso('O lembrete esta ligado mas nenhum tem texto. Escreva o texto ou desligue o lembrete.', true);
+        return;
+      }
+      reg.lembrete = {
+        ligado: true, horario: String(Lcfg.horario || '12:00'),
+        data: String(Lcfg.data || ''), lembretes: limpos
+      };
+    }
     const lista = catalogo();
     const i = lista.findIndex(function (r) { return r && String(r.id) === String(reg.id); });
     const novo = i < 0;
