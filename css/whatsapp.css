@@ -882,3 +882,28 @@ body.wa-tela-cheia { overflow: hidden; }
   .wa-prontas-form-cols { grid-template-columns: 1fr; }
   .wa-prontas-lista-itens { max-height: 180px; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MÍDIA QUE CHEGA — o que fazer quando o arquivo não está aqui
+   ══════════════════════════════════════════════════════════════════════════ */
+.wa-midia-nao { display: inline-flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 12.5px; color: #92400e; }
+.wa-midia-nao > i { color: #b45309; }
+.wa-midia-tentar {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid rgba(180,83,9,.35); background: rgba(234,179,8,.14); color: #92400e;
+  border-radius: 9999px; padding: 2px 9px; font-size: 11px; font-family: inherit; cursor: pointer;
+}
+.wa-midia-tentar:hover:not(:disabled) { background: rgba(234,179,8,.26); }
+.wa-midia-tentar:disabled { opacity: .6; cursor: progress; }
+
+/* Áudio: botão de baixar sempre à mão, e o aviso de formato não suportado */
+.wa-audio-baixar { color: #54656f; font-size: 12px; text-decoration: none; padding: 2px 4px; }
+.wa-audio-baixar:hover { color: var(--wa-verde-escuro, #047857); }
+.wa-audio-sem {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 12.5px; color: #475569;
+}
+.wa-audio-sem .wa-audio-baixar {
+  display: inline-flex; align-items: center; gap: 5px; font-weight: 600;
+  border: 1px solid var(--border-color, #cbd5e1); border-radius: 9999px; padding: 3px 10px;
+}

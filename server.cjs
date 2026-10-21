@@ -42,6 +42,12 @@ const DIARIA_DOCS_DIR = path.join(DATA_DIR, 'diaria-docs');
 // Midia do bot: FORA de /uploads/ (que e publico, regra 7). So sai pela
 // rota autenticada /api/whatsapp/bot/midia/<arquivo>.
 const BOT_MIDIA_DIR = path.join(DATA_DIR, 'bot-midia');
+// Midia que CHEGA do contato (foto, audio, video, documento, figurinha).
+// Tambem FORA de /uploads/: e dado da pessoa, e por link publico qualquer um
+// que adivinhasse o nome do arquivo abriria a foto dela. Sai so pela rota
+// autenticada /api/whatsapp/midia/<arquivo>. O caminho e o MESMO que o
+// whatsapp-webhook.cjs calcula a partir de DATA_DIR.
+const WA_MIDIA_DIR = path.join(DATA_DIR, 'wa-midia');
 const LIMITE_CORPO = 160 * 1024 * 1024; // 160 MB. O corpo inteiro e montado na MEMORIA (data += chunk);
 // ATENCAO: ja aconteceu de o state.json passar de 48 MB (fotos gravadas DENTRO
 // do JSON) e TODO save comecar a ser recusado silenciosamente. O limite subiu
@@ -75,6 +81,7 @@ try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (e) {}
 try { fs.mkdirSync(BACKUP_DIR, { recursive: true }); } catch (e) {}
 try { fs.mkdirSync(DIARIA_DOCS_DIR, { recursive: true }); } catch (e) {}
 try { fs.mkdirSync(BOT_MIDIA_DIR, { recursive: true }); } catch (e) {}
+try { fs.mkdirSync(WA_MIDIA_DIR, { recursive: true }); } catch (e) {}
 
 // ── BACKUP DA INICIALIZAÇÃO ────────────────────────────────────────────────
 // Guarda uma cópia do state.json ANTES de o sistema ler ou gravar qualquer
@@ -3413,6 +3420,126 @@ http.createServer(function (req, res) {
     // sistema e o que faz remover e reordenar funcionarem com duas pessoas
     // logadas.
     // ══════════════════════════════════════════════════════════════════════
+
+    // ══════════════════════════════════════════════════════════════════════
+    // MÍDIA QUE CHEGA DO CONTATO
+    // O arquivo é baixado da Meta quando a mensagem chega (a URL dela expira
+    // em minutos) e guardado em DATA_DIR/wa-midia, FORA de /uploads/.
+    // Aqui ele sai só para quem tem sessão e a tela do WhatsApp.
+    // ══════════════════════════════════════════════════════════════════════
+    var mWaMidia = urlPath.match(/^\/api\/whatsapp\/midia\/([^\/]+)$/);
+    if (mWaMidia && req.method === 'GET') {
+      var uWm = waUsuarioTemPermissao(req, 'visualizar');
+      if (!uWm) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      var nomeWm = decodeSeguro(mWaMidia[1]);
+      if (nomeWm === null) { responderJson(res, 400, { ok: false, error: 'nome inválido' }); return; }
+      var baseWm = path.basename(nomeWm);
+      // Só arquivo de mídia do WhatsApp (o download sempre nomeia com "wa_").
+      if (!/^wa_[\w.\-]+$/.test(baseWm)) {
+        responderJson(res, 404, { ok: false, error: 'não encontrado' }); return;
+      }
+      var alvoWm = path.join(WA_MIDIA_DIR, baseWm);
+      // COMPATIBILIDADE: antes a mídia recebida ia para a pasta pública de
+      // uploads. Os arquivos antigos continuam lá, e a tela antiga aponta para
+      // /uploads/. Esta rota também os encontra, para a conversa de ontem não
+      // ficar sem foto.
+      if (!fs.existsSync(alvoWm)) alvoWm = path.join(UPLOADS_DIR, baseWm);
+      fs.readFile(alvoWm, function (e, dados) {
+        if (e) { responderJson(res, 404, { ok: false, error: 'não encontrado' }); return; }
+        var tipoWm = detectarTipoReal(dados);
+        // SVG e HTML nunca saem inline: rodariam script na origem do sistema.
+        if (tipoWm === 'svg' || tipoWm === 'html') {
+          res.writeHead(200, Object.assign({}, SECURITY_HEADERS, {
+            'Content-Type': 'application/octet-stream', 'X-Content-Type-Options': 'nosniff',
+            'Content-Disposition': 'attachment; filename="' + baseWm.replace(/[^\w.\- ]/g, '_') + '"'
+          }));
+          res.end(dados); return;
+        }
+        // O tipo vem da EXTENSÃO (que saiu do mime da Meta no download) e é
+        // conferido contra o conteúdo. É isso que faz o áudio de voz tocar:
+        // "audio/ogg" no lugar de "application/octet-stream".
+        var extWm = path.extname(baseWm).toLowerCase();
+        var ctWm = TIPOS_IMAGEM_SEGURA[tipoWm] || MIME[extWm] || 'application/octet-stream';
+        res.writeHead(200, Object.assign({}, SECURITY_HEADERS, {
+          'Content-Type': ctWm,
+          'X-Content-Type-Options': 'nosniff',
+          'Accept-Ranges': 'none',
+          'Cache-Control': 'private, max-age=86400'
+        }));
+        res.end(dados);
+      });
+      return;
+    }
+
+    // Tentar baixar de novo a mídia de UMA mensagem (o botão "tentar de novo")
+    var mWaReb = urlPath.match(/^\/api\/whatsapp\/mensagens\/(\d+)\/midia$/);
+    if (mWaReb && req.method === 'POST') {
+      var uWr = waUsuarioTemPermissao(req, 'visualizar');
+      if (!uWr) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      if (!waWebhook || !waWebhook.baixarMidiaDaMensagem) {
+        responderJson(res, 200, { ok: false, error: 'Módulo de mídia indisponível.' }); return;
+      }
+      var msgWr = null;
+      try { msgWr = waDb.messages.getById(Number(mWaReb[1])); } catch (e) { msgWr = null; }
+      if (!msgWr) { responderJson(res, 404, { ok: false, error: 'Mensagem não encontrada.' }); return; }
+      if (!waPodeAcessarConta(uWr, msgWr.account_id)) {
+        responderJson(res, 403, { ok: false, error: 'Mensagem de outra conta.' }); return;
+      }
+      if (!msgWr.media_id) { responderJson(res, 200, { ok: false, error: 'Esta mensagem não tem mídia.' }); return; }
+      var contaWr = null;
+      try { contaWr = waDb.accounts.getById(msgWr.account_id); } catch (e) { contaWr = null; }
+      waWebhook.baixarMidiaDaMensagem(waDb, waApi, contaWr, msgWr, notifySSEClients)
+        .then(function (r) {
+          responderJson(res, 200, {
+            ok: !!r.ok, media_url: r.media_url || '',
+            expirada: !!r.expirada,
+            error: r.ok ? '' : (r.expirada
+              ? 'A Meta já apagou este arquivo (ela guarda por cerca de 30 dias).'
+              : (r.error || 'Não consegui baixar.'))
+          });
+        })
+        .catch(function (e) { responderJson(res, 200, { ok: false, error: e.message }); });
+      return;
+    }
+
+    // Tentar baixar o que faltou numa CONVERSA. A tela chama isto ao abrir a
+    // conversa: mensagem antiga que ficou sem arquivo ganha outra chance, sem
+    // ninguém precisar clicar.
+    var mWaRebC = urlPath.match(/^\/api\/whatsapp\/conversations\/(\d+)\/midia-pendente$/);
+    if (mWaRebC && req.method === 'POST') {
+      var uWc = waUsuarioTemPermissao(req, 'visualizar');
+      if (!uWc) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      if (!waWebhook || !waWebhook.baixarMidiaDaMensagem) {
+        responderJson(res, 200, { ok: true, baixadas: 0, pendentes: 0 }); return;
+      }
+      var convWc = null;
+      try { convWc = waDb.conversations.getById(Number(mWaRebC[1])); } catch (e) { convWc = null; }
+      if (!convWc) { responderJson(res, 404, { ok: false, error: 'Conversa não encontrada.' }); return; }
+      if (!waPodeAcessarConta(uWc, convWc.account_id)) {
+        responderJson(res, 403, { ok: false, error: 'Conversa de outra conta.' }); return;
+      }
+      var pendentes = [];
+      try { pendentes = waDb.messages.pendentesDeMidia(convWc.id, 10) || []; } catch (e) { pendentes = []; }
+      if (!pendentes.length) { responderJson(res, 200, { ok: true, baixadas: 0, pendentes: 0 }); return; }
+      var contaWc = null;
+      try { contaWc = waDb.accounts.getById(convWc.account_id); } catch (e) { contaWc = null; }
+      // Uma por vez, em fila: dez downloads simultâneos tomariam limite da
+      // Meta e atrapalhariam o envio de mensagem, que é mais importante.
+      var baixadas = 0;
+      var proxima = function (i) {
+        if (i >= pendentes.length) {
+          responderJson(res, 200, { ok: true, baixadas: baixadas, pendentes: pendentes.length });
+          return;
+        }
+        var m = pendentes[i];
+        m.conversation_id = convWc.id;
+        waWebhook.baixarMidiaDaMensagem(waDb, waApi, contaWc, m, notifySSEClients)
+          .then(function (r) { if (r && r.ok) baixadas++; proxima(i + 1); })
+          .catch(function () { proxima(i + 1); });
+      };
+      proxima(0);
+      return;
+    }
 
     // ══════════════════════════════════════════════════════════════════════
     // MENSAGENS PRONTAS

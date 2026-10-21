@@ -443,6 +443,41 @@ devolve o catálogo como estava.
 anexo, prévia) e `respostas-ui` (fileira com a janela fechada, lista do `/`,
 cadastro com HTML no título, celular).
 
+### 5.4 Mídia que chega do contato
+
+Foto, áudio, vídeo, documento e figurinha que a pessoa manda.
+
+**A URL da Meta expira em minutos.** Por isso o arquivo é baixado quando a
+mensagem chega (em segundo plano, para não atrasar a resposta ao webhook, que
+a Meta exige rápida) e guardado em `DATA_DIR/wa-midia`.
+
+| O que | Onde | Motivo |
+|---|---|---|
+| O arquivo | `DATA_DIR/wa-midia/wa_*` | **fora** de `/uploads/`, que é público (regra 7): foto e documento do candidato saíam por link adivinhável |
+| O endereço na mensagem | `whatsapp_messages.media_url` | gravado por `messages.gravarMidia`, que usa o helper `run` — é ele que **salva o banco em disco** |
+| A ficha do arquivo | tabela `whatsapp_media` | via `media.registrar`, pelo mesmo helper |
+| Quem entrega | `GET /api/whatsapp/midia/<arquivo>` | exige sessão e a tela `whatsapp`; o tipo sai do **conteúdo** do arquivo |
+
+**Tentativas.** Três tentativas com intervalo crescente, porque a falha quase
+sempre é passageira (rede, 429 da Meta). O que **não** se tenta de novo é mídia
+que a Meta já apagou (ela guarda por cerca de 30 dias): nesse caso a mensagem
+fica marcada (`media_falhou`) e a tela mostra **"mídia não disponível"** com um
+botão de tentar de novo — antes isso ficava em "(baixando...)" para sempre.
+Ao abrir uma conversa, a tela pede ao servidor para tentar o que ficou
+pendente (`POST /api/whatsapp/conversations/<id>/midia-pendente`, no máximo 10
+por vez, uma atrás da outra para não tomar limite da Meta).
+
+**Áudio de voz.** Chega como `audio/ogg; codecs=opus`. A tabela de extensões
+comparava a string inteira e devolvia nada: o arquivo virava `.bin`, era
+servido como `application/octet-stream` e o player não tocava. Agora o
+parâmetro é descartado antes da comparação. Onde o navegador não toca OGG/Opus
+(Safari/iPhone), a tela troca o player por um **botão de baixar**.
+
+**Compatibilidade:** a mídia antiga, que ficou na pasta pública, continua
+aparecendo — a rota nova procura lá também. Nada foi movido nem apagado.
+
+**Testado por:** suíte `midia`.
+
 ---
 
 ## 6. Fluxo Financeiro em detalhe
@@ -620,6 +655,9 @@ tipo de erro que volta: se você mexer na área, confira que não reintroduziu.
 | WhatsApp preso em "inicializando" e Conexões vazia | Arquivo `.cjs` novo fora do `COPY` do Dockerfile: o `require` falha e, por estar no mesmo `try` dos módulos essenciais, desliga o canal todo. **Nada havia sumido** |
 | Suíte de tela falhando só na execução completa | Espera por tempo fixo em vez de por condição, com a máquina ocupada |
 | Tela nova aparecendo sempre vazia | Ler o estado por `window.state`: o `state` é declarado com `let` no `js/app.js`, e `let` **não** cria propriedade no `window` — leia pelo nome (`typeof state !== 'undefined'`) |
+| Aba que não aparece, ou que diz "sem permissão" para quem tem | Mesmo caso com `window.loggedUser`: também é `let` no `js/app.js`. A aba Bot ficava invisível e o salvar recusava calado |
+| Foto recebida "desaparece" depois de um deploy | Gravar o endereço do arquivo com `getDb().prepare(...).run(...)`: muda só a memória. Toda escrita no SQLite do WhatsApp tem que passar pelo helper `run` do módulo, que salva em disco |
+| Áudio de voz que não toca | Tipo da Meta vem com parâmetro (`audio/ogg; codecs=opus`); comparar a string inteira com a tabela dava `.bin` e `octet-stream` |
 | Mensagem velha passando na frente da nova | `ORDER BY` numa data gravada como texto: `"...T10:00"` é maior que `"... 23:00"` (o `T` vem depois do espaço). Ordene por `julianday(...)` |
 
 ---
@@ -639,6 +677,7 @@ js/telas.js                  permissão por tela — MESMO arquivo nas duas pont
 whatsapp-bot.cjs             motor do bot (ordem de decisão, fila, envio)
 js/whatsapp-bot-ui.js        a aba Bot
 js/whatsapp-respostas-ui.js  mensagens prontas (fileira na conversa + cadastro)
+DATA_DIR/wa-midia/          midia que CHEGA do contato (fora da pasta publica)
 js/security.js               camadas extras de proteção no navegador
 js/data.js                   dados iniciais (NUNCA colocar senha aqui)
 css/                         estilos (style, design-system, por módulo)
@@ -667,9 +706,11 @@ docs/                        deploy no Coolify, WhatsApp, equipamentos
 - Permissão por tela com bloqueio no servidor (seção 4.1).
 - Bot de atendimento no WhatsApp oficial, nascendo desligado (seção 5.2).
 - Mensagens prontas na conversa, com janela de 24 horas respeitada (seção 5.3).
+- Mídia recebida: download que persiste, tipo certo no áudio de voz e rota
+  com sessão em vez da pasta pública (seção 5.4).
 - Testes automatizados **no repositório**: `node testes/rodar.cjs` sobe um
   servidor isolado numa porta livre (com pasta de dados descartável) por suíte,
-  e um Chrome sem janela nas suítes de tela. Hoje são 20 suítes, cobrindo
+  e um Chrome sem janela nas suítes de tela. Hoje são 21 suítes, cobrindo
   sincronização com duas sessões, segurança, permissão por tela, upload por
   conteúdo, bot, mensagens prontas e varredura das 25 abas no navegador.
   `node testes/rodar.cjs --lista` mostra todas; `node testes/rodar.cjs <nome>`

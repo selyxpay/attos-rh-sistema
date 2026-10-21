@@ -362,7 +362,14 @@ function criarTabelas() {
   // Marca a mensagem que o BOT mandou, para a conversa mostrar a etiqueta e
   // para a equipe distinguir do atendimento humano. ALTER falha em silencio
   // se a coluna ja existe; mensagem antiga fica com 0, o que esta certo.
-  ['sent_by_bot INTEGER DEFAULT 0'].forEach(function (col) {
+  // media_tentativas / media_falhou: controle do download da mídia que CHEGA.
+  // Sem isso, mídia que falhou ficava para sempre em "(baixando...)" e o
+  // sistema tentava de novo sem limite — ou nunca mais tentava. Mensagem
+  // antiga fica com 0, o que está certo: ninguém tentou ainda.
+  ['sent_by_bot INTEGER DEFAULT 0',
+   'media_tentativas INTEGER DEFAULT 0',
+   'media_falhou INTEGER DEFAULT 0',
+   'media_erro TEXT DEFAULT \'\''].forEach(function (col) {
     try { db.run('ALTER TABLE whatsapp_messages ADD COLUMN ' + col); } catch (e) {}
   });
 
@@ -782,11 +789,83 @@ const messages = {
     );
   },
 
+  // ── MÍDIA QUE CHEGA ─────────────────────────────────────────────────────
+  // Grava o arquivo baixado NA MENSAGEM, pelo helper `run` do módulo — que é
+  // o que salva o banco em disco. O webhook fazia esta gravação com
+  // `getDb().prepare(...).run(...)` direto: mudava só a memória, e no próximo
+  // reinício o endereço do arquivo tinha desaparecido. Era por isso que fotos
+  // antigas "não apareciam" mesmo com o arquivo salvo no volume.
+  gravarMidia(id, dados) {
+    run(`UPDATE whatsapp_messages
+            SET media_url = ?, media_mime_type = ?, media_filename = ?,
+                media_falhou = 0, media_erro = '',
+                media_tentativas = media_tentativas + 1
+          WHERE id = ?`,
+      [dados.media_url || '', dados.media_mime_type || '', dados.media_filename || '', id]);
+  },
+
+  // Tentativa que não deu certo. `definitivo` é para quando a Meta já apagou
+  // o arquivo: não há o que tentar de novo, e a tela avisa em vez de ficar
+  // eternamente em "(baixando...)".
+  falhouMidia(id, erro, definitivo) {
+    run(`UPDATE whatsapp_messages
+            SET media_tentativas = media_tentativas + 1,
+                media_falhou = ?, media_erro = ?
+          WHERE id = ?`,
+      [definitivo ? 1 : 0, String(erro || '').slice(0, 200), id]);
+  },
+
+  // Mensagens que têm media id e ainda não têm arquivo bom. É o que a tela
+  // pede para tentar de novo ao abrir a conversa.
+  // O ".bin" entra na lista de propósito: enquanto o tipo da Meta não era
+  // entendido ("audio/ogg; codecs=opus"), o arquivo era salvo com essa
+  // extensão e o navegador se recusava a tocar. Baixar de novo resolve, e o
+  // arquivo antigo fica onde está — nada é apagado.
+  pendentesDeMidia(conversationId, limite) {
+    return getAll(
+      `SELECT id, media_id, type, media_mime_type, media_tentativas
+         FROM whatsapp_messages
+        WHERE conversation_id = ?
+          AND media_id <> ''
+          AND (media_url IS NULL OR media_url = '' OR media_url LIKE '%.bin')
+          AND media_falhou = 0
+        ORDER BY id DESC
+        LIMIT ?`,
+      [conversationId, limite || 20]
+    );
+  },
+
+  getById(id) {
+    return getOne('SELECT * FROM whatsapp_messages WHERE id = ?', [id]);
+  },
+
   updateStatus(wamid, status, errorCode, errorMessage) {
     run(
       "UPDATE whatsapp_messages SET status = ?, error_code = ?, error_message = ?, status_updated_at = datetime('now') WHERE wamid = ?",
       [status, errorCode || '', errorMessage || '', wamid]
     );
+  }
+};
+
+// ==========================================================================
+// OPERAÇÕES: MÍDIA RECEBIDA
+// Ficha do arquivo que veio do contato. Grava pelo helper `run`, que salva em
+// disco — o webhook inseria direto no banco em memória e o registro sumia no
+// reinício.
+// ==========================================================================
+const media = {
+  registrar(dados) {
+    run(
+      `INSERT INTO whatsapp_media
+        (message_id, whatsapp_media_id, mime_type, file_size, filename, local_path, sha256)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [dados.message_id || null, dados.whatsapp_media_id || '', dados.mime_type || '',
+       dados.file_size || 0, dados.filename || '', dados.local_path || '', dados.sha256 || '']
+    );
+  },
+
+  doMessage(messageId) {
+    return getOne('SELECT * FROM whatsapp_media WHERE message_id = ? ORDER BY id DESC LIMIT 1', [messageId]);
   }
 };
 
@@ -1114,7 +1193,7 @@ const bot = {
 
 module.exports = {
   init, getDb, getDbPath, salvarImediato,
-  accounts, contacts, conversations, messages, templates, tags, webhookEvents, audit,
+  accounts, contacts, conversations, messages, media, templates, tags, webhookEvents, audit,
   bot,
   dashboardStats, backup, close
 };

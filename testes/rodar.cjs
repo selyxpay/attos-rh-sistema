@@ -82,6 +82,8 @@ const SUITES = [
     titulo: 'Permissao por tela, com bloqueio no servidor' },
   { nome: 'bot',       arquivo: 'bot.cjs',            servidor: true,  navegador: false, semente: sementeAcesso,
     titulo: 'Bot de atendimento: ordem de decisao, fila, permissao e midia' },
+  { nome: 'midia',     arquivo: 'midia.cjs',          servidor: true,  navegador: false, semente: sementeAcesso,
+    titulo: 'Midia que chega: tipo certo, rota com sessao, persistencia e nova tentativa' },
   { nome: 'respostas', arquivo: 'respostas.cjs',       servidor: true,  navegador: false, semente: sementeAcesso,
     titulo: 'Mensagens prontas: janela de 24h, catalogo, permissao, anexo e previa' },
   { nome: 'respostas-ui', arquivo: 'respostas-ui.cjs',  servidor: true,  navegador: true,
@@ -191,6 +193,10 @@ async function rodarSuite(s, chrome) {
         return false;
       }
       env.BASE = 'http://127.0.0.1:' + portaServidor;
+      // A pasta de dados DO SERVIDOR do teste. Algumas suites precisam colocar
+      // um arquivo lá para exercitar rota que serve arquivo (mídia recebida,
+      // por exemplo) sem depender de internet.
+      env.DADOS = dadosDir;
       console.log('  servidor de teste: ' + env.BASE + '  (dados em ' + dadosDir + ')');
     }
 

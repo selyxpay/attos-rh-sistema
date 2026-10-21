@@ -21,17 +21,22 @@
   // cria propriedade no window: `window.state` e sempre undefined. Por isso a
   // leitura e pelo nome, nao pelo window.
   function _est() { return (typeof state !== 'undefined' && state) ? state : null; }
+  // MESMO problema do state: o usuario logado tambem e `let loggedUser` no
+  // js/app.js, e `let` nao vira propriedade do window. Com `window.loggedUser`
+  // esta tela se achava SEM PERMISSAO: a aba Bot nao aparecia e, quando
+  // aparecia, o salvar recusava com "voce nao tem permissao".
+  function _eu() { return (typeof loggedUser !== 'undefined' && loggedUser) ? loggedUser : null; }
 
   // Mesmo padrão das outras telas: só admin e mestre, e o servidor confirma.
   function _botPodeVer() {
-    if (!window.loggedUser) return false;
+    if (!_eu()) return false;
     if (!window.RTTelas) return false;
-    const n = RTTelas.telasDoFuncionario(loggedUser, _est() || {})['bot'];
+    const n = RTTelas.telasDoFuncionario(_eu(), _est() || {})['bot'];
     return n === 'ver' || n === 'editar';
   }
   function _botPodeEditar() {
-    if (!window.loggedUser || !window.RTTelas) return false;
-    return RTTelas.telasDoFuncionario(loggedUser, _est() || {})['bot'] === 'editar';
+    if (!_eu() || !window.RTTelas) return false;
+    return RTTelas.telasDoFuncionario(_eu(), _est() || {})['bot'] === 'editar';
   }
   window._botPodeVer = _botPodeVer;
 
@@ -306,7 +311,7 @@
   // Pré-visualização no estilo conversa, já com as variáveis trocadas.
   function _previaHtml(c) {
     if (!c.passos.length) return '<div class="bot-vazio">Os passos aparecem aqui como a pessoa vai ver.</div>';
-    const nome = (window.loggedUser && loggedUser.nome) || 'Maria';
+    const nome = (_eu() && _eu().nome) || 'Maria';
     return c.passos.map(function (p) {
       let txt = '';
       if (p.tipo === 'texto') txt = p.texto || '';

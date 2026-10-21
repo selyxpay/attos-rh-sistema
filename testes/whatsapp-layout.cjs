@@ -99,7 +99,15 @@ const MEDIR = `(function(){
 
   // abre a aba do WhatsApp e injeta conversas de teste na lista, para medir
   // com conteudo de verdade
-  await cdp.eval(`(function(){ switchAba('whatsapp'); })()`); await espera(1800);
+  await cdp.eval(`(function(){ switchAba('whatsapp'); })()`);
+  // Espera por CONDICAO, nao por tempo fixo (regra 18). Com a maquina ocupada,
+  // o modulo do WhatsApp terminava de desenhar DEPOIS do espera(1800) e
+  // substituia o conteudo da aba — inclusive o esqueleto que este teste
+  // injeta mais abaixo. Resultado: media de 0px em tudo, e a suite falhava so
+  // na execucao completa.
+  await esperarPor(cdp,
+    "(function(){ var a = document.getElementById('wa-content'); return !!a && a.innerHTML.length > 200; })()",
+    30000, 'a aba do WhatsApp desenhar');
   const temInbox = await cdp.eval(`!!document.querySelector('.wa-inbox')`);
   console.log('inbox presente na tela?', temInbox);
   if (!temInbox) {
@@ -121,13 +129,27 @@ const MEDIR = `(function(){
         '<div class="wa-col-chat"></div><div class="wa-col-info"></div>' +
       '</div>';
     })()`);
-    await espera(900);
   }
+  // Mede so quando ha o que medir: a coluna da lista com altura de verdade.
+  await esperarPor(cdp,
+    `(function(){
+       var c = document.querySelector('.wa-col-list');
+       var l = document.querySelector('.wa-conv-list');
+       return !!c && !!l && c.getBoundingClientRect().height > 50 && l.getBoundingClientRect().height > 10;
+     })()`,
+    30000, 'a lista de conversas ter altura para medir');
 
   const resolucoes = [[1366, 768], [1600, 900], [1920, 1080], [2560, 1440]];
   for (const [w, h] of resolucoes) {
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: false });
-    await espera(700);
+    // Troca de resolucao tambem e por condicao: o navegador refaz o layout e a
+    // altura da janela precisa ser a nova ANTES de medir.
+    await esperarPor(cdp,
+      `(function(){
+         var c = document.querySelector('.wa-col-list');
+         return window.innerHeight === ${h} && !!c && c.getBoundingClientRect().height > 50;
+       })()`,
+      20000, 'o layout assentar em ' + w + 'x' + h);
     const m = await cdp.eval(MEDIR);
     if (!m || m.semInbox) { ok(false, w + 'x' + h + ': nao achei o inbox para medir'); continue; }
     console.log('\n--- ' + w + 'x' + h + ' (janela util ' + m.janela + 'px) ---');
@@ -145,7 +167,12 @@ const MEDIR = `(function(){
   // celular continua com a regra propria
   console.log('\n--- celular 390x844 (a regra de celular tem que continuar valendo) ---');
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
-  await espera(800);
+  await esperarPor(cdp,
+    `(function(){
+       var c = document.querySelector('.wa-col-list');
+       return window.innerHeight === 844 && !!c && c.getBoundingClientRect().height > 50;
+     })()`,
+    20000, 'o layout assentar no celular');
   const mc = await cdp.eval(MEDIR);
   if (mc && !mc.semInbox) {
     console.log('   caixa: ' + Math.round(mc.caixa.h) + 'px | lista: ' + Math.round(mc.lista.h) + 'px | passa da borda: ' + mc.passouDaJanela + 'px');

@@ -539,7 +539,26 @@ window.waAbrirConversa = async function (id) {
   const li = [...document.querySelectorAll('.wa-conv-item')].find(el => el.getAttribute('onclick') === `waAbrirConversa(${id})`);
   if (li) li.classList.add('active');
   _waAtualizarBadge();
+  // Mídia que ficou sem arquivo (download falhou na hora, servidor reiniciado
+  // no meio): tenta de novo ao abrir a conversa, sem ninguém precisar clicar.
+  // Não espera pela resposta: cada arquivo que chega avisa pelo tempo real e
+  // troca o balão sozinho.
+  _waTentarMidiaPendente(id);
 };
+
+function _waTentarMidiaPendente(convId) {
+  fetch('/api/whatsapp/conversations/' + encodeURIComponent(convId) + '/midia-pendente',
+        { method: 'POST', credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      // Sem tempo real (aba antiga, SSE caído): redesenha o que baixou.
+      if (j && j.ok && j.baixadas > 0 && _waConvAberta === convId &&
+          (!_waSSE || _waSSE.readyState === 2)) {
+        waAbrirConversa(convId);
+      }
+    })
+    .catch(function () { /* sem permissão ou sem módulo: a tela segue igual */ });
+}
 
 function _waRenderChat(conv, msgs) {
   _waMsgsCache = msgs || [];
@@ -600,9 +619,13 @@ function _waBolha(m) {
   const saida = m.direction === 'outgoing';
   const tipo = String(m.type || 'text').toLowerCase();
 
+  // data-msg: o aviso de "mídia baixou" troca SÓ este balão, sem redesenhar a
+  // conversa inteira e sem perder o lugar da rolagem.
+  const idAttr = m.id ? ` data-msg="${_waEsc(m.id)}"` : '';
+
   // FIGURINHA: imagem solta, sem balão — é assim no WhatsApp.
   if (tipo === 'sticker' && m.media_url) {
-    return `<div class="wa-msg ${saida ? 'wa-msg-out' : 'wa-msg-in'} wa-msg-figurinha">
+    return `<div class="wa-msg ${saida ? 'wa-msg-out' : 'wa-msg-in'} wa-msg-figurinha"${idAttr}>
       <img class="wa-figurinha" src="${_waEsc(m.media_url)}" alt="figurinha">
       <span class="wa-msg-hora wa-hora-fora">${_waHora(m.created_at)} ${saida ? _waTick(m.status) : ''}</span>
     </div>`;
@@ -615,6 +638,14 @@ function _waBolha(m) {
     corpo = _waPlayerAudio(m);
   } else if ((tipo === 'document' || tipo === 'video') && m.media_url) {
     corpo = `<a class="wa-msg-doc" href="${_waEsc(m.media_url)}" target="_blank" rel="noopener"><i class="fa-solid fa-file-arrow-down"></i> ${_waEsc(m.media_filename || m.type)}</a>${m.content ? '<div class="wa-legenda texto-longo">' + _waEsc(m.content) + '</div>' : ''}`;
+  } else if (m.media_id && !m.media_url) {
+    // TEM mídia, mas o arquivo não está aqui. Dois casos bem diferentes, e a
+    // tela não pode mostrar o mesmo para os dois:
+    //  - ainda baixando (ou vai tentar de novo): "(baixando...)"
+    //  - a Meta já apagou o arquivo (ela guarda ~30 dias): não há o que
+    //    esperar, então avisa e para — antes isto ficava "(baixando...)"
+    //    para sempre.
+    corpo = _waMidiaFaltando(m) + (m.content ? '<div class="wa-legenda texto-longo">' + _waEsc(m.content) + '</div>' : '');
   } else if (m.content) {
     // Texto: quebras de linha preservadas (classe texto-longo) e link clicável.
     corpo = `<span class="texto-longo">${_waLinks(m.content)}</span>`;
@@ -636,9 +667,51 @@ function _waBolha(m) {
   const etiquetaBot = (m.sent_by_bot || m.sender_name === 'bot')
     ? '<span class="wa-tag-bot">bot</span>' : '';
 
-  return `<div class="wa-msg ${saida ? 'wa-msg-out' : 'wa-msg-in'}">
+  return `<div class="wa-msg ${saida ? 'wa-msg-out' : 'wa-msg-in'}"${idAttr}>
     <div class="wa-bolha">${etiquetaBot}${corpo}${reacao}<span class="wa-msg-hora">${_waHora(m.created_at)} ${saida ? _waTick(m.status) : ''}</span></div>
   </div>`;
+}
+
+// Mídia que o contato mandou e que não está no servidor.
+function _waMidiaFaltando(m) {
+  const rot = _waRotuloTipo(String(m.type || '').toLowerCase()) || WA_ROTULO_TIPO.unsupported;
+  const falhou = !!(m.media_falhou || Number(m.media_falhou) === 1);
+  if (falhou) {
+    return `<span class="wa-midia-nao">
+      <i class="fa-solid fa-circle-exclamation"></i> ${_waEsc(rot.texto)}: mídia não disponível
+      <button class="wa-midia-tentar" onclick="waTentarMidia(${Number(m.id) || 0})" title="Tentar baixar de novo">
+        <i class="fa-solid fa-rotate"></i> tentar de novo</button>
+    </span>`;
+  }
+  return `<span class="wa-msg-tipo"><i class="fa-solid ${rot.icone}"></i> ${_waEsc(rot.texto)}
+    <span class="wa-baixando">(baixando...)</span></span>`;
+}
+
+// Botão "tentar de novo" de um balão. O servidor usa o media id guardado.
+window.waTentarMidia = async function (id) {
+  if (!id) return;
+  const alvo = document.querySelector('[data-msg="' + id + '"] .wa-midia-tentar');
+  if (alvo) { alvo.disabled = true; alvo.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> baixando...'; }
+  let r = {};
+  try {
+    const resp = await fetch('/api/whatsapp/mensagens/' + encodeURIComponent(id) + '/midia',
+                             { method: 'POST', credentials: 'same-origin' });
+    r = await resp.json().catch(function () { return {}; });
+  } catch (e) { r = { ok: false, error: e.message }; }
+  if (r && r.ok && r.media_url) {
+    _waTrocarMidiaNoBalao(id, r.media_url);
+  } else {
+    _waToast((r && r.error) || 'Não consegui baixar esta mídia.', true);
+    if (alvo) { alvo.disabled = false; alvo.innerHTML = '<i class="fa-solid fa-rotate"></i> tentar de novo'; }
+  }
+};
+
+// Troca a mídia de um balão no lugar, sem redesenhar a conversa.
+function _waTrocarMidiaNoBalao(id, url) {
+  const m = (_waMsgsCache || []).find(function (x) { return Number(x.id) === Number(id); });
+  if (m) { m.media_url = url; m.media_falhou = 0; }
+  const el = document.querySelector('[data-msg="' + id + '"]');
+  if (el && m) el.outerHTML = _waBolha(m);
 }
 
 // Link clicável, em cima de texto JÁ ESCAPADO — a ordem importa: escapa
@@ -790,6 +863,11 @@ function _waConectarSSE() {
           respostasDesenharFileira(_c || { id: _waConvAberta });
         }
         if (_waSubAba === 'inbox') _waCarregarConversas();
+      } else if (d.type === 'media_ready') {
+        // A mídia acabou de ser baixada: troca só aquele balão.
+        if (d.conversation_id === _waConvAberta && d.message_id && d.media_url) {
+          _waTrocarMidiaNoBalao(d.message_id, d.media_url);
+        }
       } else if (d.type === 'message_status') {
         if (d.conversation_id === _waConvAberta && _waSubAba === 'inbox') waAbrirConversa(_waConvAberta);
       } else if (d.type === 'conversation_updated') {
@@ -1273,9 +1351,39 @@ async function _waGravouTerminou() {
 let _waPlayerContador = 0;
 let _waPlayerTocando = null;   // pausa o anterior quando outro começa
 
+// O navegador consegue tocar este arquivo? O áudio de voz do WhatsApp é
+// OGG/Opus, que o Safari (iPhone) não toca. Quando não dá, a tela oferece o
+// download em vez de um player mudo.
+function _waTocaEsseAudio(url) {
+  try {
+    const ext = String(url || '').split('?')[0].split('.').pop().toLowerCase();
+    const tipos = {
+      ogg: 'audio/ogg; codecs=opus', opus: 'audio/ogg; codecs=opus',
+      mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', amr: 'audio/amr', wav: 'audio/wav'
+    };
+    // ".bin": áudio salvo antes de o sistema entender "audio/ogg; codecs=opus".
+    // Nenhum navegador toca isso, então vai direto para o botão de baixar.
+    if (ext === 'bin') return false;
+    if (!tipos[ext]) return true;                  // tipo que não conheço: deixa tentar
+    const a = document.createElement('audio');
+    return !!a.canPlayType(tipos[ext]);
+  } catch (e) { return true; }
+}
+
 function _waPlayerAudio(m) {
   const id = 'wap-' + (++_waPlayerContador);
   const dur = m._duracao ? _waFmtSeg(m._duracao) : '';
+  const baixar = `<a class="wa-audio-baixar" href="${_waEsc(m.media_url)}" download title="Baixar o áudio"><i class="fa-solid fa-download"></i></a>`;
+  if (!_waTocaEsseAudio(m.media_url)) {
+    // Sem player: este navegador não toca o formato. Pelo menos dá para ouvir
+    // fora, e a mensagem não vira um balão morto.
+    return `<div class="wa-audio wa-audio-sem">
+      <i class="fa-solid fa-microphone-lines"></i>
+      <span>Áudio${dur ? ' · ' + dur : ''} — este navegador não toca OGG/Opus</span>
+      <a class="wa-audio-baixar" href="${_waEsc(m.media_url)}" download>
+        <i class="fa-solid fa-download"></i> baixar</a>
+    </div>`;
+  }
   return `<div class="wa-audio" id="${id}">
     <audio preload="metadata" src="${_waEsc(m.media_url)}"></audio>
     <button class="wa-audio-play" onclick="waAudioTocar('${id}')" title="Ouvir"><i class="fa-solid fa-play"></i></button>
@@ -1285,6 +1393,7 @@ function _waPlayerAudio(m) {
       <span class="wa-audio-tempo" data-dur="${dur}">${dur || '0:00'}</span>
     </div>
     <button class="wa-audio-vel" onclick="waAudioVelocidade('${id}')" title="Velocidade">1x</button>
+    ${baixar}
   </div>`;
 }
 function _waFmtSeg(s) { s = Math.max(0, Math.round(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }

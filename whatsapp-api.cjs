@@ -261,7 +261,15 @@ async function getMediaUrl(mediaId, accessToken) {
     if (res.status === 200 && res.data && res.data.url) {
       return { ok: true, url: res.data.url, mime_type: res.data.mime_type, file_size: res.data.file_size, sha256: res.data.sha256 };
     }
-    return { ok: false, error: 'Não foi possível obter URL da mídia.' };
+    // O CÓDIGO importa para quem vai tentar de novo: 400/404 é mídia que a
+    // Meta já apagou (ela guarda o arquivo por cerca de 30 dias) e insistir
+    // não resolve; 429 e 5xx são passageiros e valem nova tentativa.
+    const msgMeta = (res.data && res.data.error && res.data.error.message) || '';
+    return {
+      ok: false, status: res.status || 0,
+      expirada: res.status === 400 || res.status === 404,
+      error: 'Não foi possível obter URL da mídia.' + (msgMeta ? ' (' + msgMeta + ')' : '')
+    };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -274,28 +282,38 @@ async function getMediaUrl(mediaId, accessToken) {
  * @param {string} uploadsDir - Diretório de destino
  * @returns {Promise<{ok, local_path, mime_type, file_size}>}
  */
-async function downloadMedia(mediaId, accessToken, uploadsDir) {
+async function downloadMedia(mediaId, accessToken, destDir, urlBase) {
+  let destPath = '';
   try {
-    // 1. Obtém a URL de download
+    // 1. Obtém a URL de download. Ela EXPIRA em minutos, então o arquivo é
+    //    baixado agora e guardado no volume — a tela nunca aponta para a Meta.
     const mediaInfo = await getMediaUrl(mediaId, accessToken);
     if (!mediaInfo.ok) return mediaInfo;
 
     // 2. Define o nome do arquivo local
     const ext = mimeToExt(mediaInfo.mime_type) || 'bin';
     const filename = 'wa_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + ext;
-    const destPath = path.join(uploadsDir, filename);
+    // A pasta pode não existir na primeira mídia depois de um deploy.
+    try { fs.mkdirSync(destDir, { recursive: true }); } catch (e) {}
+    destPath = path.join(destDir, filename);
 
-    // 3. Baixa o arquivo
-    const result = await downloadFile(mediaInfo.url, accessToken, destPath);
+    // 3. Baixa para um nome temporário e só então renomeia: download cortado
+    //    no meio deixava um arquivo quebrado no lugar do bom, e a tela mostrava
+    //    foto corrompida em vez de avisar que faltou baixar.
+    const temp = destPath + '.parcial';
+    const result = await downloadFile(mediaInfo.url, accessToken, temp);
+    fs.renameSync(temp, destPath);
     return {
       ok: true,
-      local_path: '/uploads/' + filename,
+      local_path: (urlBase || '/uploads/') + filename,
       filename: filename,
       mime_type: mediaInfo.mime_type || result.mime_type,
       file_size: mediaInfo.file_size || result.size,
       sha256: mediaInfo.sha256 || ''
     };
   } catch (e) {
+    // Não deixa lixo pela metade na pasta.
+    try { if (destPath) fs.unlinkSync(destPath + '.parcial'); } catch (e2) {}
     return { ok: false, error: e.message };
   }
 }
@@ -449,6 +467,11 @@ async function getTemplates(wabaId, accessToken) {
  * Mapeia MIME type para extensão de arquivo
  */
 function mimeToExt(mimeType) {
+  // O tipo que a Meta devolve vem com PARÂMETRO: o áudio de voz do WhatsApp
+  // chega como "audio/ogg; codecs=opus". Comparar a string inteira com a
+  // tabela dava null, o arquivo era salvo como ".bin" e o navegador se
+  // recusava a tocar — era este o "áudio que falha".
+  const limpo = String(mimeType || '').split(';')[0].trim().toLowerCase();
   const map = {
     'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
     'video/mp4': 'mp4', 'video/3gpp': '3gp',
@@ -461,9 +484,18 @@ function mimeToExt(mimeType) {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
     'application/vnd.ms-powerpoint': 'ppt',
     'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
-    'text/plain': 'txt'
+    'text/plain': 'txt',
+    // Variações que aparecem de verdade no tráfego da Meta.
+    'audio/ogg; codecs=opus': 'ogg', 'audio/x-opus+ogg': 'ogg',
+    'audio/mp3': 'mp3', 'audio/x-m4a': 'm4a', 'audio/3gpp': '3gp',
+    'video/quicktime': 'mov', 'video/webm': 'webm',
+    'image/jpg': 'jpg', 'image/heic': 'heic', 'image/heif': 'heif',
+    'application/zip': 'zip', 'text/csv': 'csv'
   };
-  return map[mimeType] || null;
+  if (map[limpo]) return map[limpo];
+  // Último recurso: usa o que vem depois da barra, se parecer extensão.
+  const sufixo = limpo.split('/')[1] || '';
+  return /^[a-z0-9]{2,5}$/.test(sufixo) ? sufixo : null;
 }
 
 /**

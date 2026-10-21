@@ -15,6 +15,77 @@
 'use strict';
 
 const crypto = require('crypto');
+const path = require('path');
+
+// ==========================================================================
+// MÍDIA QUE CHEGA — ONDE FICA E COMO BAIXA
+// ==========================================================================
+// A URL que a Meta devolve EXPIRA em minutos, então o arquivo é baixado na
+// hora e guardado no volume persistente. Ele NÃO vai para DATA_DIR/uploads,
+// que é público (regra 7): foto e documento que o candidato manda são dados
+// dele, e saíam por link adivinhável. Ficam em DATA_DIR/wa-midia e só saem
+// pela rota com sessão /api/whatsapp/midia/<arquivo>.
+const WA_MIDIA_DIR = path.join(process.env.DATA_DIR || './server-data', 'wa-midia');
+const WA_MIDIA_URL = '/api/whatsapp/midia/';
+// Quantas vezes tentar antes de desistir por ora, e o intervalo entre elas.
+// A falha costuma ser passageira (rede, 429 da Meta); o que não se tenta de
+// novo é mídia que a Meta já apagou.
+const MIDIA_TENTATIVAS = 3;
+const MIDIA_ESPERA_MS = [1500, 5000];
+
+// Baixa a mídia de UMA mensagem e grava o endereço nela. Devolve
+// { ok, media_url } ou { ok:false, error, expirada }.
+// Usada pelo webhook (quando a mensagem chega) e pela rota de "tentar de
+// novo" (mensagem antiga que ficou sem arquivo).
+async function baixarMidiaDaMensagem(db, api, conta, msg, notifyClients) {
+  const mediaId = msg.media_id || '';
+  if (!mediaId) return { ok: false, error: 'mensagem sem media id' };
+  if (!conta || !conta.access_token_enc) {
+    return { ok: false, error: 'a conta deste número está sem token' };
+  }
+
+  let ultimo = { ok: false, error: 'não tentou' };
+  for (let i = 0; i < MIDIA_TENTATIVAS; i++) {
+    ultimo = await api.downloadMedia(mediaId, conta.access_token_enc, WA_MIDIA_DIR, WA_MIDIA_URL);
+    if (ultimo.ok) break;
+    // Mídia que a Meta apagou (ela guarda ~30 dias) não melhora tentando.
+    if (ultimo.expirada) break;
+    const espera = MIDIA_ESPERA_MS[i];
+    if (espera) await new Promise(function (r) { setTimeout(r, espera); });
+  }
+
+  if (!ultimo.ok) {
+    console.error('[WhatsApp mídia] mensagem ' + msg.id + ' (' + (msg.type || '?') + '): ' +
+                  (ultimo.error || 'falhou') + (ultimo.expirada ? ' — a Meta já apagou o arquivo' : ''));
+    try { db.messages.falhouMidia(msg.id, ultimo.error, !!ultimo.expirada); } catch (e) {}
+    return ultimo;
+  }
+
+  try {
+    db.messages.gravarMidia(msg.id, {
+      media_url: ultimo.local_path,
+      media_mime_type: ultimo.mime_type || msg.media_mime_type || '',
+      media_filename: msg.media_filename || ultimo.filename || ''
+    });
+    db.media.registrar({
+      message_id: msg.id, whatsapp_media_id: mediaId, mime_type: ultimo.mime_type || '',
+      file_size: ultimo.file_size || 0, filename: ultimo.filename || '',
+      local_path: ultimo.local_path || '', sha256: ultimo.sha256 || ''
+    });
+  } catch (e) {
+    console.error('[WhatsApp mídia] baixei mas não gravei na mensagem ' + msg.id + ':', e.message);
+  }
+
+  if (notifyClients && msg.conversation_id) {
+    notifyClients({
+      type: 'media_ready',
+      conversation_id: msg.conversation_id,
+      message_id: msg.id,
+      media_url: ultimo.local_path
+    });
+  }
+  return { ok: true, media_url: ultimo.local_path };
+}
 
 // ==========================================================================
 // VERIFICAÇÃO DO WEBHOOK (GET)
@@ -304,33 +375,14 @@ async function processIncomingMessage(msg, contacts, phoneNumberId, displayPhone
 
     // 8. Download de mídia em background (se houver)
     if (mediaId && account.access_token_enc) {
-      // Não bloqueia o webhook — faz o download em background
-      setImmediate(async () => {
-        try {
-          const uploadsDir = require('path').join(process.env.DATA_DIR || './server-data', 'uploads');
-          const result = await api.downloadMedia(mediaId, account.access_token_enc, uploadsDir);
-          if (result.ok) {
-            // Atualiza a mensagem com a URL local
-            db.getDb().prepare('UPDATE whatsapp_messages SET media_url = ? WHERE id = ?').run(result.local_path, messageId);
-            // Salva registro de mídia
-            db.getDb().prepare(`
-              INSERT INTO whatsapp_media (message_id, whatsapp_media_id, mime_type, file_size, filename, local_path, sha256)
-              VALUES (?, ?, ?, ?, ?, ?, ?)
-            `).run(messageId, mediaId, result.mime_type || '', result.file_size || 0, result.filename || '', result.local_path || '', result.sha256 || '');
-
-            // Notifica clientes SSE da mídia baixada
-            if (notifyClients) {
-              notifyClients({
-                type: 'media_ready',
-                conversation_id: conversation.id,
-                message_id: messageId,
-                media_url: result.local_path
-              });
-            }
-          }
-        } catch (e) {
-          console.error('[WhatsApp Webhook] Erro ao baixar mídia:', e.message);
-        }
+      // Não bloqueia o webhook: a Meta exige resposta rápida.
+      setImmediate(function () {
+        baixarMidiaDaMensagem(db, api, account, {
+          id: messageId, media_id: mediaId, conversation_id: conversation.id,
+          type: msgType, media_filename: mediaFilename
+        }, notifyClients).catch(function (e) {
+          console.error('[WhatsApp Webhook] mídia:', e.message);
+        });
       });
     }
 
@@ -413,5 +465,9 @@ module.exports = {
   handleVerification,
   validateSignature,
   processEvent,
-  startCleanup
+  startCleanup,
+  // Mídia que chega: a rota de "tentar de novo" usa a MESMA função do webhook.
+  baixarMidiaDaMensagem,
+  WA_MIDIA_DIR,
+  WA_MIDIA_URL
 };

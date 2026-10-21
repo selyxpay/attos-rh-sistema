@@ -110,6 +110,17 @@ const SEMEAR = `(async function(){
   ok(await cdp.eval(`typeof respostasUsar === 'function' && typeof respostasEnviarDireto === 'function'`),
     'as duas acoes (por a caixa / enviar) existem');
   ok(await cdp.eval(SEMEAR) === 4, 'catalogo de teste semeado');
+  // ESPERA O SERVIDOR CONFIRMAR antes de seguir. A sincronizacao busca o
+  // estado do servidor a cada poucos segundos e substitui o da aba: se ela
+  // passar antes do save chegar, a lista semeada desaparece no meio do teste
+  // (ja aconteceu, e a suite falhou por carga, nao por defeito).
+  const semeadoNoServidor = await esperarPor(cdp,
+    `(async function(){
+       const j = await fetch('/api/state', { credentials: 'same-origin' }).then(function(r){ return r.json(); });
+       return ((((j || {}).dados || {}).respostasRapidas) || []).length >= 4;
+     })()`,
+    20000, 'o catalogo chegar no servidor');
+  ok(semeadoNoServidor === true, 'e o servidor confirmou o catalogo (a sincronizacao nao apaga a lista no meio)');
 
   console.log('\n=== 2) FILEIRA COM A JANELA DE 24H FECHADA ===');
   excecoes.length = 0;
@@ -223,6 +234,87 @@ const SEMEAR = `(async function(){
     document.querySelectorAll('.wa-composer-teste, .wa-cad-teste').forEach(function(n){ n.remove(); });
     return true;
   })()`);
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // 6) GRAVA DE VERDADE? Este e o teste do defeito do `window.state`.
+  // Com ele, a aba Bot lia uma COPIA do padrao: a pessoa mexia na tela, o
+  // sistema dizia "salvo" e nada ia para o servidor. O mesmo valeria para as
+  // mensagens prontas. Aqui o caminho e o de verdade: a MESMA funcao que o
+  // campo da tela chama, e a conferencia e no SERVIDOR.
+  // ────────────────────────────────────────────────────────────────────────
+  console.log('\n=== 6) O QUE A TELA SALVA CHEGA NO SERVIDOR ===');
+  excecoes.length = 0;
+  const MARCA = 'http://teste-de-gravacao/vagas';
+  const diag = await cdp.eval(`(function(){
+    return {
+      login: (loggedUser || {}).login || '', depto: (loggedUser || {}).departamento || '',
+      nivelBot: (window.RTTelas ? RTTelas.telasDoFuncionario(loggedUser, state || {})['bot'] : '?'),
+      podeEditarBot: (typeof _botPodeVer === 'function') ? _botPodeVer() : '?'
+    };
+  })()`);
+  console.log('  (diagnostico) ' + JSON.stringify(diag));
+  const salvouBot = await cdp.eval(`(async function(){
+    if (typeof botMudarCampo !== 'function') return { erro: 'botMudarCampo nao existe' };
+    await botMudarCampo('linkVagas', ${JSON.stringify(MARCA)});
+    return { naTela: (state.botWhatsapp || {}).linkVagas || '' };
+  })()`);
+  ok(salvouBot && salvouBot.naTela === MARCA, 'a configuracao do bot mudou na tela');
+  // Espera por CONDICAO (regra 18): a gravacao passa por uma fila, e ler o
+  // servidor na linha seguinte chega antes do POST.
+  const chegouNoServidor = await esperarPor(cdp,
+    `(async function(){
+       const j = await fetch('/api/state', { credentials: 'same-origin' }).then(function(r){ return r.json(); });
+       return (((j || {}).dados || {}).botWhatsapp || {}).linkVagas === ${JSON.stringify(MARCA)};
+     })()`,
+    20000, 'a configuracao do bot chegar no servidor');
+  ok(chegouNoServidor === true,
+    'E CHEGOU NO SERVIDOR (era aqui que o defeito do window.state mordia)');
+
+  const salvouPronta = await cdp.eval(`(async function(){
+    switchAba('whatsapp');
+    waTrocarSubAba('prontas');
+    respostasNova();
+    const t = document.getElementById('resp-titulo');
+    const x = document.getElementById('resp-texto');
+    if (!t || !x) return { erro: 'o formulario nao abriu' };
+    t.value = 'Teste de gravacao';
+    x.value = 'Ola {nome}, isto e um teste.';
+    await respostasSalvarForm();
+    return { naTela: (state.respostasRapidas || []).some(function(r){ return r.titulo === 'Teste de gravacao'; }) };
+  })()`);
+  ok(salvouPronta && salvouPronta.naTela === true, 'a mensagem pronta entrou na lista da tela');
+  const prontaNoServidor = await esperarPor(cdp,
+    `(async function(){
+       const j = await fetch('/api/state', { credentials: 'same-origin' }).then(function(r){ return r.json(); });
+       const lista = (((j || {}).dados || {}).respostasRapidas) || [];
+       const achou = lista.find(function(r){ return r.titulo === 'Teste de gravacao'; });
+       return !!achou && /isto e um teste/.test(achou.texto || '');
+     })()`,
+    20000, 'a mensagem pronta chegar no servidor');
+  ok(prontaNoServidor === true, 'e chegou no servidor com o texto digitado');
+  ok(excecoes.length === 0, 'sem erro de console (' + JSON.stringify(excecoes.slice(0, 2)) + ')');
+
+  console.log('\n=== 7) E CONTINUA LA DEPOIS DE RECARREGAR A PAGINA ===');
+  await cdp.send('Page.navigate', { url: BASE + '/' });
+  await esperarPor(cdp, LOGIN_PRONTO, 30000, 'a pagina abrir de novo');
+  if (await cdp.eval(`!!document.getElementById('login-form')`)) {
+    await cdp.eval(`(function(){
+      document.getElementById('login-username').value='admin';
+      document.getElementById('login-password').value='TesteLocal#123';
+      document.getElementById('login-form').requestSubmit();
+    })()`);
+    await esperarPor(cdp, APP_PRONTO, 45000, 'o sistema carregar depois do login');
+  }
+  await esperarPor(cdp, "typeof state !== 'undefined' && !!state && !!state.botWhatsapp", 30000, 'o estado chegar');
+  const depois = await cdp.eval(`(function(){
+    return {
+      bot: (state.botWhatsapp || {}).linkVagas || '',
+      pronta: ((state.respostasRapidas || []).find(function(r){ return r.titulo === 'Teste de gravacao'; }) || {}).texto || ''
+    };
+  })()`);
+  ok(depois && depois.bot === MARCA, 'a configuracao do bot continua la depois de recarregar ("' + (depois || {}).bot + '")');
+  ok(depois && /isto e um teste/.test(depois.pronta || ''), 'e a mensagem pronta tambem');
 
   console.log('\n' + (falhas === 0 ? 'MENSAGENS PRONTAS (tela): TODOS OS TESTES OK' : falhas + ' FALHA(S)'));
   process.exit(falhas ? 1 : 0);
