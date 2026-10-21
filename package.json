@@ -4,7 +4,8 @@
   "description": "R&T Vagas IA - Sistema de Recrutamento Inteligente + WhatsApp Business",
   "main": "server.cjs",
   "scripts": {
-    "start": "node server.cjs"
+    "start": "node server.cjs",
+    "teste": "node testes/rodar.cjs"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -13,4 +14,3 @@
     "sql.js": "^1.11.0"
   }
 }
-
