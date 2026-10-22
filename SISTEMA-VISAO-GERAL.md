@@ -710,6 +710,62 @@ não — ele vale na hora, com confirmação.
 prioridade, saída/atendente/pausado, horário vencido, janela de 24 h,
 desligamento automático, lua e filtro) e pela suíte `respostas-ui` (o cartão).
 
+### 5.10 "Janela aberta" e envio em grupo
+
+A Meta só aceita mensagem **escrita à mão** nas 24 horas seguintes à última
+mensagem **recebida** (a da pessoa, não a nossa). Fora disso, só modelo
+aprovado. Essa aba é a lista de quem **ainda pode receber agora** — e é daí que
+sai o envio em grupo, porque a lista já é, por definição, quem pode receber.
+
+**A lista** (`whatsapp-db.cjs`, `janela.lista`) sai de **uma** consulta com
+subconsultas por linha: a última mensagem dela, quanto tempo falta, se o bot
+atendeu, se recebeu o funil de fora do expediente, quantos lembretes estão
+agendados, se está aguardando atendente e **se eu já respondi depois dela**.
+Ordena por quem **fecha primeiro**. Filtros: fecha em menos de 2 h, atendidos
+pelo bot, fora do expediente, aguardando atendente e sem resposta minha; mais
+busca por nome ou número.
+
+Detalhe que custou uma correção: o "já respondi depois" desempata **pelo id**
+quando os horários são iguais — `created_at` tem precisão de segundo, e quem
+responde na hora cai no mesmo segundo da mensagem recebida.
+
+**A atualização é incremental** (a cada 60 s): compara item por item por uma
+assinatura, redesenha só o que mudou e **quem sai da janela desaparece sem a
+tela piscar**. A seleção de quem continua é preservada; a de quem saiu é
+removida — não dá para mandar para quem já não pode receber.
+
+**O envio em grupo** (`whatsapp-envio-grupo.cjs`, módulo extra no try dele e no
+`COPY` do Dockerfile):
+
+| Regra | Como |
+|---|---|
+| Fila no SQLite | `whatsapp_envios_grupo` + `whatsapp_envio_grupo_itens`, com **UNIQUE (envio_id, contact_id)** — ninguém recebe duas vezes |
+| Segundo plano | a rota responde **202** na hora; trinta envios numa requisição seriam trinta segundos e um 502 |
+| Ritmo | um por vez, 2 s entre envios, 5 por rodada |
+| Retomada | a fila vive no banco: reiniciar não perde nem repete |
+| Janela conferida **na hora de cada envio** | entre montar a lista e chegar a vez dela a janela pode fechar: o item é pulado e marcado `janela_fechada` |
+| Pedido de saída | pulado e marcado `saida` |
+| Conta como mensagem do atendente | **pausa o bot** naquele contato (direto no banco se o módulo do bot não estiver carregado) e entra na conversa com o rótulo **"Envio em grupo"** (`origem = 'grupo'`) |
+| Pausar / retomar / cancelar | conferido a cada volta da fila, então vale na hora; cancelar só afeta quem **ainda não recebeu** |
+| Lembretes | opção de agendar também os lembretes da mensagem pronta, com o mesmo limite da janela de 24 h |
+| Auditoria | quem enviou, quando e para quantos |
+
+O painel do envio mostra enviados, na fila, falhos e pulados, com a lista por
+contato e o motivo de cada um.
+
+**Sobre contador de mensagens:** não existe nenhum no sistema — nem contagem
+mensal, nem limite de 1.000 grátis, nem aviso de custo, nem bloqueio por
+quantidade. O que existe, e **tem** que continuar existindo, é o **controle de
+ritmo** (intervalo entre envios, quantos por rodada, no máximo dois downloads
+de mídia ao mesmo tempo): ele protege o número de ser limitado pela Meta. A
+suíte `janela` confere as duas coisas — que não há cota e que o ritmo continua.
+
+**Testado por:** suíte `janela` (a lista com 24 h, filtros, busca, quem sai da
+janela, fila, não duplicar, reinício no meio, janela que fecha no meio da fila,
+pedido de saída, pausar/cancelar, rótulo e pausa do bot) e pela suíte
+`respostas-ui` (a aba na tela, seleção respeitando o filtro e o painel de
+envio).
+
 ---
 
 ## 6. Fluxo Financeiro em detalhe
@@ -900,6 +956,7 @@ tipo de erro que volta: se você mexer na área, confira que não reintroduziu.
 | Lembrete de horário que já passou | Sem data, o cálculo empurrava o evento para amanhã. No bot isso é errado: usa-se `naoVirarODia` e não se agenda nada |
 | Mensagem aparecendo duas vezes só no painel | Bolha otimista desenhada no envio + a mesma mensagem chegando pelo tempo real. Amarrar com `cliente_id` e trancar por `wamid`/`id` |
 | `no such column` numa coluna que "existe" | `ALTER TABLE` rodando ANTES de o `CREATE TABLE` daquela tabela, no mesmo `criarTabelas`: falha calada no try/catch e só aparece na primeira mensagem de verdade |
+| "Já respondi" aparecendo errado | Comparar só o horário: `created_at` tem precisão de SEGUNDO e a resposta imediata cai no mesmo segundo. Desempatar pelo `id` |
 | Mensagem velha passando na frente da nova | `ORDER BY` numa data gravada como texto: `"...T10:00"` é maior que `"... 23:00"` (o `T` vem depois do espaço). Ordene por `julianday(...)` |
 
 ---
@@ -921,6 +978,8 @@ js/whatsapp-bot-ui.js        a aba Bot
 js/whatsapp-respostas-ui.js  mensagens prontas (fileira na conversa + cadastro)
 whatsapp-lembretes.cjs       motor dos lembretes automaticos (fila, fuso, regras)
 js/whatsapp-lembretes-ui.js  painel "Lembretes agendados"
+whatsapp-envio-grupo.cjs     motor do envio em grupo (fila, ritmo, janela)
+js/whatsapp-janela-ui.js     aba "Janela aberta" e o painel de envio
 DATA_DIR/wa-midia/          midia que CHEGA do contato (fora da pasta publica)
 js/security.js               camadas extras de proteção no navegador
 js/data.js                   dados iniciais (NUNCA colocar senha aqui)
@@ -960,9 +1019,11 @@ docs/                        deploy no Coolify, WhatsApp, equipamentos
   do bot na mesma fila e robozinho na lista de conversas (seção 5.2).
 - Mensagem que aparecia duas vezes no painel (seção 5.8) e o modo fora do
   expediente (seção 5.9).
+- Lista "Janela aberta" e envio em grupo só para quem está dentro das 24 horas
+  (seção 5.10).
 - Testes automatizados **no repositório**: `node testes/rodar.cjs` sobe um
   servidor isolado numa porta livre (com pasta de dados descartável) por suíte,
-  e um Chrome sem janela nas suítes de tela. Hoje são 26 suítes, cobrindo
+  e um Chrome sem janela nas suítes de tela. Hoje são 27 suítes, cobrindo
   sincronização com duas sessões, segurança, permissão por tela, upload por
   conteúdo, bot, mensagens prontas e varredura das 25 abas no navegador.
   `node testes/rodar.cjs --lista` mostra todas; `node testes/rodar.cjs <nome>`

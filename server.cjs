@@ -1607,7 +1607,7 @@ function _openwaDetalhe(r) {
   const base = (r && r.erro) || 'O OpenWA recusou a chamada.';
   return msg ? base + ' Motivo: ' + msg : base;
 }
-let waDb = null, waApi = null, waWebhook = null, waBot = null, waLembretes = null, _waCarregado = false;
+let waDb = null, waApi = null, waWebhook = null, waBot = null, waLembretes = null, waGrupo = null, _waCarregado = false;
 try {
   waDb      = require('./whatsapp-db.cjs');
   waApi     = require('./whatsapp-api.cjs');
@@ -1643,6 +1643,15 @@ try {
 } catch (e) {
   console.error('[Lembretes] módulo NÃO carregou — mensagens prontas seguem sem lembrete:', e.message);
   waLembretes = null;
+}
+
+// Envio em grupo da lista "Janela aberta": também EXTRA, também no try dele.
+// ATENÇÃO: este arquivo PRECISA estar no COPY do Dockerfile (regra 16).
+try {
+  waGrupo = require('./whatsapp-envio-grupo.cjs');
+} catch (e) {
+  console.error('[Envio em grupo] módulo NÃO carregou — o resto do WhatsApp segue:', e.message);
+  waGrupo = null;
 }
 
 // Variáveis de ambiente do WhatsApp
@@ -1709,6 +1718,21 @@ let _waReady = false;
       } catch (e) {
         console.error('[Lembretes] não iniciou (o resto segue funcionando):', e.message);
         waLembretes = null;
+      }
+    }
+    if (waGrupo) {
+      try {
+        waGrupo.init({
+          db: waDb, api: waApi, notificar: notifySSEClients,
+          pastaMidia: BOT_MIDIA_DIR,         // mesma pasta segura das mensagens prontas
+          lembretes: waLembretes,            // para agendar os lembretes da pronta
+          // Quem sabe ler o catálogo das mensagens prontas é o servidor: ele é
+          // o dono do state.json.
+          lerPronta: function (id) { return _waProntaPorId(id); }
+        });
+      } catch (e) {
+        console.error('[Envio em grupo] não iniciou (o resto segue funcionando):', e.message);
+        waGrupo = null;
       }
     }
   } catch (e) {
@@ -2375,6 +2399,9 @@ http.createServer(function (req, res) {
       },
       bot: {
         modulo_carregado: !!waBot             // extra: pode estar off sem afetar o resto
+      },
+      envio_grupo: {
+        modulo_carregado: !!waGrupo           // extra: idem
       },
       lembretes: {
         modulo_carregado: !!waLembretes       // extra: idem
@@ -3721,6 +3748,171 @@ http.createServer(function (req, res) {
     }
 
     // ══════════════════════════════════════════════════════════════════════
+    // JANELA ABERTA e ENVIO EM GRUPO
+    // A lista mostra quem ainda está dentro das 24 horas da ÚLTIMA MENSAGEM
+    // RECEBIDA. O envio em grupo manda a mesma mensagem para os escolhidos,
+    // por uma fila em segundo plano. Permissão: tela `whatsapp`.
+    // ══════════════════════════════════════════════════════════════════════
+
+    if (urlPath.indexOf('/api/whatsapp/janela-aberta') === 0 && req.method === 'GET') {
+      var uJa = waUsuarioTemPermissao(req, 'visualizar');
+      if (!uJa) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      var qJa = queryParaMapa(req.url.indexOf('?') >= 0 ? req.url.slice(req.url.indexOf('?') + 1) : '');
+      if (qJa === null) { responderJson(res, 400, { ok: false, error: 'parâmetros inválidos' }); return; }
+      var filtrosJa = {};
+      if (qJa.fechando === 'true') filtrosJa.fechando_em_horas = 2;
+      if (qJa.bot === 'true') filtrosJa.so_bot = true;
+      if (qJa.fora === 'true') filtrosJa.so_fora_exp = true;
+      if (qJa.aguardando === 'true') filtrosJa.so_aguardando = true;
+      if (qJa.sem_resposta === 'true') filtrosJa.sem_resposta_minha = true;
+      if (qJa.busca) filtrosJa.busca = String(qJa.busca).slice(0, 60);
+      if (qJa.limite) filtrosJa.limite = Math.min(500, parseInt(qJa.limite) || 300);
+      // MULTI-CONTA: a pessoa só vê as contas que são dela.
+      var idsJa = waContasPermitidas(uJa);
+      if (idsJa !== null) filtrosJa.account_ids = idsJa;
+      var listaJa = [];
+      try { listaJa = waDb.janela.lista(filtrosJa) || []; } catch (e) {
+        responderJson(res, 500, { ok: false, error: e.message }); return;
+      }
+      responderJson(res, 200, { ok: true, total: listaJa.length, contatos: listaJa });
+      return;
+    }
+
+    // Criar um envio em grupo. RESPONDE NA HORA: a fila manda em segundo
+    // plano, com ritmo controlado.
+    if (urlPath === '/api/whatsapp/envio-grupo' && req.method === 'POST') {
+      var uEg = waUsuarioTemPermissao(req, 'criar');
+      if (!uEg) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false, error: 'corpo inválido' }); return; }
+        if (!waGrupo) { responderJson(res, 200, { ok: false, error: 'Módulo de envio em grupo indisponível.' }); return; }
+        var ids = Array.isArray(body && body.conversas) ? body.conversas : [];
+        if (!ids.length) { responderJson(res, 400, { ok: false, error: 'Nenhuma pessoa selecionada.' }); return; }
+        if (ids.length > 300) { responderJson(res, 400, { ok: false, error: 'Selecione no máximo 300 por envio.' }); return; }
+
+        // Texto: livre, ou o da mensagem pronta escolhida.
+        var textoEg = String((body && body.texto) || '');
+        var respEg = null;
+        if (body && body.resposta_id) {
+          respEg = _waProntaPorId(String(body.resposta_id));
+          if (!respEg) { responderJson(res, 404, { ok: false, error: 'Mensagem pronta não encontrada.' }); return; }
+          if (!textoEg.trim()) textoEg = String(respEg.texto || '');
+        }
+
+        // Só conversas que a pessoa pode acessar E que ainda estão na janela.
+        var contatos = [];
+        var foraDaJanela = 0;
+        ids.forEach(function (id) {
+          var conv = null;
+          try { conv = waDb.conversations.getById(Number(id)); } catch (e) { conv = null; }
+          if (!conv || !conv.contact_phone) return;
+          if (!waPodeAcessarConta(uEg, conv.account_id)) return;
+          if (!waDb.janela.aberta(conv.id)) { foraDaJanela++; return; }
+          contatos.push({
+            conversation_id: conv.id, contact_id: conv.contact_id,
+            account_id: conv.account_id, telefone: conv.contact_phone,
+            nome_contato: conv.contact_name || conv.contact_profile_name || ''
+          });
+        });
+        if (!contatos.length) {
+          responderJson(res, 200, {
+            ok: false,
+            error: foraDaJanela
+              ? 'A janela de 24 horas fechou para todas as pessoas selecionadas.'
+              : 'Nenhuma conversa válida na seleção.'
+          });
+          return;
+        }
+
+        var criado = null;
+        try {
+          criado = waGrupo.criar({
+            contatos: contatos, texto: textoEg,
+            resposta_id: (respEg && respEg.id) || '',
+            titulo: (respEg && respEg.titulo) || '',
+            arquivo: (body && body.arquivo) || (respEg && respEg.arquivo) || '',
+            tipoAnexo: (body && body.tipoAnexo) || (respEg && respEg.tipoAnexo) || '',
+            mime: (body && body.mime) || (respEg && respEg.mime) || '',
+            nomeArquivo: (body && body.nomeArquivo) || (respEg && respEg.nomeArquivo) || '',
+            usarLembretes: !!(body && body.usarLembretes),
+            filtro: String((body && body.filtro) || '').slice(0, 80),
+            usuario: uEg.login, usuarioNome: uEg.nome || uEg.login
+          });
+        } catch (e) {
+          responderJson(res, 500, { ok: false, error: e.message }); return;
+        }
+        if (!criado || !criado.ok) {
+          responderJson(res, 200, { ok: false, error: (criado && criado.error) || 'Não consegui criar o envio.' });
+          return;
+        }
+        waDb.audit.log({
+          user_login: uEg.login, user_name: uEg.nome,
+          action: 'Envio em grupo',
+          details: criado.na_fila + ' pessoa(s) · ' +
+                   (respEg ? '"' + String(respEg.titulo || '').slice(0, 40) + '"' : 'texto livre') +
+                   (foraDaJanela ? ' · ' + foraDaJanela + ' fora da janela' : ''),
+          ip: waIpDaReq(req), account_id: contatos[0].account_id
+        });
+        responderJson(res, 202, {
+          ok: true, envio_id: criado.envio_id, na_fila: criado.na_fila,
+          fora_da_janela: foraDaJanela, em_segundo_plano: true
+        });
+      });
+      return;
+    }
+
+    // Painel de UM envio
+    var mEgUm = urlPath.match(/^\/api\/whatsapp\/envio-grupo\/(\d+)$/);
+    if (mEgUm && req.method === 'GET') {
+      var uEgu = waUsuarioTemPermissao(req, 'visualizar');
+      if (!uEgu) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      try {
+        var envio = waDb.envioGrupo.getEnvio(Number(mEgUm[1]));
+        if (!envio) { responderJson(res, 404, { ok: false, error: 'Envio não encontrado.' }); return; }
+        responderJson(res, 200, {
+          ok: true, envio: envio,
+          contagem: waDb.envioGrupo.contagem(envio.id),
+          itens: waDb.envioGrupo.itens(envio.id, 500)
+        });
+      } catch (e) { responderJson(res, 500, { ok: false, error: e.message }); }
+      return;
+    }
+
+    // Os envios recentes
+    if (urlPath === '/api/whatsapp/envio-grupo' && req.method === 'GET') {
+      var uEgl = waUsuarioTemPermissao(req, 'visualizar');
+      if (!uEgl) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      try {
+        responderJson(res, 200, { ok: true, envios: waDb.envioGrupo.recentes(20) });
+      } catch (e) { responderJson(res, 500, { ok: false, error: e.message }); }
+      return;
+    }
+
+    // Pausar / retomar / cancelar no meio
+    var mEgAcao = urlPath.match(/^\/api\/whatsapp\/envio-grupo\/(\d+)\/(pausar|retomar|cancelar)$/);
+    if (mEgAcao && req.method === 'POST') {
+      var uEga = waUsuarioTemPermissao(req, 'criar');
+      if (!uEga) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      if (!waGrupo) { responderJson(res, 200, { ok: false, error: 'Módulo indisponível.' }); return; }
+      var idEga = Number(mEgAcao[1]);
+      var acaoEga = mEgAcao[2];
+      try {
+        var envioA = waDb.envioGrupo.getEnvio(idEga);
+        if (!envioA) { responderJson(res, 404, { ok: false, error: 'Envio não encontrado.' }); return; }
+        if (acaoEga === 'pausar') waGrupo.pausar(idEga);
+        else if (acaoEga === 'retomar') waGrupo.retomar(idEga);
+        else waGrupo.cancelar(idEga);
+        waDb.audit.log({
+          user_login: uEga.login, user_name: uEga.nome,
+          action: 'Envio em grupo: ' + acaoEga,
+          details: 'envio #' + idEga, ip: waIpDaReq(req)
+        });
+        responderJson(res, 200, { ok: true, status: (waDb.envioGrupo.getEnvio(idEga) || {}).status });
+      } catch (e) { responderJson(res, 500, { ok: false, error: e.message }); }
+      return;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
     // LEMBRETES AUTOMÁTICOS
     // A configuração mora na própria mensagem pronta (state.json). Aqui ficam
     // o agendamento e o painel. A permissão é a da tela `whatsapp`.
@@ -4849,6 +5041,7 @@ http.createServer(function (req, res) {
   if ((rel === '/js/app.js' || rel === '/js/data.js' || rel === '/js/whatsapp.js' ||
        rel === '/js/telas.js' || rel === '/js/whatsapp-bot-ui.js' ||
        rel === '/js/whatsapp-respostas-ui.js' || rel === '/js/whatsapp-lembretes-ui.js' ||
+       rel === '/js/whatsapp-janela-ui.js' ||
        rel === '/precificacao-base.json') && !autenticado) {
     res.writeHead(404, Object.assign({ 'Content-Type': 'text/plain' }, SECURITY_HEADERS));
     res.end('404 Not Found');

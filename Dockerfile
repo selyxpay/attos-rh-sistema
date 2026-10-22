@@ -34,7 +34,7 @@ COPY verificar-sistema.cjs backup-dados.cjs limpar-fotos-embutidas.cjs reparar-l
 # server.cjs passe a exigir TEM que entrar aqui, senao o require falha e o
 # modulo morre em producao -- foi o que aconteceu com o whatsapp-bot.cjs.
 # A suite "imagem" confere isso automaticamente: rode os testes antes de subir.
-COPY whatsapp-db.cjs whatsapp-api.cjs whatsapp-webhook.cjs whatsapp-bot.cjs whatsapp-lembretes.cjs ./
+COPY whatsapp-db.cjs whatsapp-api.cjs whatsapp-webhook.cjs whatsapp-bot.cjs whatsapp-lembretes.cjs whatsapp-envio-grupo.cjs ./
 # Ponte para o SEGUNDO WhatsApp (QR Code, serviço OpenWA à parte). Mesma regra:
 # se faltar ou não estiver configurado, só essa aba avisa — nada mais é afetado.
 COPY openwa.cjs ./

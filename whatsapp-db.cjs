@@ -461,6 +461,46 @@ function criarTabelas() {
     UNIQUE (arquivo, account_id)
   )`);
 
+  // ─── ENVIO EM GRUPO (lista "Janela aberta") ───────────────────────────────
+  // Uma linha por ENVIO (o que foi mandado, por quem) e uma por CONTATO
+  // daquele envio. A chave única (envio_id, contact_id) é o que garante que
+  // ninguém receba duas vezes, mesmo se o servidor reiniciar no meio da fila.
+  db.run(`CREATE TABLE IF NOT EXISTS whatsapp_envios_grupo (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    criado_por     TEXT DEFAULT '',
+    criado_nome    TEXT DEFAULT '',
+    account_id     INTEGER,
+    texto          TEXT DEFAULT '',
+    resposta_id    TEXT DEFAULT '',
+    titulo         TEXT DEFAULT '',
+    arquivo        TEXT DEFAULT '',
+    tipo_anexo     TEXT DEFAULT '',
+    mime           TEXT DEFAULT '',
+    nome_arquivo   TEXT DEFAULT '',
+    usar_lembretes INTEGER DEFAULT 0,
+    filtro         TEXT DEFAULT '',
+    status         TEXT DEFAULT 'ativo',
+    criado_em      TEXT DEFAULT (datetime('now')),
+    atualizado_em  TEXT DEFAULT (datetime('now'))
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS whatsapp_envio_grupo_itens (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    envio_id        INTEGER NOT NULL,
+    conversation_id INTEGER NOT NULL,
+    contact_id      INTEGER NOT NULL,
+    account_id      INTEGER NOT NULL,
+    telefone        TEXT NOT NULL,
+    nome_contato    TEXT DEFAULT '',
+    status          TEXT DEFAULT 'fila',
+    erro            TEXT DEFAULT '',
+    wamid           TEXT DEFAULT '',
+    texto_enviado   TEXT DEFAULT '',
+    enviado_em      TEXT,
+    atualizado_em   TEXT DEFAULT (datetime('now')),
+    UNIQUE (envio_id, contact_id)
+  )`);
+
   // ─── LEMBRETES AUTOMÁTICOS DAS MENSAGENS PRONTAS ───────────────────────────
   // A CONFIGURAÇÃO (horário do evento, textos, anexos) mora no state.json,
   // dentro da própria mensagem pronta. Aqui fica só o AGENDAMENTO: uma linha
@@ -529,6 +569,9 @@ function criarTabelas() {
     'CREATE INDEX IF NOT EXISTS idx_lembretes_evento ON whatsapp_lembretes(evento_chave)',
     'CREATE INDEX IF NOT EXISTS idx_lembretes_contato ON whatsapp_lembretes(contact_id, status)',
     'CREATE INDEX IF NOT EXISTS idx_lembretes_conversa ON whatsapp_lembretes(conversation_id, status)',
+    'CREATE INDEX IF NOT EXISTS idx_envio_itens_fila ON whatsapp_envio_grupo_itens(status, envio_id)',
+    'CREATE INDEX IF NOT EXISTS idx_envio_itens_envio ON whatsapp_envio_grupo_itens(envio_id)',
+    'CREATE INDEX IF NOT EXISTS idx_envios_grupo_status ON whatsapp_envios_grupo(status, criado_em DESC)',
     'CREATE INDEX IF NOT EXISTS idx_webhook_events_eid ON whatsapp_webhook_events(event_id)',
     'CREATE INDEX IF NOT EXISTS idx_audit_created ON whatsapp_audit_logs(created_at DESC)',
     'CREATE INDEX IF NOT EXISTS idx_audit_user ON whatsapp_audit_logs(user_login)'
@@ -984,6 +1027,206 @@ const media = {
 
   doMessage(messageId) {
     return getOne('SELECT * FROM whatsapp_media WHERE message_id = ? ORDER BY id DESC LIMIT 1', [messageId]);
+  }
+};
+
+// ==========================================================================
+// OPERAÇÕES: JANELA ABERTA
+// Quem ainda está dentro das 24 horas da ÚLTIMA MENSAGEM RECEBIDA (a dela, não
+// a minha). É a janela em que a Meta aceita mensagem escrita à mão — fora dela,
+// só modelo aprovado.
+// ==========================================================================
+const janela = {
+  // A consulta devolve, de uma vez, tudo que a linha da tela mostra: a última
+  // mensagem dela, quanto tempo falta, os sinais do bot/lua/sininho, se está
+  // aguardando atendente e se EU já respondi depois dela. Uma consulta só, com
+  // subconsultas por linha, apoiadas nos índices que já existem.
+  lista(filtros) {
+    const f = filtros || {};
+    const params = [];
+    let onde = "x.horas_restantes > 0";
+    if (f.fechando_em_horas) { onde += ' AND x.horas_restantes <= ?'; params.push(Number(f.fechando_em_horas)); }
+    if (f.so_bot) onde += " AND x.bot_em IS NOT NULL";
+    if (f.so_fora_exp) onde += " AND IFNULL(x.fora_exp,'') <> ''";
+    if (f.so_aguardando) onde += " AND x.aguardando_atendente = 1";
+    if (f.sem_resposta_minha) onde += " AND x.respondi_depois = 0";
+    if (Array.isArray(f.account_ids)) {
+      if (!f.account_ids.length) onde += ' AND 0=1';
+      else {
+        onde += ' AND x.account_id IN (' + f.account_ids.map(function () { return '?'; }).join(',') + ')';
+        f.account_ids.forEach(function (id) { params.push(id); });
+      }
+    }
+    if (f.busca) {
+      onde += ' AND (IFNULL(x.contact_name,\'\') LIKE ? OR IFNULL(x.contact_profile_name,\'\') LIKE ? OR x.contact_phone LIKE ?)';
+      const b = '%' + f.busca + '%';
+      params.push(b, b, b);
+    }
+    params.push(Number(f.limite) || 300);
+    return getAll(
+      `SELECT * FROM (
+         SELECT c.id AS conversation_id, c.account_id, c.contact_id, c.status,
+                c.assigned_to_name, c.unread_count,
+                ct.phone AS contact_phone, ct.name AS contact_name,
+                ct.profile_name AS contact_profile_name,
+                r.created_at AS ultima_recebida_em,
+                r.content AS ultima_recebida_texto,
+                r.type AS ultima_recebida_tipo,
+                24.0 - (julianday('now') - julianday(r.created_at)) * 24.0 AS horas_restantes,
+                -- EU ja respondi DEPOIS da ultima mensagem dela? O desempate
+                -- pelo id importa: created_at tem precisao de SEGUNDO, e quem
+                -- responde na hora cai no mesmo segundo da mensagem recebida.
+                CASE WHEN EXISTS (SELECT 1 FROM whatsapp_messages m2
+                                   WHERE m2.conversation_id = c.id AND m2.direction = 'outgoing'
+                                     AND (julianday(m2.created_at) > julianday(r.created_at)
+                                          OR (julianday(m2.created_at) = julianday(r.created_at) AND m2.id > r.id)))
+                     THEN 1 ELSE 0 END AS respondi_depois,
+                (SELECT MAX(m3.created_at) FROM whatsapp_messages m3
+                  WHERE m3.conversation_id = c.id AND (m3.origem = 'bot' OR m3.sent_by_bot = 1)) AS bot_em,
+                bc.pausado AS bot_pausado, bc.optou_sair AS bot_saiu,
+                IFNULL(bc.aguardando_atendente, 0) AS aguardando_atendente,
+                bc.fora_exp_periodo AS fora_exp,
+                (SELECT COUNT(*) FROM whatsapp_lembretes l
+                  WHERE l.conversation_id = c.id AND l.status = 'agendado') AS lembretes_agendados
+           FROM whatsapp_conversations c
+           LEFT JOIN whatsapp_contacts ct ON ct.id = c.contact_id
+           LEFT JOIN whatsapp_bot_contatos bc ON bc.contact_id = c.contact_id
+           JOIN whatsapp_messages r ON r.id = (
+                SELECT m.id FROM whatsapp_messages m
+                 WHERE m.conversation_id = c.id AND m.direction = 'incoming'
+                 ORDER BY julianday(m.created_at) DESC, m.id DESC LIMIT 1)
+       ) x
+       WHERE ` + onde + `
+       ORDER BY x.horas_restantes ASC
+       LIMIT ?`,
+      params
+    );
+  },
+
+  // Esta conversa ainda está dentro da janela? Conferido na hora de enviar
+  // cada um, porque entre montar a lista e chegar a vez dela a janela pode ter
+  // fechado.
+  aberta(conversationId) {
+    const r = getOne(
+      `SELECT 24.0 - (julianday('now') - julianday(created_at)) * 24.0 AS horas_restantes
+         FROM whatsapp_messages
+        WHERE conversation_id = ? AND direction = 'incoming'
+        ORDER BY julianday(created_at) DESC, id DESC LIMIT 1`,
+      [conversationId]
+    );
+    if (!r || r.horas_restantes === null || r.horas_restantes === undefined) return false;
+    return Number(r.horas_restantes) > 0;
+  }
+};
+
+// ==========================================================================
+// OPERAÇÕES: ENVIO EM GRUPO
+// ==========================================================================
+const envioGrupo = {
+  criar(d) {
+    return runInsert(
+      `INSERT INTO whatsapp_envios_grupo
+         (criado_por, criado_nome, account_id, texto, resposta_id, titulo,
+          arquivo, tipo_anexo, mime, nome_arquivo, usar_lembretes, filtro, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ativo')`,
+      [d.criado_por || '', d.criado_nome || '', d.account_id || null, d.texto || '',
+       d.resposta_id || '', d.titulo || '', d.arquivo || '', d.tipo_anexo || '',
+       d.mime || '', d.nome_arquivo || '', d.usar_lembretes ? 1 : 0, d.filtro || '']
+    );
+  },
+
+  // Uma linha por contato. ON CONFLICT não faz nada: pedir o mesmo envio duas
+  // vezes não enfileira a mesma pessoa de novo.
+  acrescentarItem(envioId, c) {
+    run(
+      `INSERT INTO whatsapp_envio_grupo_itens
+         (envio_id, conversation_id, contact_id, account_id, telefone, nome_contato, status)
+       VALUES (?, ?, ?, ?, ?, ?, 'fila')
+       ON CONFLICT(envio_id, contact_id) DO NOTHING`,
+      [envioId, c.conversation_id, c.contact_id, c.account_id, c.telefone, c.nome_contato || '']
+    );
+  },
+
+  getEnvio(id) {
+    return getOne('SELECT * FROM whatsapp_envios_grupo WHERE id = ?', [id]);
+  },
+
+  // Os próximos da fila, só de envios ATIVOS (pausado e cancelado não saem).
+  pendentes(limite) {
+    return getAll(
+      `SELECT i.*, e.texto, e.resposta_id, e.titulo, e.arquivo, e.tipo_anexo, e.mime,
+              e.nome_arquivo, e.usar_lembretes, e.criado_por, e.status AS envio_status
+         FROM whatsapp_envio_grupo_itens i
+         JOIN whatsapp_envios_grupo e ON e.id = i.envio_id
+        WHERE i.status = 'fila' AND e.status = 'ativo'
+        ORDER BY i.id ASC LIMIT ?`,
+      [limite || 10]
+    );
+  },
+
+  marcarItem(id, status, extra) {
+    const e = extra || {};
+    run(
+      `UPDATE whatsapp_envio_grupo_itens
+          SET status = ?, erro = ?, wamid = ?, texto_enviado = ?,
+              enviado_em = CASE WHEN ? = 'enviado' THEN datetime('now') ELSE enviado_em END,
+              atualizado_em = datetime('now')
+        WHERE id = ?`,
+      [status, String(e.erro || '').slice(0, 200), e.wamid || '',
+       String(e.texto || '').slice(0, 1000), status, id]
+    );
+  },
+
+  mudarStatus(envioId, status) {
+    run("UPDATE whatsapp_envios_grupo SET status = ?, atualizado_em = datetime('now') WHERE id = ?",
+        [status, envioId]);
+  },
+
+  // Cancelar: só o que AINDA não saiu. Quem já recebeu não é afetado.
+  cancelarPendentes(envioId) {
+    run(`UPDATE whatsapp_envio_grupo_itens
+            SET status = 'cancelado', erro = 'envio cancelado', atualizado_em = datetime('now')
+          WHERE envio_id = ? AND status = 'fila'`, [envioId]);
+  },
+
+  contagem(envioId) {
+    return getOne(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN status = 'fila' THEN 1 ELSE 0 END) AS na_fila,
+              SUM(CASE WHEN status = 'enviado' THEN 1 ELSE 0 END) AS enviados,
+              SUM(CASE WHEN status = 'falhou' THEN 1 ELSE 0 END) AS falhos,
+              SUM(CASE WHEN status = 'janela_fechada' THEN 1 ELSE 0 END) AS janela_fechada,
+              SUM(CASE WHEN status = 'saida' THEN 1 ELSE 0 END) AS saidas,
+              SUM(CASE WHEN status = 'cancelado' THEN 1 ELSE 0 END) AS cancelados
+         FROM whatsapp_envio_grupo_itens WHERE envio_id = ?`,
+      [envioId]
+    );
+  },
+
+  itens(envioId, limite) {
+    return getAll(
+      `SELECT i.*, c.name AS contato_nome
+         FROM whatsapp_envio_grupo_itens i
+         LEFT JOIN whatsapp_contacts c ON c.id = i.contact_id
+        WHERE i.envio_id = ?
+        ORDER BY i.id ASC LIMIT ?`,
+      [envioId, limite || 500]
+    );
+  },
+
+  // Os envios recentes, com a contagem de cada um, para o painel.
+  recentes(limite) {
+    return getAll(
+      `SELECT e.*,
+              (SELECT COUNT(*) FROM whatsapp_envio_grupo_itens i WHERE i.envio_id = e.id) AS total,
+              (SELECT COUNT(*) FROM whatsapp_envio_grupo_itens i WHERE i.envio_id = e.id AND i.status = 'enviado') AS enviados,
+              (SELECT COUNT(*) FROM whatsapp_envio_grupo_itens i WHERE i.envio_id = e.id AND i.status = 'fila') AS na_fila,
+              (SELECT COUNT(*) FROM whatsapp_envio_grupo_itens i WHERE i.envio_id = e.id AND i.status = 'falhou') AS falhos,
+              (SELECT COUNT(*) FROM whatsapp_envio_grupo_itens i WHERE i.envio_id = e.id AND i.status IN ('janela_fechada','saida','cancelado')) AS pulados
+         FROM whatsapp_envios_grupo e
+        ORDER BY e.id DESC LIMIT ?`,
+      [limite || 20]
+    );
   }
 };
 
@@ -1462,7 +1705,7 @@ const bot = {
 module.exports = {
   init, getDb, getDbPath, salvarImediato,
   accounts, contacts, conversations, messages, media, templates, tags, webhookEvents, audit,
-  lembretes,
+  lembretes, janela, envioGrupo,
   bot,
   dashboardStats, backup, close
 };

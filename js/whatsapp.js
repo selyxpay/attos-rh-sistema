@@ -106,6 +106,9 @@ function renderWhatsApp() {
   if (_waPode('editar')) abas.push({ id: 'prontas', ic: 'fa-comment-dots', label: 'Mensagens prontas' });
   // Lembretes agendados: quem atende precisa ver o que vai sair sozinho.
   if (_waPode('criar')) abas.push({ id: 'lembretes', ic: 'fa-bell', label: 'Lembretes agendados' });
+  // Janela aberta: quem ainda pode receber mensagem escrita a mao, e o envio
+  // em grupo para esses.
+  if (_waPode('criar')) abas.push({ id: 'janela', ic: 'fa-clock', label: 'Janela aberta' });
   // "Conexões" (múltiplos números oficiais) — só para quem administra o WhatsApp.
   if (_waPode('aprovar')) abas.push({ id: 'conexoes', ic: 'fa-plug', label: 'Conexões' });
   subs.innerHTML = abas.map(a =>
@@ -129,6 +132,7 @@ function renderWhatsApp() {
   else if (_waSubAba === 'bot')       _botRender(cont);
   else if (_waSubAba === 'prontas')   _respostasRender(cont);
   else if (_waSubAba === 'lembretes') _lembretesRender(cont);
+  else if (_waSubAba === 'janela')    _janelaRender(cont);
 }
 window.renderWhatsApp = renderWhatsApp;
 
@@ -869,6 +873,9 @@ function _waQuemMandou(m) {
   }
   if (origem === 'lembrete') {
     return '<span class="wa-quem wa-quem-lembrete"><i class="fa-solid fa-clock"></i> Lembrete automático</span>';
+  }
+  if (origem === 'grupo') {
+    return '<span class="wa-quem wa-quem-grupo"><i class="fa-solid fa-users"></i> Envio em grupo</span>';
   }
   if (origem === 'atendente' && m.sender_name) {
     return '<span class="wa-quem">' + _waEsc(m.sender_name) + '</span>';

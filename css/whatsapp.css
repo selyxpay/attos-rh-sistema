@@ -1160,3 +1160,73 @@ body.wa-tela-cheia { overflow: hidden; }
 .bot-fora-corpo { display: flex; flex-direction: column; gap: 10px; border-top: 1px dashed var(--border-color, #e2e8f0); padding-top: 11px; }
 .wa-sinal-lua { font-size: 10.5px; margin-left: 4px; color: #4f46e5; }
 .wa-lemb-origem.lua { background: rgba(79,70,229,.14); color: #3730a3; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   JANELA ABERTA e ENVIO EM GRUPO
+   ══════════════════════════════════════════════════════════════════════════ */
+.wa-jan-tela { display: flex; flex-direction: column; gap: 12px; }
+.wa-jan-total {
+  display: inline-block; margin-left: 6px; padding: 1px 9px; border-radius: 9999px;
+  background: rgba(5,150,105,.14); color: #047857; font-size: 12px; font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.wa-jan-barra { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.wa-jan-busca { flex: 0 1 280px; }
+
+.wa-jan-acoes {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: var(--surface-subtle, #f8fafc); border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px; padding: 8px 12px;
+}
+.wa-jan-todos { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; cursor: pointer; }
+.wa-jan-limpar {
+  border: none; background: transparent; color: var(--text-secondary, #64748b);
+  font-size: 11.5px; font-family: inherit; cursor: pointer; text-decoration: underline;
+}
+.wa-jan-espaco { flex: 1; }
+
+.wa-jan-lista { display: flex; flex-direction: column; border: 1px solid var(--border-color, #e2e8f0); border-radius: 10px; overflow: hidden; background: var(--card-bg, #fff); }
+.wa-jan-item {
+  display: grid; grid-template-columns: 34px minmax(0, 1fr) 118px; gap: 10px; align-items: center;
+  padding: 9px 12px; border-bottom: 1px solid var(--border-color, #f1f5f9);
+}
+.wa-jan-item:last-child { border-bottom: none; }
+.wa-jan-item:hover { background: var(--surface-subtle, #f8fafc); }
+.wa-jan-item.marcado { background: rgba(5,150,105,.08); }
+.wa-jan-check { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.wa-jan-meio { min-width: 0; cursor: pointer; }
+.wa-jan-topo { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.wa-jan-topo b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.wa-jan-previa { font-size: 11.5px; color: var(--text-secondary, #64748b); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-jan-tel { font-size: 10.5px; color: var(--text-light, #94a3b8); font-variant-numeric: tabular-nums; }
+.wa-jan-tag {
+  display: inline-block; padding: 1px 7px; border-radius: 9999px; font-size: 10px; font-weight: 700;
+  background: rgba(234,179,8,.18); color: #92400e;
+}
+.wa-jan-tag.cinza { background: rgba(100,116,139,.14); color: #475569; }
+.wa-jan-tempo { text-align: right; font-size: 12px; color: #047857; font-variant-numeric: tabular-nums; }
+.wa-jan-tempo.atencao b { color: #b45309; }
+.wa-jan-tempo.urgente b { color: #b91c1c; }
+
+/* Painel de envio e acompanhamento */
+.wa-jan-painel {
+  border: 1px solid #059669; border-radius: 12px; background: var(--card-bg, #fff);
+  padding: 13px; display: flex; flex-direction: column; gap: 11px;
+}
+.wa-jan-painel-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.wa-jan-painel-cab h4 { margin: 0; font-size: 14px; }
+.wa-jan-painel select, .wa-jan-painel textarea, .wa-jan-painel input[type=file] {
+  border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; padding: 8px 10px;
+  font-size: 13px; font-family: inherit; background: var(--card-bg, #fff); color: var(--text-main, #0f172a);
+}
+.wa-jan-painel textarea { resize: vertical; line-height: 1.45; }
+.wa-jan-lembrete-opc { display: inline-flex; align-items: flex-start; gap: 7px; font-size: 12px; cursor: pointer; }
+.wa-jan-previa-envio { display: flex; flex-direction: column; gap: 6px; border-top: 1px dashed var(--border-color, #e2e8f0); padding-top: 10px; }
+
+.wa-quem-grupo { color: #1d4ed8; }
+
+@media (max-width: 760px) {
+  .wa-jan-item { grid-template-columns: 30px minmax(0, 1fr) 88px; }
+  .wa-jan-topo b { max-width: 150px; }
+  .wa-jan-busca { flex: 1 0 100%; }
+}

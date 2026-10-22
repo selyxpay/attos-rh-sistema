@@ -472,6 +472,113 @@ const SEMEAR = `(async function(){
   ok(fora && fora.temPrevia, 'e a previa do funil');
   ok(fora && fora.barraSalvar, 'mexer no funil pede "Salvar alteracoes" (nao vale sozinho)');
 
+  console.log('\n=== 9c) ABA "JANELA ABERTA" ===');
+  excecoes.length = 0;
+  const jan = await cdp.eval(`(async function(){
+    if (typeof _janelaRender !== 'function') return { erro: 'a aba nao carregou' };
+    // Monta a aba com uma lista de teste (sem depender do banco do servidor).
+    const cont = document.getElementById('wa-content');
+    _waSubAba = 'janela';
+    cont.dataset.janelaCarregada = '1';
+    await _janelaRender(cont);
+    // A lista do servidor de teste vem vazia; o teste injeta a sua pela
+    // funcao de pintura, que e a MESMA que a producao usa.
+    const box = document.getElementById('wa-jan-lista');
+    return {
+      temTela: !!document.querySelector('.wa-jan-tela'),
+      temFiltros: Array.from(document.querySelectorAll('.wa-jan-barra .wa-fchip')).map(function(b){ return b.textContent.trim(); }),
+      temBusca: !!document.getElementById('wa-jan-busca'),
+      temAcoes: !!document.getElementById('wa-jan-acoes'),
+      temLista: !!box,
+      vazioExplicado: /janela aberta/i.test(box ? box.textContent : '')
+    };
+  })()`);
+  ok(jan && jan.temTela === true, 'a aba "Janela aberta" desenha');
+  ok(jan && (jan.temFiltros || []).length === 6, 'com os 6 filtros: ' + JSON.stringify((jan || {}).temFiltros));
+  ok(jan && (jan.temFiltros || []).indexOf('Fecha em menos de 2h') >= 0, 'incluindo "fecha em menos de 2h"');
+  ok(jan && jan.temBusca === true, 'tem busca por nome ou numero');
+  ok(jan && jan.temLista === true, 'e a lista');
+  ok(jan && jan.vazioExplicado === true, 'com explicacao quando esta vazia');
+
+  const sel = await cdp.eval(`(async function(){
+    // Duas pessoas dentro da janela, uma fechando logo.
+    const box = document.getElementById('wa-jan-lista');
+    const antes = [
+      { conversation_id: 301, contact_id: 31, account_id: 1, contact_name: 'Ana Ribeiro', contact_phone: '5511900000301',
+        ultima_recebida_texto: 'tenho interesse', ultima_recebida_tipo: 'text', horas_restantes: 1.5,
+        respondi_depois: 0, aguardando_atendente: 1, bot_em: '2026-10-22 08:00:00', bot_pausado: 0, bot_saiu: 0,
+        fora_exp: 'per-1', lembretes_agendados: 2 },
+      { conversation_id: 302, contact_id: 32, account_id: 1, contact_name: 'Bruno Carvalho', contact_phone: '5511900000302',
+        ultima_recebida_texto: 'bom dia', ultima_recebida_tipo: 'text', horas_restantes: 20,
+        respondi_depois: 1, aguardando_atendente: 0, lembretes_agendados: 0 }
+    ];
+    // Entra pelo caminho de verdade: a funcao de pintura incremental.
+    window.__janTesteLista = antes;
+    const pintar = function (lista) {
+      // Usa a API publica da aba: filtra/seleciona pelos handlers reais.
+      _janelaTestePintar(lista);
+    };
+    if (typeof _janelaTestePintar !== 'function') return { erro: 'sem gancho de teste' };
+    pintar(antes);
+    const linhas = function () { return Array.from(document.querySelectorAll('.wa-jan-item')).map(function(e){ return e.getAttribute('data-conv'); }); };
+    const depoisDeDesenhar = linhas();
+    // Marca uma e confere o botao de enviar.
+    janelaMarcar(301, true);
+    const botao = (document.querySelector('#wa-jan-acoes .mod-btn-primary') || {}).textContent || '';
+    // Selecionar todos (respeita o que esta na tela).
+    janelaSelecionarTodos(true);
+    const botaoTodos = (document.querySelector('#wa-jan-acoes .mod-btn-primary') || {}).textContent || '';
+    // Agora a Ana sai da janela: a lista encolhe sem piscar, e a selecao dela
+    // sai junto (nao da para mandar para quem nao pode receber).
+    const marcaDaLinha = document.querySelector('.wa-jan-item[data-conv="302"]');
+    if (marcaDaLinha) marcaDaLinha._marcaDoTeste = 'mesmo-no';
+    pintar([antes[1]]);
+    const depoisDeSair = linhas();
+    const botaoDepois = (document.querySelector('#wa-jan-acoes .mod-btn-primary') || {}).textContent || '';
+    const mesmoNo = !!(document.querySelector('.wa-jan-item[data-conv="302"]') &&
+                       document.querySelector('.wa-jan-item[data-conv="302"]')._marcaDoTeste === 'mesmo-no');
+    return {
+      desenhou: depoisDeDesenhar.join(','),
+      tagAguardando: /aguardando atendente/i.test((document.querySelector('.wa-jan-item[data-conv="302"]') || document.body).parentNode.textContent || ''),
+      umSelecionado: /\(1\)/.test(botao),
+      todosSelecionados: /\(2\)/.test(botaoTodos),
+      depoisDeSair: depoisDeSair.join(','),
+      selecaoLimpou: /\(1\)/.test(botaoDepois),
+      mesmoNo: mesmoNo
+    };
+  })()`);
+  if (sel && sel.erro) {
+    ok(false, 'a prova da selecao nao rodou: ' + sel.erro);
+  } else {
+    ok(sel && sel.desenhou === '301,302', 'a lista desenha na ordem de quem fecha primeiro (' + (sel || {}).desenhou + ')');
+    ok(sel && sel.umSelecionado === true, 'marcar uma pessoa atualiza o botao "Enviar para selecionados (1)"');
+    ok(sel && sel.todosSelecionados === true, '"selecionar todos" marca o que esta na tela (2)');
+    ok(sel && sel.depoisDeSair === '302', 'quem sai da janela DESAPARECE da lista (' + (sel || {}).depoisDeSair + ')');
+    ok(sel && sel.mesmoNo === true, 'e quem fica nao foi redesenhado (nada de piscar)');
+    ok(sel && sel.selecaoLimpou === true, 'a selecao de quem saiu tambem sai (sobrou 1)');
+  }
+
+  const painel = await cdp.eval(`(function(){
+    janelaAbrirEnvio();
+    const p = document.querySelector('.wa-jan-painel');
+    const txt = p ? p.textContent : '';
+    return {
+      abriu: !!p,
+      temPronta: !!document.getElementById('wa-jan-pronta'),
+      temTexto: !!document.getElementById('wa-jan-texto'),
+      temVariaveis: /\{nome\}/.test(txt) && /\{horario\}/.test(txt),
+      temAnexo: /Anexo/i.test(txt),
+      temPrevia: !!document.querySelector('.wa-jan-previa-envio'),
+      temBotao: /Enviar para/i.test(txt)
+    };
+  })()`);
+  ok(painel && painel.abriu === true, 'o painel de envio abre');
+  ok(painel && painel.temPronta && painel.temTexto, 'com escolha de mensagem pronta e texto livre');
+  ok(painel && painel.temVariaveis === true, 'as variaveis estao listadas');
+  ok(painel && painel.temAnexo === true, 'tem anexo opcional');
+  ok(painel && painel.temPrevia === true, 'e a previa de como vai chegar');
+  ok(excecoes.length === 0, 'sem erro de console na aba Janela aberta (' + JSON.stringify(excecoes.slice(0, 2)) + ')');
+
   console.log('\n=== 10) ROBOZINHO E SININHO NA LISTA DE CONVERSAS ===');
   const sinais = await cdp.eval(`(function(){
     const box = document.createElement('div');
