@@ -571,6 +571,7 @@ function criarTabelas() {
     'CREATE INDEX IF NOT EXISTS idx_lembretes_conversa ON whatsapp_lembretes(conversation_id, status)',
     'CREATE INDEX IF NOT EXISTS idx_envio_itens_fila ON whatsapp_envio_grupo_itens(status, envio_id)',
     'CREATE INDEX IF NOT EXISTS idx_envio_itens_envio ON whatsapp_envio_grupo_itens(envio_id)',
+    'CREATE INDEX IF NOT EXISTS idx_envio_itens_contato ON whatsapp_envio_grupo_itens(contact_id, status)',
     'CREATE INDEX IF NOT EXISTS idx_envios_grupo_status ON whatsapp_envios_grupo(status, criado_em DESC)',
     'CREATE INDEX IF NOT EXISTS idx_webhook_events_eid ON whatsapp_webhook_events(event_id)',
     'CREATE INDEX IF NOT EXISTS idx_audit_created ON whatsapp_audit_logs(created_at DESC)',
@@ -1050,6 +1051,18 @@ const janela = {
     if (f.so_fora_exp) onde += " AND IFNULL(x.fora_exp,'') <> ''";
     if (f.so_aguardando) onde += " AND x.aguardando_atendente = 1";
     if (f.sem_resposta_minha) onde += " AND x.respondi_depois = 0";
+    // DISPAROS (envio em grupo). "Nunca recebeu", "ja recebeu", "ficou de fora
+    // do ultimo" e "ficou de fora DAQUELE envio" — e o que permite mandar so
+    // para quem falta.
+    if (f.nunca_recebeu) onde += ' AND x.disparos_recebidos = 0';
+    if (f.ja_recebeu) onde += ' AND x.disparos_recebidos > 0';
+    if (f.nao_recebeu_envio) {
+      onde += ` AND NOT EXISTS (SELECT 1 FROM whatsapp_envio_grupo_itens i
+                                  WHERE i.contact_id = x.contact_id
+                                    AND i.envio_id = ?
+                                    AND i.status = 'enviado')`;
+      params.push(Number(f.nao_recebeu_envio));
+    }
     if (Array.isArray(f.account_ids)) {
       if (!f.account_ids.length) onde += ' AND 0=1';
       else {
@@ -1087,7 +1100,21 @@ const janela = {
                 IFNULL(bc.aguardando_atendente, 0) AS aguardando_atendente,
                 bc.fora_exp_periodo AS fora_exp,
                 (SELECT COUNT(*) FROM whatsapp_lembretes l
-                  WHERE l.conversation_id = c.id AND l.status = 'agendado') AS lembretes_agendados
+                  WHERE l.conversation_id = c.id AND l.status = 'agendado') AS lembretes_agendados,
+                -- DISPAROS JA RECEBIDOS por esta pessoa (envio em grupo com
+                -- item 'enviado'). Sai da fila que ja existe: nao ha controle
+                -- novo nenhum.
+                (SELECT COUNT(*) FROM whatsapp_envio_grupo_itens i
+                  WHERE i.contact_id = c.contact_id AND i.status = 'enviado') AS disparos_recebidos,
+                (SELECT MAX(i.enviado_em) FROM whatsapp_envio_grupo_itens i
+                  WHERE i.contact_id = c.contact_id AND i.status = 'enviado') AS ultimo_disparo_em,
+                (SELECT e2.titulo FROM whatsapp_envio_grupo_itens i
+                   JOIN whatsapp_envios_grupo e2 ON e2.id = i.envio_id
+                  WHERE i.contact_id = c.contact_id AND i.status = 'enviado'
+                  ORDER BY i.enviado_em DESC, i.id DESC LIMIT 1) AS ultimo_disparo_titulo,
+                (SELECT i.envio_id FROM whatsapp_envio_grupo_itens i
+                  WHERE i.contact_id = c.contact_id AND i.status = 'enviado'
+                  ORDER BY i.enviado_em DESC, i.id DESC LIMIT 1) AS ultimo_disparo_id
            FROM whatsapp_conversations c
            LEFT JOIN whatsapp_contacts ct ON ct.id = c.contact_id
            LEFT JOIN whatsapp_bot_contatos bc ON bc.contact_id = c.contact_id
@@ -1100,6 +1127,24 @@ const janela = {
        ORDER BY x.horas_restantes ASC
        LIMIT ?`,
       params
+    );
+  },
+
+  // Os disparos que ESTAS pessoas receberam, para a dica do mouse no selo.
+  // Uma consulta para a página inteira (e não uma por linha).
+  disparosDosContatos(contactIds, limite) {
+    const ids = (contactIds || []).map(Number).filter(function (n) { return !!n; });
+    if (!ids.length) return [];
+    const marcas = ids.map(function () { return '?'; }).join(',');
+    return getAll(
+      `SELECT i.contact_id, i.envio_id, i.enviado_em,
+              e.titulo, substr(IFNULL(e.texto,''), 1, 80) AS texto_inicio
+         FROM whatsapp_envio_grupo_itens i
+         JOIN whatsapp_envios_grupo e ON e.id = i.envio_id
+        WHERE i.status = 'enviado' AND i.contact_id IN (` + marcas + `)
+        ORDER BY i.enviado_em DESC, i.id DESC
+        LIMIT ?`,
+      ids.concat([Number(limite) || 600])
     );
   },
 
@@ -1211,6 +1256,41 @@ const envioGrupo = {
         WHERE i.envio_id = ?
         ORDER BY i.id ASC LIMIT ?`,
       [envioId, limite || 500]
+    );
+  },
+
+  // O envio mais recente (qualquer status): e o que o filtro "nao recebeu o
+  // ultimo disparo" usa.
+  ultimoEnvio() {
+    return getOne('SELECT * FROM whatsapp_envios_grupo ORDER BY id DESC LIMIT 1');
+  },
+
+  // PROTECAO CONTRA REPETIR: quem, entre estas conversas, JA recebeu a mesma
+  // mensagem nas ultimas N horas. "Mesma mensagem" e: a mesma mensagem pronta
+  // (quando o disparo usa uma) ou o mesmo texto (quando e texto livre).
+  jaReceberam(conversationIds, opcoes) {
+    const ids = (conversationIds || []).map(Number).filter(function (n) { return !!n; });
+    if (!ids.length) return [];
+    const o = opcoes || {};
+    const horas = Number(o.horas) || 24;
+    const marcas = ids.map(function () { return '?'; }).join(',');
+    const params = ids.slice();
+    let igual = '';
+    if (o.resposta_id) { igual = 'e.resposta_id = ?'; params.push(String(o.resposta_id)); }
+    else if (o.texto) { igual = 'e.texto = ?'; params.push(String(o.texto)); }
+    else return [];
+    params.push(horas);
+    return getAll(
+      `SELECT i.conversation_id, i.contact_id, i.nome_contato, i.enviado_em,
+              e.id AS envio_id, e.titulo
+         FROM whatsapp_envio_grupo_itens i
+         JOIN whatsapp_envios_grupo e ON e.id = i.envio_id
+        WHERE i.status = 'enviado'
+          AND i.conversation_id IN (` + marcas + `)
+          AND ` + igual + `
+          AND (julianday('now') - julianday(i.enviado_em)) * 24.0 <= ?
+        ORDER BY i.enviado_em DESC`,
+      params
     );
   },
 

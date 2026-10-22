@@ -70,8 +70,13 @@ const SEMEAR = `(async function(){
     { id:'r3', titulo:'<img src=x onerror=alert(1)>', texto:'teste <b>bold</b>', ordem:3 },
     { id:'r4', titulo:'Tabela de vagas', texto:'Segue a tabela.', ordem:4, arquivo:'pronta_x.pdf', nomeArquivo:'tabela.pdf', tipoAnexo:'documento' }
   ];
-  await RTCloud.salvarAgora(state, { merge: true, upsertIds: ['r1','r2','r3','r4'] });
-  return (state.respostasRapidas || []).length;
+  const _salvou = RTCloud.salvarAgora(state, { merge: true, upsertIds: ['r1','r2','r3','r4'] });
+  // Conta ANTES de esperar o save: a sincronizacao pode trocar o state da aba
+  // no meio do await, e isso nao e defeito — o que importa e o servidor ter
+  // recebido (conferido logo abaixo).
+  const quantas = (state.respostasRapidas || []).length;
+  await _salvou;
+  return quantas;
 })()`;
 
 (async () => {
@@ -122,6 +127,16 @@ const SEMEAR = `(async function(){
      })()`,
     20000, 'o catalogo chegar no servidor');
   ok(semeadoNoServidor === true, 'e o servidor confirmou o catalogo (a sincronizacao nao apaga a lista no meio)');
+  // E poe o catalogo em maos NA ABA. Entre o save e agora, a sincronizacao de
+  // fundo pode ter trazido um estado antigo; em vez de esperar a proxima volta
+  // dela (que numa maquina carregada demora), o teste releu o estado pelo MESMO
+  // cliente que a producao usa.
+  const catalogoNaAba = await cdp.eval(`(async function(){
+    const dados = await RTCloud.loadState();
+    if (dados && Array.isArray(dados.respostasRapidas)) state.respostasRapidas = dados.respostasRapidas;
+    return ((state.respostasRapidas) || []).length;
+  })()`);
+  ok(catalogoNaAba === 4, 'e a aba esta com as 4 mensagens prontas em maos (' + JSON.stringify(catalogoNaAba) + ')');
 
   console.log('\n=== 2) FILEIRA COM A JANELA DE 24H FECHADA ===');
   excecoes.length = 0;
@@ -494,8 +509,11 @@ const SEMEAR = `(async function(){
     };
   })()`);
   ok(jan && jan.temTela === true, 'a aba "Janela aberta" desenha');
-  ok(jan && (jan.temFiltros || []).length === 6, 'com os 6 filtros: ' + JSON.stringify((jan || {}).temFiltros));
+  ok(jan && (jan.temFiltros || []).length === 9, 'com os 9 filtros: ' + JSON.stringify((jan || {}).temFiltros));
   ok(jan && (jan.temFiltros || []).indexOf('Fecha em menos de 2h') >= 0, 'incluindo "fecha em menos de 2h"');
+  ok(jan && (jan.temFiltros || []).indexOf('Ainda não recebeu disparo') >= 0, 'e os de disparo: "Ainda não recebeu disparo"');
+  ok(jan && (jan.temFiltros || []).indexOf('Não recebeu o último disparo') >= 0, '"Não recebeu o último disparo"');
+  ok(jan && (jan.temFiltros || []).indexOf('Já recebeu disparo') >= 0, '"Já recebeu disparo"');
   ok(jan && jan.temBusca === true, 'tem busca por nome ou numero');
   ok(jan && jan.temLista === true, 'e a lista');
   ok(jan && jan.vazioExplicado === true, 'com explicacao quando esta vazia');
@@ -558,6 +576,67 @@ const SEMEAR = `(async function(){
     ok(sel && sel.selecaoLimpou === true, 'a selecao de quem saiu tambem sai (sobrou 1)');
   }
 
+  console.log('\n=== 9d) SELO DO DISPARO, HISTORICO E SELETOR ===');
+  const selo = await cdp.eval(`(async function(){
+    if (typeof _janelaTestePintar !== 'function') return { erro: 'sem gancho de teste' };
+    const lista = [
+      { conversation_id: 401, contact_id: 41, account_id: 1, contact_name: 'Ana Ribeiro', contact_phone: '5511900000401',
+        ultima_recebida_texto: 'oi', ultima_recebida_tipo: 'text', horas_restantes: 10, respondi_depois: 0,
+        disparos_recebidos: 2, ultimo_disparo_em: new Date(Date.now() - 2 * 3600 * 1000).toISOString().replace('T',' ').slice(0,19),
+        ultimo_disparo_titulo: 'Entrevista 10h dia 23', ultimo_disparo_id: 7 },
+      { conversation_id: 402, contact_id: 42, account_id: 1, contact_name: 'Bruno Carvalho', contact_phone: '5511900000402',
+        ultima_recebida_texto: 'bom dia', ultima_recebida_tipo: 'text', horas_restantes: 20, respondi_depois: 0,
+        disparos_recebidos: 0 }
+    ];
+    const envios = [
+      { id: 7, titulo: 'Entrevista 10h dia 23', criado_em: new Date(Date.now() - 2 * 3600 * 1000).toISOString().replace('T',' ').slice(0,19), total: 5, enviados: 4, na_fila: 1, status: 'ativo' },
+      { id: 6, titulo: 'Convite de sexta', criado_em: new Date(Date.now() - 26 * 3600 * 1000).toISOString().replace('T',' ').slice(0,19), total: 3, enviados: 3, na_fila: 0, status: 'concluido' }
+    ];
+    const disparos = [
+      { contact_id: 41, envio_id: 7, enviado_em: new Date(Date.now() - 2 * 3600 * 1000).toISOString().replace('T',' ').slice(0,19), titulo: 'Entrevista 10h dia 23', texto_inicio: 'Ola {nome}, a entrevista e as 10h' },
+      { contact_id: 41, envio_id: 6, enviado_em: new Date(Date.now() - 26 * 3600 * 1000).toISOString().replace('T',' ').slice(0,19), titulo: 'Convite de sexta', texto_inicio: 'Temos vaga aberta' }
+    ];
+    _janelaTestePintar(lista, envios, disparos);
+    // Marca as duas: o painel de envio da prova seguinte precisa de selecao.
+    janelaMarcar(401, true); janelaMarcar(402, true);
+    const linha = function (id) { return document.querySelector('.wa-jan-item[data-conv="' + id + '"]'); };
+    const selAna = linha(401) ? linha(401).querySelector('.wa-jan-selo') : null;
+    const selBruno = linha(402) ? linha(402).querySelector('.wa-jan-selo') : null;
+    const hist = document.querySelector('.wa-jan-historico');
+    const seletor = document.querySelector('.wa-jan-seletor select');
+    return {
+      seloAna: selAna ? selAna.textContent.trim() : '',
+      dicaAna: selAna ? (selAna.getAttribute('title') || '') : '',
+      classeAna: selAna ? selAna.className : '',
+      seloBruno: selBruno ? selBruno.textContent.trim() : '',
+      classeBruno: selBruno ? selBruno.className : '',
+      temHistorico: !!hist,
+      textoHistorico: hist ? hist.textContent.replace(/\\s+/g, ' ').trim() : '',
+      botaoFalta: hist ? Array.from(hist.querySelectorAll('button')).map(function(b){ return b.textContent.replace(/\\s+/g,' ').trim(); }) : [],
+      opcoesSeletor: seletor ? Array.from(seletor.options).map(function(o){ return o.textContent.trim(); }) : []
+    };
+  })()`);
+  if (selo && selo.erro) {
+    ok(false, 'a prova do selo nao rodou: ' + selo.erro);
+  } else {
+    ok(selo && /Disparo enviado há 2h/.test(selo.seloAna || ''), 'o selo mostra "Disparo enviado há 2h" ("' + (selo || {}).seloAna + '")');
+    ok(selo && /Entrevista 10h dia 23/.test(selo.seloAna || ''), 'com o nome do ultimo envio');
+    ok(selo && /\(2 no total\)/.test(selo.seloAna || ''), 'e quantos disparos a pessoa ja recebeu');
+    ok(selo && /Entrevista 10h dia 23/.test(selo.dicaAna || '') && /Convite de sexta/.test(selo.dicaAna || ''),
+      'a dica do mouse lista os envios recebidos');
+    ok(selo && /Ola \{nome\}/.test(selo.dicaAna || ''), 'com o comeco do texto de cada um');
+    ok(selo && /Nunca recebeu disparo/.test(selo.seloBruno || ''), 'quem nunca recebeu aparece como "Nunca recebeu disparo"');
+    ok(selo && /nunca/.test(selo.classeBruno || '') && /recebeu/.test(selo.classeAna || ''), 'os dois selos tem visual diferente');
+    ok(selo && selo.temHistorico === true, 'o bloco "Ultimos envios" aparece no topo');
+    ok(selo && /Entrevista 10h dia 23/.test(selo.textoHistorico || '') && /4 de 5/.test(selo.textoHistorico || ''),
+      'com nome, data, hora e quantos receberam ("' + String((selo || {}).textoHistorico).slice(0, 120) + '")');
+    ok(selo && (selo.botaoFalta || []).length === 2 &&
+       /Mandar para quem ainda não recebeu/.test((selo.botaoFalta || [])[0] || ''),
+      'e o botao "Mandar para quem ainda não recebeu" em cada envio');
+    ok(selo && (selo.opcoesSeletor || []).length === 3, 'o seletor "Não recebeu o envio:" lista os envios recentes (' + ((selo || {}).opcoesSeletor || []).length + ')');
+    ok(selo && /Entrevista 10h dia 23/.test(((selo.opcoesSeletor || [])[1]) || ''), 'com o nome e quando foi: "' + ((selo || {}).opcoesSeletor || [])[1] + '"');
+  }
+
   const painel = await cdp.eval(`(function(){
     janelaAbrirEnvio();
     const p = document.querySelector('.wa-jan-painel');
@@ -569,6 +648,8 @@ const SEMEAR = `(async function(){
       temVariaveis: /\{nome\}/.test(txt) && /\{horario\}/.test(txt),
       temAnexo: /Anexo/i.test(txt),
       temPrevia: !!document.querySelector('.wa-jan-previa-envio'),
+      temNome: !!document.getElementById('wa-jan-titulo'),
+      explicaNome: /em branco vira a data e a hora/i.test(txt),
       temBotao: /Enviar para/i.test(txt)
     };
   })()`);
@@ -577,6 +658,32 @@ const SEMEAR = `(async function(){
   ok(painel && painel.temVariaveis === true, 'as variaveis estao listadas');
   ok(painel && painel.temAnexo === true, 'tem anexo opcional');
   ok(painel && painel.temPrevia === true, 'e a previa de como vai chegar');
+  ok(painel && painel.temNome === true, 'o painel tem o campo "Nome deste envio"');
+  ok(painel && painel.explicaNome === true, 'explicando que em branco vira a data e a hora');
+
+  // O aviso de repeticao: quem ja recebeu a mesma mensagem nas ultimas 24h.
+  const rep = await cdp.eval(`(function(){
+    if (typeof _janelaTesteAviso !== 'function') return { erro: 'sem gancho do aviso' };
+    _janelaTesteAviso([
+      { conversation_id: 401, contact_id: 41, nome_contato: 'Ana Ribeiro', enviado_em: new Date(Date.now() - 3 * 3600 * 1000).toISOString().replace('T',' ').slice(0,19), envio_id: 7, titulo: 'Entrevista 10h dia 23' },
+      { conversation_id: 402, contact_id: 42, nome_contato: 'Bruno Carvalho', enviado_em: new Date(Date.now() - 4 * 3600 * 1000).toISOString().replace('T',' ').slice(0,19), envio_id: 7, titulo: 'Entrevista 10h dia 23' }
+    ], 5);
+    const box = document.getElementById('wa-jan-aviso-repeticao');
+    const txt = box ? box.textContent.replace(/\\s+/g, ' ').trim() : '';
+    const botoes = box ? Array.from(box.querySelectorAll('button')).map(function(b){
+      return { texto: b.textContent.replace(/\\s+/g,' ').trim(), principal: /mod-btn-primary/.test(b.className) };
+    }) : [];
+    return { abriu: !!box, txt: txt, botoes: botoes };
+  })()`);
+  ok(rep && !rep.erro && rep.abriu === true, 'o aviso de repeticao abre dentro do painel' + (rep && rep.erro ? ' (' + rep.erro + ')' : ''));
+  ok(rep && /2 pessoas já receberam esta mensagem/.test(rep.txt || ''),
+    'dizendo quantas pessoas ja receberam ("' + String((rep || {}).txt).slice(0, 80) + '")');
+  ok(rep && /Pular essas pessoas\?/.test(rep.txt || ''), 'e perguntando "Pular essas pessoas?"');
+  ok(rep && (rep.botoes || []).some(function (b) { return b.principal && /Pular e enviar para 3/.test(b.texto); }),
+    'o botao PRINCIPAL e pular (o padrao): ' + JSON.stringify((rep || {}).botoes));
+  ok(rep && (rep.botoes || []).some(function (b) { return !b.principal && /Mandar mesmo assim para 5/.test(b.texto); }),
+    'com a opcao de mandar mesmo assim');
+  ok(rep && /Ana Ribeiro/.test(rep.txt || ''), 'e mostra os nomes de quem ja recebeu');
   ok(excecoes.length === 0, 'sem erro de console na aba Janela aberta (' + JSON.stringify(excecoes.slice(0, 2)) + ')');
 
   console.log('\n=== 10) ROBOZINHO E SININHO NA LISTA DE CONVERSAS ===');

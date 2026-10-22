@@ -24,7 +24,11 @@
   };
   function pode(acao) { return (typeof _waPode === 'function') ? _waPode(acao) : false; }
 
-  let _filtro = '';            // '', 'fechando', 'bot', 'fora', 'aguardando', 'sem_resposta'
+  let _filtro = '';            // '', 'fechando', 'bot', 'fora', 'aguardando', 'sem_resposta',
+                               // 'nunca_recebeu', 'ja_recebeu', 'nao_recebeu_ultimo'
+  let _envioFiltrado = '';     // id do envio no seletor "não recebeu o envio:"
+  let _disparos = {};          // { contact_id: [ {titulo, enviado_em, texto_inicio} ] }
+  let _envios = [];            // os envios recentes (histórico e seletor)
   let _busca = '';
   let _contatos = [];
   let _selecionados = {};      // { conversation_id: true }
@@ -34,6 +38,9 @@
 
   const FILTROS = [
     ['', 'Todos'],
+    ['nunca_recebeu', 'Ainda não recebeu disparo'],
+    ['nao_recebeu_ultimo', 'Não recebeu o último disparo'],
+    ['ja_recebeu', 'Já recebeu disparo'],
     ['fechando', 'Fecha em menos de 2h'],
     ['bot', 'Atendidos pelo bot'],
     ['fora', 'Fora do expediente'],
@@ -63,7 +70,9 @@
     _carregando = true;
     try {
       let qs = '?limite=300';
-      if (_filtro) qs += '&' + encodeURIComponent(_filtro === 'sem_resposta' ? 'sem_resposta' : _filtro) + '=true';
+      if (_filtro) qs += '&' + encodeURIComponent(_filtro) + '=true';
+      // O seletor "não recebeu o envio" COMBINA com o filtro escolhido.
+      if (_envioFiltrado) qs += '&nao_recebeu_envio=' + encodeURIComponent(_envioFiltrado);
       if (_busca) qs += '&busca=' + encodeURIComponent(_busca);
       const r = await waGet('/janela-aberta' + qs);
       if (!r || !r.ok) {
@@ -75,6 +84,14 @@
       }
       if (typeof _waRedeVoltou === 'function') _waRedeVoltou();
       _contatos = r.contatos || [];
+      _envios = r.envios || [];
+      // Os disparos de cada pessoa, para a dica do mouse no selo.
+      _disparos = {};
+      (r.disparos || []).forEach(function (d) {
+        const k = String(d.contact_id);
+        if (!_disparos[k]) _disparos[k] = [];
+        _disparos[k].push(d);
+      });
       // Quem saiu da janela também sai da seleção: não dá para mandar para
       // quem já não pode receber.
       const vivos = {};
@@ -130,6 +147,8 @@
           <button class="mod-btn-secondary" onclick="janelaAtualizar()"><i class="fa-solid fa-rotate"></i> Atualizar</button>
         </div>
 
+        ${historicoHTML()}
+
         <div class="wa-jan-barra">
           <div class="wa-conv-filtros">
             ${FILTROS.map(function (f) {
@@ -137,6 +156,16 @@
                      esc(f[1]) + '</button>';
             }).join('')}
           </div>
+          ${_envios.length ? `<label class="wa-jan-seletor">
+            Não recebeu o envio:
+            <select onchange="janelaFiltrarPorEnvio(this.value)">
+              <option value="">— qualquer —</option>
+              ${_envios.map(function (e) {
+                return '<option value="' + Number(e.id) + '"' + (String(_envioFiltrado) === String(e.id) ? ' selected' : '') + '>' +
+                       esc(nomeDoEnvio(e)) + '</option>';
+              }).join('')}
+            </select>
+          </label>` : ''}
           <div class="wa-search wa-jan-busca">
             <i class="fa-solid fa-magnifying-glass"></i>
             <input type="text" id="wa-jan-busca" placeholder="Procurar nome ou número…"
@@ -150,6 +179,38 @@
 
         <div id="wa-jan-envio"></div>
       </div>`;
+  }
+
+  function nomeDoEnvio(e) {
+    const q = quandoRecebeu(e.criado_em);
+    return (e.titulo || ('Disparo #' + e.id)) + ' · ' + q;
+  }
+
+  // ÚLTIMOS ENVIOS: o histórico no topo, com o atalho que resolve o problema
+  // do dia a dia — "manda para quem ainda não recebeu".
+  function historicoHTML() {
+    if (!_envios.length) return '';
+    return `
+      <details class="wa-jan-historico" ${_envioFiltrado ? 'open' : ''}>
+        <summary><i class="fa-solid fa-clock-rotate-left"></i> Últimos envios
+          <span class="wa-jan-total">${_envios.length}</span></summary>
+        <div class="wa-jan-hist-lista">
+          ${_envios.map(function (e) {
+            const total = Number(e.total) || 0;
+            const enviados = Number(e.enviados) || 0;
+            return `<div class="wa-jan-hist-item">
+              <div class="wa-jan-hist-info">
+                <strong>${esc(e.titulo || ('Disparo #' + e.id))}</strong>
+                <span>${esc(quandoRecebeu(e.criado_em))} · ${enviados} de ${total} recebeu(ram)${
+                  Number(e.na_fila) ? ' · ' + Number(e.na_fila) + ' na fila' : ''}${
+                  Number(e.pulados) ? ' · ' + Number(e.pulados) + ' pulado(s)' : ''}</span>
+              </div>
+              ${pode('criar') ? `<button class="mod-btn-secondary" onclick="janelaMandarParaQuemFalta(${Number(e.id)})">
+                <i class="fa-solid fa-user-plus"></i> Mandar para quem ainda não recebeu</button>` : ''}
+            </div>`;
+          }).join('')}
+        </div>
+      </details>`;
   }
 
   function frase(n) {
@@ -181,12 +242,49 @@
     return _contatos.map(itemHTML).join('');
   }
 
+  // "Disparo enviado há 2h" / a data e a hora quando faz mais de um dia.
+  function quandoRecebeu(iso) {
+    if (!iso) return '';
+    const t = String(iso).replace(' ', 'T');
+    const d = new Date(t.indexOf('Z') < 0 && t.indexOf('+') < 0 ? t + 'Z' : t);
+    if (isNaN(d)) return String(iso);
+    const min = Math.round((Date.now() - d.getTime()) / 60000);
+    if (min < 1) return 'agora';
+    if (min < 60) return 'há ' + min + 'min';
+    const h = Math.round(min / 60);
+    if (h < 24) return 'há ' + h + 'h';
+    const p = function (n) { return String(n).padStart(2, '0'); };
+    return p(d.getDate()) + '/' + p(d.getMonth() + 1) + ' às ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  // O selo do disparo, com a lista dos envios na dica do mouse.
+  function seloDisparo(c) {
+    const n = Number(c.disparos_recebidos) || 0;
+    if (!n) {
+      return '<span class="wa-jan-selo nunca" title="Esta pessoa nunca recebeu envio em grupo">' +
+             '<i class="fa-regular fa-circle"></i> Nunca recebeu disparo</span>';
+    }
+    const lista = (_disparos[String(c.contact_id)] || []).slice(0, 8);
+    const dica = lista.length
+      ? lista.map(function (d) {
+          return '• ' + (d.titulo || 'disparo') + ' — ' + quandoRecebeu(d.enviado_em) +
+                 (d.texto_inicio ? ': ' + d.texto_inicio : '');
+        }).join('\n')
+      : 'Recebeu ' + n + ' disparo(s)';
+    const titulo = c.ultimo_disparo_titulo || 'disparo';
+    return '<span class="wa-jan-selo recebeu" title="' + esc(dica) + '">' +
+           '<i class="fa-solid fa-paper-plane"></i> Disparo enviado ' + esc(quandoRecebeu(c.ultimo_disparo_em)) +
+           ' · ' + esc(titulo) + (n > 1 ? ' (' + n + ' no total)' : '') + '</span>';
+  }
+
   function assinatura(c) {
     return [c.contact_name || c.contact_profile_name || '', c.contact_phone || '',
             c.ultima_recebida_texto || '', c.ultima_recebida_tipo || '',
             Math.round(Number(c.horas_restantes) * 60), c.aguardando_atendente || 0,
             c.bot_em || '', c.bot_pausado || 0, c.bot_saiu || 0,
             c.fora_exp || '', c.lembretes_agendados || 0, c.respondi_depois || 0,
+            // o selo precisa entrar aqui, senão não atualizaria
+            c.disparos_recebidos || 0, c.ultimo_disparo_em || '', c.ultimo_disparo_titulo || '',
             _selecionados[c.conversation_id] ? '1' : '0'].join('|');
   }
 
@@ -221,6 +319,7 @@
               ? '<span class="wa-jan-tag cinza">sem resposta minha</span>' : ''}
           </div>
           <div class="wa-jan-previa">${previa}</div>
+          <div class="wa-jan-selos">${seloDisparo(c)}</div>
           <div class="wa-jan-tel">${esc(typeof _waFmtTelefone === 'function' ? _waFmtTelefone(c.contact_phone) : c.contact_phone)}</div>
         </div>
         <div class="wa-jan-tempo ${urgencia(c.horas_restantes)}">
@@ -283,12 +382,33 @@
   // Gancho para a PROVA: deixa o teste entregar uma lista e usar a MESMA
   // funcao de pintura incremental que a producao usa. Sem isso, o teste teria
   // que imitar a pintura — e passaria mesmo se a de verdade estivesse errada.
-  window._janelaTestePintar = function (lista) {
+  window._janelaTestePintar = function (lista, envios, disparos) {
     _contatos = Array.isArray(lista) ? lista : [];
+    if (Array.isArray(disparos)) {
+      _disparos = {};
+      disparos.forEach(function (d) {
+        const k = String(d.contact_id);
+        if (!_disparos[k]) _disparos[k] = [];
+        _disparos[k].push(d);
+      });
+    }
+    // O bloco "Últimos envios" e o seletor vivem no desenho da aba, não na
+    // pintura da lista: entregar envios redesenha a aba inteira.
+    if (Array.isArray(envios)) {
+      _envios = envios;
+      const cont = document.getElementById('wa-content');
+      if (cont) desenhar(cont);
+    }
     const vivos = {};
     _contatos.forEach(function (c) { vivos[c.conversation_id] = true; });
     Object.keys(_selecionados).forEach(function (id) { if (!vivos[id]) delete _selecionados[id]; });
     pintarLista();
+  };
+
+  // Gancho para a PROVA do aviso de repeticao: o teste entrega a lista de quem
+  // ja recebeu e a tela monta o aviso de verdade.
+  window._janelaTesteAviso = function (repetidos, total) {
+    avisoRepeticao(repetidos || [], Number(total) || (repetidos || []).length);
   };
 
   window.janelaAtualizar = async function () {
@@ -326,6 +446,33 @@
     pintarLista();
   };
   window.janelaLimpar = function () { _selecionados = {}; pintarLista(); };
+
+  // O seletor "não recebeu o envio:" combina com o filtro escolhido.
+  window.janelaFiltrarPorEnvio = async function (id) {
+    _envioFiltrado = String(id || '');
+    const ok = await carregar();
+    const cont = document.getElementById('wa-content');
+    if (cont) desenhar(cont);
+    if (!ok) aviso('Mostrando o que já estava na tela.', true);
+  };
+
+  // O ATALHO DO DIA A DIA: filtra quem ficou de fora daquele envio, marca
+  // todos e abre o painel já pronto para mandar.
+  window.janelaMandarParaQuemFalta = async function (envioId) {
+    _envioFiltrado = String(envioId || '');
+    _filtro = '';
+    const ok = await carregar();
+    const cont = document.getElementById('wa-content');
+    if (cont) desenhar(cont);
+    if (!ok) { aviso('Não consegui atualizar a lista agora.', true); return; }
+    if (!_contatos.length) {
+      aviso('Todas as pessoas com janela aberta já receberam esse envio.');
+      return;
+    }
+    janelaSelecionarTodos(true);
+    aviso(_contatos.length + ' pessoa(s) ainda não receberam esse envio.');
+    janelaAbrirEnvio();
+  };
   window.janelaAbrirConversa = function (id) {
     if (typeof waTrocarSubAba === 'function' && typeof waAbrirConversa === 'function') {
       waTrocarSubAba('inbox');
@@ -336,7 +483,7 @@
   // ══════════════════════════════════════════════════════════════════════════
   // O PAINEL DE ENVIO
   // ══════════════════════════════════════════════════════════════════════════
-  let _envio = { texto: '', resposta_id: '', arquivo: '', nomeArquivo: '', mime: '', tipoAnexo: '', usarLembretes: false };
+  let _envio = { texto: '', resposta_id: '', arquivo: '', nomeArquivo: '', mime: '', tipoAnexo: '', usarLembretes: false, titulo: '' };
 
   function prontasDisponiveis() {
     const st = (typeof state !== 'undefined' && state) ? state : null;
@@ -357,6 +504,12 @@
         <div class="wa-jan-painel-cab">
           <h4><i class="fa-solid fa-paper-plane"></i> Enviar para ${n} pessoa${n === 1 ? '' : 's'}</h4>
           <button class="wa-pronta-fechar" onclick="janelaFecharEnvio()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="wa-prontas-form-linha">
+          <label>Nome deste envio <span class="wa-prontas-hint">(para reconhecer depois; em branco vira a data e a hora)</span></label>
+          <input type="text" id="wa-jan-titulo" maxlength="60" placeholder="Entrevista 10h dia 23"
+                 value="${esc(_envio.titulo)}" oninput="janelaNomeDoEnvio(this.value)">
         </div>
 
         <div class="wa-prontas-form-linha">
@@ -419,6 +572,13 @@
     if (t) t.focus();
   };
 
+  // O painel se redesenha inteiro em vários momentos; o que a pessoa digitou
+  // no nome tem que sobreviver a isso.
+  function guardarNome() {
+    const campo = document.getElementById('wa-jan-titulo');
+    if (campo) _envio.titulo = String(campo.value || '').slice(0, 60);
+  }
+
   function temLembrete(id) {
     const r = prontasDisponiveis().find(function (x) { return String(x.id) === String(id); });
     return !!(r && r.lembrete && r.lembrete.ligado);
@@ -447,6 +607,7 @@
   };
   window.janelaTexto = function (v) { _envio.texto = String(v || ''); atualizarPrevia(); };
   window.janelaEscolherPronta = function (id) {
+    guardarNome();
     _envio.resposta_id = String(id || '');
     const r = prontasDisponiveis().find(function (x) { return String(x.id) === _envio.resposta_id; });
     if (r) {
@@ -460,7 +621,9 @@
     janelaAbrirEnvio();
   };
   window.janelaUsarLembretes = function (v) { _envio.usarLembretes = !!v; };
+  window.janelaNomeDoEnvio = function (v) { _envio.titulo = String(v || '').slice(0, 60); };
   window.janelaTirarAnexo = function () {
+    guardarNome();
     _envio.arquivo = ''; _envio.nomeArquivo = ''; _envio.mime = ''; _envio.tipoAnexo = '';
     janelaAbrirEnvio();
   };
@@ -500,18 +663,80 @@
     if (!String(_envio.texto || '').trim() && !_envio.arquivo) {
       aviso('Escreva a mensagem ou escolha um anexo.', true); return;
     }
+    guardarNome();
+
+    // PROTEÇÃO CONTRA REPETIR: antes de perguntar qualquer coisa, conferir
+    // quem dessa seleção já recebeu esta mesma mensagem nas últimas 24 horas.
+    // Mandar a mesma coisa duas vezes no mesmo dia irrita o contato.
+    const conf = await waSend('/envio-grupo/conferir', 'POST', {
+      conversas: ids, texto: _envio.texto, resposta_id: _envio.resposta_id
+    });
+    const repetidos = (conf && conf.ok && Array.isArray(conf.repetidos)) ? conf.repetidos : [];
+    if (repetidos.length) { avisoRepeticao(repetidos, ids.length); return; }
+
     if (!confirm('Vai enviar para ' + ids.length + ' pessoa' + (ids.length === 1 ? '' : 's') + '. Confirmar?')) return;
+    janelaEnviarAgora(false);
+  };
+
+  // O aviso fica DENTRO do painel, e não numa janelinha do navegador: dá para
+  // ler os nomes e escolher com calma. O padrão é pular.
+  function avisoRepeticao(repetidos, total) {
+    const box = document.getElementById('wa-jan-envio');
+    if (!box) return;
+    const quantos = repetidos.length;
+    const sobram = Math.max(0, total - quantos);
+    const nomes = repetidos.slice(0, 12).map(function (x) {
+      return esc(x.nome_contato || ('conversa ' + x.conversation_id)) +
+             ' <span class="wa-jan-rep-quando">' + esc(quandoRecebeu(x.enviado_em)) + '</span>';
+    }).join(', ');
+    const antigo = box.innerHTML;
+    _painelAntes = antigo;
+    box.innerHTML = `
+      <div class="wa-jan-painel wa-jan-repetido" id="wa-jan-aviso-repeticao">
+        <div class="wa-jan-painel-cab">
+          <h4><i class="fa-solid fa-triangle-exclamation"></i>
+            ${quantos} pessoa${quantos === 1 ? '' : 's'} já receberam esta mensagem</h4>
+        </div>
+        <p class="wa-jan-rep-texto">
+          ${quantos === 1 ? 'Esta pessoa recebeu' : 'Estas pessoas receberam'} a mesma mensagem
+          nas últimas 24 horas. Pular ${quantos === 1 ? 'essa pessoa' : 'essas pessoas'}?
+        </p>
+        <div class="wa-jan-rep-nomes">${nomes}${repetidos.length > 12 ? ' e mais ' + (repetidos.length - 12) : ''}</div>
+        <div class="wa-prontas-form-botoes">
+          <button class="mod-btn-secondary" onclick="janelaVoltarDoAviso()">Voltar</button>
+          <button class="mod-btn-secondary wa-jan-rep-forcar" onclick="janelaEnviarAgora(true)">
+            Mandar mesmo assim para ${total}</button>
+          <button class="mod-btn-primary" ${sobram ? '' : 'disabled'} onclick="janelaEnviarAgora(false)">
+            <i class="fa-solid fa-forward"></i> Pular e enviar para ${sobram}</button>
+        </div>
+      </div>`;
+  }
+
+  let _painelAntes = '';
+  window.janelaVoltarDoAviso = function () {
+    const box = document.getElementById('wa-jan-envio');
+    if (box && _painelAntes) { box.innerHTML = _painelAntes; _painelAntes = ''; return; }
+    janelaAbrirEnvio();
+  };
+
+  window.janelaEnviarAgora = async function (repetirMesmo) {
+    const ids = Object.keys(_selecionados).map(Number);
+    if (!ids.length) { aviso('Selecione pelo menos uma pessoa.', true); return; }
     const r = await waSend('/envio-grupo', 'POST', {
       conversas: ids, texto: _envio.texto, resposta_id: _envio.resposta_id,
       arquivo: _envio.arquivo, nomeArquivo: _envio.nomeArquivo,
       mime: _envio.mime, tipoAnexo: _envio.tipoAnexo,
-      usarLembretes: _envio.usarLembretes, filtro: _filtro
+      usarLembretes: _envio.usarLembretes, filtro: _filtro,
+      titulo: _envio.titulo, repetirMesmo: !!repetirMesmo
     });
     if (!r || !r.ok) { aviso((r && r.error) || 'Não consegui criar o envio.', true); return; }
     aviso('Enviando para ' + r.na_fila + ' pessoa(s)' +
-          (r.fora_da_janela ? ' · ' + r.fora_da_janela + ' fora da janela, puladas' : '') + '.');
+          (r.fora_da_janela ? ' · ' + r.fora_da_janela + ' fora da janela, puladas' : '') +
+          (r.pulados ? ' · ' + r.pulados + ' já tinham recebido, puladas' : '') + '.');
     _selecionados = {};
     _envioAberto = r.envio_id;
+    _envio.titulo = '';
+    _painelAntes = '';
     janelaFecharEnvio();
     pintarLista();
     acompanhar();

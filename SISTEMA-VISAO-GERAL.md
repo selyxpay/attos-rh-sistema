@@ -766,6 +766,59 @@ pedido de saída, pausar/cancelar, rótulo e pausa do bot) e pela suíte
 `respostas-ui` (a aba na tela, seleção respeitando o filtro e o painel de
 envio).
 
+### 5.11 Quem já recebeu o disparo e quem ainda não
+
+O uso real: faz-se um disparo para quem está com a janela aberta; depois chega
+gente nova, e quem já recebeu volta a escrever e abre uma janela nova. Na hora
+de disparar de novo é preciso ver **quem falta**, senão a mesma pessoa recebe a
+mesma mensagem duas vezes no mesmo dia.
+
+**Nada de controle novo.** Tudo sai da fila que o envio em grupo já grava:
+`whatsapp_envio_grupo_itens` com `status = 'enviado'`. A consulta da lista
+(`janela.lista`) passou a trazer, por subconsulta em cada linha,
+`disparos_recebidos`, `ultimo_disparo_em`, `ultimo_disparo_titulo` e
+`ultimo_disparo_id` — com o índice `idx_envio_itens_contato` por
+`(contact_id, status)` para isso não pesar.
+
+| O que aparece | De onde vem |
+|---|---|
+| Selo **"Disparo enviado há 2h · Entrevista 10h dia 23"** (data e hora quando passa de um dia) | `ultimo_disparo_em` + `ultimo_disparo_titulo` |
+| **"Nunca recebeu disparo"** | `disparos_recebidos = 0` |
+| Dica do mouse com os envios recebidos (nome, data, hora e começo do texto) | `janela.disparosDosContatos(ids)`, **uma** consulta para a página inteira — nunca uma por linha |
+| Filtros "Ainda não recebeu disparo" / "Já recebeu disparo" | `disparos_recebidos = 0` / `> 0` |
+| Filtro "Não recebeu o último disparo" | o servidor resolve qual é o último (`envioGrupo.ultimoEnvio()`): a regra mora num lugar só, não na tela |
+| Seletor "Não recebeu o envio:" | `NOT EXISTS` daquele `envio_id` com status `enviado` |
+| Bloco "Últimos envios" + botão **"Mandar para quem ainda não recebeu"** | `envioGrupo.recentes(10)`; o botão aplica o filtro daquele envio, marca todos e abre o painel |
+
+Os filtros novos **combinam** com os antigos e com a busca (são todos `AND` na
+mesma consulta), e o "selecionar todos" continua respeitando o que está na
+tela. O selo entra na **assinatura** de cada linha, senão a atualização
+incremental não perceberia a mudança e o selo ficaria velho na tela.
+
+**Nome do envio.** O painel tem um campo "Nome deste envio" ("Entrevista 10h
+dia 23"). Em branco, o servidor dá um nome automático — `Disparo de DD/MM às
+HH:MM` no relógio de Brasília, ou o título da mensagem pronta. Nunca fica sem
+nome: sem nome o histórico e o selo não diriam nada.
+
+**Proteção contra repetir.** Antes de enviar, a tela chama
+`POST /api/whatsapp/envio-grupo/conferir`, que responde quem da seleção **já
+recebeu a mesma mensagem nas últimas 24 horas** — a mesma mensagem pronta
+(`resposta_id`) ou o mesmo texto livre. Se houver, o painel mostra
+"X pessoas já receberam esta mensagem. Pular essas pessoas?" com os nomes; o
+botão principal é **pular**, e há a opção "Mandar mesmo assim". O servidor
+**não confia na tela**: ele mesmo pula os repetidos, a não ser que o pedido
+venha com `repetirMesmo`, e devolve quantos foram `pulados` (que também vai
+para a Auditoria). Passadas as 24 horas não é mais repetição — mas o selo do
+histórico continua, porque quem recebeu, recebeu.
+
+**Testado por:** suíte `janela`, seção M (o selo com nome e data, a dica do
+mouse, "nunca recebeu" excluindo quem recebeu, o filtro por um envio
+escolhido, quem escreveu depois do disparo aparecendo como não recebido, a
+combinação com os filtros antigos e com a busca, o aviso de repetição por
+pronta e por texto livre, e as 24 horas) e suíte `respostas-ui`, seção 9d (o
+selo na linha, a dica, o bloco "Últimos envios" com o botão, o seletor, o
+campo do nome e o aviso com o botão de pular como padrão).
+
 ---
 
 ## 6. Fluxo Financeiro em detalhe
@@ -957,6 +1010,8 @@ tipo de erro que volta: se você mexer na área, confira que não reintroduziu.
 | Mensagem aparecendo duas vezes só no painel | Bolha otimista desenhada no envio + a mesma mensagem chegando pelo tempo real. Amarrar com `cliente_id` e trancar por `wamid`/`id` |
 | `no such column` numa coluna que "existe" | `ALTER TABLE` rodando ANTES de o `CREATE TABLE` daquela tabela, no mesmo `criarTabelas`: falha calada no try/catch e só aparece na primeira mensagem de verdade |
 | "Já respondi" aparecendo errado | Comparar só o horário: `created_at` tem precisão de SEGUNDO e a resposta imediata cai no mesmo segundo. Desempatar pelo `id` |
+| Selo/etiqueta nova que não atualiza na tela | A atualização incremental compara linhas por uma ASSINATURA: campo que não entra nela fica velho na tela até a página recarregar |
+| Regex que "come" letras dentro de um teste de tela | `\s` dentro de um template literal do `cdp.eval` vira `s`: a expressão virou `/s+/g` e o teste apagou os "s" do texto. Dentro do eval, `\\s` |
 | Mensagem velha passando na frente da nova | `ORDER BY` numa data gravada como texto: `"...T10:00"` é maior que `"... 23:00"` (o `T` vem depois do espaço). Ordene por `julianday(...)` |
 
 ---
@@ -1020,10 +1075,10 @@ docs/                        deploy no Coolify, WhatsApp, equipamentos
 - Mensagem que aparecia duas vezes no painel (seção 5.8) e o modo fora do
   expediente (seção 5.9).
 - Lista "Janela aberta" e envio em grupo só para quem está dentro das 24 horas
-  (seção 5.10).
+  (seção 5.10), e o selo de quem já recebeu disparo (seção 5.11).
 - Testes automatizados **no repositório**: `node testes/rodar.cjs` sobe um
   servidor isolado numa porta livre (com pasta de dados descartável) por suíte,
-  e um Chrome sem janela nas suítes de tela. Hoje são 27 suítes, cobrindo
+  e um Chrome sem janela nas suítes de tela. Hoje são 26 suítes, cobrindo
   sincronização com duas sessões, segurança, permissão por tela, upload por
   conteúdo, bot, mensagens prontas e varredura das 25 abas no navegador.
   `node testes/rodar.cjs --lista` mostra todas; `node testes/rodar.cjs <nome>`

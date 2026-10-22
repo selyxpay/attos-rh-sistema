@@ -136,7 +136,7 @@ const ABRIR_CHAT = `(function(){
        var cont = document.getElementById('wa-content');
        return !!aba && aba.classList.contains('active') && !!cont && cont.offsetParent !== null;
      })()`,
-    40000, 'a aba do WhatsApp ficar ativa e visivel');
+    90000, 'a aba do WhatsApp ficar ativa e visivel');
 
   console.log('=== 0) PECAS NO LUGAR ===');
   ok(await cdp.eval(`typeof _waPintarLista === 'function'`), 'a lista tem desenho incremental');

@@ -16,6 +16,10 @@
 //   - pausar e cancelar no meio;
 //   - a mensagem entra na conversa com o rotulo "Envio em grupo" e PAUSA o bot
 //     naquele contato;
+//   - QUEM JA RECEBEU DISPARO: o selo com a data e o nome do ultimo envio, a
+//     dica do mouse, os filtros "nunca recebeu" / "ja recebeu" / "nao recebeu
+//     o envio X", quem chama depois do disparo, a combinacao com os filtros
+//     antigos, o nome do envio e o aviso de repeticao nas 24 horas;
 //   - nenhum contador ou limite de mensagens no sistema.
 const fs = require('fs');
 const os = require('os');
@@ -299,6 +303,153 @@ async function testarEnvio() {
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
 }
 
+// ── M) QUEM JA RECEBEU DISPARO ─────────────────────────────────────────────
+// O problema real: faço um disparo, depois muita gente nova me chama e quem já
+// recebeu volta a escrever. Preciso ver na hora quem falta. A prova usa a FILA
+// QUE JA EXISTE (itens com status 'enviado'), nenhum controle novo.
+async function testarQuemRecebeu() {
+  console.log('\n=== M) QUEM JA RECEBEU DISPARO (selo, filtros, repeticao) ===');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'rt-disp-'));
+  const db = require(path.join(RAIZ, 'whatsapp-db.cjs'));
+  const G = require(path.join(RAIZ, 'whatsapp-envio-grupo.cjs'));
+  const L = require(path.join(RAIZ, 'whatsapp-lembretes.cjs'));
+
+  const enviados = [];
+  const apiFalsa = {
+    sendTextMessage: function (pnid, to, texto) {
+      enviados.push({ to: to, texto: texto });
+      return Promise.resolve({ ok: true, wamid: 'wamid.D' + enviados.length });
+    },
+    sendMediaMessage: function () { return Promise.resolve({ ok: true, wamid: 'wamid.DM' }); },
+    uploadMedia: function () { return Promise.resolve({ ok: true, media_id: 'mid-d' }); }
+  };
+
+  await db.init(tmp);
+  const PRONTA = { id: 'r-disp', titulo: 'Convite de entrevista',
+                   texto: 'Ola {nome}, a entrevista e amanha. Confirma?', lembrete: { ligado: false } };
+  L.init({ db: db, api: apiFalsa, notificar: null, pastaMidia: tmp }); L.parar();
+  G.init({ db: db, api: apiFalsa, notificar: null, pastaMidia: tmp, lembretes: L,
+           lerPronta: function (id) { return String(id) === PRONTA.id ? PRONTA : null; } });
+  G.parar();
+
+  const acc = db.accounts.create({ phone_number_id: 'pn-d', display_phone: '+55 11 90000-0000', status: 'connected', access_token_enc: 'TOKEN' });
+  const gente = {};
+  const nomes = { ana: 'Ana Ribeiro', bruno: 'Bruno Carvalho', carla: 'Carla Dias', diego: 'Diego Esteves' };
+  let n = 0;
+  Object.keys(nomes).forEach(function (k) {
+    n++;
+    const c = db.contacts.create({ phone: '55119777700' + (10 + n), name: nomes[k] });
+    const cid = (c && c.id) ? c.id : c;
+    const cv = db.conversations.create({ account_id: acc, contact_id: cid });
+    db.messages.create({ conversation_id: cv, account_id: acc, direction: 'incoming', type: 'text', content: 'oi', wamid: 'd-in-' + n });
+    gente[k] = { conversation_id: cv, contact_id: cid, account_id: acc,
+                 telefone: '55119777700' + (10 + n), nome_contato: nomes[k] };
+  });
+
+  // DISPARO 1 para Ana e Bruno, com NOME.
+  const e1 = G.criar({ contatos: [gente.ana, gente.bruno], texto: PRONTA.texto,
+                       resposta_id: PRONTA.id, titulo: 'Entrevista 10h dia 23',
+                       usuario: 'admin', usuarioNome: 'Administrador' });
+  ok(e1 && e1.ok === true, 'disparo 1 criado para 2 pessoas (' + (e1 || {}).na_fila + ')');
+  await filaAte(G, enviados, 2, 20000);
+  ok(enviados.length === 2, 'as 2 receberam o disparo 1 (' + enviados.length + ')');
+
+  // ── O SELO ──
+  const lista1 = db.janela.lista({});
+  const porNome = function (lista, nome) { return lista.find(function (x) { return x.contact_name === nome; }) || {}; };
+  const ana1 = porNome(lista1, 'Ana Ribeiro');
+  const carla1 = porNome(lista1, 'Carla Dias');
+  ok(Number(ana1.disparos_recebidos) === 1, 'quem recebeu tem o selo: Ana com 1 disparo (' + ana1.disparos_recebidos + ')');
+  ok(!!ana1.ultimo_disparo_em, 'com a data e a hora do disparo (' + ana1.ultimo_disparo_em + ')');
+  ok(ana1.ultimo_disparo_titulo === 'Entrevista 10h dia 23', 'e o NOME do ultimo envio ("' + ana1.ultimo_disparo_titulo + '")');
+  ok(Number(ana1.ultimo_disparo_id) === e1.envio_id, 'e o id do envio, para o filtro (' + ana1.ultimo_disparo_id + ')');
+  ok(Number(carla1.disparos_recebidos) === 0, 'quem nunca recebeu fica sem selo (Carla: ' + carla1.disparos_recebidos + ')');
+
+  // ── A DICA DO MOUSE ──
+  const dica = db.janela.disparosDosContatos([gente.ana.contact_id]);
+  ok(dica.length === 1, 'a dica do mouse traz os envios da pessoa (' + dica.length + ')');
+  ok(dica[0] && dica[0].titulo === 'Entrevista 10h dia 23', 'com o nome do envio');
+  ok(dica[0] && !!dica[0].enviado_em && /Ola \{nome\}/.test(dica[0].texto_inicio || ''),
+    'a data, a hora e o comeco do texto ("' + (dica[0] || {}).texto_inicio + '")');
+  ok(db.janela.disparosDosContatos([]).length === 0, 'sem ninguem selecionado, nao consulta nada');
+
+  // ── OS FILTROS ──
+  const nunca = db.janela.lista({ nunca_recebeu: true }).map(function (x) { return x.contact_name; });
+  ok(nunca.length === 2 && nunca.indexOf('Ana Ribeiro') < 0 && nunca.indexOf('Carla Dias') >= 0,
+    'filtro "ainda nao recebeu disparo" EXCLUI quem recebeu: ' + nunca.join(', '));
+  const ja = db.janela.lista({ ja_recebeu: true }).map(function (x) { return x.contact_name; });
+  ok(ja.length === 2 && ja.indexOf('Ana Ribeiro') >= 0 && ja.indexOf('Bruno Carvalho') >= 0,
+    'filtro "ja recebeu disparo": ' + ja.join(', '));
+
+  // DISPARO 2 so para Ana: agora o "ultimo" mudou.
+  const e2 = G.criar({ contatos: [gente.ana], texto: 'Confirma a entrevista de amanha?',
+                       titulo: 'Confirmacao dia 23', usuario: 'admin', usuarioNome: 'Administrador' });
+  await filaAte(G, enviados, 3, 20000);
+  ok(enviados.length === 3, 'disparo 2 enviado so para a Ana (' + enviados.length + ')');
+  const ana2 = porNome(db.janela.lista({}), 'Ana Ribeiro');
+  ok(Number(ana2.disparos_recebidos) === 2, 'a Ana agora tem 2 disparos (' + ana2.disparos_recebidos + ')');
+  ok(ana2.ultimo_disparo_titulo === 'Confirmacao dia 23', 'e o selo mostra o MAIS RECENTE ("' + ana2.ultimo_disparo_titulo + '")');
+  ok(Number((db.envioGrupo.ultimoEnvio() || {}).id) === e2.envio_id, 'o "ultimo disparo" do sistema e o envio 2');
+
+  const foraDoUltimo = db.janela.lista({ nao_recebeu_envio: e2.envio_id }).map(function (x) { return x.contact_name; });
+  ok(foraDoUltimo.length === 3 && foraDoUltimo.indexOf('Ana Ribeiro') < 0,
+    'filtro "nao recebeu o ULTIMO disparo" (o que o botao do historico usa): ' + foraDoUltimo.join(', '));
+  const foraDoPrimeiro = db.janela.lista({ nao_recebeu_envio: e1.envio_id }).map(function (x) { return x.contact_name; });
+  ok(foraDoPrimeiro.length === 2 && foraDoPrimeiro.indexOf('Carla Dias') >= 0 && foraDoPrimeiro.indexOf('Bruno Carvalho') < 0,
+    'filtro por UM envio escolhido (o seletor): ' + foraDoPrimeiro.join(', '));
+
+  // ── QUEM CHAMOU DEPOIS DO DISPARO ──
+  const ce = db.contacts.create({ phone: '5511977770099', name: 'Elza Nova' });
+  const cidE = (ce && ce.id) ? ce.id : ce;
+  const cvE = db.conversations.create({ account_id: acc, contact_id: cidE });
+  db.messages.create({ conversation_id: cvE, account_id: acc, direction: 'incoming', type: 'text', content: 'vi a vaga agora', wamid: 'd-in-elza' });
+  const elza = porNome(db.janela.lista({}), 'Elza Nova');
+  ok(Number(elza.disparos_recebidos) === 0, 'quem me chamou DEPOIS do disparo aparece como nao recebido');
+  ok(db.janela.lista({ nunca_recebeu: true }).some(function (x) { return x.contact_name === 'Elza Nova'; }),
+    'e entra no filtro "ainda nao recebeu disparo"');
+
+  // ── COMBINA COM OS FILTROS QUE JA EXISTEM ──
+  db.bot.gravarContato(gente.carla.contact_id, { aguardando_atendente: 1, aguardando_desde: new Date().toISOString() });
+  const combinado = db.janela.lista({ nunca_recebeu: true, so_aguardando: true }).map(function (x) { return x.contact_name; });
+  ok(combinado.length === 1 && combinado[0] === 'Carla Dias',
+    '"ainda nao recebeu" + "aguardando atendente" juntos: ' + combinado.join(', '));
+  const comBusca = db.janela.lista({ nunca_recebeu: true, busca: 'Elza' }).map(function (x) { return x.contact_name; });
+  ok(comBusca.length === 1 && comBusca[0] === 'Elza Nova', '"ainda nao recebeu" + busca: ' + comBusca.join(', '));
+  const combinaEnvio = db.janela.lista({ nao_recebeu_envio: e1.envio_id, busca: 'Carla' }).map(function (x) { return x.contact_name; });
+  ok(combinaEnvio.length === 1 && combinaEnvio[0] === 'Carla Dias', 'o seletor de envio tambem combina com a busca');
+  const semRepetir = db.janela.lista({ ja_recebeu: true, nunca_recebeu: true }).length;
+  ok(semRepetir === 0, 'dois filtros que se contradizem nao quebram a consulta (' + semRepetir + ')');
+
+  // ── PROTECAO CONTRA REPETIR ──
+  const repPronta = db.envioGrupo.jaReceberam(
+    [gente.ana.conversation_id, gente.bruno.conversation_id, gente.carla.conversation_id],
+    { resposta_id: PRONTA.id, horas: 24 });
+  const nomesRep = repPronta.map(function (x) { return x.nome_contato; });
+  ok(repPronta.length === 2 && nomesRep.indexOf('Carla Dias') < 0,
+    'a mesma mensagem PRONTA nas ultimas 24h acusa quem ja recebeu: ' + nomesRep.join(', '));
+  const repTexto = db.envioGrupo.jaReceberam(
+    [gente.ana.conversation_id, gente.bruno.conversation_id],
+    { texto: 'Confirma a entrevista de amanha?', horas: 24 });
+  ok(repTexto.length === 1 && repTexto[0].nome_contato === 'Ana Ribeiro',
+    'o mesmo TEXTO LIVRE tambem: ' + repTexto.map(function (x) { return x.nome_contato; }).join(', '));
+  ok(repTexto[0] && repTexto[0].titulo === 'Confirmacao dia 23', 'dizendo em qual envio foi ("' + repTexto[0].titulo + '")');
+  const repOutra = db.envioGrupo.jaReceberam([gente.ana.conversation_id], { texto: 'mensagem diferente', horas: 24 });
+  ok(repOutra.length === 0, 'mensagem DIFERENTE nao e repeticao (pode mandar)');
+  ok(db.envioGrupo.jaReceberam([gente.ana.conversation_id], { horas: 24 }).length === 0,
+    'sem texto nem pronta, nao inventa repeticao');
+
+  // Passadas as 24 horas, mandar de novo e normal.
+  db.getDb().run("UPDATE whatsapp_envio_grupo_itens SET enviado_em = datetime('now','-30 hours') WHERE status = 'enviado'");
+  const repVelho = db.envioGrupo.jaReceberam([gente.ana.conversation_id], { resposta_id: PRONTA.id, horas: 24 });
+  ok(repVelho.length === 0, 'o que foi enviado ha mais de 24 horas nao conta como repeticao');
+  // Mas o selo continua: quem recebeu, recebeu.
+  const anaVelha = porNome(db.janela.lista({}), 'Ana Ribeiro');
+  ok(Number(anaVelha.disparos_recebidos) === 2, 'e o selo do historico continua la (' + anaVelha.disparos_recebidos + ')');
+
+  db.close();
+  try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
+}
+
 // ── K) PELO SERVIDOR ───────────────────────────────────────────────────────
 async function login(usuario, senha) {
   const r = await fetch(BASE + '/api/login', {
@@ -409,6 +560,52 @@ async function testarServidor() {
     console.log('  (pulado) nao ha conta comum semeada');
   }
 
+  // ── As rotas do selo e dos filtros novos ──
+  const comDisparos = await jsonGet(adm.cookie, '/api/whatsapp/janela-aberta');
+  ok(Array.isArray(comDisparos.corpo.disparos), 'a lista devolve os disparos para a dica do mouse');
+  ok(Array.isArray(comDisparos.corpo.envios), 'e os envios recentes para o bloco "Ultimos envios"');
+  const umContato = (comDisparos.corpo.contatos || [])[0] || {};
+  ok('disparos_recebidos' in umContato, 'cada linha vem com o contador de disparos recebidos');
+  for (const f of ['nunca_recebeu', 'ja_recebeu', 'nao_recebeu_ultimo']) {
+    const r = await jsonGet(adm.cookie, '/api/whatsapp/janela-aberta?' + f + '=true');
+    ok(r.status === 200 && r.corpo.ok === true, 'o filtro "' + f + '" responde (' + r.status + ')');
+  }
+  const porEnvio = await jsonGet(adm.cookie, '/api/whatsapp/janela-aberta?nao_recebeu_envio=' + envioId);
+  ok(porEnvio.status === 200 && porEnvio.corpo.ok === true, 'o filtro por UM envio responde (' + porEnvio.status + ')');
+  const combinado2 = await jsonGet(adm.cookie, '/api/whatsapp/janela-aberta?nunca_recebeu=true&busca=Janela');
+  ok(combinado2.status === 200 && (combinado2.corpo.contatos || []).length === 1,
+    'combinado com a busca, acha quem nunca recebeu (' + ((combinado2.corpo.contatos || []).length) + ')');
+
+  // ── A conferencia de repeticao ──
+  const cf = await jsonPost(adm.cookie, '/api/whatsapp/envio-grupo/conferir', {
+    conversas: [naLista.conversation_id], texto: 'Ola {nome}, tudo bem?'
+  });
+  ok(cf.status === 200 && cf.corpo.ok === true && Array.isArray(cf.corpo.repetidos),
+    'a rota que confere repeticao responde (' + cf.status + ')');
+  ok(cf.corpo.repetidos.length === 0, 'quem nao recebeu nada nao e acusado de repeticao');
+  const cfVazio = await jsonPost(adm.cookie, '/api/whatsapp/envio-grupo/conferir', { conversas: [] });
+  ok(cfVazio.status === 200 && cfVazio.corpo.repetidos.length === 0, 'selecao vazia nao quebra a conferencia');
+  const cfComum = await login('zecomum', 'Comum#123');
+  if (cfComum.status === 200) {
+    const r3 = await jsonPost(cfComum.cookie, '/api/whatsapp/envio-grupo/conferir', { conversas: [1], texto: 'oi' });
+    ok(r3.status === 403, 'e 403 para quem nao tem a tela (' + r3.status + ')');
+  }
+
+  // ── O NOME do envio ──
+  const comNome = await jsonPost(adm.cookie, '/api/whatsapp/envio-grupo', {
+    conversas: [naLista.conversation_id], texto: 'Com nome escolhido', titulo: 'Entrevista 10h dia 23'
+  });
+  ok(comNome.status === 202, 'envio com nome escolhido aceito (' + comNome.status + ')');
+  const semNome = await jsonPost(adm.cookie, '/api/whatsapp/envio-grupo', {
+    conversas: [naLista.conversation_id], texto: 'Sem nome nenhum'
+  });
+  ok(semNome.status === 202, 'envio sem nome tambem (' + semNome.status + ')');
+  const listaEnvios = await jsonGet(adm.cookie, '/api/whatsapp/envio-grupo');
+  const titulos = ((listaEnvios.corpo && listaEnvios.corpo.envios) || []).map(function (e) { return e.titulo || ''; });
+  ok(titulos.indexOf('Entrevista 10h dia 23') >= 0, 'o nome escolhido fica no historico: ' + JSON.stringify(titulos.slice(0, 3)));
+  ok(titulos.some(function (t) { return /^Disparo de \d\d\/\d\d .{1,3} \d\d:\d\d$/.test(t); }),
+    'e em branco vira nome automatico com data e hora: ' + JSON.stringify(titulos.slice(0, 3)));
+
   const saude = await fetch(BASE + '/api/saude').then(r => r.json()).catch(function () { return {}; });
   ok(saude.ok === true, '/api/saude responde');
   ok(saude.envio_grupo && saude.envio_grupo.modulo_carregado === true, 'e diz que o motor de envio em grupo carregou');
@@ -449,6 +646,7 @@ function testarSemContador() {
 (async () => {
   await testarLista();
   await testarEnvio();
+  await testarQuemRecebeu();
   testarSemContador();
   await testarServidor();
   console.log('\n' + (falhas === 0 ? 'JANELA ABERTA + ENVIO EM GRUPO: TODOS OS TESTES OK' : falhas + ' FALHA(S)'));

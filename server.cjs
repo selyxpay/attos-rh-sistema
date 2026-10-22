@@ -1801,6 +1801,22 @@ function waIpDaReq(req) {
 // conversa empilhe uma fila nova de downloads para os mesmos arquivos.
 var _waVarrendoMidia = {};
 
+// O NOME DO ENVIO em grupo. Serve para a pessoa reconhecer o disparo depois
+// ("Entrevista 10h dia 23") no histórico, no selo da lista e no filtro. Em
+// branco, vira um nome automático com data e hora — nunca fica sem nome, senão
+// o histórico não diz nada.
+function _waNomeDoEnvio(escolhido, resposta) {
+  var n = String(escolhido || '').trim().slice(0, 60);
+  if (n) return n;
+  if (resposta && String(resposta.titulo || '').trim()) {
+    return String(resposta.titulo).trim().slice(0, 60);
+  }
+  var d = new Date(Date.now() - 180 * 60000);          // relógio de Brasília
+  var p = function (x) { return String(x).padStart(2, '0'); };
+  return 'Disparo de ' + p(d.getUTCDate()) + '/' + p(d.getUTCMonth() + 1) +
+         ' às ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes());
+}
+
 // ── GRAVAR A CONFIGURAÇÃO DO BOT PELO SERVIDOR ─────────────────────────────
 // Quase tudo do bot é gravado pela tela (pelo /api/state, com setKeys). Mas
 // duas coisas precisam ser gravadas AQUI: o interruptor do "fora do
@@ -3765,6 +3781,19 @@ http.createServer(function (req, res) {
       if (qJa.fora === 'true') filtrosJa.so_fora_exp = true;
       if (qJa.aguardando === 'true') filtrosJa.so_aguardando = true;
       if (qJa.sem_resposta === 'true') filtrosJa.sem_resposta_minha = true;
+      // DISPAROS: quem nunca recebeu, quem já recebeu, quem ficou de fora do
+      // ÚLTIMO envio, e quem ficou de fora de UM envio escolhido.
+      if (qJa.nunca_recebeu === 'true') filtrosJa.nunca_recebeu = true;
+      if (qJa.ja_recebeu === 'true') filtrosJa.ja_recebeu = true;
+      if (qJa.nao_recebeu_envio) filtrosJa.nao_recebeu_envio = parseInt(qJa.nao_recebeu_envio) || 0;
+      if (qJa.nao_recebeu_ultimo === 'true') {
+        // "O último" é resolvido AQUI, e não na tela: assim a regra do que é o
+        // envio mais recente mora num lugar só.
+        try {
+          var ultEnv = waDb.envioGrupo.ultimoEnvio();
+          if (ultEnv) filtrosJa.nao_recebeu_envio = ultEnv.id;
+        } catch (e) {}
+      }
       if (qJa.busca) filtrosJa.busca = String(qJa.busca).slice(0, 60);
       if (qJa.limite) filtrosJa.limite = Math.min(500, parseInt(qJa.limite) || 300);
       // MULTI-CONTA: a pessoa só vê as contas que são dela.
@@ -3774,7 +3803,41 @@ http.createServer(function (req, res) {
       try { listaJa = waDb.janela.lista(filtrosJa) || []; } catch (e) {
         responderJson(res, 500, { ok: false, error: e.message }); return;
       }
-      responderJson(res, 200, { ok: true, total: listaJa.length, contatos: listaJa });
+      // Os disparos que essas pessoas receberam, para a dica do mouse no selo.
+      // Uma consulta para a página inteira, não uma por linha.
+      var disparosJa = [];
+      try {
+        disparosJa = waDb.janela.disparosDosContatos(
+          listaJa.map(function (x) { return x.contact_id; })) || [];
+      } catch (e) { disparosJa = []; }
+      // E os envios recentes, para o bloco "Últimos envios" e o seletor.
+      var enviosJa = [];
+      try { enviosJa = waDb.envioGrupo.recentes(10) || []; } catch (e) { enviosJa = []; }
+      responderJson(res, 200, {
+        ok: true, total: listaJa.length, contatos: listaJa,
+        disparos: disparosJa, envios: enviosJa
+      });
+      return;
+    }
+
+    // PROTEÇÃO CONTRA REPETIR: quem, entre os selecionados, já recebeu esta
+    // mesma mensagem nas últimas 24 horas. A tela pergunta antes de mandar.
+    if (urlPath === '/api/whatsapp/envio-grupo/conferir' && req.method === 'POST') {
+      var uCf = waUsuarioTemPermissao(req, 'criar');
+      if (!uCf) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false, error: 'corpo inválido' }); return; }
+        var idsCf = Array.isArray(body && body.conversas) ? body.conversas : [];
+        if (!idsCf.length) { responderJson(res, 200, { ok: true, repetidos: [] }); return; }
+        var opc = {};
+        if (body.resposta_id) opc.resposta_id = String(body.resposta_id);
+        else if (body.texto) opc.texto = String(body.texto);
+        else { responderJson(res, 200, { ok: true, repetidos: [] }); return; }
+        opc.horas = 24;
+        var rep = [];
+        try { rep = waDb.envioGrupo.jaReceberam(idsCf, opc) || []; } catch (e) { rep = []; }
+        responderJson(res, 200, { ok: true, repetidos: rep });
+      });
       return;
     }
 
@@ -3799,6 +3862,26 @@ http.createServer(function (req, res) {
           if (!textoEg.trim()) textoEg = String(respEg.texto || '');
         }
 
+        // PULAR QUEM JÁ RECEBEU esta mesma mensagem nas últimas 24 horas. O
+        // padrão é pular — mandar a mesma coisa duas vezes no mesmo dia é o
+        // tipo de erro que custa caro com o contato. Quem quiser mandar de
+        // novo desmarca na tela.
+        var repetidos = {};
+        var pulados = 0;
+        if (!(body && body.repetirMesmo)) {
+          try {
+            var opcRep = {};
+            if (respEg) opcRep.resposta_id = String(respEg.id);
+            else if (textoEg) opcRep.texto = textoEg;
+            opcRep.horas = 24;
+            if (opcRep.resposta_id || opcRep.texto) {
+              (waDb.envioGrupo.jaReceberam(ids, opcRep) || []).forEach(function (x) {
+                repetidos[String(x.conversation_id)] = true;
+              });
+            }
+          } catch (e) {}
+        }
+
         // Só conversas que a pessoa pode acessar E que ainda estão na janela.
         var contatos = [];
         var foraDaJanela = 0;
@@ -3808,6 +3891,7 @@ http.createServer(function (req, res) {
           if (!conv || !conv.contact_phone) return;
           if (!waPodeAcessarConta(uEg, conv.account_id)) return;
           if (!waDb.janela.aberta(conv.id)) { foraDaJanela++; return; }
+          if (repetidos[String(conv.id)]) { pulados++; return; }
           contatos.push({
             conversation_id: conv.id, contact_id: conv.contact_id,
             account_id: conv.account_id, telefone: conv.contact_phone,
@@ -3816,10 +3900,12 @@ http.createServer(function (req, res) {
         });
         if (!contatos.length) {
           responderJson(res, 200, {
-            ok: false,
-            error: foraDaJanela
-              ? 'A janela de 24 horas fechou para todas as pessoas selecionadas.'
-              : 'Nenhuma conversa válida na seleção.'
+            ok: false, fora_da_janela: foraDaJanela, pulados: pulados,
+            error: pulados
+              ? 'Todas as pessoas selecionadas já receberam esta mensagem nas últimas 24 horas.'
+              : (foraDaJanela
+                ? 'A janela de 24 horas fechou para todas as pessoas selecionadas.'
+                : 'Nenhuma conversa válida na seleção.')
           });
           return;
         }
@@ -3829,7 +3915,7 @@ http.createServer(function (req, res) {
           criado = waGrupo.criar({
             contatos: contatos, texto: textoEg,
             resposta_id: (respEg && respEg.id) || '',
-            titulo: (respEg && respEg.titulo) || '',
+            titulo: _waNomeDoEnvio(body && body.titulo, respEg),
             arquivo: (body && body.arquivo) || (respEg && respEg.arquivo) || '',
             tipoAnexo: (body && body.tipoAnexo) || (respEg && respEg.tipoAnexo) || '',
             mime: (body && body.mime) || (respEg && respEg.mime) || '',
@@ -3848,14 +3934,15 @@ http.createServer(function (req, res) {
         waDb.audit.log({
           user_login: uEg.login, user_name: uEg.nome,
           action: 'Envio em grupo',
-          details: criado.na_fila + ' pessoa(s) · ' +
-                   (respEg ? '"' + String(respEg.titulo || '').slice(0, 40) + '"' : 'texto livre') +
-                   (foraDaJanela ? ' · ' + foraDaJanela + ' fora da janela' : ''),
+          details: criado.na_fila + ' pessoa(s) · "' +
+                   _waNomeDoEnvio(body && body.titulo, respEg).slice(0, 48) + '"' +
+                   (foraDaJanela ? ' · ' + foraDaJanela + ' fora da janela' : '') +
+                   (pulados ? ' · ' + pulados + ' já tinham recebido' : ''),
           ip: waIpDaReq(req), account_id: contatos[0].account_id
         });
         responderJson(res, 202, {
           ok: true, envio_id: criado.envio_id, na_fila: criado.na_fila,
-          fora_da_janela: foraDaJanela, em_segundo_plano: true
+          fora_da_janela: foraDaJanela, pulados: pulados, em_segundo_plano: true
         });
       });
       return;

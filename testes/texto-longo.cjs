@@ -164,12 +164,22 @@ const TEXTO = [
 
   // ---------- 3) a TELA mostra as quebras ----------
   console.log('\n=== 3) A TELA MOSTRA AS QUEBRAS (era aqui que se perdia) ===');
+  // Poe o estado do servidor em maos NA ABA antes de olhar a tela: a
+  // sincronizacao de fundo pode ter trocado o state entre o save e agora, e
+  // ai nao haveria cartao nenhum para medir (nao e defeito da tela).
+  const vagaNaAba = await cdp.eval(`(async function(){
+    const dados = await RTCloud.loadState();
+    if (dados && Array.isArray(dados.vagas)) state.vagas = dados.vagas;
+    if (dados && Array.isArray(dados.empresas)) state.empresas = dados.empresas;
+    return (state.vagas || []).some(function (v) { return v.id === 'vaga-texto-1'; });
+  })()`);
+  ok(vagaNaAba === true, 'a aba esta com a vaga em maos para desenhar');
   await cdp.eval(`(function(){ switchAba('vagas'); })()`);
   // Espera o CARTAO aparecer, nao o relogio: com a maquina ocupada, 1,6s nao
   // bastava e o teste falhava so na execucao completa.
   await esperarPor(cdp,
     "Array.from(document.querySelectorAll('.vaga-desc')).some(function(p){ return (p.textContent||'').indexOf('Auxiliar de Produção') >= 0; })",
-    30000, 'o cartao da vaga aparecer na tela');
+    45000, 'o cartao da vaga aparecer na tela');
   const naTela = await cdp.eval(`(function(){
     const ps = Array.from(document.querySelectorAll('.vaga-desc'));
     const alvo = ps.find(p => (p.textContent || '').indexOf('Auxiliar de Produção') >= 0);

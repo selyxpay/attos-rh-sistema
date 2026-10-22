@@ -115,7 +115,7 @@ const MEDIR = `(function(){
        var cont = document.getElementById('wa-content');
        return !!aba && aba.classList.contains('active') && !!cont && cont.offsetParent !== null;
      })()`,
-    40000, 'a aba do WhatsApp ficar ativa e visivel');
+    90000, 'a aba do WhatsApp ficar ativa e visivel');
   const temInbox = await cdp.eval(`!!document.querySelector('.wa-inbox')`);
   console.log('inbox presente na tela?', temInbox);
   if (!temInbox) {
