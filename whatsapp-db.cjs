@@ -437,6 +437,18 @@ function criarTabelas() {
     terminado_em    TEXT
   )`);
 
+  // marcar_apos: O QUE marcar no contato QUANDO o funil sair de verdade.
+  // 'bot' = conta a resposta (é o que o modo "só na primeira vez" olha);
+  // 'fora:<periodo>' = marca o período do modo fora do expediente.
+  // Antes a marcação era feita na hora de ENFILEIRAR: se o envio falhasse
+  // (conta sem token, erro da Meta, janela fechada), a pessoa ficava marcada
+  // como atendida sem ter recebido nada — e no modo "só na primeira vez"
+  // nunca mais receberia o funil.
+  // FICA AQUI, depois do CREATE da fila (ALTER antes do CREATE falha calado).
+  ['marcar_apos TEXT DEFAULT \'\''].forEach(function (col) {
+    try { db.run('ALTER TABLE whatsapp_bot_fila ADD COLUMN ' + col); } catch (e) {}
+  });
+
   // Diário do bot, para o painel da aba e para investigar depois.
   db.run(`CREATE TABLE IF NOT EXISTS whatsapp_bot_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1655,6 +1667,39 @@ const bot = {
           ", atualizado_em = datetime('now') WHERE contact_id = ?", vals.concat([contactId]));
     }
   },
+  // Quantos contatos estão marcados como JÁ ATENDIDOS pelo funil. É o número
+  // que a aba Bot mostra ao lado do modo "só na primeira vez" — sem ele, a
+  // pessoa não tem como saber quem já recebeu.
+  quantosAtendidos: function () {
+    const r = getOne("SELECT COUNT(*) AS n FROM whatsapp_bot_contatos WHERE ultima_resposta_em IS NOT NULL AND ultima_resposta_em <> ''");
+    return (r && Number(r.n)) || 0;
+  },
+  quantosForaExp: function () {
+    const r = getOne("SELECT COUNT(*) AS n FROM whatsapp_bot_contatos WHERE fora_exp_periodo IS NOT NULL AND fora_exp_periodo <> ''");
+    return (r && Number(r.n)) || 0;
+  },
+
+  // LIBERAR PARA RECEBER O FUNIL DE NOVO. Apaga SÓ a marcação de "já
+  // atendido" (e a contagem do dia, que é da mesma regra). NÃO mexe em quem
+  // pediu para sair, em quem está pausado à mão, nem em quem está na fila do
+  // atendente: essas são decisões de outra natureza e apagá-las junto faria o
+  // bot atropelar gente que pediu silêncio.
+  // Com contactId, libera só aquela pessoa. Sem, libera todas.
+  // Devolve quantos contatos ESTAVAM marcados (é o número que a tela mostra).
+  liberarFunil: function (contactId) {
+    const onde = contactId ? ' WHERE contact_id = ?' : '';
+    const params = contactId ? [contactId] : [];
+    const r = getOne(
+      "SELECT COUNT(*) AS n FROM whatsapp_bot_contatos WHERE " +
+      "((ultima_resposta_em IS NOT NULL AND ultima_resposta_em <> '') OR " +
+      " (fora_exp_periodo IS NOT NULL AND fora_exp_periodo <> ''))" +
+      (contactId ? ' AND contact_id = ?' : ''), params);
+    const quantos = (r && Number(r.n)) || 0;
+    run("UPDATE whatsapp_bot_contatos SET ultima_resposta_em = NULL, respostas_no_dia = 0, " +
+        "dia_da_contagem = '', fora_exp_periodo = '', atualizado_em = datetime('now')" + onde, params);
+    return quantos;
+  },
+
   // Conta uma resposta do bot no dia (vira 1 quando o dia muda).
   contarResposta: function (contactId) {
     const c = bot.contato(contactId);
@@ -1678,11 +1723,12 @@ const bot = {
     try {
       const id = runInsert(`INSERT INTO whatsapp_bot_fila
         (wamid_gatilho, account_id, conversation_id, contact_id, telefone, nome_contato,
-         passos_json, passo_atual, total_passos, enviar_em, status, motivo)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 'pendente', ?)`,
+         passos_json, passo_atual, total_passos, enviar_em, status, motivo, marcar_apos)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 'pendente', ?, ?)`,
         [dados.wamid || null, dados.account_id, dados.conversation_id, dados.contact_id,
          dados.telefone, dados.nome_contato || '', JSON.stringify(dados.passos || []),
-         (dados.passos || []).length, dados.enviar_em || new Date().toISOString(), dados.motivo || '']);
+         (dados.passos || []).length, dados.enviar_em || new Date().toISOString(),
+         dados.motivo || '', dados.marcar_apos || '']);
       return id;
     } catch (e) {
       // UNIQUE violado = webhook repetido. Não é erro: é a proteção agindo.
@@ -1690,6 +1736,13 @@ const bot = {
       throw e;
     }
   },
+  // A marca é usada UMA vez: depois de aplicada, sai da linha da fila. Sem
+  // isto, um reinício no meio da sequência marcaria o contato duas vezes e a
+  // contagem do dia (modo "sempre") sairia errada.
+  limparMarcaDaFila: function (id) {
+    run("UPDATE whatsapp_bot_fila SET marcar_apos = '' WHERE id = ?", [id]);
+  },
+
   filaPendentes: function (limite) {
     return getAll(`SELECT * FROM whatsapp_bot_fila
       WHERE status = 'pendente' AND (enviar_em IS NULL OR enviar_em <= ?)

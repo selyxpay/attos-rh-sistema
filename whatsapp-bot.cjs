@@ -268,6 +268,16 @@ function _linkDaSequencia(cfg) {
 // ── A ORDEM DE DECISÃO ─────────────────────────────────────────────────────
 // Devolve o que fazer com esta mensagem recebida. Função PURA: não grava
 // nada, não envia nada. Dá para testar sozinha, e é o que os testes fazem.
+// O bot está trabalhando? Vale para o modo normal OU para o fora do
+// expediente, que tem interruptor próprio. Fica numa função só porque DUAS
+// coisas dependem dela: a decisão (abaixo) e o "não marcar nada com o bot
+// desligado" (no aoReceberMensagem).
+function algumModoLigado(cfg) {
+  const fe = (cfg && cfg.foraExpediente) || {};
+  const feLigado = !!fe.ligado && Array.isArray(fe.passos) && fe.passos.length > 0;
+  return { ligado: !!(cfg && cfg.ligado) || feLigado, feLigado: feLigado };
+}
+
 function decidir(entrada) {
   const cfg = entrada.config;
   const est = entrada.estado || {};
@@ -277,7 +287,7 @@ function decidir(entrada) {
   // FORA DO EXPEDIENTE tem interruptor PRÓPRIO: ele funciona mesmo com o bot
   // normal desligado — é justamente para isso que serve ("saí do trabalho").
   const fe = cfg.foraExpediente || {};
-  const feLigado = !!fe.ligado && Array.isArray(fe.passos) && fe.passos.length > 0;
+  const feLigado = algumModoLigado(cfg).feLigado;
   if (!cfg.ligado && !feLigado) return { acao: 'nada', motivo: 'bot desligado' };
 
   // 1) PEDIDO DE SAÍDA — vale antes de tudo, inclusive de atendente.
@@ -372,6 +382,18 @@ async function aoReceberMensagem(ctx) {
   const contactId = ctx.contact_id;
   const agoraISO = new Date().toISOString();
 
+  // BOT DESLIGADO: SAI AQUI, SEM GRAVAR NADA.
+  // Antes, a primeira coisa que esta função fazia era gravar a linha do
+  // contato (ultima_msg_recebida_em) — ou seja, quem escrevesse com o bot
+  // desligado já deixava rastro na tabela do bot. Não bloqueava o funil (o
+  // modo "só na primeira vez" olha ultima_resposta_em, que é outra coluna),
+  // mas é marcação de uma automação que não rodou, e a regra combinada é
+  // clara: com o bot desligado, nada é marcado. Quem escreveu enquanto ele
+  // estava fora continua "nunca atendido" e recebe o funil ao religar.
+  if (!algumModoLigado(cfg).ligado) {
+    return { acao: 'nada', motivo: 'bot desligado' };
+  }
+
   // Registra que a pessoa falou AGORA (serve para o retorno do atendente).
   try { _db.bot.gravarContato(contactId, { ultima_msg_recebida_em: agoraISO }); } catch (e) {}
 
@@ -422,12 +444,14 @@ async function aoReceberMensagem(ctx) {
         wamid: ctx.wamid, account_id: ctx.account_id, conversation_id: ctx.conversation_id,
         contact_id: contactId, telefone: ctx.telefone, nome_contato: ctx.nome || '',
         passos: fe.passos, motivo: d.motivo,
-        enviar_em: new Date().toISOString()
+        enviar_em: new Date().toISOString(),
+        // A marca do PERÍODO fica guardada NA FILA e só é aplicada no contato
+        // quando a primeira mensagem sair de verdade (ver processarFila).
+        // Marcar aqui significava: envio que falhasse deixava a pessoa
+        // marcada como atendida sem ter recebido nada.
+        marcar_apos: 'fora:' + String(fe.periodo || '1')
       });
       if (id === null) return { acao: 'nada', motivo: 'webhook repetido (mesma mensagem)' };
-      // Marca o PERÍODO: enquanto o modo estiver ligado, esta pessoa não
-      // recebe o funil outra vez, mesmo escrevendo dez vezes.
-      _db.bot.gravarContato(contactId, { fora_exp_periodo: String(fe.periodo || '1') });
       _db.bot.registrar('fora_expediente', contactId, ctx.telefone, d.motivo);
       const lembFe = agendarLembretesDoContato(fe, ctx, contactId, 'fora-expediente', 'Fora do expediente');
       processarFila();
@@ -443,13 +467,15 @@ async function aoReceberMensagem(ctx) {
         wamid: ctx.wamid, account_id: ctx.account_id, conversation_id: ctx.conversation_id,
         contact_id: contactId, telefone: ctx.telefone, nome_contato: ctx.nome || '',
         passos: cfg.passos, motivo: d.motivo,
-        enviar_em: new Date().toISOString()
+        enviar_em: new Date().toISOString(),
+        // Idem: a contagem da resposta (que é o que o modo "só na primeira
+        // vez" olha) só vale depois que o funil sair de verdade.
+        marcar_apos: 'bot'
       });
       if (id === null) {
         // wamid repetido: webhook duplicado. Não é erro.
         return { acao: 'nada', motivo: 'webhook repetido (mesma mensagem)' };
       }
-      _db.bot.contarResposta(contactId);
       _db.bot.registrar('inicio', contactId, ctx.telefone, d.motivo);
       // LEMBRETES: agenda para este contato, se o lembrete do bot estiver
       // ligado. Horário vencido não agenda nada — manda só a sequência.
@@ -660,8 +686,10 @@ async function processarFila() {
         tentativas: (linha.tentativas || 0) + 1
       });
 
+      let saiuDeVerdade = false;
       try {
         await enviarPasso(linha, passo, cfg);
+        saiuDeVerdade = true;
       } catch (e) {
         // FALHA NUM PASSO NÃO TRAVA OS OUTROS: registra e segue.
         console.error('[Bot] passo ' + (idx + 1) + ' falhou:', e.message);
@@ -670,6 +698,25 @@ async function processarFila() {
           ultimo_erro: 'passo ' + (idx + 1) + ': ' + e.message
         });
         _db.bot.registrar('erro', linha.contact_id, linha.telefone, 'passo ' + (idx + 1) + ': ' + e.message);
+      }
+
+      // A MARCA DE "JÁ ATENDIDO" É APLICADA AQUI, e só aqui: a primeira
+      // mensagem do funil chegou na pessoa. Se nenhum passo sair, nada é
+      // marcado e ela continua "nunca atendida" — que é o certo.
+      if (saiuDeVerdade && linha.marcar_apos) {
+        try {
+          if (linha.marcar_apos === 'bot') {
+            _db.bot.contarResposta(linha.contact_id);
+          } else if (String(linha.marcar_apos).indexOf('fora:') === 0) {
+            _db.bot.gravarContato(linha.contact_id, {
+              fora_exp_periodo: String(linha.marcar_apos).slice(5)
+            });
+          }
+          _db.bot.limparMarcaDaFila(linha.id);
+          linha.marcar_apos = '';
+        } catch (e) {
+          console.error('[Bot] não marquei o contato ' + linha.contact_id + ':', e.message);
+        }
       }
 
       const proximo = idx + 1;

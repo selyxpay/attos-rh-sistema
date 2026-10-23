@@ -132,6 +132,18 @@ async function login(usuario, senha) {
   return { status: r.status, cookie: r.headers.get('set-cookie') };
 }
 const pegar = async ck => (await fetch(BASE + '/api/state', { headers: { Cookie: ck } }).then(r => r.json()));
+const jsonGet = async (ck, caminho) => {
+  const r = await fetch(BASE + caminho, { headers: ck ? { Cookie: ck } : {} });
+  return { status: r.status, corpo: await r.json().catch(() => ({})) };
+};
+const jsonPost = async (ck, caminho, corpo) => {
+  const r = await fetch(BASE + caminho, {
+    method: 'POST',
+    headers: Object.assign({ 'Content-Type': 'application/json' }, ck ? { Cookie: ck } : {}),
+    body: corpo === undefined ? undefined : JSON.stringify(corpo)
+  });
+  return { status: r.status, corpo: await r.json().catch(() => ({})) };
+};
 const salvar = async (ck, corpo) => {
   const r = await fetch(BASE + '/api/state', {
     method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: ck },
@@ -293,13 +305,233 @@ async function testarServidor() {
   const j7 = await t7.json().catch(function () { return {}; });
   ok(j7.ok === false, 'telefone curto e recusado');
 
+  console.log('\n=== B7b) A ROTA DE LIBERAR O FUNIL ===');
+  const admLib = await login('admin', 'TesteLocal#123');
+  const semNada = await jsonPost(admLib.cookie, '/api/whatsapp/bot/liberar-funil', {});
+  ok(semNada.status === 400, 'sem dizer quem, recusa (' + semNada.status + ') — nao limpa a base sem querer');
+  const todos = await jsonPost(admLib.cookie, '/api/whatsapp/bot/liberar-funil', { todos: true });
+  ok(todos.status === 200 && todos.corpo.ok === true, 'com todos:true, responde ok (' + todos.status + ')');
+  ok(typeof todos.corpo.liberados === 'number', 'dizendo quantos foram liberados (' + todos.corpo.liberados + ')');
+  const umContato = await jsonPost(admLib.cookie, '/api/whatsapp/bot/liberar-funil', { contact_id: 999999 });
+  ok(umContato.status === 200, 'contato que nao existe nao quebra (' + umContato.status + ')');
+  const painelLib = await jsonGet(admLib.cookie, '/api/whatsapp/bot/painel');
+  ok(painelLib.status === 200 && typeof painelLib.corpo.atendidos === 'number',
+    'o painel diz quantos contatos estao marcados (' + painelLib.corpo.atendidos + ')');
+  const audLib = await jsonGet(admLib.cookie, '/api/whatsapp/audit-logs?limit=20');
+  ok(((audLib.corpo && audLib.corpo.logs) || []).some(function (l) { return /Liberou contato/i.test(l.action || ''); }),
+    'e a Auditoria registrou quem liberou');
+  const comum = await login('zecomum', 'Comum#123');
+  if (comum.status === 200) {
+    const r = await jsonPost(comum.cookie, '/api/whatsapp/bot/liberar-funil', { todos: true });
+    ok(r.status === 403, 'quem nao pode editar o bot recebe 403 (' + r.status + ')');
+  }
+
   console.log('\n=== B8) SERVIDOR DE PE NO FIM ===');
   const vivo = await fetch(BASE + '/api/time');
   ok(vivo.status === 200, 'servidor respondendo (' + vivo.status + ')');
 }
 
+
+// ── C) DESLIGAR E RELIGAR ──────────────────────────────────────────────────
+// A pergunta que originou esta secao: com o bot desligado, quem escreve fica
+// marcado e deixa de receber o funil quando eu religo? Aqui o bot roda DE
+// VERDADE (banco real numa pasta temporaria, Meta de mentira), porque o que
+// interessa e o que fica GRAVADO.
+async function testarDesligarReligar() {
+  const db = require(path.join(RAIZ, 'whatsapp-db.cjs'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'rt-bot-liga-'));
+  await db.init(tmp);
+
+  let falhaDaMeta = false;
+  const enviados = [];
+  const apiFalsa = {
+    sendTextMessage: function (pn, to, texto) {
+      if (falhaDaMeta) return Promise.resolve({ ok: false, error: 'conta sem token (de proposito)' });
+      enviados.push({ to: to, texto: texto });
+      return Promise.resolve({ ok: true, wamid: 'wamid.R' + enviados.length });
+    },
+    sendMediaMessage: function () { return Promise.resolve({ ok: true, wamid: 'wamid.RM' }); },
+    uploadMedia: function () { return Promise.resolve({ ok: true, media_id: 'mid-r' }); }
+  };
+
+  let CFG = {
+    ligado: false, modo: 'primeira_vez', diasParaNovoContato: 0,
+    passos: [{ tipo: 'texto', texto: 'Ola {nome}, veja as vagas: {link_vagas}' }],
+    linkVagas: 'https://exemplo/vagas', intervaloPadraoSeg: 0,
+    atendente: bot.CONFIG_PADRAO.atendente, saida: bot.CONFIG_PADRAO.saida,
+    ritmo: { porMinuto: 600 }
+  };
+  bot.iniciar({ db: db, api: apiFalsa, notificar: null, pastaMidia: tmp,
+                lembretes: null, lerConfig: function () { return CFG; } });
+  bot.parar();
+
+  const acc = db.accounts.create({ phone_number_id: 'pn-liga', display_phone: '+55 11 90000-0000', status: 'connected', access_token_enc: 'TOKEN' });
+  let seq = 0;
+  const criar = function (tel, nome) {
+    const c = db.contacts.create({ phone: tel, name: nome });
+    const cid = (c && c.id) ? c.id : c;
+    const cv = db.conversations.create({ account_id: acc, contact_id: cid });
+    return { cid: cid, cv: cv, tel: tel, nome: nome };
+  };
+  const escrever = async function (p, texto) {
+    seq++;
+    const wamid = 'w-liga-' + seq;
+    db.messages.create({ conversation_id: p.cv, account_id: acc, direction: 'incoming', type: 'text', content: texto || 'oi', wamid: wamid });
+    return await bot.aoReceberMensagem({
+      wamid: wamid, account_id: acc, conversation_id: p.cv, contact_id: p.cid,
+      telefone: p.tel, nome: p.nome, texto: texto || 'oi', tipo: 'text'
+    });
+  };
+  const rodarFila = async function (quantos, limiteMs) {
+    const fim = Date.now() + (limiteMs || 8000);
+    const alvo = enviados.length + quantos;
+    while (Date.now() < fim && enviados.length < alvo) {
+      await bot.processarFila();
+      if (enviados.length >= alvo) break;
+      await new Promise(function (r) { setTimeout(r, 120); });
+    }
+  };
+  const linhaDo = function (cid) {
+    return db.getDb().exec('SELECT COUNT(*) AS n FROM whatsapp_bot_contatos WHERE contact_id = ' + Number(cid));
+  };
+  const marcado = function (cid) {
+    const c = db.bot.contato(cid) || {};
+    return !!c.ultima_resposta_em;
+  };
+
+  console.log('=== C1) BOT DESLIGADO NAO MARCA NINGUEM ===');
+  const ana = criar('5511977770001', 'Ana Desligado');
+  const r1 = await escrever(ana, 'tenho interesse');
+  ok(r1 && r1.acao === 'nada' && /desligad/.test(r1.motivo || ''),
+    'com o bot desligado, a decisao e nada (' + (r1 && r1.motivo) + ')');
+  ok(enviados.length === 0, 'e nada foi enviado');
+  const res = linhaDo(ana.cid);
+  const linhas = res && res[0] && res[0].values && res[0].values[0] ? Number(res[0].values[0][0]) : 0;
+  ok(linhas === 0, 'NAO existe nem linha deste contato na tabela do bot (' + linhas + ')');
+  ok(!marcado(ana.cid), 'ou seja: continua "nunca atendido"');
+  ok(db.bot.quantosAtendidos() === 0, 'e a contagem de atendidos segue em zero');
+
+  console.log('\n=== C2) RELIGAR ENVIA O FUNIL PARA QUEM NAO RECEBEU ===');
+  CFG = Object.assign({}, CFG, { ligado: true });
+  const r2 = await escrever(ana, 'oi de novo');
+  ok(r2 && r2.acao === 'sequencia', 'ao religar, a MESMA pessoa entra no funil (' + (r2 && r2.acao) + ')');
+  // O aoReceberMensagem chama a fila na hora (de proposito), entao as vezes a
+  // primeira mensagem ja saiu aqui. Quando nao saiu, vale conferir que a marca
+  // ainda nao existe; a prova forte de que a marca vem DO ENVIO esta em C4.
+  if (enviados.length === 0) {
+    ok(!marcado(ana.cid), 'enquanto o funil nao saiu, ela nao esta marcada');
+  } else {
+    console.log('  (a fila ja enviou na hora; a prova da marca-apos-envio esta em C4)');
+  }
+  await rodarFila(1);
+  ok(enviados.length === 1, 'a primeira mensagem do funil saiu (' + enviados.length + ')');
+  ok(/Ana/.test(enviados[0].texto || ''), 'com o nome dela: "' + enviados[0].texto + '"');
+  ok(marcado(ana.cid), 'AGORA ela esta marcada como atendida');
+  ok(db.bot.quantosAtendidos() === 1, 'e a contagem subiu para 1');
+
+  console.log('\n=== C3) QUEM JA RECEBEU NAO RECEBE DE NOVO (so na primeira vez) ===');
+  const r3 = await escrever(ana, 'e as vagas?');
+  ok(r3 && r3.acao === 'nada' && /ja foi atendido/.test(r3.motivo || ''),
+    'a mesma pessoa nao recebe o funil outra vez (' + (r3 && r3.motivo) + ')');
+  // E desligar/religar nao muda isso.
+  CFG = Object.assign({}, CFG, { ligado: false });
+  await escrever(ana, 'oi');
+  CFG = Object.assign({}, CFG, { ligado: true });
+  const r3b = await escrever(ana, 'oi');
+  ok(r3b && r3b.acao === 'nada', 'desligar e religar NAO faz quem ja recebeu receber de novo');
+
+  console.log('\n=== C4) FUNIL QUE FALHA NAO MARCA NINGUEM ===');
+  const bruno = criar('5511977770002', 'Bruno Falha');
+  falhaDaMeta = true;
+  const r4 = await escrever(bruno, 'quero vaga');
+  ok(r4 && r4.acao === 'sequencia', 'o funil dele foi para a fila');
+  await bot.processarFila();
+  await new Promise(function (r) { setTimeout(r, 150); });
+  await bot.processarFila();
+  ok(!marcado(bruno.cid),
+    'o envio falhou na Meta, entao ele NAO foi marcado como atendido (era o defeito: marcava ao enfileirar)');
+  falhaDaMeta = false;
+  const r4b = await escrever(bruno, 'oi?');
+  ok(r4b && r4b.acao === 'sequencia', 'e na mensagem seguinte ele entra no funil de novo');
+  await rodarFila(1);
+  ok(marcado(bruno.cid), 'agora que saiu de verdade, esta marcado');
+
+  console.log('\n=== C5) MODO "SEMPRE" ENVIA TODA VEZ ===');
+  CFG = Object.assign({}, CFG, { modo: 'sempre', limiteSempre: 'horas', limiteHoras: 0 });
+  const carla = criar('5511977770003', 'Carla Sempre');
+  const s1 = await escrever(carla, 'oi');
+  await rodarFila(1);
+  const s2 = await escrever(carla, 'oi outra vez');
+  await rodarFila(1);
+  ok(s1.acao === 'sequencia' && s2.acao === 'sequencia', 'no modo sempre, as duas mensagens geram funil');
+  const doCarla = enviados.filter(function (e) { return e.to === carla.tel; });
+  ok(doCarla.length === 2, 'e as duas sairam (' + doCarla.length + ')');
+
+  console.log('\n=== C6) LIBERAR FAZ TODO MUNDO RECEBER DE NOVO ===');
+  CFG = Object.assign({}, CFG, { modo: 'primeira_vez', diasParaNovoContato: 0 });
+  // Quem pediu saida e quem esta pausado nao podem ser atropelados.
+  const diego = criar('5511977770004', 'Diego Saiu');
+  await escrever(diego, 'quero sair');
+  const elza = criar('5511977770005', 'Elza Pausada');
+  await escrever(elza, 'oi');
+  await rodarFila(1);
+  db.bot.gravarContato(elza.cid, { pausado: 1, pausado_por: 'atendente' });
+
+  const antes = db.bot.quantosAtendidos();
+  ok(antes >= 3, 'antes de liberar, ' + antes + ' contato(s) estao marcados');
+  const liberados = db.bot.liberarFunil(null);
+  ok(liberados === antes, 'o liberar devolve quantos estavam marcados (' + liberados + ')');
+  ok(db.bot.quantosAtendidos() === 0, 'e nao sobra ninguem marcado');
+  const r6 = await escrever(ana, 'oi depois de liberar');
+  ok(r6 && r6.acao === 'sequencia', 'quem ja tinha recebido volta a receber o funil (' + (r6 && r6.acao) + ')');
+  const dDiego = db.bot.contato(diego.cid) || {};
+  ok(dDiego.optou_sair === 1, 'quem pediu para SAIR continua fora (optou_sair intacto)');
+  const r6b = await escrever(diego, 'oi');
+  ok(r6b && r6b.acao === 'nada', 'e o bot continua calado com ele');
+  const dElza = db.bot.contato(elza.cid) || {};
+  ok(dElza.pausado === 1, 'quem esta PAUSADO a mao continua pausado');
+
+  console.log('\n=== C7) LIBERAR SO UM CONTATO ===');
+  await rodarFila(1);                     // o funil da Ana saindo de novo
+  const fabio = criar('5511977770006', 'Fabio Um');
+  await escrever(fabio, 'oi');
+  await rodarFila(1);
+  ok(marcado(fabio.cid) && marcado(ana.cid), 'dois contatos marcados');
+  const umSo = db.bot.liberarFunil(fabio.cid);
+  ok(umSo === 1, 'liberar um devolve 1 (' + umSo + ')');
+  ok(!marcado(fabio.cid), 'ele foi liberado');
+  ok(marcado(ana.cid), 'e a outra pessoa NAO foi mexida');
+
+  console.log('\n=== C8) FORA DO EXPEDIENTE: MARCA SO DEPOIS DE ENVIAR ===');
+  CFG = Object.assign({}, CFG, {
+    ligado: false,
+    foraExpediente: { ligado: true, periodo: 'p1', passos: [{ tipo: 'texto', texto: 'Estamos fora do horario.' }] }
+  });
+  const gilda = criar('5511977770007', 'Gilda Fora');
+  falhaDaMeta = true;
+  const f1 = await escrever(gilda, 'oi');
+  ok(f1 && f1.acao === 'fora_expediente', 'o funil de fora do expediente foi para a fila');
+  await bot.processarFila();
+  await new Promise(function (r) { setTimeout(r, 150); });
+  await bot.processarFila();
+  const gFalhou = db.bot.contato(gilda.cid) || {};
+  ok(!gFalhou.fora_exp_periodo, 'envio que falhou NAO marca o periodo (' + (gFalhou.fora_exp_periodo || 'vazio') + ')');
+  falhaDaMeta = false;
+  await escrever(gilda, 'oi?');
+  await rodarFila(1);
+  const gOk = db.bot.contato(gilda.cid) || {};
+  ok(gOk.fora_exp_periodo === 'p1', 'depois de sair de verdade, o periodo e marcado (' + gOk.fora_exp_periodo + ')');
+  const f2 = await escrever(gilda, 'oi mais uma vez');
+  ok(f2 && f2.acao === 'nada', 'e ela nao recebe o funil de fora do expediente outra vez');
+
+  db.close();
+  try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
+}
+
 (async () => {
   testarDecisao();
+  console.log('');
+  await testarDesligarReligar();
   console.log('');
   await testarServidor();
   console.log('\n' + (falhas === 0 ? 'BOT: TODOS OS TESTES OK' : falhas + ' FALHA(S)'));

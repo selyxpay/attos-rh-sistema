@@ -895,6 +895,53 @@ pronta e por texto livre, e as 24 horas) e suíte `respostas-ui`, seção 9d (o
 selo na linha, a dica, o bloco "Últimos envios" com o botão, o seletor, o
 campo do nome e o aviso com o botão de pular como padrão).
 
+### 5.11.1 Desligar e religar o bot: quem recebe o funil de novo
+
+A pergunta que originou esta seção: **com o bot desligado, quem escrever fica
+marcado e deixa de receber o funil quando eu religar?**
+
+**O que o código fazia (e o que mudou):**
+
+| Situação | Antes | Hoje |
+|---|---|---|
+| Bot desligado, chega mensagem | `aoReceberMensagem` gravava a linha do contato (`ultima_msg_recebida_em`) **antes** de decidir qualquer coisa | **sai sem gravar nada**: `if (!algumModoLigado(cfg).ligado) return` |
+| Religar o bot | quem escreveu com ele desligado **recebia** o funil (a marca de "atendido" é outra coluna, `ultima_resposta_em`) | igual — e agora sem rastro nenhum da automação que não rodou |
+| Funil enfileirado | `contarResposta()` marcava **na hora de enfileirar** | a marca vai para a fila (`marcar_apos`) e só é aplicada **depois que o primeiro passo sai de verdade** |
+| Envio que falha (sem token, erro da Meta) | pessoa marcada como atendida **sem ter recebido nada** — e no modo "só na primeira vez" **nunca mais** receberia | não marca; na próxima mensagem ela entra no funil de novo |
+| Fora do expediente | `fora_exp_periodo` marcado ao enfileirar (mesmo defeito) | marcado só depois do envio |
+
+**Importante, e que continua igual:** no modo **"só na primeira vez"**, quem já
+recebeu o funil **não recebe de novo** ao religar o bot — isso é o que o modo
+significa, não um defeito. O que decide é `ultima_resposta_em`:
+
+```js
+if (cfg.modo === 'primeira_vez') {
+  if (!est.ultima_resposta_em) return { acao: 'sequencia', motivo: 'primeiro contato' };
+  const dias = (agora - new Date(est.ultima_resposta_em)) / 864e5;
+  const limite = Number(cfg.diasParaNovoContato) || 0;
+  if (limite > 0 && dias >= limite) return { acao: 'sequencia', motivo: 'voltou depois de ...' };
+  return { acao: 'nada', motivo: 'ja foi atendido e nao passou o prazo' };
+}
+```
+
+**Para fazer todo mundo receber de novo** existe o botão
+**"Liberar contatos para receber o funil de novo"** (passo 2 da aba Bot) e, na
+conversa de cada pessoa, o atalho **"liberar funil"** só para ela. Os dois
+batem em `POST /api/whatsapp/bot/liberar-funil` (`{todos:true}` ou
+`{contact_id}` — o `todos` é explícito para um pedido mal formado não limpar a
+base inteira) e apagam **só** a marcação de atendido e a contagem do dia.
+**Não** mexem em quem pediu para sair, em quem está pausado à mão, nem em quem
+está na fila do atendente: apagar isso junto faria o bot atropelar gente que
+pediu silêncio. A tela mostra quantos contatos estão marcados, e a Auditoria
+registra quem liberou e quantos.
+
+**Testado por:** suíte `bot`, seção C: bot desligado não cria nem a linha do
+contato, religar manda o funil para quem não recebeu, quem já recebeu não
+recebe de novo (nem desligando e religando), envio que falha não marca, modo
+"sempre" manda toda vez, o liberar geral faz todo mundo receber outra vez
+preservando saída e pausa, o liberar de um só não encosta nos outros, e o fora
+do expediente seguindo a mesma regra.
+
 ### 5.12 Áudio gravado na hora (mensagem de voz)
 
 O problema: a Meta só mostra o áudio como **mensagem de voz** se ele chegar em
@@ -1152,6 +1199,8 @@ tipo de erro que volta: se você mexer na área, confira que não reintroduziu.
 | Rotação de senha que tranca a instalação nova | Marcar "todo mundo" trancaria os testes e qualquer deploy limpo. Mire em QUEM TEM SENHA ANTIGA — instalação nova já nasce em scrypt |
 | Áudio que chega como arquivo e não como voz | A Meta só toca como mensagem de voz se for OGG/Opus E for enviado com `type: audio` SEM caption. Navegador nenhum grava OGG direto (menos o Firefox): precisa converter |
 | `spawn` com entrada inválida derrubando o servidor | ffmpeg sai antes de ler tudo e o `stdin` estoura EPIPE. Sem `stdin.on('error')`, o processo do Node morre junto |
+| Contato marcado como "atendido" sem ter recebido nada | Marcar na hora de ENFILEIRAR. Se o envio falha, no modo "só na primeira vez" a pessoa nunca mais recebe o funil. Marque depois do envio |
+| Automação desligada deixando rastro | Gravar a linha do contato antes de decidir. Com o bot desligado, nada deve ser marcado |
 | `replace()` comendo pedaço do arquivo num script de patch | `$&`, `$'` e `$1` têm significado no texto de substituição. Em patch, use `split(a).join(b)` |
 | Âncora de patch que não casa em `js/app.js` | Esse arquivo é **CRLF**; o resto do projeto é LF. Ajuste o fim de linha antes de procurar |
 | Regex que "come" letras dentro de um teste de tela | `\s` dentro de um template literal do `cdp.eval` vira `s`: a expressão virou `/s+/g` e o teste apagou os "s" do texto. Dentro do eval, `\\s` |

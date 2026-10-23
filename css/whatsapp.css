@@ -1297,3 +1297,22 @@ body.wa-tela-cheia { overflow: hidden; }
   .bot-audio-previa, .wa-prontas-audio { max-width: none; }
   .wa-prontas-gravar { width: 100%; justify-content: center; }
 }
+
+/* ── Já recebeu o funil (dentro da conversa) ────────────────────────────── */
+.wa-bot-funil {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px;
+  padding: 2px 7px; border-radius: 999px; background: rgba(29,78,216,.12); color: #1d4ed8;
+}
+.wa-bot-funil.nao { background: rgba(100,116,139,.12); color: #64748b; }
+
+/* ── Liberar contatos (aba Bot) ─────────────────────────────────────────── */
+.bot-liberar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap; margin-top: 12px; padding: 11px 13px; border-radius: 10px;
+  background: var(--surface-subtle, #f8fafc); border: 1px dashed var(--border-color, #e2e8f0);
+}
+.bot-liberar-txt { font-size: 12.5px; line-height: 1.55; min-width: 0; }
+.bot-ajuda-modo { margin-bottom: 10px; }
+@media (max-width: 760px) {
+  .bot-liberar button { width: 100%; justify-content: center; }
+}

@@ -4747,11 +4747,66 @@ http.createServer(function (req, res) {
       var uBp = waUsuarioTemPermissao(req, 'visualizar');
       if (!uBp) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
       if (!waBot) { responderJson(res, 200, { ok: true, disponivel: false }); return; }
+      // atendidos: quantos contatos estão marcados como "já receberam o
+      // funil". É o número que a aba Bot mostra ao lado do modo "só na
+      // primeira vez" — e o que o botão de liberar zera.
+      var _atendidos = 0, _foraExp = 0;
+      try { _atendidos = waDb.bot.quantosAtendidos(); } catch (e) {}
+      try { _foraExp = waDb.bot.quantosForaExp(); } catch (e) {}
       responderJson(res, 200, {
         ok: true, disponivel: true,
         painel: waDb.bot.painel(),
         config: waBot.configAtual(),
+        atendidos: _atendidos,
+        fora_exp_marcados: _foraExp,
         ultimos: waDb.bot.ultimosLogs(40)
+      });
+      return;
+    }
+
+    // LIBERAR CONTATOS PARA RECEBER O FUNIL DE NOVO.
+    // Apaga só a marcação de "já atendido" (e a contagem do dia, que é da
+    // mesma regra). NÃO mexe em quem pediu para sair, em quem está pausado à
+    // mão, nem em quem está na fila do atendente.
+    //   { contact_id: 123 }  -> libera só aquela pessoa (botão na conversa)
+    //   { todos: true }      -> libera todas (botão da aba Bot)
+    // O "todos" é EXPLÍCITO de propósito: um pedido mal formado não pode
+    // limpar a marcação de toda a base sem querer.
+    if (urlPath === '/api/whatsapp/bot/liberar-funil' && req.method === 'POST') {
+      var uLf = waUsuarioTemPermissao(req, 'editar');
+      if (!uLf) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false, error: 'corpo inválido' }); return; }
+        var idLf = Number((body && body.contact_id) || 0);
+        var todosLf = !!(body && body.todos);
+        if (!idLf && !todosLf) {
+          responderJson(res, 400, { ok: false, error: 'Diga contact_id (uma pessoa) ou todos:true.' });
+          return;
+        }
+        var liberados = 0;
+        try {
+          liberados = waDb.bot.liberarFunil(idLf || null);
+        } catch (e) {
+          console.error('[Bot] falha ao liberar o funil:', e.message);
+          responderJson(res, 500, { ok: false, error: 'Falha ao liberar: ' + e.message });
+          return;
+        }
+        var quemLf = 'todos os contatos';
+        if (idLf) {
+          var cLf = null;
+          try { cLf = waDb.contacts.getById ? waDb.contacts.getById(idLf) : null; } catch (e) {}
+          quemLf = 'o contato ' + (cLf ? ((cLf.name || cLf.phone) + ' (' + idLf + ')') : idLf);
+        }
+        try {
+          waDb.audit.log({
+            user_login: uLf.login, user_name: uLf.nome,
+            action: 'Liberou contato(s) para receber o funil de novo',
+            details: quemLf + ' · ' + liberados + ' contato(s) estavam marcados',
+            ip: waIpDaReq(req)
+          });
+        } catch (e) {}
+        try { waDb.bot.registrar('liberado', idLf || 0, '', 'liberado por ' + uLf.login + ' (' + liberados + ')'); } catch (e) {}
+        responderJson(res, 200, { ok: true, liberados: liberados, todos: todosLf && !idLf });
       });
       return;
     }

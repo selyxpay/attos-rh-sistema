@@ -283,11 +283,18 @@
         <!-- PASSO 2 — quando responder -->
         <section class="bot-passo">
           ${_botCabecalhoPasso(2, 'Quando responder', _botSituacaoPasso(c, 2))}
+          <p class="bot-ajuda bot-ajuda-modo">
+            <b>Qual a diferença:</b> em <b>só na primeira vez</b>, cada pessoa recebe o funil
+            UMA vez e depois nunca mais (a não ser que volte depois dos dias combinados);
+            em <b>sempre</b>, quem escrever recebe de novo, respeitando o limite por dia.
+            Desligar e religar o bot <b>não</b> faz quem já recebeu receber outra vez —
+            para isso existe o botão de liberar, no fim deste passo.
+          </p>
           <label class="bot-opcao">
             <input type="radio" name="bot-modo" value="primeira_vez" ${c.modo === 'primeira_vez' ? 'checked' : ''} ${trava}
                    onchange="botMudarCampo('modo','primeira_vez')">
             <div><b>Só na primeira vez</b>
-              <small>Responde no primeiro contato da pessoa. Se ela voltar depois de
+              <small>Cada pessoa recebe o funil uma vez só. Se ela voltar depois de
               <input type="number" min="0" max="365" class="bot-mini" id="bot-dias" value="${Number(c.diasParaNovoContato) || 0}" ${trava}
                      onchange="botMudarNumero('diasParaNovoContato', this.value)"> dia(s) sem conversa, responde de novo.
               Com 0, responde uma única vez e nunca mais.</small>
@@ -312,6 +319,18 @@
             <input type="number" min="1" max="120" class="bot-mini" value="${Number(c.intervaloPadraoSeg) || 3}" ${trava}
                    onchange="botMudarNumero('intervaloPadraoSeg', this.value)"> segundo(s).
           </label>
+
+          <!-- QUEM JÁ RECEBEU, E COMO LIBERAR DE NOVO -->
+          <div class="bot-liberar">
+            <div class="bot-liberar-txt">
+              <b>${_atendidos()} contato(s)</b> já estão marcados como atendidos pelo funil.
+              ${_foraExpMarcados() ? '<br><span class="bot-ajuda">' + _foraExpMarcados() + ' marcado(s) também no modo fora do expediente.</span>' : ''}
+              <div class="bot-ajuda">No modo "só na primeira vez", são essas pessoas que NÃO recebem o funil de novo.</div>
+            </div>
+            ${podeEditar ? `<button class="mod-btn-secondary" onclick="botLiberarFunilTodos()">
+              <i class="fa-solid fa-rotate-left"></i> Liberar contatos para receber o funil de novo
+            </button>` : ''}
+          </div>
         </section>
 
         <!-- PASSO 3 — link das vagas -->
@@ -1260,6 +1279,58 @@
     redesenhar();
   };
 
+  // Quantos contatos estão marcados. Vem do servidor junto com o painel.
+  function _atendidos() { return Number(_painel && _painel.atendidos) || 0; }
+  function _foraExpMarcados() { return Number(_painel && _painel.fora_exp_marcados) || 0; }
+
+  // LIBERAR TODOS. Confirmação obrigatória: é uma ação que faz o bot voltar a
+  // falar com gente que já tinha sido atendida.
+  window.botLiberarFunilTodos = async function () {
+    const quantos = _atendidos();
+    if (!confirm(
+      'Liberar TODOS os contatos para receber o funil de novo?\n\n' +
+      quantos + ' contato(s) estão marcados como atendidos. Depois disso, todos eles ' +
+      'voltam a receber o funil na próxima mensagem que mandarem — inclusive no modo ' +
+      '"só na primeira vez".\n\n' +
+      'Quem pediu para sair continua de fora, e quem está com o bot pausado continua pausado.'
+    )) return;
+    try {
+      const r = await fetch('/api/whatsapp/bot/liberar-funil', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ todos: true })
+      });
+      const j = await r.json().catch(function () { return {}; });
+      if (!j.ok) { alert(j.error || 'Não consegui liberar.'); return; }
+      alert(j.liberados + ' contato(s) liberados. Todos voltam a receber o funil na próxima mensagem.');
+      _painel = null;
+      redesenhar();
+    } catch (e) { alert('Falha: ' + (e.message || e)); }
+  };
+
+  // LIBERAR SÓ UMA PESSOA — o botão que aparece dentro da conversa dela.
+  window.botLiberarFunilContato = async function (contactId, nome) {
+    if (!confirm(
+      'Liberar ' + (nome || 'este contato') + ' para receber o funil de novo?\n\n' +
+      'Na próxima mensagem que a pessoa mandar, o bot responde o funil desde o começo.'
+    )) return;
+    try {
+      const r = await fetch('/api/whatsapp/bot/liberar-funil', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contact_id: Number(contactId) })
+      });
+      const j = await r.json().catch(function () { return {}; });
+      if (!j.ok) { alert(j.error || 'Não consegui liberar.'); return; }
+      alert(j.liberados
+        ? 'Pronto: a pessoa volta a receber o funil na próxima mensagem.'
+        : 'Esta pessoa já não estava marcada — ela recebe o funil na próxima mensagem.');
+      if (typeof botControleDaConversa === 'function' && window._waConversaAberta) {
+        botControleDaConversa(window._waConversaAberta);
+      }
+    } catch (e) { alert('Falha: ' + (e.message || e)); }
+  };
+
   window.botAtualizarPainel = async function () { _painel = null; redesenhar(); };
 
   // ── CONTROLE DO BOT DENTRO DA CONVERSA ───────────────────────────────────
@@ -1294,6 +1365,14 @@
     return { classe: 'ligado', icone: 'fa-robot', rotulo: 'bot ativo', pausado: false, motivo: '' };
   }
 
+  // "Já recebeu o funil" = tem marcação de atendido (modo normal) ou de
+  // período (fora do expediente). É a MESMA marcação que o botão de liberar
+  // apaga, então a tela e o botão falam da mesma coisa.
+  function _jaRecebeuFunil(ct) {
+    if (!ct) return false;
+    return !!(ct.ultima_resposta_em || (ct.fora_exp_periodo && String(ct.fora_exp_periodo).trim()));
+  }
+
   window.botCarregarControle = async function (contactId) {
     const alvo = document.getElementById('wa-bot-ctrl');
     if (!alvo || !contactId) return;
@@ -1315,7 +1394,22 @@
           ? '<button class="wa-btn-mini" title="' + (est.pausado ? 'Devolver ao bot' : 'Pausar o bot neste contato') +
             '" onclick="botAlternarContato(' + Number(contactId) + ',' + (est.pausado ? 'false' : 'true') + ')">' +
             '<i class="fa-solid ' + (est.pausado ? 'fa-rotate-left' : 'fa-pause') + '"></i></button>'
-          : '');
+          : '') +
+        // JÁ RECEBEU O FUNIL? E o atalho para liberar SÓ esta pessoa. No modo
+        // "só na primeira vez" é isto que faz o bot voltar a atender alguém
+        // sem precisar liberar a base toda.
+        (_jaRecebeuFunil(ct)
+          ? '<span class="wa-bot-funil" title="No modo \'só na primeira vez\', esta pessoa não recebe o funil de novo">' +
+              '<i class="fa-solid fa-check"></i> já recebeu o funil' +
+            '</span>' +
+            (_botPodeEditar()
+              ? '<button class="wa-btn-mini" title="Liberar esta pessoa para receber o funil de novo"' +
+                ' onclick="botLiberarFunilContato(' + Number(contactId) + ', ' +
+                JSON.stringify(String(ct.nome_contato || ct.name || '')) + ')">' +
+                '<i class="fa-solid fa-rotate-left"></i> liberar funil</button>'
+              : '')
+          : '<span class="wa-bot-funil nao" title="Esta pessoa ainda vai receber o funil na próxima mensagem">' +
+              '<i class="fa-regular fa-circle"></i> nunca recebeu o funil</span>');
     } catch (e) { alvo.innerHTML = ''; }
   };
 
