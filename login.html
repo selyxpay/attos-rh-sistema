@@ -90,18 +90,18 @@
             <div class="login-logo-area"><img src="img/logo-rt.png" class="logo-img" alt="R&amp;T Empregos"></div>
             <h2 style="color:#f1f5f9;font-size:19px;margin-bottom:6px;">Troque sua senha para continuar</h2>
             <p style="color:#94a3b8;font-size:12.5px;margin-bottom:18px;line-height:1.6;">
-                A senha que você usou é uma das que ficaram <strong style="color:#fca5a5;">públicas no código do sistema</strong>.
-                Qualquer pessoa que tenha visto o repositório consegue entrar com ela.
-                Escolha uma senha nova agora — leva 10 segundos.
+                Olá, tudo bem? Por causa de um problema de <strong style="color:#fca5a5;">segurança mundial</strong>,
+                muitas senhas foram vazadas na internet. Para proteger você e a nossa empresa,
+                pedimos que troque sua senha agora.
             </p>
             <form id="troca-form">
                 <div class="form-group" style="width:100%;display:flex;flex-direction:column;text-align:left;margin-bottom:14px;">
                     <label for="troca-nova" style="color:#cbd5e1;font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-lock"></i> Nova senha</label>
-                    <input type="password" id="troca-nova" required minlength="6" placeholder="Pelo menos 6 caracteres" class="form-control-login" autocomplete="new-password">
+                    <input type="password" id="troca-nova" required minlength="8" placeholder="Pelo menos 8 caracteres, com letras e números" class="form-control-login" autocomplete="new-password">
                 </div>
                 <div class="form-group" style="width:100%;display:flex;flex-direction:column;text-align:left;margin-bottom:8px;">
-                    <label for="troca-conf" style="color:#cbd5e1;font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-lock"></i> Repita a nova senha</label>
-                    <input type="password" id="troca-conf" required minlength="6" placeholder="Digite de novo" class="form-control-login" autocomplete="new-password">
+                    <label for="troca-conf" style="color:#cbd5e1;font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-lock"></i> Confirmar nova senha</label>
+                    <input type="password" id="troca-conf" required minlength="8" placeholder="Digite de novo" class="form-control-login" autocomplete="new-password">
                 </div>
                 <div id="troca-erro" class="login-error-alert" style="display:none;"><i class="fa-solid fa-circle-exclamation"></i> <span></span></div>
                 <button type="submit" class="btn-login-submit"><span>Salvar e entrar</span> <i class="fa-solid fa-arrow-right"></i></button>
@@ -256,8 +256,10 @@
 
         // LOGIN
         // ── TROCA OBRIGATORIA DE SENHA ──────────────────────────────────────
-        // Guardamos a senha digitada so na memoria desta pagina, porque
-        // /api/trocar-senha exige a senha atual. Nada vai para o disco.
+        // A senha digitada fica so na memoria desta pagina, para avisar na
+        // hora se a nova for igual a antiga. Nada vai para o disco, e a rota
+        // /api/trocar-senha-obrigatoria nao pede a senha antiga: a pessoa
+        // acabou de provar quem e no login.
         var _senhaAtualNaMemoria = '';
         function mostrarTrocaObrigatoria(senhaUsada) {
           _senhaAtualNaMemoria = senhaUsada;
@@ -273,18 +275,20 @@
           var err  = document.getElementById('troca-erro');
           var diz = function (t) { err.querySelector('span').textContent = t; err.style.display = 'flex'; };
           err.style.display = 'none';
-          if (nova.length < 6) { diz('A senha nova precisa ter pelo menos 6 caracteres.'); return; }
-          if (nova !== conf)   { diz('As duas senhas nao sao iguais.'); return; }
-          if (nova === _senhaAtualNaMemoria) { diz('Escolha uma senha DIFERENTE da atual — a atual e publica.'); return; }
+          if (nova.length < 8) { diz('A senha nova precisa ter pelo menos 8 caracteres.'); return; }
+          if (!/[A-Za-zÀ-ÿ]/.test(nova)) { diz('A senha precisa ter pelo menos uma letra.'); return; }
+          if (!/[0-9]/.test(nova)) { diz('A senha precisa ter pelo menos um numero.'); return; }
+          if (nova !== conf)   { diz('As duas senhas precisam ser iguais.'); return; }
+          if (nova === _senhaAtualNaMemoria) { diz('A senha nova nao pode ser igual a antiga.'); return; }
           var btn = trocaForm.querySelector('button[type=submit]'); btn.disabled = true;
           try {
-            var r = await fetch('/api/trocar-senha', {
+            var r = await fetch('/api/trocar-senha-obrigatoria', {
               method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
-              body: JSON.stringify({ senhaAtual: _senhaAtualNaMemoria, senhaNova: nova })
+              body: JSON.stringify({ senhaNova: nova, senhaConfirma: conf })
             });
             var d = await r.json().catch(function () { return {}; });
             if (r.status === 200 && d.ok) { _senhaAtualNaMemoria = ''; window.location.href = '/'; return; }
-            diz(d.motivo === 'dados' ? 'Senha invalida. Use pelo menos 6 caracteres.' : 'Nao consegui trocar a senha. Tente de novo.');
+            diz(d.aviso || 'Nao consegui trocar a senha. Tente de novo.');
           } catch (e2) { diz('Erro de conexao. Tente de novo.'); }
           finally { btn.disabled = false; }
         });
@@ -301,8 +305,9 @@
             var r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ login: login, senha: senha }) });
             var d = await r.json().catch(function () { return {}; });
             if (r.status === 200 && d.ok) {
-              // Senha publica: a sessao ja vale (senao nem daria para trocar),
-              // mas o sistema so abre depois da troca.
+              // Conta marcada para trocar a senha: a sessao ja vale (senao nem
+              // daria para trocar), mas o servidor responde 423 em todo o
+              // resto do sistema ate ela escolher uma senha nova.
               if (d.trocaObrigatoria) { mostrarTrocaObrigatoria(senha); return; }
               window.location.href = '/'; return;
             }

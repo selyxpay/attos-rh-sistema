@@ -873,6 +873,9 @@
                             </div>
                         </div>
                         <div class="mod-header-actions">
+                            <button class="mod-btn-secondary" id="btn-exigir-troca-senha" onclick="exigirTrocaDeSenhaDeTodos()" title="Todas as contas, inclusive a sua, vão escolher uma senha nova no próximo acesso.">
+                                <i class="fa-solid fa-user-shield"></i> Exigir troca de senha de todos
+                            </button>
                             <button class="mod-btn-primary" id="btn-copiar-link-cadastro">
                                 <i class="fa-solid fa-copy"></i> Copiar Link de Auto-Cadastro
                             </button>
@@ -4106,6 +4109,10 @@
     </div>
 
     <!-- Core App Scripts (o ?v= força o navegador a baixar a versão nova a cada deploy) -->
+    <!-- A troca obrigatoria de senha vem ANTES de tudo: o envelope do fetch
+         que trata o 423 precisa estar no lugar antes de qualquer tela falar
+         com o servidor. -->
+    <script src="js/troca-senha.js?v=20261023a"></script>
     <script src="js/security.js?v=20260910b"></script>
     <script src="js/vps-sync.js?v=20261021a"></script>
     <script src="js/exata-catalogo.js?v=20260910b"></script>
@@ -4114,7 +4121,7 @@
          regra nao existir em dois lugares e divergir. Precisa vir antes do
          app.js, que o consome. -->
     <script src="js/telas.js?v=20261021c"></script>
-    <script src="js/app.js?v=20261021d"></script>
+    <script src="js/app.js?v=20261023a"></script>
     <script src="js/whatsapp.js?v=20261022b"></script>
     <script src="js/whatsapp-bot-ui.js?v=20261022b"></script>
     <!-- Mensagens prontas: a fileira acima da caixa de escrever e a tela de

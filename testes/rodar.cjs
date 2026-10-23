@@ -24,6 +24,15 @@ const crypto = require('crypto');
 const RAIZ = path.resolve(__dirname, '..');
 const SENHA_ADMIN = 'TesteLocal#123';
 const sha = s => crypto.createHash('sha256').update(String(s), 'utf8').digest('hex');
+// MESMO formato do servidor (hashSenhaForte, no server.cjs). Semear com
+// SHA-256 fazia a conta parecer ANTIGA, e a rotacao de senhas da subida
+// trancava a conta do teste inteiro — do mesmo jeito que tranca, de proposito,
+// as contas antigas de producao.
+const scrypt = senha => {
+  const sal = crypto.randomBytes(16);
+  const chave = crypto.scryptSync(String(senha), sal, 32, { N: 16384, r: 8, p: 1 });
+  return 'scrypt$16384$8$1$' + sal.toString('hex') + '$' + chave.toString('hex');
+};
 
 // ── SEMENTES ───────────────────────────────────────────────────────────────
 // Algumas suites precisam de contas especificas para testar nivel de acesso.
@@ -31,9 +40,9 @@ const sha = s => crypto.createHash('sha256').update(String(s), 'utf8').digest('h
 function sementeAcesso() {
   return {
     funcionarios: [
-      { id: 'f-admin', login: 'admin', nome: 'Administrador', departamento: 'administracao', status: 'ativo', senha: sha(SENHA_ADMIN) },
-      { id: 'f-mestre', login: 'joaobalaf', nome: 'Joao', departamento: 'administracao', status: 'ativo', senha: sha('Mestre#123') },
-      { id: 'f-comum', login: 'zecomum', nome: 'Ze Comum', departamento: 'selecao', status: 'ativo', senha: sha('Comum#123'), permissoes: { selecao: { visualizar: true } } }
+      { id: 'f-admin', login: 'admin', nome: 'Administrador', departamento: 'administracao', status: 'ativo', senha: scrypt(SENHA_ADMIN) },
+      { id: 'f-mestre', login: 'joaobalaf', nome: 'Joao', departamento: 'administracao', status: 'ativo', senha: scrypt('Mestre#123') },
+      { id: 'f-comum', login: 'zecomum', nome: 'Ze Comum', departamento: 'selecao', status: 'ativo', senha: scrypt('Comum#123'), permissoes: { selecao: { visualizar: true } } }
     ],
     candidatos: [], vagas: [], fluxosFinanceiros: [], equipamentos: [], logs: [],
     fila: { contadores: {}, senhas: [], ultimaChamada: null }
@@ -42,11 +51,11 @@ function sementeAcesso() {
 function sementeTelas() {
   return {
     funcionarios: [
-      { id: 'f-admin', login: 'admin', nome: 'Administrador', departamento: 'administracao', status: 'ativo', senha: sha(SENHA_ADMIN) },
-      { id: 'f-sem', login: 'zesem', nome: 'Ze Sem', departamento: 'selecao', status: 'ativo', senha: sha('Sem#123'), permissoes: {} },
-      { id: 'f-ver', login: 'zever', nome: 'Ze Ver', departamento: 'selecao', status: 'ativo', senha: sha('Ver#123'), permissoes: {} },
-      { id: 'f-edit', login: 'zeedit', nome: 'Ze Edit', departamento: 'selecao', status: 'ativo', senha: sha('Edit#123'), permissoes: {} },
-      { id: 'f-antigo', login: 'zeantigo', nome: 'Ze Antigo', departamento: 'dp', status: 'ativo', senha: sha('Antigo#123') }
+      { id: 'f-admin', login: 'admin', nome: 'Administrador', departamento: 'administracao', status: 'ativo', senha: scrypt(SENHA_ADMIN) },
+      { id: 'f-sem', login: 'zesem', nome: 'Ze Sem', departamento: 'selecao', status: 'ativo', senha: scrypt('Sem#123'), permissoes: {} },
+      { id: 'f-ver', login: 'zever', nome: 'Ze Ver', departamento: 'selecao', status: 'ativo', senha: scrypt('Ver#123'), permissoes: {} },
+      { id: 'f-edit', login: 'zeedit', nome: 'Ze Edit', departamento: 'selecao', status: 'ativo', senha: scrypt('Edit#123'), permissoes: {} },
+      { id: 'f-antigo', login: 'zeantigo', nome: 'Ze Antigo', departamento: 'dp', status: 'ativo', senha: scrypt('Antigo#123') }
     ],
     candidatos: [], vagas: [], fluxosFinanceiros: [], equipamentos: [], precificacao: [],
     logs: [{ id: 'log-0', data: 'ontem', usuario: 'Sistema', acao: 'inicio', categoria: 'sistema' }],
@@ -64,6 +73,8 @@ const SUITES = [
     titulo: 'Imagem do Docker completa, peca opcional nao derruba o resto, contas sobrevivem' },
   { nome: 'backend',   arquivo: 'backend-fechado.cjs', servidor: true, navegador: false,
     titulo: 'Backend e pasta de dados fechados para a web (o vazamento do /server.cjs)' },
+  { nome: 'senha',     arquivo: 'senha-forte.cjs',    servidor: false, navegador: false,
+    titulo: 'Senha em scrypt e troca obrigatoria (sobe o servidor por conta propria)' },
   { nome: 'seguranca', arquivo: 'seguranca.cjs',      servidor: true,  navegador: false, semente: sementeAcesso,
     titulo: 'Seguranca e estabilidade (queda por URL, escalada de acesso, senha no payload)' },
   { nome: 'upload',    arquivo: 'upload.cjs',         servidor: true,  navegador: false,

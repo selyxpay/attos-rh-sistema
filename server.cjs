@@ -358,6 +358,10 @@ const MIME = {
 // ==========================================================================
 const SECURITY_HEADERS = {
   'X-Frame-Options': 'DENY',
+  // HSTS: o navegador passa a só aceitar HTTPS neste domínio pelo próximo ano.
+  // Fecha a janela em que alguém digita "vemserrt.com.br" sem https e a
+  // primeira requisição (com o cookie de sessão) sai em texto puro.
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
   // Câmera e localização liberadas para o próprio site (candidato tira foto por 'capture')
@@ -791,14 +795,59 @@ function parseCookies(req) {
 function tokenDaReq(req) { return parseCookies(req)['rt_session']; }
 function reqAutenticada(req) { return !!sessaoValida(tokenDaReq(req)); }
 
-// Senha: SHA-256 padrão (mesmo do cliente); aceita texto puro legado
+// ── COMO A SENHA É GUARDADA ────────────────────────────────────────────────
+// SCRYPT com sal por pessoa. Antes era SHA-256 puro: rápido de calcular, sem
+// sal nenhum — quem copiasse o state.json quebrava senha curta ou numérica
+// numa tarde, e duas pessoas com a mesma senha tinham o mesmo hash. O scrypt
+// é LENTO de propósito (gasta memória e tempo em cada tentativa), então
+// adivinhar em massa deixa de ser viável.
+//
+// O formato gravado diz tudo o que a conferência precisa, e por isso dá para
+// endurecer os parâmetros amanhã sem invalidar o que já está gravado:
+//   scrypt$<N>$<r>$<p>$<sal em hex>$<chave em hex>
+const SCRYPT = { N: 16384, r: 8, p: 1, tam: 32 };   // ~16 MB e ~60 ms por conta
+function hashSenhaForte(senha) {
+  const sal = crypto.randomBytes(16);
+  const chave = crypto.scryptSync(String(senha), sal, SCRYPT.tam,
+                                  { N: SCRYPT.N, r: SCRYPT.r, p: SCRYPT.p });
+  return 'scrypt$' + SCRYPT.N + '$' + SCRYPT.r + '$' + SCRYPT.p + '$' +
+         sal.toString('hex') + '$' + chave.toString('hex');
+}
+function _scryptConfere(digitada, armazenada) {
+  const p = String(armazenada).split('$');
+  if (p.length !== 6) return false;
+  const N = parseInt(p[1], 10), r = parseInt(p[2], 10), pp = parseInt(p[3], 10);
+  if (!N || !r || !pp) return false;
+  let sal, esperado;
+  try { sal = Buffer.from(p[4], 'hex'); esperado = Buffer.from(p[5], 'hex'); } catch (e) { return false; }
+  if (!sal.length || !esperado.length) return false;
+  let calculado;
+  try {
+    calculado = crypto.scryptSync(String(digitada), sal, esperado.length,
+                                  { N: N, r: r, p: pp, maxmem: 256 * 1024 * 1024 });
+  } catch (e) { return false; }
+  // Comparação em tempo constante: comparar com === devolve a resposta mais
+  // rápido quando os primeiros bytes já diferem, e isso é informação de graça
+  // para quem está medindo.
+  return crypto.timingSafeEqual(calculado, esperado);
+}
+// SHA-256 continua existindo por DOIS motivos: conferir o hash LEGADO de quem
+// ainda não entrou depois da migração, e reconhecer as senhas que vazaram
+// (HASH_SENHAS_PUBLICAS, logo abaixo). Nada novo é gravado assim.
 function hashSenhaServer(senha) { return crypto.createHash('sha256').update(String(senha), 'utf8').digest('hex'); }
 function senhaConfere(digitada, armazenada) {
   // Conta SEM senha nao entra, nunca. Antes caia no String(digitada) ===
   // String(undefined) la embaixo: quem digitasse a palavra "undefined" entrava.
   if (armazenada === undefined || armazenada === null || armazenada === '') return false;
-  if (String(armazenada).length !== 64) return String(digitada) === String(armazenada);
-  return hashSenhaServer(digitada) === String(armazenada);
+  const g = String(armazenada);
+  if (g.indexOf('scrypt$') === 0) return _scryptConfere(digitada, g);
+  if (g.length !== 64) return String(digitada) === g;            // texto puro legado
+  return hashSenhaServer(digitada) === g;                         // SHA-256 legado
+}
+// Guardada de um jeito antigo? Então o próximo login regrava em scrypt.
+function senhaPrecisaMigrar(armazenada) {
+  const g = String(armazenada || '');
+  return !!g && g.indexOf('scrypt$') !== 0;
 }
 
 // ── SENHAS QUE ESTAO PUBLICAS ──────────────────────────────────────────────
@@ -822,10 +871,171 @@ function senhaEhPublica(texto) {
   return HASH_SENHAS_PUBLICAS.indexOf(hashSenhaServer(String(texto))) >= 0;
 }
 
+// ── A REGRA DA SENHA NOVA ──────────────────────────────────────────────────
+// Um lugar só, usado por TODAS as rotas que gravam senha. Antes cada uma tinha
+// o seu mínimo (4, 6, 8), e a mais frouxa é que valia na prática.
+// Devolve { ok: true } ou { ok: false, motivo: '...' } — o motivo é o que a
+// tela mostra para a pessoa.
+const SENHA_MINIMA = 8;
+function politicaSenha(nova, opcoes) {
+  const o = opcoes || {};
+  const n = String(nova || '');
+  if (n.length < SENHA_MINIMA) return { ok: false, motivo: 'curta' };
+  if (!/[A-Za-zÀ-ÿ]/.test(n)) return { ok: false, motivo: 'sem_letra' };
+  if (!/[0-9]/.test(n)) return { ok: false, motivo: 'sem_numero' };
+  if (senhaEhPublica(n)) return { ok: false, motivo: 'publica' };
+  if (o.login && n.toLowerCase() === String(o.login).toLowerCase()) return { ok: false, motivo: 'igual_login' };
+  if (o.atual !== undefined && o.atual !== null && o.atual !== '' && senhaConfere(n, o.atual)) {
+    return { ok: false, motivo: 'igual' };
+  }
+  return { ok: true };
+}
+const MOTIVO_SENHA = {
+  curta: 'A senha precisa ter pelo menos ' + SENHA_MINIMA + ' caracteres.',
+  sem_letra: 'A senha precisa ter pelo menos uma letra.',
+  sem_numero: 'A senha precisa ter pelo menos um número.',
+  publica: 'Essa senha está na lista das que vazaram. Escolha outra.',
+  igual_login: 'A senha não pode ser igual ao seu login.',
+  igual: 'A senha nova não pode ser igual à antiga.'
+};
+
 // Anti-brute-force por login (memória): 5 falhas -> 60s de espera
 const tentativasLogin = {};
 function podeTentarLogin(login) { const t = tentativasLogin[login]; return !(t && t.ate && Date.now() < t.ate); }
 function registrarFalhaLogin(login) { const t = tentativasLogin[login] || { n: 0, ate: 0 }; t.n++; if (t.n % 5 === 0) t.ate = Date.now() + 60 * 1000; tentativasLogin[login] = t; }
+
+// E TAMBÉM POR IP. Só por nome de login não resolve: quem quer entrar varre
+// uma lista de logins, uma tentativa em cada, e nunca estoura o limite de
+// nenhum deles. 30 erros em 10 minutos do mesmo IP param tudo por 10 minutos.
+const tentativasLoginIp = {};
+const ERROS_IP = 30;
+const JANELA_IP = 10 * 60 * 1000;
+function ipDaReq(req) {
+  return String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim() || 'sem-ip';
+}
+function podeTentarLoginIp(ip) {
+  const t = tentativasLoginIp[ip];
+  if (!t) return true;
+  if (Date.now() - t.inicio > JANELA_IP) { delete tentativasLoginIp[ip]; return true; }
+  return t.n < ERROS_IP;
+}
+function registrarFalhaLoginIp(ip) {
+  const t = tentativasLoginIp[ip];
+  if (!t || Date.now() - t.inicio > JANELA_IP) { tentativasLoginIp[ip] = { n: 1, inicio: Date.now() }; return; }
+  t.n++;
+  if (t.n === ERROS_IP) console.warn('[RT] muitas tentativas de login erradas do IP ' + ip + ' — bloqueado por 10 min.');
+}
+function limparFalhasLoginIp(ip) { delete tentativasLoginIp[ip]; }
+
+// ── TROCA OBRIGATÓRIA DE SENHA ─────────────────────────────────────────────
+// Em 21/10/2026 saiu uma falha crítica de execução remota no mundo PHP
+// (CVE-2026-109618 / CVE-2026-109619). Este sistema é Node e não usa PHP, mas
+// senhas antigas deste sistema já estiveram num repositório público, então
+// todas foram rotacionadas: cada pessoa escolhe uma senha nova no próximo
+// acesso, e até escolher o sistema fica trancado para ela.
+//
+// O identificador abaixo é o que faz a rotação acontecer UMA vez. Para exigir
+// a troca de todo mundo de novo, o admin usa o botão na tela de Funcionários
+// (que grava um identificador novo) — não é preciso mexer no código.
+const ROTACAO_SENHAS_ID = '2026-10-23-vazamento-mundial';
+const MENSAGEM_TROCA_SENHA =
+  'Olá, tudo bem? Por causa de um problema de segurança mundial, muitas senhas ' +
+  'foram vazadas na internet. Para proteger você e a nossa empresa, pedimos que ' +
+  'troque sua senha agora.';
+
+// O que continua respondendo mesmo com a conta trancada: o necessário para
+// fazer login, saber quem sou, trocar a senha e sair — mais as rotas PÚBLICAS
+// (ficha do candidato, diária, relatório por link, webhook da Meta), que não
+// são do funcionário e não têm por que parar.
+const ROTAS_LIVRES_NA_TROCA = [
+  /^\/api\/(login|logout|me|time|saude)$/,
+  /^\/api\/(trocar-senha|trocar-senha-obrigatoria)$/,
+  /^\/api\/(solicitar-senha|definir-senha|status-senha|register-staff)$/,
+  /^\/api\/diaria\/(config|trabalhador)(\/|$)/,
+  /^\/api\/relatorio-equip\//,
+  /^\/webhooks\//
+];
+function _rotaLivreNaTroca(urlPath) {
+  for (let i = 0; i < ROTAS_LIVRES_NA_TROCA.length; i++) {
+    if (ROTAS_LIVRES_NA_TROCA[i].test(urlPath)) return true;
+  }
+  return false;
+}
+// Responde 423 (trancado) e devolve true quando a conta precisa trocar a senha
+// antes de usar o sistema. Vale para quem ACABOU de entrar e para quem já
+// estava logado — na próxima requisição que ela fizer.
+function bloqueioDeTrocaDeSenha(req, res, urlPath, autenticado) {
+  if (!autenticado) return false;
+  if (urlPath.indexOf('/api/') !== 0) return false;      // arquivos da tela passam
+  if (_rotaLivreNaTroca(urlPath)) return false;
+  const u = usuarioDaReq(req);
+  if (!u || !u.precisaTrocarSenha) return false;
+  responderJson(res, 423, { ok: false, motivo: 'troca_de_senha', aviso: MENSAGEM_TROCA_SENHA });
+  return true;
+}
+
+// Marca TODAS as contas para trocar a senha. Só acrescenta campo — não apaga
+// conta, não mexe em senha, não derruba ninguém que já esteja trocando.
+function marcarTodosParaTrocarSenha(dados, motivo) {
+  let quantas = 0;
+  (Array.isArray(dados.funcionarios) ? dados.funcionarios : []).forEach(function (f) {
+    if (!f) return;
+    f.precisaTrocarSenha = true;
+    quantas++;
+    // O espelho da senha em texto puro sai junto, onde ainda existir.
+    if (f.senhaVisivel !== undefined) delete f.senhaVisivel;
+  });
+  if (!dados.seguranca || typeof dados.seguranca !== 'object') dados.seguranca = {};
+  dados.seguranca.rotacaoId = String(motivo || ROTACAO_SENHAS_ID);
+  dados.seguranca.rotacaoEm = Date.now();
+  return quantas;
+}
+
+// Roda em TODA subida. É idempotente por conta: marca quem tem senha
+// guardada do jeito antigo e ainda não está marcado. Conta que já trocou
+// (scrypt) não é marcada de novo, e conta que chegar depois — restauração de
+// um backup antigo, por exemplo — é pega na subida seguinte.
+function rotacaoDeSenhasNoBoot() {
+  comTrava(function () {
+    const st = lerEstadoParaGravar();
+    const d = st.dados || {};
+    let marcadas = 0;
+    let limpas = 0;
+    (Array.isArray(d.funcionarios) ? d.funcionarios : []).forEach(function (f) {
+      if (!f) return;
+      // O espelho da senha em texto puro sai sempre, de toda conta.
+      if (f.senhaVisivel !== undefined) { delete f.senhaVisivel; limpas++; }
+      // QUEM ENTRA NA ROTAÇÃO: conta cuja senha está guardada do jeito ANTIGO
+      // (SHA-256 sem sal, ou texto puro). É essa que pode ter vazado — e é
+      // essa que o sistema não consegue garantir. Conta SEM senha não tem o
+      // que rotacionar (quando o admin definir uma, a própria rota de
+      // redefinição já marca a troca).
+      if (!f.senha || !senhaPrecisaMigrar(f.senha)) return;
+      if (f.precisaTrocarSenha === true) return;
+      f.precisaTrocarSenha = true;
+      marcadas++;
+    });
+    if (!marcadas && !limpas) return;                 // nada a fazer: nem grava
+    if (!d.seguranca || typeof d.seguranca !== 'object') d.seguranca = {};
+    d.seguranca.rotacaoId = ROTACAO_SENHAS_ID;
+    d.seguranca.rotacaoEm = Date.now();
+    if (marcadas) {
+      if (!Array.isArray(d.logs)) d.logs = [];
+      d.logs.unshift({
+        id: 'log-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+        data: new Date().toLocaleString('pt-BR'),
+        usuario: 'Sistema',
+        acao: 'Troca de senha exigida de ' + marcadas + ' conta(s) com senha guardada do jeito antigo ' +
+              '(vazamento mundial de senhas de 21/10/2026).',
+        categoria: 'seguranca'
+      });
+    }
+    try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); } catch (e) {}
+    console.log('[Segurança] troca de senha exigida de ' + marcadas + ' conta(s)' +
+                (limpas ? ' · ' + limpas + ' senha(s) em texto puro apagadas' : '') +
+                ' · rotação ' + ROTACAO_SENHAS_ID);
+  });
+}
 
 // ── LIMITE DE UPLOAD SEM LOGIN ─────────────────────────────────────────────
 // A ficha pública de candidatura precisa subir 3 fotos, e uma pessoa pode
@@ -1273,7 +1483,7 @@ function garantirAdminServidor() {
                   // arquivo ficou baixavel em producao. Falhar fechado e o
                   // certo: deploy mal configurado nao pode virar porta aberta.
                   if (process.env.ADMIN_SENHA) {
-                    nova.senha = hashSenhaServer(String(process.env.ADMIN_SENHA));
+                    nova.senha = hashSenhaForte(String(process.env.ADMIN_SENHA));
                   } else {
                     nova.senha = '';
                     console.warn('[RT] *** ADMIN_SENHA nao esta definida.');
@@ -1301,7 +1511,7 @@ function garantirAdminServidor() {
       // exige trocar no primeiro login.
       d.funcionarios.push({
         id: 'func-admin', nome: 'Administrador', login: 'admin',
-        senha: process.env.ADMIN_SENHA ? hashSenhaServer(String(process.env.ADMIN_SENHA)) : '',
+        senha: process.env.ADMIN_SENHA ? hashSenhaForte(String(process.env.ADMIN_SENHA)) : '',
         departamento: 'administracao', status: 'ativo', permissoes: {}
       });
       if (!process.env.ADMIN_SENHA) {
@@ -1325,7 +1535,7 @@ function garantirAdminServidor() {
         // Só entra aqui quando a senha está VAZIA (ver o if acima): senha de
         // produção nunca é sobrescrita. Sem ADMIN_SENHA, continua vazia.
         if (process.env.ADMIN_SENHA) {
-          adm.senha = hashSenhaServer(String(process.env.ADMIN_SENHA));
+          adm.senha = hashSenhaForte(String(process.env.ADMIN_SENHA));
           mudou = true;
         }
         if (!process.env.ADMIN_SENHA) {
@@ -1426,7 +1636,10 @@ function permitirRota(req, res, urlPath, metodo, autenticado) {
 // conferem permissão e registram. Repor sempre também é o que impede o
 // estado novo (sem o campo `senha`, removido do GET) de apagar a senha de
 // todo mundo no primeiro save.
-const CAMPOS_SENHA = ['senha', 'senhaVisivel'];
+// 'precisaTrocarSenha' entra aqui porque e o que TRANCA a conta: se o cliente
+// pudesse manda-lo no estado, qualquer pessoa logada se destrancaria sozinha
+// mandando 'false' no proprio registro.
+const CAMPOS_SENHA = ['senha', 'senhaVisivel', 'precisaTrocarSenha'];
 const CAMPOS_ACESSO = [
   'permissoes', 'permissoesFluxo', 'permissoesEspeciais', 'telas',
   'departamento', 'perfil', 'status', 'bloqueadoLogin',
@@ -1466,6 +1679,11 @@ function _reporCamposDeAcesso(dados, antes, requester) {
     // conta mestre. `senhaVisivel` é sempre do servidor (gravada no login).
     delete f.senhaVisivel;
     if (!podeAcesso) delete f.senha;
+    // Senha definida por outra pessoa (o admin, no cadastro) é PROVISÓRIA: o
+    // dono escolhe a dele no primeiro acesso, e aí ela passa a ser guardada
+    // em scrypt (o login regrava). Sem isto, a senha que o admin digitou
+    // valeria para sempre — e ele a conheceria para sempre.
+    if (podeAcesso && f.senha) f.precisaTrocarSenha = true;
     if (!podeAcesso) {
       f.permissoes = {};
       delete f.permissoesFluxo;
@@ -1535,10 +1753,10 @@ function filtrarSenhaVisivel(dados) {
     const c = Object.assign({}, f);
     // A senha em si NUNCA sai junto com o estado — só pelo /api/ver-senha (que audita).
     delete c.senhaVisivel;
-    // Vai só um SIM/NÃO, para a tela indicar de quem já dá para consultar a senha.
+    // Antes ia um SIM/NÃO dizendo de quem a senha dava para consultar. Hoje
+    // não dá para consultar a de ninguém: scrypt não volta atrás.
     const armazenada = String(f.senha || '');
-    const ehHash = armazenada.length === 64 && /^[0-9a-f]{64}$/i.test(armazenada);
-    c.senhaConhecida = !!f.senhaVisivel || (!!armazenada && !ehHash);
+    c.senhaConhecida = false;
     // E o HASH também não sai. O comentário acima sempre disse isso, mas o
     // código só removia `senhaVisivel`: o SHA-256 de TODOS os funcionários
     // (inclusive das contas mestre) descia para qualquer pessoa logada, e
@@ -1980,6 +2198,11 @@ http.createServer(function (req, res) {
   // PORTÃO DE PERMISSÃO POR TELA. Um ponto só, antes de qualquer rota. Rota
   // que não pertence a uma tela passa direto; /api/state é filtrado por
   // chave, no próprio handler dele.
+  // CONTA TRANCADA ATÉ TROCAR A SENHA. Vem antes do portão de telas: quem
+  // precisa trocar a senha não usa nada do sistema, nem o que ela teria
+  // permissão de usar.
+  if (bloqueioDeTrocaDeSenha(req, res, urlPath, autenticado)) return;
+
   if (!permitirRota(req, res, urlPath, req.method, autenticado)) return;
 
   // ---- API: LOGIN (verificação REAL no servidor) ----
@@ -1989,10 +2212,15 @@ http.createServer(function (req, res) {
       const login = String((body && body.login) || '').trim().toLowerCase();
       const senha = String((body && body.senha) || '');
       if (!login) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
+      const ipLogin = ipDaReq(req);
+      if (!podeTentarLoginIp(ipLogin)) { responderJson(res, 429, { ok: false, motivo: 'bloqueado_ip' }); return; }
       if (!podeTentarLogin(login)) { responderJson(res, 429, { ok: false, motivo: 'bloqueado' }); return; }
       const st = lerEstadoParaGravar();
       const u = ((st.dados && st.dados.funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === login; });
-      if (!u || !senhaConfere(senha, u.senha)) { registrarFalhaLogin(login); responderJson(res, 401, { ok: false, motivo: 'credenciais' }); return; }
+      if (!u || !senhaConfere(senha, u.senha)) {
+        registrarFalhaLogin(login); registrarFalhaLoginIp(ipLogin);
+        responderJson(res, 401, { ok: false, motivo: 'credenciais' }); return;
+      }
       // Contas MESTRE (joaobalaf/admin) NUNCA são bloqueadas por status — sempre entram para administrar.
       if (!ehMestreLogin(u.login)) {
         if (u.status === 'aguardando_aprovacao') { responderJson(res, 403, { ok: false, motivo: 'aprovacao' }); return; }
@@ -2000,17 +2228,21 @@ http.createServer(function (req, res) {
         if (u.bloqueadoLogin) { responderJson(res, 403, { ok: false, motivo: 'bloqueado_admin' }); return; }
       }
       limparFalhasLogin(login);
+      limparFalhasLoginIp(ipLogin);
 
-      // Contas antigas guardam só o hash da senha (que é irreversível). Aqui, no login,
-      // é o ÚNICO momento em que o servidor vê a senha em texto — então guardamos, para
-      // o admin conseguir consultar depois. A pessoa NÃO precisa trocar de senha.
-      if (!u.senhaVisivel) {
+      // O login é o ÚNICO momento em que o servidor vê a senha em texto. Antes
+      // ele aproveitava para GUARDAR esse texto (senhaVisivel), para o admin
+      // poder consultar depois — ou seja, o state.json tinha a senha de todo
+      // mundo legível. Agora acontece o contrário: aproveita para REGRAVAR a
+      // senha em scrypt e apagar qualquer texto puro que tenha sobrado.
+      if (senhaPrecisaMigrar(u.senha) || u.senhaVisivel) {
         comTrava(function () {
           const st2 = lerEstadoParaGravar();
           const d2 = st2.dados || {};
           const alvo = (d2.funcionarios || []).find(function (f) { return (f.login || '').toLowerCase() === login; });
-          if (alvo && !alvo.senhaVisivel) {
-            alvo.senhaVisivel = senha;
+          if (alvo) {
+            if (senhaPrecisaMigrar(alvo.senha)) alvo.senha = hashSenhaForte(senha);
+            delete alvo.senhaVisivel;
             try { gravarEstado({ dados: d2, version: (st2.version || 0) + 1, atualizadoEm: Date.now() }); } catch (e) {}
           }
         });
@@ -2023,10 +2255,16 @@ http.createServer(function (req, res) {
       // Entrou com uma senha que esta publica no GitHub: a sessao vale (senao a
       // pessoa nem conseguiria trocar), mas a tela vai exigir a troca antes de
       // liberar o sistema.
-      const trocaObrigatoria = senhaEhPublica(senha);
-      if (trocaObrigatoria) console.warn('[RT] ' + u.login + ' entrou com senha publica — troca exigida.');
+      // Três motivos para exigir a troca: a senha está na lista das que
+      // vazaram, a conta foi marcada na rotação geral, ou alguém redefiniu a
+      // senha dela (senha que outra pessoa conhece não serve).
+      const trocaObrigatoria = senhaEhPublica(senha) || u.precisaTrocarSenha === true;
+      if (trocaObrigatoria) console.warn('[RT] ' + u.login + ' precisa trocar a senha antes de usar o sistema.');
       res.writeHead(200, Object.assign({ 'Content-Type': 'application/json; charset=utf-8', 'Set-Cookie': cookie }, SECURITY_HEADERS));
-      res.end(JSON.stringify({ ok: true, user: semSenha, trocaObrigatoria: trocaObrigatoria }));
+      res.end(JSON.stringify({
+        ok: true, user: semSenha, trocaObrigatoria: trocaObrigatoria,
+        avisoTroca: trocaObrigatoria ? MENSAGEM_TROCA_SENHA : ''
+      }));
     });
     return;
   }
@@ -2047,8 +2285,12 @@ http.createServer(function (req, res) {
     const st = lerEstadoParaGravar();
     const u = ((st.dados && st.dados.funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === s.login; });
     if (!u) { responderJson(res, 401, { ok: false }); return; }
-    const semSenha = Object.assign({}, u); delete semSenha.senha;
-    responderJson(res, 200, { ok: true, user: semSenha });
+    const semSenha = Object.assign({}, u); delete semSenha.senha; delete semSenha.senhaVisivel;
+    responderJson(res, 200, {
+      ok: true, user: semSenha,
+      precisaTrocarSenha: u.precisaTrocarSenha === true,
+      avisoTroca: u.precisaTrocarSenha === true ? MENSAGEM_TROCA_SENHA : ''
+    });
     return;
   }
 
@@ -2062,7 +2304,7 @@ http.createServer(function (req, res) {
       if (err) { responderJson(res, 400, { ok: false }); return; }
       const atual = String((body && body.senhaAtual) || '');
       const nova  = String((body && body.senhaNova) || '');
-      if (!atual || nova.length < 6) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
+      if (!atual) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
 
       comTrava(function () {
         const st = lerEstadoParaGravar(); const d = st.dados || {};
@@ -2074,10 +2316,12 @@ http.createServer(function (req, res) {
         // A "senha atual" é a que estiver valendo agora — inclusive se o admin acabou
         // de redefinir. Quem troca é sempre o dono da conta.
         if (!senhaConfere(atual, u.senha)) { responderJson(res, 403, { ok: false, motivo: 'senha_atual' }); return; }
-        if (senhaConfere(nova, u.senha))   { responderJson(res, 400, { ok: false, motivo: 'igual' }); return; }
+        const regra = politicaSenha(nova, { atual: u.senha, login: u.login });
+        if (!regra.ok) { responderJson(res, 400, { ok: false, motivo: regra.motivo, aviso: MOTIVO_SENHA[regra.motivo] }); return; }
 
-        u.senha = hashSenhaServer(nova);
-        u.senhaVisivel = nova;   // o admin continua conseguindo consultar
+        u.senha = hashSenhaForte(nova);
+        delete u.senhaVisivel;          // nunca mais texto puro guardado
+        u.precisaTrocarSenha = false;   // trocou: está liberado
 
         if (!Array.isArray(d.logs)) d.logs = [];
         d.logs.unshift({
@@ -2091,6 +2335,90 @@ http.createServer(function (req, res) {
         responderJson(res, 200, { ok: true });
       }, res);
     });
+    return;
+  }
+
+  // ---- A TROCA OBRIGATÓRIA: a pessoa está logada, mas trancada ------------
+  // Não pede a senha antiga de propósito: ela acabou de provar quem é no
+  // login, e metade das contas chegou aqui justamente porque a senha antiga
+  // vazou ou foi definida por outra pessoa.
+  if (urlPath === '/api/trocar-senha-obrigatoria' && req.method === 'POST') {
+    if (!autenticado) { responderJson(res, 401, { ok: false }); return; }
+    const requerente = usuarioDaReq(req);
+    if (!requerente) { responderJson(res, 401, { ok: false }); return; }
+    lerCorpo(req, function (err, body) {
+      if (err) { responderJson(res, 400, { ok: false }); return; }
+      const nova = String((body && body.senhaNova) || '');
+      const confirma = String((body && body.senhaConfirma) || '');
+      if (nova !== confirma) {
+        responderJson(res, 400, { ok: false, motivo: 'confirmacao', aviso: 'As duas senhas precisam ser iguais.' });
+        return;
+      }
+      comTrava(function () {
+        const st = lerEstadoParaGravar(); const d = st.dados || {};
+        const u = (d.funcionarios || []).find(function (f) {
+          return (f.login || '').toLowerCase() === (requerente.login || '').toLowerCase();
+        });
+        if (!u) { responderJson(res, 404, { ok: false }); return; }
+
+        const regra = politicaSenha(nova, { atual: u.senha, login: u.login });
+        if (!regra.ok) { responderJson(res, 400, { ok: false, motivo: regra.motivo, aviso: MOTIVO_SENHA[regra.motivo] }); return; }
+
+        u.senha = hashSenhaForte(nova);
+        delete u.senhaVisivel;
+        u.precisaTrocarSenha = false;
+        u.senhaTrocadaEm = Date.now();
+
+        if (!Array.isArray(d.logs)) d.logs = [];
+        d.logs.unshift({
+          id: 'log-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+          data: new Date().toLocaleString('pt-BR'),
+          usuario: u.nome || u.login,
+          acao: 'Trocou a senha na troca obrigatória (vazamento mundial). As outras sessões dela foram encerradas.',
+          categoria: 'seguranca',
+          ip: ipDaReq(req)
+        });
+        try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); } catch (e) {}
+
+        // DERRUBA AS OUTRAS SESSÕES. Se a senha antiga vazou, quem estava
+        // dentro com ela continuaria dentro — trocar a senha não expulsaria
+        // ninguém. A sessão de agora (deste navegador) é a única que fica.
+        const meuToken = tokenDaReq(req);
+        let derrubadas = 0;
+        Object.keys(sessions).forEach(function (tok) {
+          const sess = sessions[tok];
+          if (!sess || tok === meuToken) return;
+          if (String(sess.login || '').toLowerCase() === (u.login || '').toLowerCase()) {
+            delete sessions[tok]; derrubadas++;
+          }
+        });
+        if (derrubadas) salvarSessions();
+        responderJson(res, 200, { ok: true, sessoesDerrubadas: derrubadas });
+      }, res);
+    });
+    return;
+  }
+
+  // ---- O admin exige a troca de senha de TODO MUNDO de novo ---------------
+  if (urlPath === '/api/exigir-troca-senha' && req.method === 'POST') {
+    if (!autenticado) { responderJson(res, 401, { ok: false }); return; }
+    const quemPede = usuarioDaReq(req);
+    if (!ehAdminDeAcesso(quemPede)) { responderJson(res, 403, { ok: false, motivo: 'sem_permissao' }); return; }
+    comTrava(function () {
+      const st = lerEstadoParaGravar(); const d = st.dados || {};
+      const quantas = marcarTodosParaTrocarSenha(d, 'manual-' + Date.now());
+      if (!Array.isArray(d.logs)) d.logs = [];
+      d.logs.unshift({
+        id: 'log-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+        data: new Date().toLocaleString('pt-BR'),
+        usuario: quemPede.nome || quemPede.login,
+        acao: 'Exigiu a troca de senha de todas as contas (' + quantas + ').',
+        categoria: 'seguranca',
+        ip: ipDaReq(req)
+      });
+      try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); } catch (e) {}
+      responderJson(res, 200, { ok: true, marcadas: quantas });
+    }, res);
     return;
   }
 
@@ -2218,7 +2546,9 @@ http.createServer(function (req, res) {
       if (err) { responderJson(res, 400, { ok: false }); return; }
       const token = String((body && body.token) || '');
       const nova = String((body && body.senha) || '');
-      if (!token || nova.length < 6) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
+      if (!token) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
+      const regraDef = politicaSenha(nova, {});
+      if (!regraDef.ok) { responderJson(res, 400, { ok: false, motivo: regraDef.motivo, aviso: MOTIVO_SENHA[regraDef.motivo] }); return; }
 
       limparPedidos();
       const p = pedidos.find(function (x) { return x.token === token; });
@@ -2231,9 +2561,10 @@ http.createServer(function (req, res) {
         const u = ((d.funcionarios) || []).find(function (f) { return (f.login || '').toLowerCase() === p.login; });
         if (!u) { responderJson(res, 404, { ok: false }); return; }
 
-        u.senha = hashSenhaServer(nova);
-        u.senhaVisivel = nova;          // o admin continua conseguindo consultar
+        u.senha = hashSenhaForte(nova);
+        delete u.senhaVisivel;
         u.bloqueadoLogin = false;
+        u.precisaTrocarSenha = false;   // acabou de escolher uma senha nova
 
         if (!Array.isArray(d.logs)) d.logs = [];
         d.logs.unshift({
@@ -2276,7 +2607,7 @@ http.createServer(function (req, res) {
         if (pendentes >= 30) { responderJson(res, 429, { ok: false, motivo: 'limite' }); return; }
         d.funcionarios.push({
           id: _novoIdServidor('func'), nome: nome, email: '', telefone: telefone, login: login,
-          senha: hashSenhaServer(senha), senhaVisivel: senha,
+          senha: hashSenhaForte(senha),
           departamento: depto, departamentoSolicitado: depto, cargo: 'Colaborador em Aprovação',
           instituicao: instituicao,
           status: 'aguardando_aprovacao', dataSolicitacao: new Date().toLocaleString('pt-BR'),
@@ -2297,15 +2628,20 @@ http.createServer(function (req, res) {
       if (err) { responderJson(res, 400, { ok: false }); return; }
       const funcId = String((body && body.funcId) || '');
       const nova = String((body && body.novaSenha) || '');
-      if (!funcId || nova.length < 4) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
+      if (!funcId) { responderJson(res, 400, { ok: false, motivo: 'dados' }); return; }
+      const regraReset = politicaSenha(nova, {});
+      if (!regraReset.ok) { responderJson(res, 400, { ok: false, motivo: regraReset.motivo, aviso: MOTIVO_SENHA[regraReset.motivo] }); return; }
       comTrava(function () {
         const st = lerEstadoParaGravar(); const d = st.dados || {};
         const alvo = (d.funcionarios || []).find(function (f) { return f.id === funcId; });
         if (!alvo) { responderJson(res, 404, { ok: false }); return; }
         if (!podeVerSenhaDe(requester, alvo)) { responderJson(res, 403, { ok: false, motivo: 'sem_permissao' }); return; }
-        alvo.senha = hashSenhaServer(nova);
-        alvo.senhaVisivel = nova;
+        alvo.senha = hashSenhaForte(nova);
+        delete alvo.senhaVisivel;
         alvo.bloqueadoLogin = false;
+        // Senha definida por OUTRA pessoa é provisória: o dono troca no
+        // próximo login e aí ninguém mais conhece a senha dele.
+        alvo.precisaTrocarSenha = true;
         try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); responderJson(res, 200, { ok: true }); }
         catch (e) { responderJson(res, 500, { ok: false }); }
       }, res);
@@ -2328,27 +2664,14 @@ http.createServer(function (req, res) {
 
         let precisaGravar = false;
 
-        // A senha pode vir de três situações diferentes:
-        //  1) senhaVisivel guardada (cadastro novo, redefinição, ou login já capturado);
-        //  2) conta ANTIGA com a senha em texto puro no campo 'senha' (antes do hash) —
-        //     dá para revelar e já aproveitamos para guardar em senhaVisivel;
-        //  3) só o hash SHA-256: é via de mão única, NÃO tem como reverter. Nesse caso a
-        //     senha aparece sozinha assim que a pessoa fizer o próximo login (o servidor
-        //     captura no /api/login). Ela não precisa trocar de senha.
-        let senhaRevelada = alvo.senhaVisivel || null;
-        let motivo = null;
-
-        if (!senhaRevelada) {
-          const armazenada = String(alvo.senha || '');
-          const ehHash = armazenada.length === 64 && /^[0-9a-f]{64}$/i.test(armazenada);
-          if (armazenada && !ehHash) {
-            senhaRevelada = armazenada;
-            alvo.senhaVisivel = armazenada;
-            precisaGravar = true;
-          } else {
-            motivo = 'aguardando_login';
-          }
-        }
+        // NÃO EXISTE MAIS SENHA PARA VER. A senha agora é guardada em scrypt,
+        // que é via de mão única, e o espelho em texto puro (senhaVisivel) foi
+        // apagado — era ele que fazia o state.json carregar a senha de todo
+        // mundo legível. Quem precisa dar acesso a alguém usa "Redefinir
+        // senha": define uma provisória, e o dono troca no próximo login.
+        let senhaRevelada = null;
+        let motivo = 'hash_forte';
+        if (alvo.senhaVisivel) { delete alvo.senhaVisivel; precisaGravar = true; }
 
         // Auditoria: registra a visualização (contas mestre são "fantasma" — não registram)
         if (requester && !ehMestreLogin(requester.login)) {
@@ -2358,7 +2681,8 @@ http.createServer(function (req, res) {
             id: 'log-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
             data: new Date().toLocaleString('pt-BR'),
             usuario: requester.nome || requester.login,
-            acao: 'Visualizou a senha de "' + (alvo.nome || alvo.login) + '" (' + (alvo.login || '') + ').',
+            acao: 'Tentou ver a senha de "' + (alvo.nome || alvo.login) + '" (' + (alvo.login || '') +
+                  ') — as senhas agora são guardadas com hash forte e não podem ser mostradas.',
             categoria: 'seguranca',
             ip: ip
           });
@@ -2369,7 +2693,7 @@ http.createServer(function (req, res) {
           try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); } catch (e) {}
         }
 
-        responderJson(res, 200, { ok: true, senha: senhaRevelada, motivo: motivo });
+        responderJson(res, 200, { ok: false, senha: null, motivo: motivo });
       }, res);
     });
     return;
@@ -5190,6 +5514,7 @@ http.createServer(function (req, res) {
     _fase('garantirAdminServidor', garantirAdminServidor);
     _fase('garantirCadastrosFinanceiro', garantirCadastrosFinanceiro);
     _fase('migrarDiariaFase2', migrarDiariaFase2);
+    _fase('rotacaoDeSenhas', rotacaoDeSenhasNoBoot);
     // O resumo entra na MESMA fila do garantirAdminServidor (comTrava), então
     // só roda depois que a carga inicial terminou — senão mostraria zero em tudo.
     comTrava(function () {

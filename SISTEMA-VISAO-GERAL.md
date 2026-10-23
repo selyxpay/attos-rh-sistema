@@ -195,6 +195,82 @@ continua salvando normalmente.
   fino de botões dentro das telas).
 - **Mestre**: logins `joaobalaf` e `admin` — acesso total.
 
+### 4.0 Como a senha é guardada (e por que não existe mais "ver senha")
+
+**scrypt com sal, uma vez por pessoa.** O formato gravado no campo `senha` é:
+
+```
+scrypt$<N>$<r>$<p>$<sal em hex>$<chave em hex>
+```
+
+Guardar os parâmetros junto é o que permite endurecer o custo amanhã sem
+invalidar o que já está gravado. Hoje: N=16384, r=8, p=1 — cerca de **60 ms e
+16 MB por conferência**, que é lento de propósito: adivinhar senha em massa
+deixa de ser viável. A comparação usa `crypto.timingSafeEqual`.
+
+**O que havia antes, e por que era grave:**
+
+| Antes | Problema |
+|---|---|
+| `senha` = **SHA-256 sem sal** | rápido de calcular e sem sal: senha curta ou numérica se quebra fora do sistema em pouco tempo, e duas pessoas com a mesma senha tinham o mesmo hash |
+| `senhaVisivel` = **a senha em texto puro** | o login capturava a senha digitada e **guardava**, para o admin poder consultar. Ou seja: o `state.json` carregava a senha de todo mundo legível, e ele é o arquivo que mais circula (backup, cópia para a máquina de quem programa, 16 MB trafegando) |
+
+Hoje: `senhaVisivel` **não existe mais** — é apagada de toda conta na subida, e
+nenhuma rota volta a gravá-la. `/api/ver-senha` continua existindo, responde
+`ok:false, motivo:'hash_forte'` e **não mostra senha de ninguém**. Quem precisa
+dar acesso usa **Redefinir senha** (senha provisória), e o dono escolhe a
+definitiva no primeiro acesso.
+
+**Conferência e migração sozinha** (`senhaConfere`):
+
+1. começa com `scrypt$` → confere com scrypt;
+2. 64 caracteres hex → SHA-256 **legado**, aceita;
+3. qualquer outra coisa → texto puro **legado**, aceita.
+
+No login, quando a senha estava guardada do jeito antigo, o servidor
+**regrava em scrypt** na hora (é o único momento em que ele vê a senha em
+texto). A pessoa não percebe nada e continua com a mesma senha.
+
+**A regra da senha nova** (`politicaSenha`, um lugar só): mínimo **8**
+caracteres, pelo menos **uma letra** e **um número**, não pode ser igual à
+antiga, não pode ser igual ao login, e não pode estar na lista das que já
+foram públicas (`HASH_SENHAS_PUBLICAS`). Antes cada rota tinha o seu mínimo
+(4, 6, 8) — e a mais frouxa é que valia na prática.
+
+### 4.0.1 Troca obrigatória de senha
+
+Por que existe: em 21/10/2026 saiu uma falha crítica no mundo PHP
+(CVE-2026-109618 / CVE-2026-109619). Este sistema é Node e **não usa PHP**,
+mas senhas antigas dele já estiveram num repositório público — e o histórico do
+Git não se apaga. Então todas foram rotacionadas.
+
+| Peça | Onde | O que faz |
+|---|---|---|
+| Marcação | `rotacaoDeSenhasNoBoot()` | em **toda** subida, marca `precisaTrocarSenha = true` em quem tem senha guardada do jeito **antigo** e ainda não está marcado. Idempotente por conta: quem já trocou (scrypt) não é marcado de novo, e conta que chegar depois (restauração de backup) é pega na subida seguinte |
+| Tranca | `bloqueioDeTrocaDeSenha()` | responde **423** em qualquer `/api/` enquanto a conta estiver marcada. Vem **antes** do portão de telas: quem precisa trocar não usa nem o que teria permissão de usar |
+| O que continua livre | `ROTAS_LIVRES_NA_TROCA` | login, logout, `/api/me`, `/api/time`, `/api/saude`, as rotas de troca de senha, as rotas **públicas** (ficha do candidato, diária, relatório por link) e o webhook da Meta. Arquivos da tela (não-`/api/`) passam, senão a tela da troca não carregaria |
+| A tela | `js/troca-senha.js` | monta a tela que tranca o sistema. Carregado **antes** do `app.js`: ele envelopa o `fetch` e, ao ver um 423, abre a tela na hora — vale para quem **já estava logado**, sem precisar conferir em cada uma das centenas de chamadas |
+| No login | `login.html` | o `/api/login` devolve `trocaObrigatoria` e a mensagem; a tela de troca aparece ali mesmo |
+| Troca | `POST /api/trocar-senha-obrigatoria` | **não pede a senha antiga** (a pessoa acabou de provar quem é no login, e metade chegou aqui porque a senha antiga vazou). Grava em scrypt, limpa a marca, registra na Auditoria e **derruba as outras sessões** daquela pessoa |
+| Botão do admin | `POST /api/exigir-troca-senha` | marca **todas** as contas de novo, inclusive a de quem clicou. Fica em Funcionários: "Exigir troca de senha de todos" |
+
+Detalhe que vale lembrar: **derrubar as outras sessões** é parte da correção.
+Sem isso, quem já estava dentro com a senha vazada continuaria dentro —
+trocar a senha não expulsaria ninguém.
+
+**Senha que outra pessoa define é provisória.** Vale para `/api/reset-senha` e
+para o cadastro de colaborador pela tela de Funcionários (que chega pelo
+`POST /api/state` com o hash feito no navegador): a conta nasce com
+`precisaTrocarSenha = true`, o dono escolhe a dele no primeiro acesso, e aí
+**ninguém mais conhece a senha dele**.
+
+**Testado por:** suíte `senha` (`testes/senha-forte.cjs`), que sobe o servidor
+por conta própria porque parte da prova é o que acontece **na subida** e depois
+de **reiniciar**: scrypt com sal, nenhuma senha em texto no `state.json`, a
+rotação mirando só o legado, instalação nova não trancando ninguém, 423 em todo
+o sistema, a regra da senha nova, as outras sessões caindo, a senha antiga
+deixando de valer, o botão do admin, a senha provisória e o limite por IP.
+
 ### 4.1 Acesso por tela (`js/telas.js`) — leia antes de mexer em permissão
 
 Arquivo **único**, carregado por `<script>` no navegador **e** por `require()`
@@ -1011,6 +1087,11 @@ tipo de erro que volta: se você mexer na área, confira que não reintroduziu.
 | `no such column` numa coluna que "existe" | `ALTER TABLE` rodando ANTES de o `CREATE TABLE` daquela tabela, no mesmo `criarTabelas`: falha calada no try/catch e só aparece na primeira mensagem de verdade |
 | "Já respondi" aparecendo errado | Comparar só o horário: `created_at` tem precisão de SEGUNDO e a resposta imediata cai no mesmo segundo. Desempatar pelo `id` |
 | Selo/etiqueta nova que não atualiza na tela | A atualização incremental compara linhas por uma ASSINATURA: campo que não entra nela fica velho na tela até a página recarregar |
+| Senha "protegida" que ainda dá para ler | Hash forte não serve para nada se existir um espelho da senha em texto puro ao lado (era o `senhaVisivel`). Procure o campo, não só o algoritmo |
+| Troca de senha que não expulsa ninguém | Trocar a senha não invalida sessão: quem estava dentro com a senha vazada continua dentro. Derrube as outras sessões da pessoa junto |
+| Rotação de senha que tranca a instalação nova | Marcar "todo mundo" trancaria os testes e qualquer deploy limpo. Mire em QUEM TEM SENHA ANTIGA — instalação nova já nasce em scrypt |
+| `replace()` comendo pedaço do arquivo num script de patch | `$&`, `$'` e `$1` têm significado no texto de substituição. Em patch, use `split(a).join(b)` |
+| Âncora de patch que não casa em `js/app.js` | Esse arquivo é **CRLF**; o resto do projeto é LF. Ajuste o fim de linha antes de procurar |
 | Regex que "come" letras dentro de um teste de tela | `\s` dentro de um template literal do `cdp.eval` vira `s`: a expressão virou `/s+/g` e o teste apagou os "s" do texto. Dentro do eval, `\\s` |
 | Mensagem velha passando na frente da nova | `ORDER BY` numa data gravada como texto: `"...T10:00"` é maior que `"... 23:00"` (o `T` vem depois do espaço). Ordene por `julianday(...)` |
 
@@ -1035,6 +1116,8 @@ whatsapp-lembretes.cjs       motor dos lembretes automaticos (fila, fuso, regras
 js/whatsapp-lembretes-ui.js  painel "Lembretes agendados"
 whatsapp-envio-grupo.cjs     motor do envio em grupo (fila, ritmo, janela)
 js/whatsapp-janela-ui.js     aba "Janela aberta" e o painel de envio
+js/troca-senha.js            tela que tranca o sistema ate a pessoa trocar a senha
+docs/SEGURANCA-VPS-COOLIFY.md  o que conferir na VPS e no Coolify (PHP, portas, variaveis)
 DATA_DIR/wa-midia/          midia que CHEGA do contato (fora da pasta publica)
 js/security.js               camadas extras de proteção no navegador
 js/data.js                   dados iniciais (NUNCA colocar senha aqui)
@@ -1076,9 +1159,11 @@ docs/                        deploy no Coolify, WhatsApp, equipamentos
   expediente (seção 5.9).
 - Lista "Janela aberta" e envio em grupo só para quem está dentro das 24 horas
   (seção 5.10), e o selo de quem já recebeu disparo (seção 5.11).
+- Senha em scrypt, fim da senha em texto puro e troca obrigatória de todas as
+  senhas antigas (seções 4.0 e 4.0.1).
 - Testes automatizados **no repositório**: `node testes/rodar.cjs` sobe um
   servidor isolado numa porta livre (com pasta de dados descartável) por suíte,
-  e um Chrome sem janela nas suítes de tela. Hoje são 26 suítes, cobrindo
+  e um Chrome sem janela nas suítes de tela. Hoje são 27 suítes, cobrindo
   sincronização com duas sessões, segurança, permissão por tela, upload por
   conteúdo, bot, mensagens prontas e varredura das 25 abas no navegador.
   `node testes/rodar.cjs --lista` mostra todas; `node testes/rodar.cjs <nome>`

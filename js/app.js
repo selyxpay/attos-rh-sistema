@@ -598,6 +598,9 @@ async function ativarNuvem() {
       if (typeof criarSessaoComExpiracao === 'function') criarSessaoComExpiracao(me.user);
       else { try { localStorage.setItem('rt_logged_user', JSON.stringify(me.user)); } catch (e) {} }
       loggedUser = me.user;
+      // Conta marcada para trocar a senha: tranca a tela aqui mesmo, sem
+      // esperar a primeira requisicao tomar 423.
+      if (me.precisaTrocarSenha && window.RTTroca) RTTroca.mostrar(me.avisoTroca);
       // Confirma a exibição do app (esconde a tela de login interna, monta cabeçalho/menu)
       if (typeof verificarSessao === 'function') verificarSessao();
     }
@@ -3454,7 +3457,8 @@ function setupEventListeners() {
         email,
         login: loginVal.toLowerCase(),
         senha: senhaFinal,
-        senhaVisivel: senhaVal,   // senha visível para o admin (novo funcionário)
+        // senhaVisivel saiu: a senha em texto puro nao e guardada em lugar
+        // nenhum. O servidor grava so o scrypt (hashSenhaForte).
         departamento: depto,
         instituicao: depto === 'clinica' ? instituicao : '',
         nivelAcesso: depto === 'administracao' ? 'administrador' : 'comum',
@@ -6294,11 +6298,10 @@ function renderFuncionarios() {
           ${f.login}
           ${podeRedefinirSenha(f) ? `
           <div style="margin-top:3px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
-            <button class="btn btn-secondary btn-sm" style="padding:1px 7px;font-size:10px;" onclick="verSenhaFuncionario('${f.id}')"><i class="fa-solid fa-eye"></i> Ver senha</button>
-            <button class="btn btn-secondary btn-sm" style="padding:1px 7px;font-size:10px;" onclick="resetarSenhaFuncionario('${f.id}')"><i class="fa-solid fa-key"></i> Redefinir</button>
-            ${f.senhaConhecida === false
-              ? '<span title="Senha antiga (embaralhada). Aparece aqui assim que a pessoa fizer o próximo login — ela não precisa trocar de senha." style="font-size:9.5px;font-weight:600;color:#D97706;background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.3);padding:1px 6px;border-radius:8px;"><i class="fa-solid fa-hourglass-half"></i> aguardando login</span>'
-              : '<span title="A senha desta conta pode ser consultada." style="font-size:9.5px;font-weight:600;color:#059669;background:rgba(5,150,105,.12);border:1px solid rgba(5,150,105,.3);padding:1px 6px;border-radius:8px;"><i class="fa-solid fa-check"></i> disponível</span>'}
+            <button class="btn btn-secondary btn-sm" style="padding:1px 7px;font-size:10px;" onclick="resetarSenhaFuncionario('${f.id}')"><i class="fa-solid fa-key"></i> Redefinir senha</button>
+            ${f.precisaTrocarSenha
+              ? '<span title="Esta pessoa vai escolher uma senha nova no próximo acesso." style="font-size:9.5px;font-weight:600;color:#D97706;background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.3);padding:1px 6px;border-radius:8px;"><i class="fa-solid fa-hourglass-half"></i> vai trocar a senha</span>'
+              : '<span title="A senha é guardada embaralhada (scrypt). Nem o sistema consegue ler." style="font-size:9.5px;font-weight:600;color:#059669;background:rgba(5,150,105,.12);border:1px solid rgba(5,150,105,.3);padding:1px 6px;border-radius:8px;"><i class="fa-solid fa-shield-halved"></i> senha protegida</span>'}
           </div>` : ''}
         </td>
         <td>
@@ -6616,7 +6619,46 @@ function podeRedefinirSenha(f) {
   if (ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao') return true;
   return !!(loggedUser.podeVerSenhas && f.departamento === loggedUser.departamento);
 }
+// NÃO EXISTE MAIS "VER SENHA". A senha agora é guardada com scrypt (via de
+// mão única) e o espelho em texto puro foi apagado — era ele que fazia o
+// state.json carregar a senha de todo mundo legível. Quem precisa dar acesso
+// usa "Redefinir senha": define uma provisória e a pessoa troca no primeiro
+// acesso. A função continua existindo porque telas antigas podem chamá-la.
 window.verSenhaFuncionario = async function (funcId) {
+  const func = (state.funcionarios || []).find(f => f.id === funcId);
+  const nome = func ? func.nome : 'esta conta';
+  alert(
+    'A senha de "' + nome + '" não pode ser mostrada.\n\n' +
+    'As senhas agora são guardadas embaralhadas (scrypt), e isso é de mão única: ' +
+    'nem o sistema consegue desembaralhar. Foi exatamente assim que paramos de ' +
+    'guardar a senha de todo mundo em texto puro.\n\n' +
+    'O QUE FAZER: use "Redefinir senha", combine a senha provisória com a pessoa, ' +
+    'e ela escolhe a definitiva no primeiro acesso.'
+  );
+};
+
+// O admin exige a troca de senha de TODO MUNDO de novo.
+window.exigirTrocaDeSenhaDeTodos = async function () {
+  if (!confirm(
+    'Exigir que TODAS as contas troquem a senha no próximo acesso?\n\n' +
+    'Isso inclui a sua: você também vai trocar agora.\n\n' +
+    'Use quando desconfiar de vazamento de senha.'
+  )) return;
+  try {
+    const r = await fetch('/api/exigir-troca-senha', { method: 'POST', credentials: 'same-origin' });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 200 && d.ok) {
+      alert(d.marcadas + ' conta(s) vão trocar a senha no próximo acesso.\n\nA sua tela vai pedir a troca agora.');
+      window.location.reload();
+      return;
+    }
+    if (r.status === 403) { alert('Só a administração pode exigir a troca de senha de todos.'); return; }
+    alert('Não consegui marcar as contas. Tente de novo.');
+  } catch (e) { alert('Erro de conexão. Tente novamente.'); }
+};
+
+// Guardada para referência: era isto que mostrava a senha de alguém.
+window._verSenhaAntigo = async function (funcId) {
   const func = (state.funcionarios || []).find(f => f.id === funcId);
   try {
     const r = await fetch('/api/ver-senha', {
@@ -6651,9 +6693,10 @@ window.verSenhaFuncionario = async function (funcId) {
 window.resetarSenhaFuncionario = async function (funcId) {
   const func = (state.funcionarios || []).find(f => f.id === funcId);
   if (!func) return;
-  const nova = prompt(`Definir NOVA senha para "${func.nome}" (mínimo 4 caracteres):`);
+  const nova = prompt(`Definir uma senha PROVISÓRIA para "${func.nome}"\n(pelo menos 8 caracteres, com letras e números):`);
   if (nova == null) return;
-  if (String(nova).length < 4) { alert('A senha precisa ter ao menos 4 caracteres.'); return; }
+  const critica = (window.RTTroca && RTTroca.criticar) ? RTTroca.criticar(nova, nova) : '';
+  if (critica) { alert(critica); return; }
   try {
     const r = await fetch('/api/reset-senha', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -6661,7 +6704,11 @@ window.resetarSenhaFuncionario = async function (funcId) {
     });
     const d = await r.json().catch(() => ({}));
     if (r.status === 200 && d.ok) {
-      alert(`Senha de "${func.nome}" definida como:\n\n${nova}\n\nAnote e passe para o funcionário.`);
+      alert(
+        'Senha PROVISÓRIA de "' + func.nome + '":\n\n' + nova + '\n\n' +
+        'Passe para a pessoa. No primeiro acesso ela vai escolher a senha definitiva, ' +
+        'e aí ninguém mais conhece a senha dela.'
+      );
       try { const nuvem = await RTCloud.loadState(); if (nuvem) { state = nuvem; renderFuncionarios(); } } catch (e) {}
     } else if (r.status === 403) {
       alert('Você não tem permissão para redefinir a senha deste funcionário (só do seu departamento).');
