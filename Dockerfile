@@ -55,6 +55,25 @@ COPY img ./img
 ENV NODE_ENV=production
 ENV PORT=80
 ENV DATA_DIR=/data
+
+# TETO DE MEMÓRIA DO NODE (metade da proteção; a outra está no Coolify).
+# --------------------------------------------------------------------------
+# O que esta linha faz: limita o monte (heap) do JavaScript a 512 MB. Se algo
+# dentro do sistema sair comendo memória — uma cópia a mais do state.json, uma
+# mídia grande, um laço ruim — o Node morre DENTRO do contêiner, o Coolify o
+# levanta de novo em segundos e a VPS continua de pé. Sem teto, o processo
+# cresce até o kernel começar a matar coisa no servidor inteiro: aí caem o
+# site, o painel do Coolify e o agente da Hostinger ao mesmo tempo.
+#
+# Por que 512 MB: o uso real é de ~95 MB de heap e ~200 MB de RSS, com o
+# state.json em 16 MB. 512 MB dá folga de cinco vezes e ainda assim é um teto.
+#
+# O QUE ESTA LINHA NÃO FAZ: ela não limita o contêiner, só o heap do Node
+# (buffers de mídia e o SQLite ficam fora dela). O limite DURO é no Coolify:
+#   Coolify → aplicação R&T → Advanced/Resource Limits → Memory Limit: 768M
+# Com os dois, nem o Node nem o contêiner conseguem derrubar a VPS.
+ENV NODE_OPTIONS=--max-old-space-size=512
+
 EXPOSE 80
 
 # Declara /data como volume: reforça que esta pasta é persistente e não deve
