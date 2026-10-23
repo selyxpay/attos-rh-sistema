@@ -1283,3 +1283,17 @@ body.wa-tela-cheia { overflow: hidden; }
   .wa-jan-seletor select { flex: 1; max-width: none; }
   .wa-jan-hist-item button { flex: 1 0 100%; }
 }
+
+/* ── Gravador de áudio (passos do bot, fora do expediente, prontas) ─────── */
+.bot-btn-gravar { border-color: #059669; color: #059669; }
+.bot-btn-gravar:hover { background: rgba(5,150,105,.08); }
+.bot-audio-previa { width: 100%; max-width: 340px; margin-top: 8px; display: block; }
+.wa-prontas-audio { width: 100%; max-width: 320px; margin-top: 7px; display: block; }
+.wa-prontas-gravar {
+  margin-top: 7px; font-size: 12.5px; padding: 7px 11px;
+  display: inline-flex; align-items: center; gap: 7px;
+}
+@media (max-width: 760px) {
+  .bot-audio-previa, .wa-prontas-audio { max-width: none; }
+  .wa-prontas-gravar { width: 100%; justify-content: center; }
+}

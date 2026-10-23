@@ -1872,6 +1872,18 @@ try {
   waGrupo = null;
 }
 
+// Conversão do áudio GRAVADO NA TELA para OGG/Opus (mensagem de voz): EXTRA,
+// no try dele. Se faltar o arquivo ou o ffmpeg, a gravação pela tela avisa que
+// não dá e o envio de áudio por ARQUIVO continua funcionando igual.
+// ATENÇÃO: este arquivo PRECISA estar no COPY do Dockerfile (regra 16).
+let waAudio = null;
+try {
+  waAudio = require('./audio-voz.cjs');
+} catch (e) {
+  console.error('[Áudio] módulo NÃO carregou — gravar pela tela fica indisponível:', e.message);
+  waAudio = null;
+}
+
 // Variáveis de ambiente do WhatsApp
 const WA_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || '';
 const WA_APP_SECRET   = process.env.WHATSAPP_APP_SECRET   || '';
@@ -2144,8 +2156,9 @@ function _waEnviarMidiaPronta(conta, token, telefone, resp, legenda) {
   var nomeArq = path.basename(String(resp.arquivo || ''));
   var caminho = path.join(BOT_MIDIA_DIR, nomeArq);
   var ehDoc   = resp.tipoAnexo === 'documento';
-  var mime    = resp.mime || (ehDoc ? 'application/pdf' : 'image/jpeg');
-  var tipoMeta = ehDoc ? 'document' : 'image';
+  var ehAudio = resp.tipoAnexo === 'audio';
+  var mime    = resp.mime || (ehDoc ? 'application/pdf' : (ehAudio ? 'audio/ogg' : 'image/jpeg'));
+  var tipoMeta = waApi.tipoMetaDoAnexo(resp.tipoAnexo);
   if (!nomeArq || !fs.existsSync(caminho)) {
     return Promise.resolve({ ok: false, error: 'O anexo desta mensagem não está mais no servidor.' });
   }
@@ -2159,7 +2172,9 @@ function _waEnviarMidiaPronta(conta, token, telefone, resp, legenda) {
   var mandar = function (mediaId) {
     var envio = { id: mediaId };
     if (ehDoc) envio.filename = resp.nomeArquivo || nomeArq;
-    return waApi.sendMediaMessage(conta.phone_number_id, telefone, tipoMeta, envio, legenda, token);
+    // Áudio não leva legenda: a Meta recusa caption em mensagem de voz.
+    return waApi.sendMediaMessage(conta.phone_number_id, telefone, tipoMeta, envio,
+                                  ehAudio ? '' : legenda, token);
   };
   var cache = null;
   try { cache = waDb.bot.midiaCache(nomeArq, conta.id); } catch (e) { cache = null; }
@@ -2745,7 +2760,10 @@ http.createServer(function (req, res) {
       },
       lembretes: {
         modulo_carregado: !!waLembretes       // extra: idem
-      }
+      },
+      // Conversor do áudio gravado na tela. Com ffmpeg:false a gravação pela
+      // tela avisa e o envio por ARQUIVO continua funcionando.
+      audio_voz: waAudio ? waAudio.situacao() : { ffmpeg: false, modulo_carregado: false }
     });
     return;
   }
@@ -4624,7 +4642,7 @@ http.createServer(function (req, res) {
         };
 
         enviar.then(function (r) {
-          var tipo = temAnexo ? (resp.tipoAnexo === 'documento' ? 'document' : 'image') : 'text';
+          var tipo = temAnexo ? waApi.tipoMetaDoAnexo(resp.tipoAnexo) : 'text';
           registrar(tipo, texto, r && r.ok ? r.wamid : null,
             temAnexo ? '/api/whatsapp/respostas/midia/' + encodeURIComponent(resp.arquivo) : '');
           pausarBot();
@@ -4907,6 +4925,84 @@ http.createServer(function (req, res) {
           console.error('[Bot] falha ao gravar a mídia:', e.message);
           responderJson(res, 500, { ok: false, error: 'Falha ao gravar o arquivo.' });
         }
+      });
+      return;
+    }
+
+    // ÁUDIO GRAVADO NA TELA. Caminho separado do upload de arquivo de
+    // propósito: aqui o que chega é WEBM/Opus (o que o navegador grava) e
+    // PRECISA passar pelo ffmpeg para virar OGG/Opus, senão a Meta não mostra
+    // como mensagem de voz. O upload de arquivo continua existindo,
+    // inalterado, na rota acima.
+    if (urlPath === '/api/whatsapp/bot/audio-gravado' && req.method === 'POST') {
+      var uAg = waUsuarioTemPermissao(req, 'editar');
+      if (!uAg) { responderJson(res, 403, { ok: false, error: 'Sem permissão.' }); return; }
+      if (!waAudio) {
+        responderJson(res, 503, {
+          ok: false, motivo: 'sem_ffmpeg',
+          error: 'A gravação não pôde ser convertida: o conversor de áudio não está disponível no servidor. ' +
+                 'Envie o áudio como arquivo OGG/Opus, que continua funcionando.'
+        });
+        return;
+      }
+      lerCorpo(req, function (err, body) {
+        if (err) { responderJson(res, 400, { ok: false, error: 'corpo inválido' }); return; }
+        var mAg = /^data:([^;,]*)[^,]*,([\s\S]*)$/.exec((body && body.dataUrl) || '');
+        if (!mAg) { responderJson(res, 400, { ok: false, error: 'gravação inválida' }); return; }
+        var bufAg;
+        try { bufAg = Buffer.from(mAg[2], 'base64'); }
+        catch (e) { responderJson(res, 400, { ok: false, error: 'base64 inválido' }); return; }
+        if (!bufAg.length) { responderJson(res, 400, { ok: false, error: 'gravação vazia' }); return; }
+        if (bufAg.length > waAudio.LIMITE_ENTRADA) {
+          responderJson(res, 413, {
+            ok: false, motivo: 'grande',
+            error: 'A gravação passou de ' + Math.round(waAudio.LIMITE_ENTRADA / 1048576) + ' MB.'
+          });
+          return;
+        }
+        // A conversão roda FORA do caminho da resposta (o módulo tem fila de
+        // no máximo 2 processos): o event loop não fica preso aqui.
+        waAudio.converter(bufAg).then(function (r) {
+          if (!r || !r.ok) {
+            var status = r && r.motivo === 'sem_ffmpeg' ? 503
+                       : (r && r.motivo === 'ocupado' ? 429
+                       : (r && r.motivo === 'grande' ? 413 : 400));
+            responderJson(res, status, {
+              ok: false, motivo: (r && r.motivo) || 'falhou',
+              error: (r && r.erro) || 'Não consegui converter a gravação.'
+            });
+            return;
+          }
+          // Conferência final pelo CONTEÚDO: o que vai para o disco tem que
+          // ser OGG de verdade, não a palavra do ffmpeg.
+          var tipoSaida = detectarTipoReal(r.buffer);
+          if (tipoSaida !== 'ogg') {
+            responderJson(res, 500, { ok: false, error: 'A conversão saiu num formato inesperado (' + tipoSaida + ').' });
+            return;
+          }
+          var nomeAg = 'bot_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.ogg';
+          try {
+            fs.writeFileSync(path.join(BOT_MIDIA_DIR, nomeAg), r.buffer);
+          } catch (e) {
+            console.error('[Áudio] falha ao gravar:', e.message);
+            responderJson(res, 500, { ok: false, error: 'Falha ao gravar o arquivo.' });
+            return;
+          }
+          try {
+            waDb.audit.log({
+              user_login: uAg.login, user_name: uAg.nome, action: 'Gravou áudio pela tela',
+              details: String(body.destino || 'bot') + ' · ' + Math.round(bufAg.length / 1024) + ' KB gravados · ' +
+                       Math.round(r.buffer.length / 1024) + ' KB em OGG/Opus',
+              ip: waIpDaReq(req)
+            });
+          } catch (e) {}
+          responderJson(res, 200, {
+            ok: true, arquivo: nomeAg, tipo: 'ogg', mime: 'audio/ogg',
+            tipoAnexo: 'audio', tamanho: r.buffer.length, gravado: true
+          });
+        }).catch(function (e) {
+          responderJson(res, 500, { ok: false, error: 'Falha na conversão: ' + e.message });
+        });
       });
       return;
     }

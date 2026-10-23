@@ -142,12 +142,13 @@ async function enviarItem(item) {
   let r = null;
   try {
     if (item.arquivo) {
-      const ehDoc = item.tipo_anexo === 'documento';
+      const tipoMeta = _api.tipoMetaDoAnexo(item.tipo_anexo);
       const mediaId = await mediaIdDoArquivo(item.arquivo, item.account_id, item.mime, conta, token);
       const envio = { id: mediaId };
-      if (ehDoc) envio.filename = item.nome_arquivo || path.basename(item.arquivo);
+      if (tipoMeta === 'document') envio.filename = item.nome_arquivo || path.basename(item.arquivo);
+      // Mensagem de voz não leva legenda: a Meta recusa caption em áudio.
       r = await _api.sendMediaMessage(conta.phone_number_id, item.telefone,
-        ehDoc ? 'document' : 'image', envio, texto, token);
+        tipoMeta, envio, tipoMeta === 'audio' ? '' : texto, token);
     } else {
       r = await _api.sendTextMessage(conta.phone_number_id, item.telefone, texto, token);
     }

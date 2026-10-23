@@ -129,7 +129,7 @@
     const botoes = itens.map(function (r) {
       const t = esc(r.titulo || 'sem título');
       const anexo = r.arquivo
-        ? '<i class="fa-solid ' + (r.tipoAnexo === 'documento' ? 'fa-file-pdf' : 'fa-image') + ' wa-pronta-anexo"></i>'
+        ? '<i class="fa-solid ' + (r.tipoAnexo === 'documento' ? 'fa-file-pdf' : (r.tipoAnexo === 'audio' ? 'fa-microphone' : 'fa-image')) + ' wa-pronta-anexo"></i>'
         : '';
       const dica = fechada
         ? 'A janela de 24 horas fechou'
@@ -317,7 +317,7 @@
       });
       const j = await resp.json().catch(function () { return {}; });
       if (j && j.ok) {
-        const tipo = r.arquivo ? (r.tipoAnexo === 'documento' ? 'document' : 'image') : 'text';
+        const tipo = r.arquivo ? (r.tipoAnexo === 'documento' ? 'document' : (r.tipoAnexo === 'audio' ? 'audio' : 'image')) : 'text';
         const nova = {
           direction: 'outgoing', type: tipo, content: j.texto || r.texto || '',
           media_url: r.arquivo ? '/api/whatsapp/respostas/midia/' + encodeURIComponent(r.arquivo) : '',
@@ -403,7 +403,7 @@
       return '<button class="wa-prontas-item' + (i === 0 ? ' alvo' : '') + '" data-id="' + esc(r.id) + '" ' +
         (fechada ? 'disabled' : '') + ' onclick="respostasUsar(\'' + esc(r.id) + '\')">' +
         '<span class="wa-prontas-item-tit">' +
-          (r.arquivo ? '<i class="fa-solid ' + (r.tipoAnexo === 'documento' ? 'fa-file-pdf' : 'fa-image') + '"></i> ' : '') +
+          (r.arquivo ? '<i class="fa-solid ' + (r.tipoAnexo === 'documento' ? 'fa-file-pdf' : (r.tipoAnexo === 'audio' ? 'fa-microphone' : 'fa-image')) + '"></i> ' : '') +
           esc(r.titulo || 'sem título') + '</span>' +
         '<span class="wa-prontas-item-txt">' + esc(previa) + '</span>' +
         '</button>';
@@ -499,7 +499,7 @@
   function cardHTML(r, i, total, podeEditar) {
     const anexo = r.arquivo
       ? `<a class="wa-prontas-chip" href="/api/whatsapp/respostas/midia/${encodeURIComponent(r.arquivo)}" target="_blank" rel="noopener">
-           <i class="fa-solid ${r.tipoAnexo === 'documento' ? 'fa-file-pdf' : 'fa-image'}"></i>
+           <i class="fa-solid ${r.tipoAnexo === 'documento' ? 'fa-file-pdf' : (r.tipoAnexo === 'audio' ? 'fa-microphone' : 'fa-image')}"></i>
            ${esc(r.nomeArquivo || r.arquivo)}</a>`
       : '';
     return `
@@ -753,12 +753,18 @@
     const vars = VARIAVEIS.map(function (x) {
       return `<button class="wa-prontas-var" title="${esc(x.d)}" onclick="respostasInserirVar('${esc(x.v)}')">${esc(x.v)}</button>`;
     }).join('');
+    const iconeAnexo = f.tipoAnexo === 'documento' ? 'fa-file-pdf'
+                     : (f.tipoAnexo === 'audio' ? 'fa-microphone' : 'fa-image');
     const anexo = f.arquivo
       ? `<div class="wa-prontas-anexo-atual">
-           <i class="fa-solid ${f.tipoAnexo === 'documento' ? 'fa-file-pdf' : 'fa-image'}"></i>
+           <i class="fa-solid ${iconeAnexo}"></i>
            ${esc(f.nomeArquivo || f.arquivo)}
            <button class="wa-btn-mini perigo" title="Tirar o anexo" onclick="respostasTirarAnexo()"><i class="fa-solid fa-xmark"></i></button>
-         </div>`
+         </div>
+         ${f.tipoAnexo === 'audio'
+           ? `<audio class="wa-prontas-audio" controls preload="none"
+                src="/api/whatsapp/respostas/midia/${encodeURIComponent(f.arquivo)}"></audio>`
+           : ''}`
       : `<div class="wa-prontas-anexo-vazio">Sem anexo</div>`;
     return `
       <div class="wa-prontas-form">
@@ -773,9 +779,13 @@
         </div>
         <div class="wa-prontas-form-cols">
           <div class="wa-prontas-form-linha">
-            <label>Anexo <span class="wa-prontas-hint">(imagem ou PDF, opcional)</span></label>
+            <label>Anexo <span class="wa-prontas-hint">(imagem, PDF ou áudio — opcional, um por mensagem)</span></label>
             ${anexo}
-            <input type="file" id="resp-arquivo" accept="image/png,image/jpeg,image/webp,application/pdf" onchange="respostasAnexar(this)">
+            <input type="file" id="resp-arquivo" accept="image/png,image/jpeg,image/webp,application/pdf,audio/ogg,.ogg,.opus" onchange="respostasAnexar(this)">
+            <button type="button" class="mod-btn-secondary wa-prontas-gravar" onclick="respostasGravarAudio()">
+              <i class="fa-solid fa-microphone"></i> Gravar áudio
+            </button>
+            <small class="wa-prontas-hint">O áudio gravado vira <b>mensagem de voz</b> no WhatsApp. Ele ocupa o lugar do anexo desta mensagem.</small>
           </div>
           <div class="wa-prontas-form-linha curta">
             <label>Ordem</label>
@@ -917,6 +927,24 @@
     redesenhar();
   };
 
+  // GRAVAR NA HORA para a mensagem pronta. A mensagem tem UM anexo, então o
+  // áudio gravado ocupa o lugar dele (a tela avisa isso ao lado do botão).
+  window.respostasGravarAudio = function () {
+    if (!pode('editar') || !_form || !window.RTAudio) return;
+    lerForm();                      // não perde o que já foi digitado
+    RTAudio.gravar({
+      destino: 'pronta', titulo: 'Gravar áudio da mensagem',
+      aoUsar: function (res) {
+        _form.arquivo = res.arquivo;
+        _form.nomeArquivo = res.nomeArquivo;
+        _form.mime = res.mime;
+        _form.tipoAnexo = 'audio';
+        aviso('Áudio pronto. Clique em Salvar para guardar a mensagem.');
+        redesenhar();
+      }
+    });
+  };
+
   window.respostasAnexar = function (input) {
     if (!pode('editar') || !_form) return;
     const arq = input && input.files && input.files[0];
@@ -926,17 +954,20 @@
     const leitor = new FileReader();
     leitor.onload = async function () {
       try {
-        const r = await fetch('/api/whatsapp/respostas/midia', {
+        // Áudio vai pela rota do BOT (que aceita OGG); imagem e PDF seguem
+        // pela rota das prontas, como sempre.
+        const ehAudio = /audio|ogg|opus/i.test(arq.type || '') || /\.(ogg|opus)$/i.test(arq.name || '');
+        const r = await fetch(ehAudio ? '/api/whatsapp/bot/midia' : '/api/whatsapp/respostas/midia', {
           method: 'POST', credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dataUrl: leitor.result })
+          body: JSON.stringify(ehAudio ? { dataUrl: leitor.result, destino: 'audio' } : { dataUrl: leitor.result })
         });
         const j = await r.json().catch(function () { return {}; });
         if (!j.ok) { aviso(j.error || 'Não consegui enviar o arquivo.', true); return; }
         _form.arquivo = j.arquivo;
         _form.nomeArquivo = arq.name;
         _form.mime = j.mime;
-        _form.tipoAnexo = j.tipoAnexo;
+        _form.tipoAnexo = ehAudio ? 'audio' : j.tipoAnexo;
         aviso('Anexo pronto. Clique em Salvar para guardar a mensagem.');
         redesenhar();
       } catch (e) { aviso('Falha no envio: ' + (e.message || e), true); }

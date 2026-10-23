@@ -14,6 +14,12 @@ WORKDIR /app
 
 # --- Dependências primeiro (aproveita o cache do Docker) -------------------
 # O sql.js (banco do WhatsApp) é JavaScript puro: não precisa de compilador.
+# FFMPEG: converte o audio GRAVADO NA TELA (webm/opus, o unico formato que o
+# navegador grava) para OGG/Opus, que e o que a Meta mostra como MENSAGEM DE
+# VOZ. Sem ele o sistema sobe igual: a gravacao pela tela avisa que nao da e o
+# envio de audio por ARQUIVO continua funcionando (ver audio-voz.cjs).
+RUN apk add --no-cache ffmpeg
+
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
@@ -34,7 +40,7 @@ COPY verificar-sistema.cjs backup-dados.cjs limpar-fotos-embutidas.cjs reparar-l
 # server.cjs passe a exigir TEM que entrar aqui, senao o require falha e o
 # modulo morre em producao -- foi o que aconteceu com o whatsapp-bot.cjs.
 # A suite "imagem" confere isso automaticamente: rode os testes antes de subir.
-COPY whatsapp-db.cjs whatsapp-api.cjs whatsapp-webhook.cjs whatsapp-bot.cjs whatsapp-lembretes.cjs whatsapp-envio-grupo.cjs ./
+COPY whatsapp-db.cjs whatsapp-api.cjs whatsapp-webhook.cjs whatsapp-bot.cjs whatsapp-lembretes.cjs whatsapp-envio-grupo.cjs audio-voz.cjs ./
 # Ponte para o SEGUNDO WhatsApp (QR Code, serviço OpenWA à parte). Mesma regra:
 # se faltar ou não estiver configurado, só essa aba avisa — nada mais é afetado.
 COPY openwa.cjs ./

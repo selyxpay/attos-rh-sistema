@@ -895,6 +895,66 @@ pronta e por texto livre, e as 24 horas) e suíte `respostas-ui`, seção 9d (o
 selo na linha, a dica, o bloco "Últimos envios" com o botão, o seletor, o
 campo do nome e o aviso com o botão de pular como padrão).
 
+### 5.12 Áudio gravado na hora (mensagem de voz)
+
+O problema: a Meta só mostra o áudio como **mensagem de voz** se ele chegar em
+**OGG/Opus**. O navegador, por outro lado, só grava em **WEBM/Opus** (Chrome e
+Edge) ou OGG/Opus (Firefox). Então, sem conversão, gravar pela tela daria
+sempre no mesmo aviso que o upload de arquivo já dava: "a Meta exige OGG/Opus".
+
+Por isso a gravação tem um caminho **separado** do upload de arquivo, e os dois
+**convivem**: quem já tem um `.ogg` pronto anexa o arquivo como sempre; quem
+não tem, grava na hora.
+
+| Peça | Onde | O que faz |
+|---|---|---|
+| Gravador | `js/audio-gravador.js` | a tela de gravar: pede o microfone, mostra o tempo correndo, Parar, prévia para ouvir, e **Regravar / Descartar / Usar este áudio**. Carregado em três lugares com a MESMA tela |
+| Conversor | `audio-voz.cjs` | roda o ffmpeg: OGG/Opus **mono, 48 kHz**, no máximo **2 processos ao mesmo tempo**, fila de 8, corte em 190 s e tempo limite de 60 s |
+| Rota | `POST /api/whatsapp/bot/audio-gravado` | recebe o webm, converte, **confere pelo conteúdo** que saiu OGG mesmo, grava na pasta protegida e devolve `{arquivo, mime:'audio/ogg', tipoAnexo:'audio'}` |
+| Imagem | `Dockerfile` | `apk add --no-cache ffmpeg` + `audio-voz.cjs` no `COPY` (regra 16) |
+| Saúde | `/api/saude` | `audio_voz.ffmpeg` diz se o conversor está lá |
+
+**Nada é salvo antes do "Usar este áudio".** Gravar, ouvir, regravar e desistir
+não deixa rastro no servidor: a gravação vive só na memória da aba até a pessoa
+confirmar. Só então ela sobe, é convertida e vira arquivo.
+
+**Onde aparece o botão de microfone:**
+
+- **passos do bot** (tipo áudio) — e, pelo mesmo desenho, a sequência do
+  **modo fora do expediente**, já que as duas usam a mesma função com um
+  prefixo diferente;
+- **mensagens prontas** — ali a mensagem tem UM anexo, então o áudio ocupa o
+  lugar dele (a tela avisa isso ao lado do botão).
+
+Depois de escolhido, o passo mostra um **player** para ouvir e botões para
+**trocar** (outro arquivo ou outra gravação) ou **remover**.
+
+**Se o ffmpeg não estiver na imagem**, nada quebra: a rota responde
+`motivo:'sem_ffmpeg'`, a tela explica e manda usar o arquivo, e o upload de
+arquivo OGG continua funcionando igual. É a mesma regra dos outros módulos
+opcionais (regra 17).
+
+**Áudio nas mensagens prontas exigiu um ajuste nos três caminhos de envio.**
+Mensagem pronta, envio em grupo e lembrete decidiam o tipo da Meta cada um por
+conta própria, com `ehDoc ? 'document' : 'image'` — ou seja, áudio chegaria
+rotulado como imagem e a Meta recusaria. Agora os três chamam
+`waApi.tipoMetaDoAnexo()`, num lugar só, e **áudio vai sem legenda** (a Meta
+recusa caption em mensagem de voz).
+
+**Testado por:** suíte `audio` (`testes/audio-gravado.cjs`), que sobe o
+servidor várias vezes para provar com e sem conversor: a gravação virando OGG
+de verdade (conferido pelo conteúdo), o arquivo fora da pasta pública e só com
+login, o limite de tamanho, a conversão que falha sem derrubar o servidor, a
+saída que não é OGG sendo recusada, **no máximo 2 conversões ao mesmo tempo**
+(medido pelo diário de um dublê de ffmpeg), a convivência entre arquivo e
+gravação, e o bot mandando como `type: audio` **sem legenda** — tanto na
+sequência real quanto no botão "Enviar teste".
+
+Um detalhe do teste que vale saber: o `audio-voz.cjs` aceita `FFMPEG_BIN`
+apontando para um `.cjs`, que então roda pelo próprio node. É a costura que
+deixa a suíte provar fila, falha e formato errado **sem precisar de ffmpeg
+instalado** na máquina de quem programa (no Windows, não há).
+
 ---
 
 ## 6. Fluxo Financeiro em detalhe
@@ -1090,6 +1150,8 @@ tipo de erro que volta: se você mexer na área, confira que não reintroduziu.
 | Senha "protegida" que ainda dá para ler | Hash forte não serve para nada se existir um espelho da senha em texto puro ao lado (era o `senhaVisivel`). Procure o campo, não só o algoritmo |
 | Troca de senha que não expulsa ninguém | Trocar a senha não invalida sessão: quem estava dentro com a senha vazada continua dentro. Derrube as outras sessões da pessoa junto |
 | Rotação de senha que tranca a instalação nova | Marcar "todo mundo" trancaria os testes e qualquer deploy limpo. Mire em QUEM TEM SENHA ANTIGA — instalação nova já nasce em scrypt |
+| Áudio que chega como arquivo e não como voz | A Meta só toca como mensagem de voz se for OGG/Opus E for enviado com `type: audio` SEM caption. Navegador nenhum grava OGG direto (menos o Firefox): precisa converter |
+| `spawn` com entrada inválida derrubando o servidor | ffmpeg sai antes de ler tudo e o `stdin` estoura EPIPE. Sem `stdin.on('error')`, o processo do Node morre junto |
 | `replace()` comendo pedaço do arquivo num script de patch | `$&`, `$'` e `$1` têm significado no texto de substituição. Em patch, use `split(a).join(b)` |
 | Âncora de patch que não casa em `js/app.js` | Esse arquivo é **CRLF**; o resto do projeto é LF. Ajuste o fim de linha antes de procurar |
 | Regex que "come" letras dentro de um teste de tela | `\s` dentro de um template literal do `cdp.eval` vira `s`: a expressão virou `/s+/g` e o teste apagou os "s" do texto. Dentro do eval, `\\s` |
@@ -1118,6 +1180,9 @@ whatsapp-envio-grupo.cjs     motor do envio em grupo (fila, ritmo, janela)
 js/whatsapp-janela-ui.js     aba "Janela aberta" e o painel de envio
 js/troca-senha.js            tela que tranca o sistema ate a pessoa trocar a senha
 docs/SEGURANCA-VPS-COOLIFY.md  o que conferir na VPS e no Coolify (PHP, portas, variaveis)
+audio-voz.cjs                conversao do audio gravado para OGG/Opus (ffmpeg)
+js/audio-gravador.js         a tela de gravar audio (bot, fora do expediente, prontas)
+docs/VPS-TRAVOU.md           runbook de VPS travada (memoria, disco, Docker, limpeza)
 DATA_DIR/wa-midia/          midia que CHEGA do contato (fora da pasta publica)
 js/security.js               camadas extras de proteção no navegador
 js/data.js                   dados iniciais (NUNCA colocar senha aqui)
@@ -1163,7 +1228,7 @@ docs/                        deploy no Coolify, WhatsApp, equipamentos
   senhas antigas (seções 4.0 e 4.0.1).
 - Testes automatizados **no repositório**: `node testes/rodar.cjs` sobe um
   servidor isolado numa porta livre (com pasta de dados descartável) por suíte,
-  e um Chrome sem janela nas suítes de tela. Hoje são 27 suítes, cobrindo
+  e um Chrome sem janela nas suítes de tela. Hoje são 28 suítes, cobrindo
   sincronização com duas sessões, segurança, permissão por tela, upload por
   conteúdo, bot, mensagens prontas e varredura das 25 abas no navegador.
   `node testes/rodar.cjs --lista` mostra todas; `node testes/rodar.cjs <nome>`

@@ -201,6 +201,20 @@ async function sendTemplateMessage(phoneNumberId, to, templateName, language, co
  * @param {string} caption - Legenda (opcional, não suportada por áudio)
  * @param {string} accessToken - Token
  */
+// COMO O ANEXO DO SISTEMA VIRA O TIPO DA META. Um lugar só: os três caminhos
+// de envio (mensagem pronta, envio em grupo e lembrete) chamam esta função.
+// Antes cada um fazia "ehDoc ? 'document' : 'image'" por conta própria — então
+// áudio chegava rotulado como imagem e a Meta recusava.
+//   imagem    -> image
+//   documento -> document
+//   audio     -> audio   (é o que faz tocar como MENSAGEM DE VOZ)
+function tipoMetaDoAnexo(tipoAnexo) {
+  const t = String(tipoAnexo || '').toLowerCase();
+  if (t === 'documento' || t === 'document') return 'document';
+  if (t === 'audio' || t === 'áudio' || t === 'voz') return 'audio';
+  return 'image';
+}
+
 async function sendMediaMessage(phoneNumberId, to, mediaType, mediaData, caption, accessToken) {
   try {
     const url = META_API_BASE + '/' + phoneNumberId + '/messages';
@@ -555,6 +569,7 @@ module.exports = {
   sendTextMessage,
   sendTemplateMessage,
   sendMediaMessage,
+  tipoMetaDoAnexo,
   markAsRead,
   getMediaUrl,
   downloadMedia,

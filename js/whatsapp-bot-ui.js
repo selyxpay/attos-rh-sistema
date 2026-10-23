@@ -599,19 +599,30 @@
                    value="${esc(p.url)}" ${trava} onchange="${pre}MudarPasso(${i},'url', this.value)">`;
       } else {
         const temArquivo = !!p.arquivo;
+        const ehAudio = p.tipo === 'audio';
         corpo = `
           <div class="bot-arquivo">
             ${temArquivo
               ? `<span class="bot-arquivo-ok"><i class="fa-solid fa-check"></i> ${esc(p.nomeArquivo || p.arquivo)}</span>`
               : '<span class="bot-arquivo-nao">Nenhum arquivo enviado</span>'}
             ${podeEditar ? `<label class="bot-btn-arq">
-              <i class="fa-solid fa-upload"></i> ${temArquivo ? 'Trocar' : 'Enviar'}
-              <input type="file" hidden accept="${p.tipo === 'imagem' ? 'image/*' : (p.tipo === 'audio' ? 'audio/ogg,.ogg,.opus' : 'application/pdf,.pdf')}"
+              <i class="fa-solid fa-upload"></i> ${temArquivo ? 'Trocar arquivo' : 'Enviar arquivo'}
+              <input type="file" hidden accept="${p.tipo === 'imagem' ? 'image/*' : (ehAudio ? 'audio/ogg,.ogg,.opus' : 'application/pdf,.pdf')}"
                      onchange="${pre}SubirMidia(${i}, this)">
             </label>` : ''}
+            ${(podeEditar && ehAudio) ? `<button type="button" class="bot-btn-arq bot-btn-gravar" onclick="${pre}GravarAudio(${i})">
+              <i class="fa-solid fa-microphone"></i> ${temArquivo ? 'Gravar outro' : 'Gravar áudio'}
+            </button>` : ''}
+            ${(podeEditar && temArquivo) ? `<button type="button" class="bot-ic bot-ic-mau" title="Remover o áudio"
+              onclick="${pre}TirarMidia(${i})"><i class="fa-solid fa-xmark"></i></button>` : ''}
           </div>
-          ${p.tipo === 'audio'
-            ? '<small class="bot-ajuda">A Meta só mostra como <b>mensagem de voz</b> se o arquivo for OGG/Opus. Exporte nesse formato.</small>'
+          ${(ehAudio && temArquivo)
+            ? `<audio class="bot-audio-previa" controls preload="none"
+                 src="/api/whatsapp/bot/midia/${encodeURIComponent(p.arquivo)}"></audio>`
+            : ''}
+          ${ehAudio
+            ? '<small class="bot-ajuda">Grave aqui pelo microfone, ou envie um arquivo <b>OGG/Opus</b>. ' +
+              'A gravação é convertida no servidor para o formato que o WhatsApp toca como <b>mensagem de voz</b>.</small>'
             : `<textarea class="form-control bot-textarea" rows="2" placeholder="Legenda (opcional)" ${trava}
                  onchange="${pre}MudarPasso(${i},'legenda', this.value)">${esc(p.legenda)}</textarea>`}`;
       }
@@ -985,6 +996,28 @@
     leitor.readAsDataURL(arq);
   };
 
+  // Gravar na hora na sequência do FORA DO EXPEDIENTE. Mesmo gravador, mesma
+  // regra: entra no passo só depois de "Usar este áudio".
+  window.botForaGravarAudio = function (i) {
+    const fe = _foraDoRascunho();
+    if (!fe.passos[i] || !window.RTAudio) return;
+    RTAudio.gravar({
+      destino: 'fora', titulo: 'Gravar áudio do passo ' + (i + 1),
+      aoUsar: function (res) {
+        fe.passos[i].arquivo = res.arquivo;
+        fe.passos[i].nomeArquivo = res.nomeArquivo;
+        fe.passos[i].mime = res.mime;
+        redesenhar();
+      }
+    });
+  };
+  window.botForaTirarMidia = function (i) {
+    const fe = _foraDoRascunho();
+    if (!fe.passos[i]) return;
+    fe.passos[i].arquivo = ''; fe.passos[i].nomeArquivo = ''; fe.passos[i].mime = '';
+    redesenhar();
+  };
+
   // Lembretes do fora do expediente.
   window.botForaLembreteLigar = function (ligado) {
     const L = _foraDoRascunho().lembrete;
@@ -1203,6 +1236,28 @@
       } catch (e) { alert('Falha no envio: ' + (e.message || e)); }
     };
     leitor.readAsDataURL(arq);
+  };
+
+  // GRAVAR NA HORA. O arquivo só entra no passo depois de "Usar este áudio"
+  // (o gravador cuida disso) e, como o resto da aba, só vale ao salvar.
+  window.botGravarAudio = function (i) {
+    const c = rasc();
+    if (!c.passos[i] || !window.RTAudio) return;
+    RTAudio.gravar({
+      destino: 'bot', titulo: 'Gravar áudio do passo ' + (i + 1),
+      aoUsar: function (res) {
+        c.passos[i].arquivo = res.arquivo;
+        c.passos[i].nomeArquivo = res.nomeArquivo;
+        c.passos[i].mime = res.mime;
+        redesenhar();
+      }
+    });
+  };
+  window.botTirarMidia = function (i) {
+    const c = rasc();
+    if (!c.passos[i]) return;
+    c.passos[i].arquivo = ''; c.passos[i].nomeArquivo = ''; c.passos[i].mime = '';
+    redesenhar();
   };
 
   window.botAtualizarPainel = async function () { _painel = null; redesenhar(); };

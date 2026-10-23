@@ -73,6 +73,8 @@ const SUITES = [
     titulo: 'Imagem do Docker completa, peca opcional nao derruba o resto, contas sobrevivem' },
   { nome: 'backend',   arquivo: 'backend-fechado.cjs', servidor: true, navegador: false,
     titulo: 'Backend e pasta de dados fechados para a web (o vazamento do /server.cjs)' },
+  { nome: 'audio',     arquivo: 'audio-gravado.cjs',  servidor: false, navegador: false,
+    titulo: 'Audio gravado na tela: conversao para OGG/Opus, sem ffmpeg, fila e envio como voz' },
   { nome: 'senha',     arquivo: 'senha-forte.cjs',    servidor: false, navegador: false,
     titulo: 'Senha em scrypt e troca obrigatoria (sobe o servidor por conta propria)' },
   { nome: 'seguranca', arquivo: 'seguranca.cjs',      servidor: true,  navegador: false, semente: sementeAcesso,
