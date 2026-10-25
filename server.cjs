@@ -26,7 +26,36 @@ const crypto = require('crypto');
       process.env[m[1]] = v;
     });
     console.log('[RT] .env carregado.');
-  } catch (e) { console.error('[RT] Falha ao ler .env:', e.message); }
+  } catch (e) { console.error('[ATTOS] Falha ao ler .env:', e.message); }
+})();
+
+// ── ADMIN_SENHA É OBRIGATÓRIA ──────────────────────────────────────────────
+// É dela que sai a senha da conta `admin`. Sem a variável, a conta nascia SEM
+// SENHA: ninguém entrava nela, o sistema subia assim mesmo e o problema só
+// aparecia quando alguém tentava usar o painel. Deploy mal configurado agora
+// para na hora, com o motivo na tela, em vez de virar um sistema meio aberto.
+//
+// Se esta mensagem apareceu num sistema que JÁ ESTAVA no ar: nada foi perdido.
+// Defina ADMIN_SENHA (Coolify → Environment Variables, ou o .env na máquina
+// local) e suba de novo. A senha que cada pessoa já usa não é afetada — a
+// variável só vale para a conta `admin`, e só quando ela ainda não tem senha.
+(function exigirAdminSenha() {
+  if (String(process.env.ADMIN_SENHA || '').trim()) return;
+  console.error('');
+  console.error('==========================================================================');
+  console.error('  ATTOS RH — NAO SUBI: a variavel ADMIN_SENHA esta vazia.');
+  console.error('--------------------------------------------------------------------------');
+  console.error('  E dela que sai a senha da conta "admin". Sem ela, a conta nasce sem');
+  console.error('  senha e ninguem consegue entrar no painel.');
+  console.error('');
+  console.error('  COMO RESOLVER');
+  console.error('    Na VPS:     Coolify -> a aplicacao -> Environment Variables');
+  console.error('                ADMIN_SENHA=<uma senha forte>   e faca o redeploy.');
+  console.error('    Na sua maquina:  escreva ADMIN_SENHA=<senha> no arquivo .env,');
+  console.error('                     ou rode  ADMIN_SENHA=\'...\' node server.cjs');
+  console.error('==========================================================================');
+  console.error('');
+  process.exit(1);
 })();
 
 const PORT = Number(process.env.PORT) || 3000;

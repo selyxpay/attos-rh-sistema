@@ -13,17 +13,24 @@ em produção.
 
 ```bash
 npm install          # uma dependência só: sql.js (SQLite do módulo WhatsApp)
+cp .env.example .env # e preencha o ADMIN_SENHA
 node server.cjs      # sobe em http://localhost:3000
 ```
 
-Variáveis de ambiente: `PORT`, `DATA_DIR`, `ADMIN_SENHA`, `APP_URL`,
-`NODE_ENV`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`.
+**`ADMIN_SENHA` é obrigatória.** Sem ela o servidor **não sobe**: para na
+inicialização e explica o motivo. É dela que sai a senha da conta `admin` —
+antes, sem a variável, a conta nascia sem senha e ninguém entrava no painel.
+
+As variáveis estão todas documentadas, uma a uma, no
+[.env.example](.env.example): `ADMIN_SENHA`, `PORT`, `DATA_DIR`, `NODE_ENV`,
+`APP_URL`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`,
+`WHATSAPP_CRYPTO_KEY`, `META_API_BASE` e `FFMPEG_BIN`.
 
 Para rodar na sua máquina sem encostar em dado real, aponte o `DATA_DIR` para
 uma pasta nova:
 
 ```bash
-PORT=3010 DATA_DIR=/tmp/rt-local ADMIN_SENHA='umaSenhaQualquer' node server.cjs
+PORT=3010 DATA_DIR=/tmp/attos-local ADMIN_SENHA='umaSenhaQualquer' node server.cjs
 ```
 
 ## Testes
