@@ -35,6 +35,8 @@ async function esperarPor(fn, limiteMs, oQue) {
 }
 
 // Mensagem pronta de exemplo, com dois lembretes — o caso real do usuario.
+// O horario 12:00 aqui e SO para as contas da secao A, que recebem um `agora`
+// SIMULADO (dezDaManha) e por isso dao o mesmo resultado a qualquer hora.
 const PRONTA = {
   id: 'r-entrevista', titulo: 'Entrevista do meio-dia',
   texto: 'Olá {nome}! Sua entrevista é hoje ao meio-dia. Link: https://meet.exemplo/rt-123',
@@ -47,6 +49,27 @@ const PRONTA = {
     ]
   }
 };
+
+// ── O HORARIO DO EVENTO NO CAMINHO DE SERVIDOR SAI DE `agora` ──────────────
+// A secao D agenda DE VERDADE, contra o relogio da maquina. Com o horario
+// fixo em 12:00, o lembrete de "15 minutos antes" cai as 11:45 — e entre
+// 11:45 e 12:00 ele JA PASSOU: o motor agendava so 1 dos 2 e a suite
+// quebrava. Todo dia, naqueles 15 minutos. Falha de teste que depende da
+// hora e pior do que teste que nao existe: ensina a ignorar a falha.
+//
+// Agora o evento e sempre daqui a 90 minutos, entao os dois lembretes
+// (-15 min e na hora) estao SEMPRE no futuro, em qualquer minuto do dia.
+// Se o +90 passar da meia-noite, o eventoEmUtc joga para o dia seguinte —
+// e os dois continuam no futuro, que e o que o teste precisa.
+function horarioDaqui(minutos) {
+  const L = require(path.join(RAIZ, 'whatsapp-lembretes.cjs'));
+  return L.horarioSP(new Date(Date.now() + minutos * 60000));
+}
+function prontaParaOServidor() {
+  const copia = JSON.parse(JSON.stringify(PRONTA));
+  copia.lembrete.horario = horarioDaqui(90);
+  return copia;
+}
 
 // ── A) AS CONTAS DE HORARIO (funcoes puras, sem servidor) ──────────────────
 function testarContas() {
@@ -148,7 +171,11 @@ async function testarServidor() {
   console.log('\n=== C) CADASTRO DA MENSAGEM PRONTA COM LEMBRETE ===');
   const e1 = await pegar(adm.cookie);
   const d1 = e1.dados;
-  d1.respostasRapidas = [JSON.parse(JSON.stringify(PRONTA))];
+  // Horario calculado a partir de agora — ver prontaParaOServidor().
+  const prontaSrv = prontaParaOServidor();
+  console.log('   evento deste teste: ' + prontaSrv.lembrete.horario +
+              ' (agora e ' + horarioDaqui(0) + ' em Brasilia)');
+  d1.respostasRapidas = [prontaSrv];
   const g1 = await salvar(adm.cookie, { dados: d1, merge: true, upsertIds: [PRONTA.id], baseVersion: e1.version });
   ok(g1.status === 200, 'gravou a mensagem pronta com lembrete (' + g1.status + ')');
   const lido = ((await pegar(adm.cookie)).dados.respostasRapidas || [])[0];
