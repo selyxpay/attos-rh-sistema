@@ -4081,7 +4081,6 @@ http.createServer(function (req, res) {
         if (waPodeAcessarConta(u, _accSel)) filters.account_id = _accSel;
       }
       var convs = waDb.conversations.list(filters);
-      convs.forEach(function (c) { c.tags = waDb.tags.getForConversation(c.id); });
       responderJson(res, 200, { ok: true, conversations: convs, total: waDb.conversations.count(filters) });
       return;
     }
@@ -4093,7 +4092,6 @@ http.createServer(function (req, res) {
       var convId = parseInt(matchConv[1]);
       var conv = waDb.conversations.getById(convId);
       if (!conv) { responderJson(res, 404, { ok: false, error: 'Conversa não encontrada.' }); return; }
-      conv.tags = waDb.tags.getForConversation(convId);
       var query = req.url.indexOf('?') >= 0 ? req.url.slice(req.url.indexOf('?') + 1) : '';
       var qp = queryParaMapa(query);
       if (qp === null) { responderJson(res, 400, { error: 'parâmetros inválidos' }); return; }
@@ -4182,21 +4180,6 @@ http.createServer(function (req, res) {
       });
       return;
     }
-    // Tags da conversa
-    var matchTags = urlPath.match(/^\/api\/whatsapp\/conversations\/(\d+)\/tags$/);
-    if (matchTags && req.method === 'POST') {
-      var u = waUsuarioTemPermissao(req, 'editar');
-      if (!u) { responderJson(res, 403, { ok: false }); return; }
-      lerCorpo(req, function (err, body) {
-        if (err) { responderJson(res, 400, { ok: false }); return; }
-        var convId = parseInt(matchTags[1]);
-        if (body.action === 'add' && body.tag_id) { waDb.tags.addToConversation(convId, body.tag_id); }
-        else if (body.action === 'remove' && body.tag_id) { waDb.tags.removeFromConversation(convId, body.tag_id); }
-        responderJson(res, 200, { ok: true, tags: waDb.tags.getForConversation(convId) });
-      });
-      return;
-    }
-
     // ---- ENVIAR MENSAGEM ----
     if (urlPath === '/api/whatsapp/messages/send' && req.method === 'POST') {
       var u = waUsuarioTemPermissao(req, 'criar');
@@ -4385,24 +4368,6 @@ http.createServer(function (req, res) {
             responderJson(res, 200, { ok: false, error: result.error });
           }
         }).catch(function (e) { responderJson(res, 500, { ok: false, error: e.message }); });
-      });
-      return;
-    }
-
-    // ---- TAGS ----
-    if (urlPath === '/api/whatsapp/tags' && req.method === 'GET') {
-      var u = waUsuarioTemPermissao(req, 'visualizar');
-      if (!u) { responderJson(res, 403, { ok: false }); return; }
-      responderJson(res, 200, { ok: true, tags: waDb.tags.list() });
-      return;
-    }
-    if (urlPath === '/api/whatsapp/tags' && req.method === 'POST') {
-      var u = waUsuarioTemPermissao(req, 'editar');
-      if (!u) { responderJson(res, 403, { ok: false }); return; }
-      lerCorpo(req, function (err, body) {
-        if (err) { responderJson(res, 400, { ok: false }); return; }
-        var tagId = waDb.tags.create(body.name || 'Nova Tag', body.color);
-        responderJson(res, 200, { ok: true, tag_id: tagId });
       });
       return;
     }

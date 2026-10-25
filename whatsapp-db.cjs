@@ -339,14 +339,14 @@ function criarTabelas() {
     )
   `);
 
-  db.run(`CREATE TABLE IF NOT EXISTS whatsapp_tags (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, color TEXT DEFAULT '#6366f1', created_at TEXT DEFAULT (datetime('now'))
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS whatsapp_conversation_tags (
-    conversation_id INTEGER NOT NULL, tag_id INTEGER NOT NULL, PRIMARY KEY (conversation_id, tag_id),
-    FOREIGN KEY (conversation_id) REFERENCES whatsapp_conversations(id), FOREIGN KEY (tag_id) REFERENCES whatsapp_tags(id)
-  )`);
+  // ETIQUETAS DE CONVERSA: o CREATE saiu. A funcao nunca foi terminada -- o
+  // backend existia e a tela nunca chamou -- e foi removida na customizacao
+  // da ATTOS RH. Banco que JA TEM as tabelas whatsapp_tags e
+  // whatsapp_conversation_tags continua com elas e com o que houver dentro:
+  // nada aqui as apaga. Banco novo simplesmente nao as cria, e ninguem mais
+  // consulta. Se um dia a funcao voltar, o CREATE volta junto.
+  // NAO CONFUNDIR com whatsapp_contacts.tags, que e outra coisa: uma coluna
+  // JSON no proprio contato, usada pelo cadastro de contatos e que FICA.
 
   db.run(`CREATE TABLE IF NOT EXISTS whatsapp_webhook_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT UNIQUE, event_type TEXT DEFAULT '', payload TEXT DEFAULT '',
@@ -1497,41 +1497,6 @@ const templates = {
 };
 
 // ==========================================================================
-// OPERAÇÕES: TAGS
-// ==========================================================================
-const tags = {
-  create(name, color) {
-    const existing = getOne('SELECT id FROM whatsapp_tags WHERE name = ?', [name]);
-    if (existing) return existing.id;
-    return runInsert('INSERT INTO whatsapp_tags (name, color) VALUES (?, ?)', [name, color || '#6366f1']);
-  },
-
-  list() {
-    return getAll('SELECT * FROM whatsapp_tags ORDER BY name');
-  },
-
-  addToConversation(conversationId, tagId) {
-    const existing = getOne('SELECT 1 FROM whatsapp_conversation_tags WHERE conversation_id = ? AND tag_id = ?', [conversationId, tagId]);
-    if (!existing) {
-      run('INSERT INTO whatsapp_conversation_tags (conversation_id, tag_id) VALUES (?, ?)', [conversationId, tagId]);
-    }
-  },
-
-  removeFromConversation(conversationId, tagId) {
-    run('DELETE FROM whatsapp_conversation_tags WHERE conversation_id = ? AND tag_id = ?', [conversationId, tagId]);
-  },
-
-  getForConversation(conversationId) {
-    return getAll(`
-      SELECT t.* FROM whatsapp_tags t
-      INNER JOIN whatsapp_conversation_tags ct ON t.id = ct.tag_id
-      WHERE ct.conversation_id = ?
-      ORDER BY t.name
-    `, [conversationId]);
-  }
-};
-
-// ==========================================================================
 // OPERAÇÕES: WEBHOOK EVENTS (idempotência)
 // ==========================================================================
 const webhookEvents = {
@@ -1837,7 +1802,7 @@ const bot = {
 
 module.exports = {
   init, getDb, getDbPath, salvarImediato,
-  accounts, contacts, conversations, messages, media, templates, tags, webhookEvents, audit,
+  accounts, contacts, conversations, messages, media, templates, webhookEvents, audit,
   lembretes, janela, envioGrupo,
   bot,
   dashboardStats, backup, close
