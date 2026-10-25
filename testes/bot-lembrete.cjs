@@ -78,7 +78,7 @@ async function testarBotAgendando() {
   let config = {
     ligado: true, modo: 'primeira_vez', diasParaNovoContato: 7,
     limiteSempre: '1_dia', limiteHoras: 6,
-    linkVagas: 'https://attosrh.com.br/vagas',
+    linkVagas: 'https://example.com/vagas',
     intervaloPadraoSeg: 0,
     passos: [{ id: 'p1', tipo: 'texto', texto: 'Oi {nome}! A entrevista e as {horario}. Vagas: {link_vagas}' }],
     atendente: bot.CONFIG_PADRAO.atendente,
@@ -121,7 +121,7 @@ async function testarBotAgendando() {
   ok(/Carla/.test(primeira.texto || ''), 'com o nome da pessoa: "' + (primeira.texto || '') + '"');
   ok(primeira.texto && primeira.texto.indexOf(hEvento) >= 0,
     'E COM O MESMO HORARIO do lembrete ({horario} = ' + hEvento + ')');
-  ok(/attosrh/.test(primeira.texto || ''), 'e com o link das vagas');
+  ok(/example\.com/.test(primeira.texto || ''), 'e com o link das vagas');
 
   const chave = 'bot|' + L.paraSql(L.eventoEmUtc('', hEvento, Date.now(), true));
   let doEvento = db.lembretes.doEvento(chave);
@@ -196,7 +196,7 @@ async function testarBotAgendando() {
   ok(enviados.length === antes + 1, 'chegou a hora: o lembrete do bot foi enviado (' + enviados.length + ')');
   const ultimo = enviados[enviados.length - 1] || {};
   ok(ultimo.texto && ultimo.texto.indexOf(hEvento) >= 0, 'com o horario do evento: "' + (ultimo.texto || '') + '"');
-  ok(/attosrh/.test(ultimo.texto || ''), 'e o {link} resolvido pelo link das vagas do bot');
+  ok(/example\.com/.test(ultimo.texto || ''), 'e o {link} resolvido pelo link das vagas do bot');
   const naConversa = db.messages.listByConversation(cv, 50, 0).filter(function (m) { return m.origem === 'lembrete'; });
   ok(naConversa.length === 1, 'a mensagem entrou na conversa marcada como lembrete (' + naConversa.length + ')');
   const contatoBot = db.bot.contato(cid) || {};
@@ -225,7 +225,7 @@ async function testarServidor() {
   const d1 = e1.dados;
   d1.botWhatsapp = {
     ligado: false, modo: 'primeira_vez', diasParaNovoContato: 7,
-    linkVagas: 'https://attosrh.com.br/vagas', intervaloPadraoSeg: 3,
+    linkVagas: 'https://example.com/vagas', intervaloPadraoSeg: 3,
     passos: [{ id: 'p1', tipo: 'texto', texto: 'Oi {nome}, entrevista as {horario}' }],
     lembrete: {
       ligado: true, titulo: 'Entrevista', horario: '12:00', data: '',

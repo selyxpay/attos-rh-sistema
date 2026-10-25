@@ -5,4 +5,6 @@ Allow: /candidato.html
 Disallow: /api/
 Disallow: /uploads/
 
-Sitemap: https://attosrh.com.br/sitemap.xml
+# Sitemap: a linha exige endereco absoluto e o dominio ainda nao foi
+# definido. Quando sair, recrie o sitemap.xml e aponte aqui:
+#   Sitemap: https://SEU-DOMINIO/sitemap.xml

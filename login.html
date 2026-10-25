@@ -10,21 +10,22 @@
     <meta name="author" content="ATTOS RH">
     <!-- Azul da marca: é a cor que o navegador usa na barra do celular. -->
     <meta name="theme-color" content="#0A6E93">
-    <link rel="canonical" href="https://attosrh.com.br/">
     <!-- Ícone do navegador (favicon) -->
     <link rel="icon" type="image/png" href="img/favicon-attos.png">
     <link rel="apple-touch-icon" href="img/favicon-attos.png">
-    <!-- Compartilhamento (WhatsApp, redes sociais) -->
+    <!-- Compartilhamento (WhatsApp, redes sociais).
+         SEM canonical, og:url, og:image e twitter:image: essas tags exigem
+         ENDERECO ABSOLUTO, e o dominio da ATTOS RH ainda nao foi definido.
+         Colocar um dominio chutado aqui e pior que nao ter: aponta a marca
+         para um site que pode ser de outra pessoa. Quando o dominio sair,
+         acrescente as quatro de volta e o <loc> do sitemap. -->
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="ATTOS RH">
     <meta property="og:title" content="ATTOS RH — Consultoria e Recursos Humanos">
     <meta property="og:description" content="Recrutamento e seleção, vagas em logística, produção e serviços, e acompanhamento do candidato do cadastro à contratação.">
-    <meta property="og:image" content="https://attosrh.com.br/img/logo-attos.png">
-    <meta property="og:url" content="https://attosrh.com.br/">
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="ATTOS RH — Consultoria e Recursos Humanos">
     <meta name="twitter:description" content="Recrutamento e seleção, vagas em logística, produção e serviços.">
-    <meta name="twitter:image" content="https://attosrh.com.br/img/logo-attos.png">
     <!-- Dados estruturados para o Google (empresa + site) -->
     <script type="application/ld+json">
     {
@@ -32,9 +33,6 @@
       "@type": "Organization",
       "name": "ATTOS RH",
       "alternateName": ["ATTOS RH Consultoria e Recursos Humanos", "AttosRH"],
-      "url": "https://attosrh.com.br/",
-      "logo": "https://attosrh.com.br/img/logo-attos.png",
-      "image": "https://attosrh.com.br/img/logo-attos.png",
       "description": "ATTOS RH — Consultoria e Recursos Humanos. Recrutamento e seleção, com vagas em logística, produção e serviços.",
       "areaServed": "BR",
       "knowsAbout": ["Consultoria em Recursos Humanos", "Recrutamento e Seleção", "Vagas de emprego", "Logística", "Produção"]
@@ -44,8 +42,7 @@
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
-      "name": "ATTOS RH — Consultoria e Recursos Humanos",
-      "url": "https://attosrh.com.br/"
+      "name": "ATTOS RH — Consultoria e Recursos Humanos"
     }
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">

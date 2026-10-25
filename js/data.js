@@ -14,7 +14,7 @@ const INITIAL_DATA = {
     {
       id: 'func-1',
       nome: 'Administrador',
-      email: 'admin@attosrh.com.br',
+      email: '',
       login: 'admin',
       senha: '',   // o servidor define pela variavel ADMIN_SENHA (nunca aqui)
       departamento: 'administracao',
@@ -39,7 +39,7 @@ const INITIAL_DATA = {
     {
       id: 'func-2',
       nome: 'Maria da Seleção',
-      email: 'maria@attosrh.com.br',
+      email: '',
       login: 'maria',
       senha: '',   // sem senha de fabrica: quem cria a conta define
       departamento: 'selecao',
@@ -63,7 +63,7 @@ const INITIAL_DATA = {
     {
       id: 'func-3',
       nome: 'Carlos do DP',
-      email: 'carlos@attosrh.com.br',
+      email: '',
       login: 'carlos',
       senha: '',   // sem senha de fabrica: quem cria a conta define
       departamento: 'dp',
@@ -113,7 +113,7 @@ const INITIAL_DATA = {
     {
       id: 'func-5',
       nome: 'João Balaf (Admin)',
-      email: 'joaobalaf@attosrh.com.br',
+      email: '',
       login: 'joaobalaf',
       senha: '',   // sem senha de fabrica: quem cria a conta define
       departamento: 'administracao',

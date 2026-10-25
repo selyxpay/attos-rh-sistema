@@ -79,7 +79,7 @@ Em **Environment Variables**, defina:
 | `NODE_ENV` | `production` | Sim — impede que as senhas apareçam no log |
 | `DATA_DIR` | `/data` | Sim |
 | `PORT` | `80` | Sim |
-| `APP_URL` | `https://attosrh.com.br` | Sim |
+| `APP_URL` | `https://SEU-DOMINIO` | Sim |
 | `WHATSAPP_VERIFY_TOKEN` | (gerado por você) | Só para o WhatsApp |
 | `WHATSAPP_APP_SECRET` | (do Meta Developer) | Só para o WhatsApp |
 | `WHATSAPP_CRYPTO_KEY` | (gerado por você) | Recomendado |
@@ -181,7 +181,7 @@ Resumo do que depende de você:
 4. Gerar um **Access Token permanente** (System User no Business Manager).
 5. No sistema: **WhatsApp → Conexões** → preencher Phone Number ID, WABA ID,
    Access Token e o **funcionário responsável** → *Salvar* → *Testar*.
-6. No Meta: **Webhook** → URL `https://attosrh.com.br/webhooks/whatsapp`,
+6. No Meta: **Webhook** → URL `https://SEU-DOMINIO/webhooks/whatsapp`,
    token de verificação = `WHATSAPP_VERIFY_TOKEN`, e assinar o campo `messages`.
 
 Repita o passo 5 para cada número/funcionário (Carlos → número A, Pedro →

@@ -68,7 +68,7 @@ async function testarMotor() {
     // O bot NORMAL fica DESLIGADO de proposito: o fora do expediente tem
     // interruptor proprio e tem que funcionar assim ("sai do trabalho").
     ligado: false, modo: 'primeira_vez', diasParaNovoContato: 7,
-    linkVagas: 'https://attosrh.com.br/vagas', intervaloPadraoSeg: 0,
+    linkVagas: 'https://example.com/vagas', intervaloPadraoSeg: 0,
     passos: [{ id: 'pn', tipo: 'texto', texto: 'Atendimento normal' }],
     atendente: bot.CONFIG_PADRAO.atendente,
     saida: bot.CONFIG_PADRAO.saida,
@@ -123,7 +123,7 @@ async function testarMotor() {
   const txt = (enviados[0] || {}).texto || '';
   ok(/Antiga/.test(txt), 'com o nome da pessoa: "' + txt + '"');
   ok(txt.indexOf(hEntrevista) >= 0, 'e com o horario da entrevista ({horario} = ' + hEntrevista + ')');
-  ok(/attosrh/.test(txt), 'e com o link');
+  ok(/example\.com/.test(txt), 'e com o link');
 
   // 2) CONTATO NOVO tambem recebe.
   const rN = await bot.aoReceberMensagem({

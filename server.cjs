@@ -375,7 +375,7 @@ const MIME = {
 const SECURITY_HEADERS = {
   'X-Frame-Options': 'DENY',
   // HSTS: o navegador passa a só aceitar HTTPS neste domínio pelo próximo ano.
-  // Fecha a janela em que alguém digita "attosrh.com.br" sem https e a
+  // Fecha a janela em que alguém digita o endereço do sistema sem https e a
   // primeira requisição (com o cookie de sessão) sai em texto puro.
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
   'X-Content-Type-Options': 'nosniff',

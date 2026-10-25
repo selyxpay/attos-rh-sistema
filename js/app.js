@@ -804,7 +804,7 @@ function initLocalStorage() {
       state.funcionarios.push({
         id: 'func-5',
         nome: 'João Balaf (Admin)',
-        email: 'joaobalaf@attosrh.com.br',
+        email: '',
         login: 'joaobalaf',
         senha: '',   // sem senha aqui: este arquivo vai para o GitHub
         departamento: 'administracao',

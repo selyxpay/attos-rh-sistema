@@ -44,7 +44,7 @@ docker system df
 echo "===== PHP FORA DO DOCKER (CVE-2026-115560) ====="
 php -v 2>&1 | head -3; which php 2>/dev/null; dpkg -l 2>/dev/null | grep -c "^ii  php"
 echo "===== SAUDE DO SISTEMA ATTOS RH ====="
-curl -s -m 10 http://127.0.0.1/api/saude 2>/dev/null || curl -s -m 10 https://attosrh.com.br/api/saude
+curl -s -m 10 http://127.0.0.1/api/saude 2>/dev/null || curl -s -m 10 https://SEU-DOMINIO/api/saude
 echo
 } 2>&1 | tee /tmp/diagnostico-rt.txt
 ```
@@ -114,7 +114,7 @@ Regra simples: **comando com a palavra `volume` não entra.** Os dados do ATTOS 
 Depois da limpeza, confira que o sistema respondeu:
 
 ```bash
-curl -s https://attosrh.com.br/api/saude
+curl -s https://SEU-DOMINIO/api/saude
 docker ps --format "table {{.Names}}\t{{.Status}}"
 ```
 
@@ -142,6 +142,6 @@ curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh | sudo bash
   o que juntou pico de memória com pico de disco.
 - **Antes de atualizar o Coolify:** `df -h /` e `free -h`. Se o disco estiver
   acima de 80%, limpe primeiro (item 4).
-- **Depois de atualizar:** confira `curl -s https://attosrh.com.br/api/saude`.
+- **Depois de atualizar:** confira `curl -s https://SEU-DOMINIO/api/saude`.
 - **Deploy forçado só quando precisar.** Ele reconstrói a imagem do zero, e é a
   operação mais pesada que a VPS faz.

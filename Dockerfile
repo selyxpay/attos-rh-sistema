@@ -42,7 +42,10 @@ COPY index.html login.html candidato.html talento.html fila-display.html ./
 # Politica de privacidade — PUBLICA de proposito: a Meta exige que ela abra
 # sem login para aprovar o app do WhatsApp Business.
 COPY privacidade.html ./
-COPY robots.txt sitemap.xml ./
+# O sitemap.xml saiu: ele so existe com endereco absoluto, e o dominio da
+# ATTOS RH ainda nao foi definido. Quando sair, recrie o arquivo e volte a
+# lista-lo aqui, junto com a linha Sitemap do robots.txt.
+COPY robots.txt ./
 COPY css ./css
 COPY js  ./js
 COPY img ./img

@@ -83,7 +83,7 @@ atualização — ele é um container separado.
 Depois de atualizar, confira que o sistema respondeu:
 
 ```bash
-curl -s https://attosrh.com.br/api/saude
+curl -s https://SEU-DOMINIO/api/saude
 ```
 
 ### 4. Fechar a porta do painel do Coolify para a internet
