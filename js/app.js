@@ -2235,10 +2235,10 @@ function setupEventListeners() {
         nome,
         cpf,
         rg,
-        pis: '000.00000.00-0',
+        pis: '',
         telefone,
         email,
-        endereco: 'Endereço não informado',
+        endereco: '',
         vagaId,
         empresaId: vaga.empresaId,
         codigoVaga: `${vaga.empresaNome} ${vaga.codigo}`,
@@ -2246,11 +2246,10 @@ function setupEventListeners() {
         status: coluna,
         diasEtapa: 1,
         dataCadastro: new Date().toISOString(),
-        documentos: {
-          selfie: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-          rgFrontal: 'https://images.unsplash.com/photo-1554774853-aae0a22c8aa4?w=400',
-          comprovante: 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=400'
-        }
+        // Nasce SEM documento. Antes vinham tres fotos do Unsplash, que a
+        // ficha mostrava como se fossem da pessoa -- quem olhava a tela via
+        // "documento entregue" onde nao havia nada.
+        documentos: {}
       };
 
       state.candidatos.push(novoCandidato);
@@ -4116,7 +4115,7 @@ function abrirDrawerDetalhes(candidatoId) {
   }
   setSafeText('det-cpf', cand.cpf);
   setSafeText('det-rg', cand.rg);
-  setSafeText('det-pis', cand.pis || '000.00000.00-0');
+  setSafeText('det-pis', cand.pis || '—');
   setSafeText('det-telefone', cand.telefone);
   setSafeText('det-email', cand.email);
   setSafeText('det-endereco', cand.endereco || 'Endereço não informado');
@@ -4204,10 +4203,19 @@ function abrirDrawerDetalhes(candidatoId) {
   // Imagens e arquivos dos Documentos (Mapeando os 6 documentos)
   const docs = cand.documentos || {};
   let countUploaded = 0;
+  // Espaco vazio desenhado na propria pagina, para o <img> nao ficar com o
+  // icone de imagem quebrada quando o documento ainda nao chegou. Era aqui
+  // que entrava foto do Unsplash: imagem de outra pessoa, ocupando o lugar
+  // do documento de verdade.
+  const SEM_DOC = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="260">' +
+    '<rect width="400" height="260" fill="#eef2f6"/>' +
+    '<text x="200" y="136" text-anchor="middle" font-family="sans-serif" ' +
+    'font-size="17" fill="#8a99a8">Documento nao enviado</text></svg>');
 
   const selfieEl = document.getElementById('img-doc-selfie');
   if (selfieEl) {
-    selfieEl.src = docs.selfie || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150';
+    selfieEl.src = docs.selfie || SEM_DOC;
     selfieEl.alt = `Selfie de ${cand.nome}`;
     if (docs.selfie) {
       selfieEl.dataset.originalSrc = docs.selfie;
@@ -4219,7 +4227,7 @@ function abrirDrawerDetalhes(candidatoId) {
 
   const rgFrenteEl = document.getElementById('img-doc-rgFrente');
   if (rgFrenteEl) {
-    rgFrenteEl.src = docs.rgFrente || 'https://images.unsplash.com/photo-1554774853-aae0a22c8aa4?w=400';
+    rgFrenteEl.src = docs.rgFrente || SEM_DOC;
     rgFrenteEl.alt = `RG Frente de ${cand.nome}`;
     if (docs.rgFrente) {
       rgFrenteEl.dataset.originalSrc = docs.rgFrente;
@@ -4231,7 +4239,7 @@ function abrirDrawerDetalhes(candidatoId) {
 
   const fotoPisEl = document.getElementById('img-doc-fotoPis');
   if (fotoPisEl) {
-    fotoPisEl.src = docs.fotoPis || 'https://images.unsplash.com/photo-1554774853-aae0a22c8aa4?w=400';
+    fotoPisEl.src = docs.fotoPis || SEM_DOC;
     fotoPisEl.alt = `Foto PIS/NIS de ${cand.nome}`;
     if (docs.fotoPis) {
       fotoPisEl.dataset.originalSrc = docs.fotoPis;
@@ -4243,7 +4251,7 @@ function abrirDrawerDetalhes(candidatoId) {
 
   const cpfDocumentoEl = document.getElementById('img-doc-cpfDocumento');
   if (cpfDocumentoEl) {
-    cpfDocumentoEl.src = docs.cpfDocumento || 'https://images.unsplash.com/photo-1554774853-aae0a22c8aa4?w=400';
+    cpfDocumentoEl.src = docs.cpfDocumento || SEM_DOC;
     cpfDocumentoEl.alt = `CPF de ${cand.nome}`;
     if (docs.cpfDocumento) {
       cpfDocumentoEl.dataset.originalSrc = docs.cpfDocumento;
@@ -4255,7 +4263,7 @@ function abrirDrawerDetalhes(candidatoId) {
 
   const comprovanteEl = document.getElementById('img-doc-comprovanteResidencia');
   if (comprovanteEl) {
-    comprovanteEl.src = docs.comprovanteResidencia || 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=400';
+    comprovanteEl.src = docs.comprovanteResidencia || SEM_DOC;
     comprovanteEl.alt = `Comprovante de Residência de ${cand.nome}`;
     if (docs.comprovanteResidencia) {
       comprovanteEl.dataset.originalSrc = docs.comprovanteResidencia;
@@ -4267,7 +4275,7 @@ function abrirDrawerDetalhes(candidatoId) {
 
   const cartaoEl = document.getElementById('img-doc-cartaoBancoVerso');
   if (cartaoEl) {
-    cartaoEl.src = docs.cartaoBancoVerso || 'https://images.unsplash.com/photo-1554774853-aae0a22c8aa4?w=400';
+    cartaoEl.src = docs.cartaoBancoVerso || SEM_DOC;
     cartaoEl.alt = `Cartão Banco Verso de ${cand.nome}`;
     if (docs.cartaoBancoVerso) {
       cartaoEl.dataset.originalSrc = docs.cartaoBancoVerso;
@@ -5741,25 +5749,6 @@ function podeRedefinirSenha(f) {
   if (ehMestre(loggedUser.login) || loggedUser.departamento === 'administracao') return true;
   return !!(loggedUser.podeVerSenhas && f.departamento === loggedUser.departamento);
 }
-// NÃO EXISTE MAIS "VER SENHA". A senha agora é guardada com scrypt (via de
-// mão única) e o espelho em texto puro foi apagado — era ele que fazia o
-// state.json carregar a senha de todo mundo legível. Quem precisa dar acesso
-// usa "Redefinir senha": define uma provisória e a pessoa troca no primeiro
-// acesso. A função continua existindo porque telas antigas podem chamá-la.
-window.verSenhaFuncionario = async function (funcId) {
-  const func = (state.funcionarios || []).find(f => f.id === funcId);
-  const nome = func ? func.nome : 'esta conta';
-  alert(
-    'A senha de "' + nome + '" não pode ser mostrada.\n\n' +
-    'As senhas agora são guardadas embaralhadas (scrypt), e isso é de mão única: ' +
-    'nem o sistema consegue desembaralhar. Foi exatamente assim que paramos de ' +
-    'guardar a senha de todo mundo em texto puro.\n\n' +
-    'O QUE FAZER: use "Redefinir senha", combine a senha provisória com a pessoa, ' +
-    'e ela escolhe a definitiva no primeiro acesso.'
-  );
-};
-
-// O admin exige a troca de senha de TODO MUNDO de novo.
 window.exigirTrocaDeSenhaDeTodos = async function () {
   if (!confirm(
     'Exigir que TODAS as contas troquem a senha no próximo acesso?\n\n' +
@@ -5779,39 +5768,8 @@ window.exigirTrocaDeSenhaDeTodos = async function () {
   } catch (e) { alert('Erro de conexão. Tente novamente.'); }
 };
 
-// Guardada para referência: era isto que mostrava a senha de alguém.
-window._verSenhaAntigo = async function (funcId) {
-  const func = (state.funcionarios || []).find(f => f.id === funcId);
-  try {
-    const r = await fetch('/api/ver-senha', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin', body: JSON.stringify({ funcId: funcId })
-    });
-    const d = await r.json().catch(() => ({}));
-    if (r.status === 200 && d.ok) {
-      const nome = func ? func.nome : '';
-      if (d.senha) {
-        alert(`Senha de "${nome}":\n\n${d.senha}`);
-      } else if (d.motivo === 'aguardando_login') {
-        // Senha guardada só como hash (via de mão única). O sistema captura sozinho
-        // no próximo login da pessoa — ela NÃO precisa trocar de senha.
-        alert(
-          `A senha de "${nome}" ainda não pode ser exibida.\n\n` +
-          `Essa conta é antiga e a senha está embaralhada (isso é de mão única — nem o sistema consegue desembaralhar).\n\n` +
-          `O QUE FAZER:\n` +
-          `Peça para "${nome}" entrar no sistema uma vez com a senha que ele já usa.\n` +
-          `Assim que ele logar, o sistema guarda a senha e ela passa a aparecer aqui para sempre.\n` +
-          `Ele NÃO precisa trocar de senha.\n\n` +
-          `Se ele esqueceu a senha, use o botão "Redefinir" para criar uma nova.`
-        );
-      } else {
-        alert('Não foi possível ver a senha desta conta.');
-      }
-    } else if (r.status === 403) {
-      alert('Você não tem permissão para ver a senha deste funcionário.');
-    } else { alert('Não foi possível ver a senha.'); }
-  } catch (e) { alert('Erro de conexão. Tente novamente.'); }
-};
+// Dar acesso a alguém é SÓ por aqui: define uma senha provisória e o dono
+// troca no primeiro login. Não existe caminho para ler a senha de ninguém.
 window.resetarSenhaFuncionario = async function (funcId) {
   const func = (state.funcionarios || []).find(f => f.id === funcId);
   if (!func) return;

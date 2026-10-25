@@ -363,7 +363,7 @@ const SECURITY_HEADERS = {
     "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
     "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com",
-    "img-src 'self' data: blob: https://images.unsplash.com https://ui-avatars.com https://api.qrserver.com",
+    "img-src 'self' data: blob: https://ui-avatars.com https://api.qrserver.com",
     // O OCR (Tesseract) baixa TRÊS coisas de fora, e todas precisam estar aqui:
     //   • o motor e o núcleo (wasm) .......... cdn.jsdelivr.net
     //   • o DICIONÁRIO de português .......... tessdata.projectnaptha.com
@@ -1402,7 +1402,7 @@ const ROTAS_POR_TELA = [
   // ordem, a aba Bot passaria a ser liberada pela permissão do WhatsApp.
   { re: /^\/api\/whatsapp\/bot\//,                                      tela: 'bot' },
   { re: /^\/api\/whatsapp\//,                                           tela: 'whatsapp' },
-  { re: /^\/api\/(ver-senha|reset-senha|aprovar-senha|solicitacoes-senha)$/, tela: 'funcionarios' },
+  { re: /^\/api\/(reset-senha|aprovar-senha|solicitacoes-senha)$/,          tela: 'funcionarios' },
 ];
 
 // Responde 401/403 e devolve false quando a sessão não pode usar a rota.
@@ -1519,15 +1519,19 @@ function usuarioDaReq(req) {
   const f = ((st.dados && st.dados.funcionarios) || []).find(function (x) { return (x.login || '').toLowerCase() === s.login; });
   return f ? Object.assign({}, f) : null;
 }
-// Visibilidade da SENHA VISÍVEL: mestre vê todas; representante vê só do próprio
-// departamento; os demais não veem nenhuma. (Aplicado no servidor, não dá pra burlar.)
+// Quem pode MEXER na senha de outra pessoa (redefinir): mestre e administração
+// podem em qualquer conta; representante, só no próprio departamento.
+// O nome fala em "ver" por motivo histórico — existiu uma rota /api/ver-senha,
+// que foi removida quando a senha passou a ser scrypt. Hoje isso guarda o
+// /api/reset-senha, que é o único caminho para dar acesso a alguém.
 function veTodasAsSenhas(requester) { return !!(requester && (ehMestreLogin(requester.login) || requester.departamento === 'administracao')); }
 // Só vê senha quem: é mestre/administração, OU foi MARCADO (podeVerSenhas) e é do mesmo departamento.
 function podeVerSenhaDe(requester, alvo) {
   if (veTodasAsSenhas(requester)) return true;
   return !!(requester && requester.podeVerSenhas && alvo && alvo.departamento === requester.departamento);
 }
-// A senha visível NUNCA vai junto com o estado — só via /api/ver-senha (que registra o acesso).
+// A senha NUNCA vai junto com o estado. Não existe caminho para lê-la: o que
+// se guarda é o hash scrypt, que é de mão única.
 // ==========================================================================
 // PEDIDOS DE REDEFINIÇÃO DE SENHA (com aprovação do admin)
 // Ficam em arquivo PRÓPRIO, fora do state.json. Assim o token secreto nunca
@@ -1561,7 +1565,7 @@ function filtrarSenhaVisivel(dados) {
   saida.funcionarios = dados.funcionarios.map(function (f) {
     if (!f) return f;
     const c = Object.assign({}, f);
-    // A senha em si NUNCA sai junto com o estado — só pelo /api/ver-senha (que audita).
+    // A senha em si NUNCA sai junto com o estado (é hash scrypt, de mão única).
     delete c.senhaVisivel;
     // Antes ia um SIM/NÃO dizendo de quem a senha dava para consultar. Hoje
     // não dá para consultar a de ninguém: scrypt não volta atrás.
@@ -2424,56 +2428,6 @@ http.createServer(function (req, res) {
     return;
   }
 
-  // ---- API: VER a senha de um funcionário (registra QUEM viu, DE QUEM, quando e IP) ----
-  if (urlPath === '/api/ver-senha' && req.method === 'POST') {
-    if (!autenticado) { responderJson(res, 401, { ok: false }); return; }
-    const requester = usuarioDaReq(req);
-    lerCorpo(req, function (err, body) {
-      if (err) { responderJson(res, 400, { ok: false }); return; }
-      const funcId = String((body && body.funcId) || '');
-      comTrava(function () {
-        const st = lerEstadoParaGravar(); const d = st.dados || {};
-        const alvo = (d.funcionarios || []).find(function (f) { return f.id === funcId; });
-        if (!alvo) { responderJson(res, 404, { ok: false }); return; }
-        if (!podeVerSenhaDe(requester, alvo)) { responderJson(res, 403, { ok: false, motivo: 'sem_permissao' }); return; }
-
-        let precisaGravar = false;
-
-        // NÃO EXISTE MAIS SENHA PARA VER. A senha agora é guardada em scrypt,
-        // que é via de mão única, e o espelho em texto puro (senhaVisivel) foi
-        // apagado — era ele que fazia o state.json carregar a senha de todo
-        // mundo legível. Quem precisa dar acesso a alguém usa "Redefinir
-        // senha": define uma provisória, e o dono troca no próximo login.
-        let senhaRevelada = null;
-        let motivo = 'hash_forte';
-        if (alvo.senhaVisivel) { delete alvo.senhaVisivel; precisaGravar = true; }
-
-        // Auditoria: registra a visualização (contas mestre são "fantasma" — não registram)
-        if (requester && !ehMestreLogin(requester.login)) {
-          if (!Array.isArray(d.logs)) d.logs = [];
-          const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
-          d.logs.unshift({
-            id: 'log-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-            data: new Date().toLocaleString('pt-BR'),
-            usuario: requester.nome || requester.login,
-            acao: 'Tentou ver a senha de "' + (alvo.nome || alvo.login) + '" (' + (alvo.login || '') +
-                  ') — as senhas agora são guardadas com hash forte e não podem ser mostradas.',
-            categoria: 'seguranca',
-            ip: ip
-          });
-          precisaGravar = true;
-        }
-
-        if (precisaGravar) {
-          try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); } catch (e) {}
-        }
-
-        responderJson(res, 200, { ok: false, senha: null, motivo: motivo });
-      }, res);
-    });
-    return;
-  }
-
   // ---- API: hora do servidor ----
   if (urlPath === '/api/time' && req.method === 'GET') {
     responderJson(res, 200, { epoch: Date.now() });
@@ -2547,7 +2501,7 @@ http.createServer(function (req, res) {
   if (urlPath === '/api/state' && req.method === 'GET') {
     const s = lerEstado();
     if (autenticado) {
-      // A senha visível é removida daqui — só sai pela rota /api/ver-senha (com registro)
+      // A senha é removida daqui: não sai por rota nenhuma.
       let dadosFiltrados = filtrarSenhaVisivel(s.dados);
       // PERMISSÃO POR TELA: o que a pessoa não pode ver não desce. Antes o
       // estado INTEIRO ia para qualquer sessão — salário de todas as fichas,

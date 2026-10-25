@@ -147,12 +147,13 @@ const achar = (estado, login) =>
   const h1 = await api.post('/api/trocar-senha-obrigatoria', { senhaNova: 'x', senhaConfirma: 'x' }, ckAdmin);
   ok(h1.status === 400, 'senha de um caractere e recusada mesmo sem estar trancado (' + h1.status + ')');
 
-  console.log('\n=== 3) VER SENHA NAO MOSTRA SENHA DE NINGUEM ===');
+  console.log('\n=== 3) NAO EXISTE MAIS CAMINHO PARA LER SENHA ===');
+  // A rota /api/ver-senha foi REMOVIDA: com scrypt nao havia senha para
+  // mostrar, e ela so respondia {ok:false}. O que tem que continuar valendo e
+  // que nenhuma senha sai do servidor, por rota nenhuma.
   const ver = await api.post('/api/ver-senha', { funcId: adm1.id }, ckAdmin);
-  ok(ver.status === 200 && ver.corpo.ok === false,
-    'a rota responde, mas sem senha (' + ver.status + ', ok=' + ver.corpo.ok + ')');
-  ok(ver.corpo.motivo === 'hash_forte', 'dizendo o motivo: ' + ver.corpo.motivo);
-  ok(!ver.corpo.senha, 'e nenhuma senha vem no corpo');
+  ok(ver.status === 404, 'a rota /api/ver-senha nao existe mais (' + ver.status + ')');
+  ok(!ver.corpo || !ver.corpo.senha, 'e nenhuma senha vem no corpo');
 
   console.log('\n=== 4) SENHA ANTIGA (SHA-256) NO ESTADO: A ROTACAO MIRA NELA ===');
   // Monta a situacao da PRODUCAO: uma conta com senha guardada do jeito
