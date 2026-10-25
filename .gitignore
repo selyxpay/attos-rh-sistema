@@ -20,3 +20,6 @@ INICIAR-SISTEMA-LOCAL.bat
 stderr.txt
 stdout.txt
 
+
+# Backup feito antes da customizacao Atos RH (nunca vai pro git)
+_backup_pre_atos/
