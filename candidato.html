@@ -8,7 +8,7 @@
   <meta name="robots" content="index, follow">
   <link rel="icon" type="image/png" href="img/favicon-attos.png">
   <link rel="apple-touch-icon" href="img/favicon-attos.png">
-  <meta name="theme-color" content="#e11d2a">
+  <meta name="theme-color" content="#0A6E93">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -46,7 +46,7 @@
     .pub-title { font-size: 22px; font-weight:600; color: var(--color-text-main) !important; margin-bottom: 4px; }
     .pub-subtitle { font-size: 14px; color: var(--color-text-muted) !important; margin-bottom: 28px; }
     .recruiter-banner {
-      background: #be123c;
+      background: #0A5F80;
       color: #fff; padding: 14px 20px; border-radius:8px;
       margin-bottom: 24px; display: flex; align-items: center; gap: 12px;
       font-size: 13px; font-weight: 500;
@@ -643,7 +643,7 @@ function detectRecrutador() {
   if (recId === 'agencia') {
     recrutadorLinkId = 'agencia';
     banner.style.display = 'flex';
-    avatar.style.background = '#be123c';
+    avatar.style.background = '#0A5F80';
     avatar.textContent = 'R';
     msg.textContent = 'Bem-vindo(a)! Você está se candidatando pelo link oficial da ATTOS RH.';
   } else {
@@ -651,7 +651,7 @@ function detectRecrutador() {
     if (!rec) return;
     recrutadorLinkId = recId;
     banner.style.display = 'flex';
-    avatar.style.background = rec.corHex || '#be123c';
+    avatar.style.background = rec.corHex || '#0A5F80';
     avatar.textContent = rec.nome[0].toUpperCase();
     msg.innerHTML = 'Você está se candidatando via link de <strong>' + rec.nome + '</strong>. Será atribuído(a) automaticamente a este(a) recrutador(a).';
   }
@@ -733,7 +733,7 @@ function startConfetti() {
   const ctx = canvas.getContext('2d');
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
-  const colors = ['#be123c','#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#a855f7','#ec4899'];
+  const colors = ['#0A5F80','#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#a855f7','#ec4899'];
   const pieces = [];
   for (let i = 0; i < 130; i++) {
     pieces.push({

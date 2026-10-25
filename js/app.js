@@ -832,7 +832,8 @@ function initLocalStorage() {
       }
     }
 
-    // Módulo de Equipamentos (Entrega/Devolução do DP)
+    // Equipamentos saiu do sistema, mas a chave FICA: o historico continua no
+    // state.json e varias rotinas (backup, diagnostico) contam com ela existindo.
     if (!state.equipamentos) { state.equipamentos = []; alterado = true; }
 
     // Módulo Fluxo Financeiro (DP)
@@ -3823,7 +3824,7 @@ function renderRelatoriosCharts() {
         datasets: [{
           label: 'Contratações',
           data: dataRecrutadores,
-          backgroundColor: state.recrutadores.map(r => r.corHex || '#be123c'),
+          backgroundColor: state.recrutadores.map(r => r.corHex || '#0A5F80'),
           borderRadius: 6,
           barThickness: 32
         }]
@@ -3940,7 +3941,7 @@ function renderPortalLinks() {
   const agenciaLink = base + 'candidato.html?rec=agencia';
   let html = `
     <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:rgba(190,18,60,0.08);border:1px solid rgba(190,18,60,0.2);border-radius:8px;flex-wrap:wrap;">
-      <div style="width:32px;height:32px;border-radius:50%;background:#be123c;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;color:#fff;flex-shrink:0;">R</div>
+      <div style="width:32px;height:32px;border-radius:50%;background:#0A5F80;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;color:#fff;flex-shrink:0;">R</div>
       <div style="flex:1;min-width:200px;">
         <div style="font-weight:600;font-size:13px;color:var(--text-primary);">Agência ATTOS RH (Link Oficial)</div>
         <div style="font-size:11px;color:var(--text-secondary);word-break:break-all;">${agenciaLink}</div>
@@ -6379,7 +6380,7 @@ function criarPermissoesZeradas() {
 const _AREA_LABEL_EXC = { banco_talentos: 'Banco de Talentos', selecao: 'Seleção', dp: 'Departamento Pessoal' };
 
 // Quem pode excluir em cada área:
-//  - banco_talentos: João + Administrador RT (administracao) + quem tiver banco_talentos.excluir
+//  - banco_talentos: João + Administrador (administracao) + quem tiver banco_talentos.excluir
 //  - selecao/dp: João + administracao + administrador do próprio depto (representanteDepto) + permissão excluir
 function podeExcluirArea(area) {
   if (!loggedUser) return false;
@@ -8423,12 +8424,12 @@ function renderDashboardOverview() {
         datasets: [{
           label: 'Contratos Feitos',
           data: counts,
-          borderColor: '#e11d48',
+          borderColor: '#07769C',
           backgroundColor: 'rgba(225, 29, 72, 0.1)',
           fill: true,
           tension: 0.4,
           borderWidth: 3,
-          pointBackgroundColor: '#e11d48'
+          pointBackgroundColor: '#07769C'
         }]
       },
       options: {
@@ -8495,7 +8496,7 @@ function renderDashboardOverview() {
         labels: labels,
         datasets: [{
           data: data,
-          backgroundColor: state.recrutadores.map(r => r.corHex || '#be123c'),
+          backgroundColor: state.recrutadores.map(r => r.corHex || '#0A5F80'),
           borderRadius: 6,
           barThickness: 24
         }]
@@ -8723,7 +8724,7 @@ function createTrailParticle(x, y) {
   particle.className = 'rocket-particle';
   
   // Cores dinâmicas de chama (Vermelho, Laranja, Amarelo)
-  const colors = ['#e11d48', '#f97316', '#eab308', '#ffffff'];
+  const colors = ['#04A1D8', '#4EB548', '#07769C', '#ffffff'];
   const color = colors[Math.floor(Math.random() * colors.length)];
   
   // Dimensões aleatórias

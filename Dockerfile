@@ -1,5 +1,5 @@
 # ==========================================================================
-# R&T VAGAS IA — site + backend (Node) rodando 100% na VPS.
+# ATTOS RH — site + backend (Node) rodando 100% na VPS.
 # --------------------------------------------------------------------------
 # Arquitetura: GitHub -> Coolify -> VPS.
 # O GitHub tem o CÓDIGO. A VPS tem os DADOS REAIS.
@@ -66,7 +66,7 @@ ENV DATA_DIR=/data
 #
 # O QUE ESTA LINHA NÃO FAZ: ela não limita o contêiner, só o heap do Node
 # (buffers de mídia e o SQLite ficam fora dela). O limite DURO é no Coolify:
-#   Coolify → aplicação R&T → Advanced/Resource Limits → Memory Limit: 768M
+#   Coolify → aplicação ATTOS RH → Advanced/Resource Limits → Memory Limit: 768M
 # Com os dois, nem o Node nem o contêiner conseguem derrubar a VPS.
 ENV NODE_OPTIONS=--max-old-space-size=512
 

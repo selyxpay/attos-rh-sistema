@@ -1,66 +1,96 @@
 /* ==========================================================================
-   ATTOS RH DESIGN SYSTEM — v6.0 (referência: "frosted link dashboard on rice
-   paper" — bordas finas em vez de sombra, tipografia densa, um único azul
-   de destaque, cantos em três tamanhos: pílula / botão-cartão / cartão grande)
+   ATTOS RH DESIGN SYSTEM — v7.0
+   Barra lateral azul, verde no item onde você está, conteúdo em papel claro.
+   Bordas finas em vez de sombra pesada, tipografia densa, cantos abertos.
+   TODA cor sai do :root abaixo — não escreva hex solto numa regra.
 
    A fonte Inter já é carregada pelo <link> do index.html — não duplicamos o
    @import aqui. Inter faz tudo: de rótulo de 11px a título de 20px.
    ========================================================================== */
 
 :root {
-  /* ── Cor de ação (botões) — preto quase puro, "ação comprometida" ────── */
-  --color-primary: #0A0A0A;
-  --color-primary-dark: #171717;
+  /* ════════════════════════════════════════════════════════════════════════
+     PALETA ATTOS RH — tirada do PNG do logo, não "parecida com".
+       verde do símbolo  #4EB548      azul do símbolo  #04A1D8
+     As duas são CLARAS: branco em cima delas dá 2,6:1 e 3,0:1, e o mínimo
+     legível (WCAG AA) é 4,5:1. Por isso existem duas famílias aqui:
+       • --marca-*  : a cor exata do logo, para SUPERFÍCIE e DESENHO
+                      (faixa, ícone, borda, selo) — nunca atrás de texto miúdo.
+       • --acao-*   : a mesma cor escurecida até passar no AA, para TEXTO,
+                      botão e link.
+     Trocar uma pela outra é o erro fácil aqui. Antes de usar uma cor nova
+     atrás de texto, confira o contraste.
+     ════════════════════════════════════════════════════════════════════════ */
 
-  /* ── Azul da ATTOS RH — a cor da marca. É ela que marca onde você está:
-     item ativo do menu, foco de campo, detalhes de destaque. */
-  --color-rt-red: #D40203;
-  --color-rt-red-dark: #9F0102;
+  /* ── Cores do logo, exatas ──────────────────────────────────────────── */
+  --marca-azul: #04A1D8;
+  --marca-verde: #4EB548;
 
-  /* ── Azul — segue existindo para gráficos e chips informativos, mas não é
-     mais quem dá o destaque na navegação. */
-  --color-accent-blue: #2563EB;
-  --color-accent-blue-dark: #1E40AF;
-  --color-blue-dark: #1E40AF;
-  --color-blue: #2563EB;
+  /* ── Cores de ação (passam no AA com texto branco) ──────────────────── */
+  --acao-azul: #07769C;          /* botão principal, link       — 5,15:1 */
+  --acao-azul-forte: #0A5F80;    /* hover / pressionado         — 7,09:1 */
+  --acao-verde: #2E7D32;         /* confirmar, aprovar          — 5,13:1 */
 
-  /* ── Superfícies: papel, não vidro ─────────────────────────────────── */
+  /* ── Barra lateral e cabeçalho ──────────────────────────────────────── */
+  --barra: #0A6E93;              /* fundo       — branco em cima: 5,73:1 */
+  --barra-fundo: #095E7E;        /* um tom abaixo, para o pé da barra    */
+  --barra-texto: rgba(255, 255, 255, 0.86);   /* item inativo   — 4,70:1 */
+  --barra-icone: rgba(255, 255, 255, 0.62);
+  --barra-ativo: var(--marca-verde);          /* pílula do item ativo    */
+  --barra-ativo-texto: #10303A;               /* em cima do verde — 5,33:1 */
+  --barra-divisa: rgba(255, 255, 255, 0.14);
+
+  /* ── Superfícies ────────────────────────────────────────────────────── */
   --color-white: #FFFFFF;
   --color-glass-bg: #FFFFFF;
-  --color-glass-border: #E5E5E5;   /* "Ash" — a linha que segura o sistema inteiro */
-  --color-paper-mist: #F5F5F5;     /* superfície alternativa (linhas hover, painéis aninhados) */
+  --papel: #F5F8FA;              /* fundo da página, cinza puxado p/ azul */
+  --papel-fundo: #EDF3F7;        /* linha alternada, painel aninhado      */
+  --color-paper-mist: #EDF3F7;
+  --color-glass-border: #DCE5EA; /* a linha que segura o sistema inteiro  */
 
-  /* ── Texto ────────────────────────────────────────────────────────── */
-  --color-text-main: #262626;      /* Graphite — corpo */
-  --color-text-title: #171717;     /* Charcoal — títulos */
-  --color-text-muted: #737373;     /* Fog — texto secundário, placeholder */
+  /* ── Texto ──────────────────────────────────────────────────────────── */
+  --color-text-title: #10212B;   /* títulos                    — 16,0:1 */
+  --color-text-main: #1F2937;    /* corpo                      — 14,7:1 */
+  --color-text-muted: #5F7280;   /* secundário, placeholder     — 4,99:1 */
 
-  /* ── Status (mantém o significado operacional, tom Dub) ─────────────── */
-  --status-pending: #EA580C;
-  --status-analysis: #2563EB;
-  --status-interview: #7C3AED;
-  --status-approved: #16A34A;
-  --status-hired: #16A34A;
-  --status-unfit: #DC2626;
+  /* ── Status (significado operacional) ───────────────────────────────── */
+  --status-pending: #B45309;
+  --status-analysis: var(--acao-azul);
+  --status-interview: #6D28D9;
+  --status-approved: var(--acao-verde);
+  --status-hired: var(--acao-verde);
+  --status-unfit: #B3261E;
 
-  /* ── Sombra: quase ausente. As bordas é que definem o contêiner ─────── */
-  --shadow-premium: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-floating: 0 20px 20px rgba(0, 0, 0, 0.09);
+  /* ── Profundidade: sombra azulada e baixa, nunca cinza-chumbo ───────── */
+  --shadow-premium: 0 1px 2px rgba(10, 110, 147, 0.07);
+  --shadow-floating: 0 14px 34px rgba(10, 110, 147, 0.14);
 
-  /* ── Raios: vocabulário fechado — pílula / cartão / cartão grande ────── */
-  --radius-sm: 6px;     /* inputs */
-  --radius-md: 8px;     /* botões */
-  --radius-lg: 12px;    /* cartões */
-  --radius-xl: 16px;    /* cartões grandes */
-  --radius-2xl: 16px;
+  /* ── Raios: mais abertos que os do sistema anterior, de propósito ───── */
+  --radius-sm: 8px;     /* campos                                        */
+  --radius-md: 10px;    /* botões                                        */
+  --radius-lg: 14px;    /* cartões                                       */
+  --radius-xl: 20px;    /* cartões grandes, modais                       */
+  --radius-2xl: 20px;
   --radius-pill: 9999px;
 
-  /* ── Remapeamento (mesmos nomes usados em style.css/mobile.css/etc.) ── */
-  --primary: var(--color-primary);
-  --primary-hover: var(--color-primary-dark);
-  --primary-light: rgba(37, 99, 235, 0.08);
-  --dark-sidebar: #0A0A0A;
-  --dark-sidebar-active: var(--color-rt-red);
+  /* ── Remapeamento: os nomes antigos continuam valendo ────────────────
+     style.css, mobile.css, whatsapp.css e fluxo-financeiro.css usam estes
+     nomes em centenas de regras. Eles ficam, apontando para a paleta nova —
+     assim a troca de cor acontece num lugar só, aqui em cima.
+     Os nomes com "rt" são do sistema de origem e seguem por compatibilidade. */
+  --color-primary: var(--acao-azul);
+  --color-primary-dark: var(--acao-azul-forte);
+  --color-rt-red: var(--marca-azul);
+  --color-rt-red-dark: var(--acao-azul);
+  --color-accent-blue: var(--marca-azul);
+  --color-accent-blue-dark: var(--acao-azul);
+  --color-blue: var(--marca-azul);
+  --color-blue-dark: var(--acao-azul);
+  --primary: var(--acao-azul);
+  --primary-hover: var(--acao-azul-forte);
+  --primary-light: rgba(4, 161, 216, 0.10);
+  --dark-sidebar: var(--barra);
+  --dark-sidebar-active: var(--barra-ativo);
   --bg-main: transparent;
   --card-bg: var(--color-glass-bg);
   --border-color: var(--color-glass-border);
@@ -70,6 +100,7 @@
   --shadow-md: var(--shadow-premium);
   --shadow-lg: var(--shadow-floating);
 }
+
 
 /* 1. FUNDO — TELA BRANCA, SEM GRADIENTE NEM TEXTURA DE RUÍDO */
 body {
@@ -170,11 +201,11 @@ label,
 
 .sidebar,
 .sidebar-modern {
-  background: #0A0A0A !important;
+  background: linear-gradient(180deg, var(--barra) 0%, var(--barra-fundo) 100%) !important;
   border-radius: var(--radius-lg) !important;
   box-shadow: none !important;
   margin: 16px !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid var(--barra-divisa) !important;
 
   position: sticky !important;
   top: 16px !important;
@@ -235,6 +266,41 @@ label,
   padding: 0 !important;
 }
 
+/* ── A marca na barra lateral: símbolo + nome em texto ──────────────────
+   O logo completo traz "ATTOS RH" em preto, que desaparece no azul. Aqui
+   entra só o símbolo (as três figuras), num quadrado branco que o separa do
+   fundo, e o nome é TEXTO — acompanha a cor da barra em qualquer tema. */
+.sidebar-header .logo-area {
+  flex-direction: column !important;
+  gap: 10px !important;
+}
+.sidebar-header .logo-area .logo-simbolo {
+  width: 62px !important;
+  height: 62px !important;
+  max-width: 62px !important;
+  max-height: 62px !important;
+  background: #FFFFFF !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 7px !important;
+  object-fit: contain !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16) !important;
+}
+.sidebar-header .logo-area .logo-nome {
+  font-family: 'Inter', sans-serif;
+  font-size: 17px;
+  font-weight: 300;
+  letter-spacing: 0.13em;
+  color: #FFFFFF;
+  line-height: 1;
+  white-space: nowrap;
+}
+/* "RH" em peso cheio: o olho pega o nome inteiro, mas a sigla fica como
+   marca. É o mesmo contraste de peso que o logo impresso tem. */
+.sidebar-header .logo-area .logo-nome strong {
+  font-weight: 700;
+  margin-left: 0.22em;
+}
+
 .sidebar-nav {
   padding: 0 !important;
 }
@@ -245,7 +311,7 @@ label,
 
 .nav-item a {
   border-radius: var(--radius-pill) !important;
-  color: #A3A3A3 !important;
+  color: var(--barra-texto) !important;
   font-weight: 500 !important;
   font-family: 'Inter', sans-serif !important;
   transition: background 0.15s ease, color 0.15s ease !important;
@@ -258,7 +324,7 @@ label,
 }
 
 .sidebar-nav .nav-item a i {
-  color: #737373 !important;
+  color: var(--barra-icone) !important;
   font-size: 15px !important;
   transition: color 0.15s ease !important;
 }
@@ -273,19 +339,22 @@ label,
   transform: none !important;
 }
 
-/* O item onde você está usa o VERMELHO DA MARCA. É o detalhe que identifica a
-   ATTOS RH dentro de um sistema que, de resto, é preto e branco de propósito. */
+/* O item onde você está usa o VERDE DO LOGO, numa pílula sólida sobre o azul
+   da barra. As duas cores da marca aparecem juntas, e é o contraste entre
+   elas que diz "você está aqui" — não precisa de borda nem de sombra.
+   O texto é escuro porque branco sobre esse verde dá 2,6:1, e o mínimo
+   legível é 4,5:1. Escuro sobre o verde dá 5,3:1. */
 .nav-item.active a {
-  background: var(--color-rt-red) !important;
-  color: #FFFFFF !important;
-  font-weight: 500 !important;
+  background: var(--barra-ativo) !important;
+  color: var(--barra-ativo-texto) !important;
+  font-weight: 600 !important;
   box-shadow: none !important;
   border-left: none !important;
   padding-left: 14px !important;
 }
 
 .nav-item.active a i {
-  color: #FFFFFF !important;
+  color: var(--barra-ativo-texto) !important;
 }
 
 .sidebar-footer {
@@ -370,11 +439,11 @@ input[type="date"],
 select,
 textarea {
   background: var(--color-white) !important;
-  border: 1px solid #171717 !important;
+  border: 1px solid var(--color-glass-border) !important;
   border-radius: var(--radius-sm) !important;
   padding: 10px 14px !important;
   font-size: 13.5px !important;
-  color: #171717 !important;
+  color: var(--color-text-main) !important;
 }
 
 .form-control:focus,
@@ -531,13 +600,15 @@ textarea:focus {
   flex-shrink: 0;
 }
 
-.mod-header-icon-badge.badge-blue    { background: var(--color-accent-blue) !important; }
-.mod-header-icon-badge.badge-emerald { background: #16A34A !important; }
-.mod-header-icon-badge.badge-red     { background: #DC2626 !important; }
-.mod-header-icon-badge.badge-purple  { background: #7C3AED !important; }
-.mod-header-icon-badge.badge-amber   { background: #EA580C !important; }
-.mod-header-icon-badge.badge-teal    { background: #0F766E !important; }
-.mod-header-icon-badge.badge-indigo  { background: #4338CA !important; }
+/* O ícone do cabeçalho sai da paleta da marca. O vermelho ficou só onde
+   SIGNIFICA alguma coisa — Inaptos e Lixeira —, e no tom do sistema. */
+.mod-header-icon-badge.badge-blue    { background: var(--marca-azul) !important; }
+.mod-header-icon-badge.badge-emerald { background: var(--acao-verde) !important; }
+.mod-header-icon-badge.badge-red     { background: var(--status-unfit) !important; }
+.mod-header-icon-badge.badge-purple  { background: var(--status-interview) !important; }
+.mod-header-icon-badge.badge-amber   { background: var(--status-pending) !important; }
+.mod-header-icon-badge.badge-teal    { background: var(--acao-azul) !important; }
+.mod-header-icon-badge.badge-indigo  { background: var(--acao-azul-forte) !important; }
 
 /* Correção de colisão: badge-blue/red/purple/green/yellow também são CHIPS DE
    STATUS (regras acima com !important, fundo pastel e font-size 11px). No
@@ -634,7 +705,7 @@ textarea:focus {
 
 .mod-btn-secondary:hover {
   background: var(--color-paper-mist) !important;
-  border-color: #D4D4D4 !important;
+  border-color: var(--marca-azul) !important;
   transform: none !important;
   color: var(--color-text-title) !important;
 }
@@ -657,7 +728,7 @@ textarea:focus {
 
 .mod-btn-secondary-light:hover {
   background: var(--color-paper-mist) !important;
-  border-color: #D4D4D4 !important;
+  border-color: var(--marca-azul) !important;
   color: var(--color-text-title) !important;
   transform: none !important;
 }
@@ -667,10 +738,10 @@ textarea:focus {
   font-size: 10px !important;
   font-weight: 600 !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.06em !important;
-  color: #737373 !important;
+  letter-spacing: 0.08em !important;
+  color: rgba(255, 255, 255, 0.62) !important;
   padding: 16px 14px 6px 14px !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-top: 1px solid var(--barra-divisa) !important;
   margin-top: 8px !important;
 }
 
@@ -713,15 +784,15 @@ b, strong {
    atenção com o conteúdo. O destaque agora é só o item ativo, em vermelho. */
 .sidebar-nav .nav-item a i {
   color: #FFFFFF !important;
-  opacity: 0.75;
+  opacity: 0.68;
   transition: opacity 0.15s ease !important;
 }
 
-/* No item ativo (fundo azul) e no hover, o ícone vira branco — a cor cederia
-   contraste ali. As regras da seção 4 já fazem isso; estas garantem que a cor
-   do módulo não vença por ser mais específica. */
-.sidebar-nav .nav-item.active a i,
+/* No HOVER o ícone vira branco; no item ATIVO (pílula verde) ele fica escuro,
+   senão não se lê. As regras da seção 4 já fazem isso; estas garantem que a
+   cor do módulo não vença por ser mais específica. */
 .sidebar-nav .nav-item:hover a i { color: #FFFFFF !important; }
+.sidebar-nav .nav-item.active a i { color: var(--barra-ativo-texto) !important; }
 
 /* ── Movimento: curto e discreto ────────────────────────────────────────── */
 
@@ -746,7 +817,7 @@ b, strong {
 .dashboard-chart-card:hover,
 .kanban-card:hover,
 .banco-candidato-card:hover {
-  border-color: #D4D4D4 !important;
+  border-color: var(--marca-azul) !important;
   transform: translateY(-1px) !important;
 }
 
@@ -771,4 +842,84 @@ b, strong {
   .btn:active,
   .mod-btn-primary:active { transform: none !important; }
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TELA DE ENTRADA — ATTOS RH
+   --------------------------------------------------------------------------
+   O desenho antigo era vidro escuro sobre fundo quase preto. Aqui a entrada
+   é clara: o azul da marca ocupa a tela como superfície e o cartão branco
+   fica em cima, com o logo completo (que tem o nome em preto e só funciona
+   sobre branco). As regras moram neste arquivo porque ele carrega por
+   último — é o que garante que vencem o style.css sem precisar de mais
+   especificidade.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.login-overlay-full {
+  background-color: var(--barra) !important;
+  /* Duas manchas de luz, muito discretas: tiram o chapado do azul sem virar
+     gradiente colorido. O verde aparece só como um sopro no canto. */
+  background-image:
+    radial-gradient(900px 600px at 15% 0%, rgba(4, 161, 216, 0.55), transparent 62%),
+    radial-gradient(700px 520px at 100% 100%, rgba(78, 181, 72, 0.30), transparent 60%) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.login-glass-box {
+  background: var(--color-white) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  border-radius: var(--radius-xl) !important;
+  box-shadow: 0 24px 60px rgba(7, 48, 64, 0.30) !important;
+  color: var(--color-text-main) !important;
+  padding: 40px 36px 34px !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  overflow: visible !important;
+}
+
+/* O título era branco (fundo escuro). No cartão branco ele sumia. */
+.login-glass-box h2 {
+  color: var(--color-text-title) !important;
+  font-size: 19px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+}
+.login-glass-box .login-subtext {
+  color: var(--color-text-muted) !important;
+}
+.login-glass-box label,
+.login-glass-box .form-label {
+  color: var(--color-text-title) !important;
+}
+
+/* O logo é a primeira coisa que se vê: ocupa o espaço de verdade. */
+.login-glass-box .logo-img {
+  height: 130px !important;
+  margin-bottom: 4px !important;
+}
+.login-logo-area {
+  margin-bottom: 18px !important;
+}
+
+/* Um fio das duas cores da marca no topo do cartão: é o detalhe que
+   identifica o sistema sem precisar repetir o logo em outro lugar. */
+.login-glass-box::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--marca-azul) 0%, var(--marca-azul) 52%, var(--marca-verde) 52%, var(--marca-verde) 100%);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+/* Rodapé público da tela de entrada: fica sobre o azul, então vai em branco. */
+.login-overlay-full footer,
+.login-overlay-full .login-seo-footer {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+.login-overlay-full footer a {
+  color: #FFFFFF !important;
+  text-decoration: underline !important;
 }

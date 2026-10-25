@@ -202,36 +202,8 @@
   .exame-form-grid,
   .exame-detalhe-grid { grid-template-columns: 1fr !important; }
 
-  /* KPIs do Exame/Equipamentos: 2 por linha (no desktop são 3 ou 4) */
-  .exame-kpi-row { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
-  .exame-kpi-card { padding: 12px !important; gap: 10px; }
-  .exame-kpi-icon { width: 34px !important; height: 34px !important; min-width: 34px; font-size: 14px !important; }
-  .exame-kpi-num { font-size: 20px !important; }
-  .exame-kpi-label { font-size: 10.5px !important; line-height: 1.2; }
-
-  /* ---- Lista de exames: a grade de 7 colunas vira CARD ---------------------
-     2.3fr 1.1fr 1.4fr 1.7fr 1.4fr 1fr 1.1fr não cabe em 390px de jeito nenhum. */
-  .exame-table-header { display: none !important; }
-  .exame-table-row {
-    display: block !important;
-    padding: 14px 16px !important;
-    border-bottom: 8px solid var(--surface-2, #F1F5F9);
-  }
-  .exame-table-row > span { display: block; width: 100%; margin-bottom: 8px; }
-  .exame-table-row > span:last-child { margin-bottom: 0; }
-  .exame-col-nome { font-size: 15px; font-weight: 600; }
-  .exame-table-row .btn { width: 100%; justify-content: center; min-height: 44px; }
-
   /* Barras de filtro: um campo por linha, botão largura cheia */
   .exame-filtros-bar { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 14px; }
-  .exame-filtro-group { width: 100%; min-width: 0; flex: 1 1 auto; }
-  .exame-filtros-bar .btn { width: 100%; justify-content: center; min-height: 44px; }
-
-  /* Cabeçalho das abas Exame/Equipamentos empilha */
-  .exame-header-area { flex-direction: column; align-items: flex-start; gap: 12px; }
-  .exame-header-right { width: 100%; }
-  .exame-header-right .btn { width: 100%; justify-content: center; }
-  .exame-titulo { font-size: 20px; }
 
   /* Chaves deslizantes (Entrega/Devolução, Online/Presencial) na largura toda */
   .equip-switch { max-width: 100%; }
@@ -250,12 +222,6 @@
     min-width: 40px !important; min-height: 40px !important;
     display: inline-flex !important; align-items: center; justify-content: center;
   }
-  .equip-lightbox-acoes .btn { flex: 1; min-height: 40px; }
-
-  /* Painel da Seleção na ficha (enviar para exame) e cartões-filtro */
-  .equip-kpi-btn { text-align: left; }
-  .equip-check-grid { grid-template-columns: 1fr 1fr; }
-  .equip-check { min-height: 44px; }
 }
 
 /* ==========================================================================
@@ -332,9 +298,6 @@
   .user-profile-badge .user-info,
   .user-profile-badge > i.fa-chevron-down { display: none !important; }
   .user-profile-badge .user-avatar { margin: 0 !important; }
-
-  /* Anexos: os dois botões um embaixo do outro (cabem melhor no dedo) */
-  .equip-upload-botoes { grid-template-columns: 1fr; }
 }
 
 /* ==========================================================================

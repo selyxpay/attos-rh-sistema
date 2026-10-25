@@ -13,7 +13,7 @@ const INITIAL_DATA = {
   funcionarios: [
     {
       id: 'func-1',
-      nome: 'Administrador RT',
+      nome: 'Administrador',
       email: 'admin@attosrh.com.br',
       login: 'admin',
       senha: '',   // o servidor define pela variavel ADMIN_SENHA (nunca aqui)
@@ -161,8 +161,7 @@ const INITIAL_DATA = {
         candidatos: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
         funcionarios: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
         sistema: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
-        exportacoes: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
-        exame_medico: { visualizar: true, criar: false, editar: true, excluir: false, aprovar: true, exportar: false, relatorios: false, perms: false }
+        exportacoes: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false }
       }
     }
   ],
@@ -213,10 +212,10 @@ const INITIAL_DATA = {
 
   // Motivos de inaptidão cadastrados pelo admin
   motivosInaptidao: [
-    { id: 'mot-1', descricao: 'Antecedente criminal', criadoPor: 'Administrador RT', dataCriacao: '2026-01-01' },
-    { id: 'mot-2', descricao: 'Restrição em empresa parceira', criadoPor: 'Administrador RT', dataCriacao: '2026-01-01' },
-    { id: 'mot-3', descricao: 'CPF irregular / bloqueado', criadoPor: 'Administrador RT', dataCriacao: '2026-01-01' },
-    { id: 'mot-4', descricao: 'Comportamento inadequado em processo anterior', criadoPor: 'Administrador RT', dataCriacao: '2026-01-01' }
+    { id: 'mot-1', descricao: 'Antecedente criminal', criadoPor: 'Administrador', dataCriacao: '2026-01-01' },
+    { id: 'mot-2', descricao: 'Restrição em empresa parceira', criadoPor: 'Administrador', dataCriacao: '2026-01-01' },
+    { id: 'mot-3', descricao: 'CPF irregular / bloqueado', criadoPor: 'Administrador', dataCriacao: '2026-01-01' },
+    { id: 'mot-4', descricao: 'Comportamento inadequado em processo anterior', criadoPor: 'Administrador', dataCriacao: '2026-01-01' }
   ],
 
   // Banco de candidatos inaptos (CPFs bloqueados)
@@ -234,7 +233,7 @@ const INITIAL_DATA = {
     {
       id: 'log-1',
       data: '21/05/2026 09:30:15',
-      usuario: 'Administrador RT',
+      usuario: 'Administrador',
       acao: 'Acessou o sistema ATTOS RH',
       categoria: 'sistema'
     },

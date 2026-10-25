@@ -4,14 +4,17 @@
 
 :root {
     /* Paleta de Cores HSL Premium */
-    --primary: hsl(343, 80%, 50%);         /* Azul ATTOS (#e11d48) */
-    --primary-hover: hsl(343, 80%, 40%);   /* Azul ATTOS Escuro (#be123c) */
-    --primary-light: hsl(343, 80%, 95%);
-    
-    --dark-sidebar: hsl(0, 0%, 9%);         /* Preto Sidebar (#171717) */
-    --dark-sidebar-active: hsl(0, 0%, 14%); /* Cinza Sidebar (#242424) */
-    --bg-main: hsl(210, 20%, 96%);          /* Cinza Claro Fundo (#f1f5f9) */
-    --card-bg: hsl(0, 0%, 100%);
+    /* Os valores de verdade ficam no :root do design-system.css, que carrega
+       DEPOIS deste arquivo e vence. Aqui eles sao repetidos para que esta
+       folha continue coerente sozinha (ex.: aberta fora do painel). */
+    --primary: #07769C;          /* azul de acao ATTOS   */
+    --primary-hover: #0A5F80;    /* hover                */
+    --primary-light: rgba(4, 161, 216, 0.10);
+
+    --dark-sidebar: #0A6E93;        /* azul da barra lateral */
+    --dark-sidebar-active: #4EB548; /* verde do item ativo   */
+    --bg-main: #F5F8FA;             /* papel claro           */
+    --card-bg: #FFFFFF;
     
     /* Cores de Recrutadores / Status */
     --color-yellow: hsl(42, 95%, 55%);      /* ML / Pendente (#eab308) */
@@ -401,13 +404,18 @@ h1, h2, h3, h4, h5, h6 {
     background-color: #e2e8f0;
 }
 
+/* Acao destrutiva continua VERMELHA -- e o unico lugar onde o vermelho tem
+   significado. O tom e o do sistema (--status-unfit), nao o vermelho vivo de
+   antes, e o hover escurece em vermelho: por um instante o hover ficou azul,
+   na troca da paleta, e botao de excluir que fica azul ao passar o mouse
+   engana. */
 .btn-danger {
-    background-color: var(--color-red);
+    background-color: var(--status-unfit, #B3261E);
     color: #ffffff;
 }
 
 .btn-danger:hover {
-    background-color: #be123c;
+    background-color: #8C1D16;
 }
 
 .btn-sm {
@@ -3311,362 +3319,9 @@ h1, h2, h3, h4, h5, h6 {
     50% { box-shadow: 0 0 0 4px rgba(239,68,68,0.25); opacity: 0.85; }
 }
 
-/* ==========================================================================
-   ESTILOS: ABA EXAME MÉDICO ADMISSIONAL
-   ========================================================================== */
-
-.exame-medico-wrapper {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 0 40px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.exame-header-area {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 8px;
-}
-
-.exame-header-left {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-
-.exame-header-icon {
-    width: 48px;
-    height: 48px;
-    background: var(--primary-light, rgba(37, 99, 235, 0.06));
-    color: var(--primary, #2563EB);
-    border-radius: var(--radius-md, 8px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-.exame-titulo {
-    font-family: sans-serif;
-    font-size: 24px;
-    font-weight: 600;
-    color: var(--color-text-title, #0F172A);
-    margin: 0;
-}
-
-.exame-subtitulo {
-    font-size: 13px;
-    color: var(--text-secondary, #64748B);
-    margin: 4px 0 0;
-}
-
-/* KPIs de Exame */
-.exame-kpi-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 16px;
-}
-
-.exame-kpi-card {
-    background: var(--color-white, #FFFFFF);
-    border: 1px solid var(--color-glass-border, #E2E8F0);
-    border-radius: var(--radius-lg, 14px);
-    padding: 20px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    box-shadow: 0 20px 20px rgba(0, 0, 0, 0.09);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.exame-kpi-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 20px 20px rgba(0, 0, 0, 0.09);
-}
-
-.exame-kpi-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-}
-
-.exame-kpi-total .exame-kpi-icon {
-    background: rgba(37, 99, 235, 0.1);
-    color: #2563EB;
-}
-
-.exame-kpi-aguardando .exame-kpi-icon {
-    background: rgba(217, 119, 6, 0.1);
-    color: #D97706;
-}
-
-.exame-kpi-concluido .exame-kpi-icon {
-    background: rgba(5, 150, 105, 0.1);
-    color: #059669;
-}
-
-.exame-kpi-info {
-    display: flex;
-    flex-direction: column;
-}
-
-.exame-kpi-num {
-    font-family: sans-serif;
-    font-size: 26px;
-    font-weight: 600;
-    color: var(--color-text-title, #0F172A);
-    line-height: 1.1;
-}
-
-.exame-kpi-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-secondary, #64748B);
-    margin-top: 4px;
-}
-
-/* Filtros Bar */
-.exame-filtros-bar {
-    background: var(--color-white, #FFFFFF);
-    border: 1px solid var(--color-glass-border, #E2E8F0);
-    border-radius: var(--radius-lg, 14px);
-    padding: 14px 20px;
-    display: flex;
-    gap: 16px;
-    align-items: center;
-    flex-wrap: wrap;
-    box-shadow: 0 20px 20px rgba(0, 0, 0, 0.09);
-}
-
-.exame-filtro-group {
-    position: relative;
-    display: flex;
-    align-items: center;
-    flex: 1;
-    min-width: 200px;
-}
-
-.exame-filtro-group i {
-    position: absolute;
-    left: 14px;
-    color: var(--text-secondary, #64748B);
-    pointer-events: none;
-    font-size: 14px;
-}
-
-.exame-filtro-input,
-.exame-filtro-select {
-    width: 100%;
-    padding: 10px 14px 10px 38px;
-    border: 1px solid var(--color-glass-border, #E2E8F0);
-    border-radius: var(--radius-sm, 8px);
-    background: #F8FAFC;
-    font-size: 13px;
-    color: var(--color-text-main, #1E293B);
-    outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.exame-filtro-input:focus,
-.exame-filtro-select:focus {
-    border-color: var(--primary, #2563EB);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
-    background: #FFFFFF;
-}
-
-/* Tabela de Exames */
-.exame-table-wrapper {
-    background: var(--color-white, #FFFFFF);
-    border: 1px solid var(--color-glass-border, #E2E8F0);
-    border-radius: var(--radius-lg, 14px);
-    box-shadow: 0 20px 20px rgba(0, 0, 0, 0.09);
-    overflow: hidden;
-}
-
-.exame-table-header {
-    display: grid;
-    grid-template-columns: 2.3fr 1.1fr 1.4fr 1.7fr 1.4fr 1fr 1.1fr;
-    gap: 12px;
-    padding: 14px 20px;
-    background: #F8FAFC;
-    border-bottom: 1px solid var(--color-glass-border, #E2E8F0);
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: var(--text-secondary, #64748B);
-    letter-spacing: 0.5px;
-}
-
-.exame-table-row {
-    display: grid;
-    grid-template-columns: 2.3fr 1.1fr 1.4fr 1.7fr 1.4fr 1fr 1.1fr;
-    gap: 12px;
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--color-glass-border, #E2E8F0);
-    font-size: 13px;
-    align-items: center;
-    background: #FFFFFF;
-    transition: background-color 0.2s ease;
-}
-
-.exame-table-row:hover {
-    background-color: #F8FAFC;
-}
-
-.exame-table-row:last-child {
-    border-bottom: none;
-}
-
-.exame-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: var(--primary-light, rgba(37, 99, 235, 0.06));
-    color: var(--primary, #2563EB);
-    font-weight: 600;
-    font-size: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.exame-col-nome {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 600;
-    color: var(--color-text-title, #0F172A);
-}
-
-.exame-col-nome-texto {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.exame-sininho-alert {
-    color: #D97706;
-    font-size: 13px;
-    cursor: help;
-    animation: exameSininhoPulse 1.5s infinite alternate ease-in-out;
-    will-change: transform, filter;
-}
-
 @keyframes exameSininhoPulse {
     0% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(217,119,6,0)); }
     100% { transform: scale(1.15) rotate(5deg); filter: drop-shadow(0 0 4px rgba(217,119,6,0.5)); }
-}
-
-.exame-col-cpf,
-.exame-col-tel,
-.exame-col-resp {
-    color: var(--color-text-main, #1E293B);
-}
-
-.exame-col-empresa strong {
-    color: var(--color-text-title, #0F172A);
-    font-weight: 600;
-}
-
-.exame-col-empresa small {
-    color: var(--text-secondary, #64748B);
-}
-
-.exame-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border-radius: 16px;
-    font-size: 11px;
-    font-weight: 600;
-}
-
-.exame-badge-ok {
-    background: rgba(5, 150, 105, 0.1);
-    color: #059669;
-}
-
-.exame-badge-pend {
-    background: rgba(217, 119, 6, 0.1);
-    color: #D97706;
-}
-
-.exame-wpp-link {
-    color: #059669;
-    font-weight: 600;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    white-space: nowrap;
-    transition: opacity 0.2s;
-}
-
-.exame-wpp-link:hover {
-    opacity: 0.8;
-    text-decoration: underline;
-}
-
-/* Botões */
-.btn-exame-upload,
-.btn-exame-ver {
-    width: 100%;
-    padding: 8px 12px;
-    border-radius: 6px;
-    border: none;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-}
-
-.btn-exame-upload {
-    background: #059669;
-    color: #FFFFFF;
-}
-
-.btn-exame-upload:hover {
-    background: #047857;
-}
-
-.btn-exame-ver {
-    background: #F1F5F9;
-    color: #334155;
-    border: 1px solid #E2E8F0;
-}
-
-.btn-exame-ver:hover {
-    background: #E2E8F0;
-    color: #0F172A;
-}
-
-.exame-empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: var(--text-secondary, #64748B);
-}
-
-.exame-empty-state i {
-    font-size: 42px;
-    color: #CBD5E1;
-    margin-bottom: 12px;
-    display: block;
 }
 
 /* Modais de Exame */
@@ -3719,11 +3374,6 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 18px;
     background: var(--primary-light, rgba(37, 99, 235, 0.06));
     color: var(--primary, #2563EB);
-}
-
-.modal-exame-icon-hospital {
-    background: rgba(37, 99, 235, 0.1);
-    color: #2563EB;
 }
 
 .modal-exame-close {
@@ -3880,40 +3530,6 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--text-secondary, #64748B);
 }
 
-.exame-btn-download {
-    padding: 6px 12px;
-    font-size: 11px;
-}
-
-.exame-pdf-placeholder {
-    text-align: center;
-    padding: 24px;
-    color: var(--text-secondary, #64748B);
-    border: 1px dashed #CBD5E1;
-    border-radius: var(--radius-sm, 8px);
-    background: #F8FAFC;
-    font-size: 13px;
-}
-
-/* Toast de Confirmação */
-.exame-toast-ok {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    background: #059669;
-    color: #FFFFFF;
-    padding: 14px 20px;
-    border-radius: var(--radius-sm, 8px);
-    font-size: 13.5px;
-    font-weight: 600;
-    box-shadow: 0 20px 20px rgba(0, 0, 0, 0.09);
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    animation: exameFadeInUp 0.3s ease-out;
-}
-
 @keyframes exameFadeInUp {
     0% { transform: translateY(20px); opacity: 0; }
     100% { transform: translateY(0); opacity: 1; }
@@ -3921,63 +3537,6 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Responsividade */
 @media (max-width: 900px) {
-    .exame-table-header {
-        display: none;
-    }
-    .exame-table-row {
-        grid-template-columns: 1fr;
-        gap: 8px;
-        padding: 16px;
-        position: relative;
-    }
-    .exame-col-nome {
-        margin-bottom: 4px;
-    }
-    .exame-col-status {
-        position: absolute;
-        top: 16px;
-        right: 16px;
-    }
-    .exame-table-row > span {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .exame-table-row > span::before {
-        content: attr(class);
-        font-weight: 600;
-        font-size: 10px;
-        text-transform: uppercase;
-        color: var(--text-secondary, #64748B);
-        width: 100px;
-        flex-shrink: 0;
-        display: inline-block;
-    }
-    
-    .exame-table-row .exame-col-nome::before { display: none; }
-    .exame-table-row .exame-col-status::before { display: none; }
-    .exame-table-row .exame-col-acao::before { display: none; }
-    
-    .exame-table-row .exame-col-cpf::before { content: "CPF:"; }
-    .exame-table-row .exame-col-tel::before { content: "Telefone:"; }
-    .exame-table-row .exame-col-empresa::before { content: "Empresa:"; }
-    .exame-table-row .exame-col-resp::before { content: "Responsável:"; }
-    
-    .btn-exame-upload, .btn-exame-ver {
-        margin-top: 8px;
-    }
-}
-
-
-
-/* ── Sub-abas do Exame Médico (Não Concluídos / Concluídos / Todos / Relatório) ── */
-.exame-subtabs {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 16px;
-    border-bottom: 1px solid var(--color-glass-border, #E2E8F0);
-    padding-bottom: 2px;
 }
 
 .exame-subtab {
@@ -4029,11 +3588,6 @@ h1, h2, h3, h4, h5, h6 {
 
 /* No celular, as sub-abas rolam na horizontal em vez de quebrar a tela */
 @media (max-width: 768px) {
-    .exame-subtabs {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
     .exame-subtab { flex: 0 0 auto; }
 }
 
@@ -4051,36 +3605,6 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 12px;
 }
 
-/* Checkboxes dos equipamentos */
-.equip-check-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 8px;
-    margin-top: 6px;
-}
-.equip-check {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
-    border: 1px solid var(--color-glass-border, #E2E8F0);
-    border-radius: 8px;
-    background: var(--color-white, #FFFFFF);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: border-color .15s ease, background-color .15s ease;
-}
-.equip-check:hover { border-color: var(--primary, #2563EB); }
-.equip-check input { width: 16px; height: 16px; cursor: pointer; flex: 0 0 auto; }
-/* .marcado e mantido por JS: navegadores sem suporte a :has() (Safari antigo)
-   continuam mostrando o item selecionado. */
-.equip-check.marcado,
-.equip-check:has(input:checked) {
-    border-color: var(--primary, #2563EB);
-    background: rgba(37, 99, 235, 0.06);
-}
-
 /* Caixa de upload das fotos */
 .equip-upload-box {
     border: 1px dashed var(--color-glass-border, #CBD5E1);
@@ -4089,108 +3613,7 @@ h1, h2, h3, h4, h5, h6 {
     background: var(--surface-2, rgba(15, 23, 42, 0.02));
 }
 
-/* Miniaturas dos arquivos anexados no formulário */
-.equip-fotos-preview {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: 10px;
-    margin-top: 12px;
-}
-.equip-foto-item {
-    position: relative;
-    border: 1px solid var(--color-glass-border, #E2E8F0);
-    border-radius: 8px;
-    overflow: hidden;
-    background: var(--color-white, #FFFFFF);
-    display: flex;
-    flex-direction: column;
-}
-.equip-foto-item img {
-    width: 100%;
-    height: 84px;
-    object-fit: cover;
-    display: block;
-}
-.equip-foto-pdf {
-    width: 100%;
-    height: 84px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28px;
-    color: #DC2626;
-    background: rgba(220, 38, 38, 0.06);
-}
-.equip-foto-nome {
-    display: block;
-    padding: 6px 8px;
-    font-size: 10.5px;
-    color: var(--text-secondary, #64748B);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.equip-foto-remover {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 22px;
-    height: 22px;
-    border: none;
-    border-radius: 50%;
-    background: rgba(220, 38, 38, 0.92);
-    color: #FFFFFF;
-    font-size: 11px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.equip-foto-remover:hover { background: #B91C1C; }
-
-/* Galeria na tela de visualização (clicar amplia em aba nova) */
-.equip-galeria {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 12px;
-    margin-top: 10px;
-}
-.equip-galeria-item {
-    position: relative;
-    border: 1px solid var(--color-glass-border, #E2E8F0);
-    border-radius: 8px;
-    overflow: hidden;
-    background: var(--color-white, #FFFFFF);
-    padding: 0;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    text-align: left;
-    transition: transform .15s ease, box-shadow .15s ease;
-}
-.equip-galeria-item:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-.equip-galeria-item img {
-    width: 100%;
-    height: 110px;
-    object-fit: cover;
-    display: block;
-}
-.equip-galeria-item .equip-foto-pdf { height: 110px; }
-.equip-galeria-zoom {
-    display: block;
-    padding: 6px 8px;
-    font-size: 10.5px;
-    font-weight: 600;
-    color: var(--primary, #2563EB);
-    border-top: 1px solid var(--color-glass-border, #E2E8F0);
-}
-
 @media (max-width: 768px) {
-    .equip-check-grid { grid-template-columns: 1fr 1fr; }
-    .equip-fotos-preview, .equip-galeria { grid-template-columns: 1fr 1fr; }
 }
 
 /* ==========================================================================
@@ -4216,16 +3639,6 @@ select.exame-filtro-select:focus {
     background-repeat: no-repeat;
     background-position: right 13px center;
     background-size: 13px;
-}
-
-/* O recuo à esquerda só vale quando existe MESMO um ícone antes do campo */
-.exame-filtro-input,
-.exame-filtro-select {
-    padding-left: 14px;
-}
-.exame-filtro-group > i ~ .exame-filtro-input,
-.exame-filtro-group > i ~ .exame-filtro-select {
-    padding-left: 40px;
 }
 
 /* Campos de data: o seletor de calendário do navegador fica à direita */
@@ -4303,119 +3716,7 @@ input.form-control[type="date"] {
 .equip-switch[data-ativo="entrega"]   .equip-switch-opt[data-tipo="entrega"]   { color: #059669; }
 .equip-switch[data-ativo="devolucao"] .equip-switch-opt[data-tipo="devolucao"] { color: #D97706; }
 
-/* ── Cartões do topo clicáveis (Todos / Entregas / Devoluções) ──────────── */
-.equip-kpi-btn {
-    text-align: left;
-    cursor: pointer;
-    font-family: inherit;
-    position: relative;
-}
-.equip-kpi-btn.active {
-    border-color: var(--primary, #2563EB);
-    box-shadow: 0 20px 20px rgba(0, 0, 0, 0.09);
-}
-.equip-kpi-btn.active::after {
-    content: "";
-    position: absolute;
-    left: 20px;
-    right: 20px;
-    bottom: 0;
-    height: 3px;
-    border-radius: 6px 3px 0 0;
-    background: var(--primary, #2563EB);
-}
-
-/* ── Visualizador de fotos (lightbox dentro do sistema) ─────────────────── */
-.equip-lightbox {
-    position: relative;
-    width: min(94vw, 980px);
-    max-height: 92vh;
-    display: flex;
-    flex-direction: column;
-    background: #0F172A;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 20px 20px rgba(0, 0, 0, 0.09);
-}
-.equip-lightbox-close {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    z-index: 2;
-    width: 34px;
-    height: 34px;
-    border: none;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, .14);
-    color: #FFFFFF;
-    font-size: 15px;
-    cursor: pointer;
-}
-.equip-lightbox-close:hover { background: rgba(255, 255, 255, .28); }
-.equip-lightbox-body {
-    flex: 1 1 auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 18px;
-    overflow: auto;
-    min-height: 240px;
-}
-.equip-lightbox-body img {
-    max-width: 100%;
-    max-height: 74vh;
-    object-fit: contain;
-    border-radius: 8px;
-}
-.equip-lightbox-pdf {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    color: #E2E8F0;
-    text-align: center;
-    padding: 30px;
-}
-.equip-lightbox-pdf i { font-size: 54px; color: #F87171; }
-.equip-lightbox-pdf span { font-size: 12.5px; color: #94A3B8; }
-.equip-lightbox-bar {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding: 12px 16px;
-    background: #1E293B;
-    border-top: 1px solid rgba(255, 255, 255, .08);
-}
-.equip-lightbox-nome {
-    font-size: 12.5px;
-    font-weight: 600;
-    color: #E2E8F0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 40%;
-}
-.equip-lightbox-acoes {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-.equip-lightbox-contador {
-    font-size: 12px;
-    font-weight: 600;
-    color: #94A3B8;
-    min-width: 54px;
-    text-align: center;
-}
-
 @media (max-width: 768px) {
-    .equip-lightbox { width: 100vw; max-height: 100vh; border-radius: 0; }
-    .equip-lightbox-nome { max-width: 100%; }
-    .equip-lightbox-bar { justify-content: center; }
 }
 
 /* Chave Online / Presencial do exame médico (reaproveita .equip-switch) */
@@ -4450,88 +3751,7 @@ input.form-control[type="date"] {
     pointer-events: none;
 }
 
-/* Botões de anexo do equipamento (Tirar foto / Escolher arquivo) */
-.equip-upload-botoes {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-}
-.equip-upload-botoes .btn { width: 100%; justify-content: center; }
-
-/* Labels que funcionam como botão para upload (compatível com celular) */
-.equip-upload-label {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    cursor: pointer;
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
-    text-align: center;
-}
-
-/* ── Equipamentos: Cards Mobile ────────────────────────────────────────── */
-.equip-mobile-view { display: none; }
-.equip-desktop-view { display: block; }
-
 @media (max-width: 768px) {
-    .equip-mobile-view { display: flex; flex-direction: column; gap: 10px; }
-    .equip-desktop-view { display: none !important; }
-}
-
-.equip-card-mobile {
-    background: var(--surface-card, #fff);
-    border: 1px solid var(--border-color, rgba(0,0,0,.08));
-    border-radius: 12px;
-    padding: 14px 16px;
-    cursor: pointer;
-    transition: box-shadow .15s, border-color .15s;
-}
-.equip-card-mobile:hover,
-.equip-card-mobile:active {
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    border-color: var(--primary, #2563EB);
-}
-.equip-card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 10px;
-}
-.equip-card-header strong {
-    font-size: 14px;
-    color: var(--color-text-title, #0F172A);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-}
-.equip-card-body {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    font-size: 12.5px;
-    color: var(--text-secondary, #64748B);
-}
-.equip-card-body span {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.equip-card-body i {
-    width: 14px;
-    text-align: center;
-    font-size: 11px;
-    color: var(--primary, #2563EB);
-}
-.equip-card-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 10px;
-    padding-top: 8px;
-    border-top: 1px solid var(--border-color, rgba(0,0,0,.06));
 }
 
 /* ── Importador de registros antigos (Forms + Drive) ───────────────────── */
@@ -5490,35 +4710,7 @@ input.form-control[type="date"] {
     .rt-aviso-quem { margin-right: 0; }
 }
 
-/* ── Relatório de equipamentos para a empresa cliente ────────────────────── */
-.equip-col-check { width: 40px; text-align: center; }
-.equip-col-check input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
-.equip-barra-selecao,
-#equip-barra-selecao > .equip-barra-selecao {
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-    background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px;
-    padding: 10px 14px; margin-bottom: 12px;
-}
-.equip-sel-info { font-size: 13.5px; color: #1E3A8A; margin-right: auto; }
-.equip-sel-info b { font-size: 16px; }
-
-.rel-equip-ok {
-    margin-top: 16px; background: #ECFDF5; border: 1px solid #A7F3D0;
-    border-radius: 12px; padding: 14px;
-}
-.rel-equip-ok-titulo { font-weight: 600; color: #047857; font-size: 14.5px; }
-.rel-equip-ok-txt { margin: 6px 0 10px; font-size: 13px; color: #065F46; }
-.rel-equip-link input {
-    width: 100%; padding: 10px 12px; font-size: 13px; font-family: ui-monospace, monospace;
-    border: 1px solid #A7F3D0; border-radius: 8px; background: #fff; color: #0F172A;
-}
-.rel-equip-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-
 @media (max-width: 768px) {
-    .equip-barra-selecao { flex-direction: column; align-items: stretch; }
-    .equip-barra-selecao .btn { width: 100%; min-height: 44px; justify-content: center; }
-    .equip-sel-info { margin-right: 0; text-align: center; }
-    .rel-equip-acoes .btn { width: 100%; min-height: 44px; justify-content: center; }
 }
 
 /* Nota/relação em destaque dentro do resultado da busca */
@@ -5543,21 +4735,6 @@ body.app-shell {
 /* Alternativa para navegadores sem :has() (Safari anterior ao 15.4):
    a regra abaixo não depende dele. */
 body.app-shell > .app-container { max-height: 100%; }
-
-/* ── Equipamentos: alternar entre Registros e Links enviados ─────────────── */
-.equip-visoes { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
-.equip-visao-btn {
-    display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; min-height: 42px;
-    border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px;
-    background: var(--surface-card, #fff); color: var(--text-secondary, #64748b);
-    font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
-}
-.equip-visao-btn.ativa { background: #2563EB; border-color: #2563EB; color: #fff; }
-.equip-visao-conta {
-    min-width: 20px; padding: 1px 7px; border-radius: 9999px; font-size: 11.5px;
-    background: rgba(0,0,0,.08); color: inherit;
-}
-.equip-visao-btn.ativa .equip-visao-conta { background: rgba(255,255,255,.25); }
 
 /* ── Histórico dos links enviados ────────────────────────────────────────── */
 .rel-busca { margin-bottom: 14px; }
@@ -5605,7 +4782,6 @@ body.app-shell > .app-container { max-height: 100%; }
 .rel-emp { font-weight: 600; color: var(--text-secondary, #64748b); }
 
 @media (max-width: 768px) {
-    .equip-visao-btn { flex: 1 1 auto; justify-content: center; min-height: 46px; }
     .rel-selo { margin-left: 0; }
     .rel-card-acoes .btn { flex: 1 1 auto; min-height: 42px; justify-content: center; }
 }

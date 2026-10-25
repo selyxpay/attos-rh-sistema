@@ -8,7 +8,7 @@
   <meta name="robots" content="index, follow">
   <link rel="icon" type="image/png" href="img/favicon-attos.png">
   <link rel="apple-touch-icon" href="img/favicon-attos.png">
-  <meta name="theme-color" content="#e11d2a">
+  <meta name="theme-color" content="#0A6E93">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -78,7 +78,7 @@
     }
     /* Recruiter banner */
     .recruiter-banner {
-      background: #be123c;
+      background: #0A5F80;
       color: #fff; padding: 14px 20px; border-radius:8px;
       margin-bottom: 24px; display: flex; align-items: center; gap: 12px;
       font-size: 13px; font-weight: 500;
@@ -136,7 +136,7 @@
 
     <!-- Banner de recrutadora (mostrado se ?rec=X) -->
     <div id="recruiter-banner" class="recruiter-banner" style="display:none;">
-      <div class="recruiter-avatar" id="recruiter-avatar" style="background:#be123c;">R</div>
+      <div class="recruiter-avatar" id="recruiter-avatar" style="background:#0A5F80;">R</div>
       <span id="recruiter-msg">Você está se cadastrando no Banco de Talentos da ATTOS RH.</span>
     </div>
 
@@ -309,7 +309,7 @@ function startConfetti() {
   const ctx = canvas.getContext('2d');
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
-  const colors = ['#be123c','#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#a855f7','#ec4899'];
+  const colors = ['#0A5F80','#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#a855f7','#ec4899'];
   const pieces = [];
   for (let i = 0; i < 130; i++) {
     pieces.push({
@@ -439,7 +439,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const rec    = (state.recrutadores || []).find(r => r.id === recrutadorLinkId);
     if (rec && banner) {
       banner.style.display = 'flex';
-      if (avatar) { avatar.style.background = rec.corHex || '#be123c'; avatar.textContent = rec.nome[0].toUpperCase(); }
+      if (avatar) { avatar.style.background = rec.corHex || '#0A5F80'; avatar.textContent = rec.nome[0].toUpperCase(); }
       if (msg) msg.innerHTML = 'Você está se cadastrando no banco de talentos de <strong>' + rec.nome + '</strong>. Ela será notificada do seu cadastro.';
     }
   }

@@ -444,8 +444,8 @@
   transition: border-color .15s ease, color .15s ease;
 }
 .wa-btn-tela-cheia:hover {
-  border-color: var(--color-rt-red, #D40203);
-  color: var(--color-rt-red, #D40203);
+  border-color: var(--color-rt-red, #07769C);
+  color: var(--color-rt-red, #07769C);
 }
 
 body.wa-tela-cheia .sidebar,
@@ -494,7 +494,7 @@ body.wa-tela-cheia .wa-inbox {
   box-shadow: 0 2px 10px rgba(0, 0, 0, .22);
 }
 body.wa-tela-cheia .wa-sair-tela-cheia { display: inline-flex; }
-.wa-sair-tela-cheia:hover { background: var(--color-rt-red, #D40203); }
+.wa-sair-tela-cheia:hover { background: var(--color-rt-red, #07769C); }
 
 body.wa-tela-cheia { overflow: hidden; }
 
