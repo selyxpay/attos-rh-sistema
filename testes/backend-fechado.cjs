@@ -40,11 +40,11 @@ async function pegar(caminho, cookie) {
     '/whatsapp-api.cjs',
     '/whatsapp-db.cjs',
     '/whatsapp-webhook.cjs',
-    '/equipamentos-protecao.cjs',
-    '/openwa.cjs',
+    '/whatsapp-bot.cjs',
+    '/whatsapp-lembretes.cjs',
     '/backup-dados.cjs',
     '/verificar-sistema.cjs',
-    '/restaurar-equipamentos.cjs',
+    '/restaurar-registros.cjs',
     '/limpar-fotos-embutidas.cjs'
   ];
   for (const c of doBackend) {
@@ -94,7 +94,7 @@ async function pegar(caminho, cookie) {
   // senha, token ou chave escrita dentro.
   const publicos = [
     '/js/security.js', '/js/vps-sync.js', '/js/exata-catalogo.js',
-    '/login.html', '/candidato.html', '/talento.html', '/diaria-trabalhador.html',
+    '/login.html', '/candidato.html', '/talento.html',
     '/css/style.css'
   ];
   const padroesDeSegredo = [
@@ -123,8 +123,7 @@ async function pegar(caminho, cookie) {
   // ---------- 5) o que PRECISA continuar funcionando ----------
   console.log('\n=== 5) NAO BLOQUEEI DEMAIS ===');
   const precisam = [
-    '/', '/login.html', '/candidato.html', '/talento.html',
-    '/diaria-trabalhador.html', '/relatorio-equip.html', '/privacidade.html',
+    '/', '/login.html', '/candidato.html', '/talento.html', '/privacidade.html',
     '/fila-display.html', '/css/style.css', '/css/whatsapp.css',
     '/js/security.js', '/js/vps-sync.js', '/api/time'
   ];

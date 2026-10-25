@@ -128,7 +128,7 @@ const ok = (c, m) => { console.log((c ? '  OK   ' : '  FALHOU: ') + m); if (!c) 
   })()`);
   ok(rAt2.ok, 'e o unshift que antes estourava agora funciona (' + JSON.stringify(rAt2) + ')');
 
-  console.log('\n=== TODAS AS 25 ABAS AINDA ABREM SEM ERRO ===');
+  console.log('\n=== TODAS AS ABAS DO MENU AINDA ABREM SEM ERRO ===');
   excecoes.length = 0;
   const abas = await cdp.eval(`(function(){
     return Array.from(document.querySelectorAll('[data-aba]')).map(e => e.getAttribute('data-aba'));

@@ -110,7 +110,7 @@ const PNG_B64 = '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c
   })()`);
   console.log('   ' + JSON.stringify(render));
   ok(render.largura > 0 && render.altura > 0,
-    'a imagem carregou no <img> (naturalWidth ' + render.largura + ') — e isto que as telas de candidato e equipamento fazem');
+    'a imagem carregou no <img> (naturalWidth ' + render.largura + ') — e isto que a tela de candidato faz');
 
   // ---------- 3) SVG com login NAO renderiza como imagem nem executa ----------
   console.log('\n=== SVG NAO E SERVIDO COMO IMAGEM ===');

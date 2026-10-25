@@ -28,7 +28,7 @@
 (function (raiz) {
   'use strict';
 
-  // As 25 abas do painel, na ordem do menu. O id é o mesmo `data-aba` que o
+  // As 20 abas do painel, na ordem do menu. O id é o mesmo `data-aba` que o
   // index.html já usa — não existe mais tabela de "área" no meio do caminho.
   var TELAS = [
     { id: 'dashboard',        nome: 'Dashboard' },
@@ -36,19 +36,13 @@
     { id: 'banco-talentos',   nome: 'Banco de Talentos' },
     { id: 'selecao',          nome: 'Seleção' },
     { id: 'depto-pessoal',    nome: 'Depto. Pessoal' },
-    { id: 'equipamentos',     nome: 'Entrega/Devolução de Equipamentos' },
-    { id: 'exame-medico',     nome: 'Exame Médico' },
     { id: 'fluxo-financeiro', nome: 'Fluxo Financeiro' },
-    { id: 'comissao',         nome: 'Comissão' },
-    { id: 'margem',           nome: 'Controle ASO Repasse (Margem)' },
     { id: 'whatsapp',         nome: 'WhatsApp Oficial' },
-    { id: 'whatsapp-qr',      nome: 'WhatsApp QR' },
     { id: 'bot',              nome: 'Bot do WhatsApp' },
     { id: 'funcionarios',     nome: 'Funcionários' },
     { id: 'controle-acesso',  nome: 'Controle de Acesso (horários)' },
     { id: 'cadastros-exata',  nome: 'Cadastros Exata' },
     { id: 'documentos',       nome: 'Documentos' },
-    { id: 'diaria',           nome: 'Diária (Presença RT)' },
     { id: 'relatorios',       nome: 'Relatórios' },
     { id: 'site',             nome: 'Site' },
     { id: 'meu-painel',       nome: 'Meu Painel' },
@@ -81,9 +75,18 @@
     vagas:                ['vagas', 'dashboard', 'site'],
     candidatos:           ['selecao', 'depto-pessoal', 'dashboard', 'lixeira', 'documentos', 'site'],
     bancoTalentos:        ['banco-talentos', 'lixeira'],
-    contratacoes:         ['comissao', 'dashboard', 'depto-pessoal'],
-    recrutadores:         ['meu-painel', 'selecao', 'dashboard', 'comissao'],
+    contratacoes:         ['dashboard', 'depto-pessoal'],
+    recrutadores:         ['meu-painel', 'selecao', 'dashboard'],
     atividades:           ['dashboard'],
+    // ── CHAVES DE MÓDULO REMOVIDO ─────────────────────────────────────────
+    // Equipamentos, Exame Médico, Margem e Diária saíram do sistema, mas o
+    // DADO deles continua no state.json. Estas linhas APONTAM DE PROPÓSITO
+    // para telas que não existem mais: como ninguém tem uma tela que saiu da
+    // lista TELAS, o filtro devolve [] para todo mundo na leitura e repõe o
+    // valor do servidor na gravação. Ou seja, o histórico fica guardado,
+    // invisível e intocável pela interface.
+    // APAGAR estas linhas faria o contrário: chave não mapeada passa para
+    // TODOS (ver o comentário do CHAVES_POR_TELA acima).
     examesMedicos:        ['exame-medico'],
     equipamentos:         ['equipamentos'],
     relatoriosEquip:      ['equipamentos'],
@@ -159,13 +162,10 @@
     // Estas quatro, no menu de hoje, são só de quem administra. A regra geral
     // (área 'sistema') deixava entrar por chamada de função, mas o item ficava
     // escondido — ou seja, na prática a pessoa não tinha.
-    if (aba === 'lixeira' || aba === 'cadastros-exata' || aba === 'diaria' ||
+    if (aba === 'lixeira' || aba === 'cadastros-exata' ||
         aba === 'inaptos' || aba === 'configuracoes') return ehAdmin(f);
     if (aba === 'controle-acesso') {
       return ehAdmin(f) || !!(f.permissoesEspeciais && f.permissoesEspeciais.podeGerenciarHorariosAcesso);
-    }
-    if (aba === 'equipamentos') {
-      return ehAdmin(f) || f.departamento === 'dp' || _perm(f, 'equipamentos', 'visualizar');
     }
     if (aba === 'fluxo-financeiro') {
       return ehMestreLogin(f.login)
@@ -178,20 +178,8 @@
         || _ehResponsavelFF(f, dados, 'gestao') || _ehResponsavelFF(f, dados, 'financeiro');
     }
     if (aba === 'whatsapp') return ehAdmin(f) || _perm(f, 'whatsapp', 'visualizar');
-    if (aba === 'whatsapp-qr') return ehAdmin(f) || _perm(f, 'whatsapp', 'aprovar');
     // Tela NOVA: nasce fechada. Só admin vê, até alguém liberar na matriz.
     if (aba === 'bot') return ehAdmin(f);
-    if (aba === 'margem') {
-      return ehMestreLogin(f.login)
-        || ['administracao', 'financeiro', 'gestao'].indexOf(f.departamento) >= 0
-        || _perm(f, 'comissao', 'visualizar');
-    }
-    // Exame Médico: o MENU de hoje só mostra para clínica, seleção e
-    // administração (mestre incluso).
-    if (aba === 'exame-medico') {
-      return ehMestreLogin(f.login)
-        || ['clinica', 'selecao', 'administracao'].indexOf(f.departamento) >= 0;
-    }
     if (aba === 'funcionarios') return ehAdmin(f) || _perm(f, 'funcionarios', 'visualizar');
     if (aba === 'auditoria') return ehAdmin(f) || _perm(f, 'sistema', 'visualizar');
     if (ehMestreLogin(f.login)) return true;
@@ -200,7 +188,7 @@
     var AREA = {
       'dashboard': 'dashboard', 'vagas': 'vagas', 'banco-talentos': 'banco_talentos',
       'selecao': 'selecao', 'depto-pessoal': 'dp', 'relatorios': 'relatorios',
-      'comissao': 'comissao', 'site': 'candidatos', 'documentos': 'dp'
+      'site': 'candidatos', 'documentos': 'dp'
     };
     var area = AREA[aba];
     if (area && f.permissoes && f.permissoes[area]) {
@@ -213,7 +201,6 @@
       return ['dashboard', 'vagas', 'banco-talentos', 'selecao', 'site', 'meu-painel'].indexOf(aba) >= 0;
     }
     if (depto === 'dp') return ['depto-pessoal', 'banco-talentos'].indexOf(aba) >= 0;
-    if (depto === 'comissao') return ['comissao'].indexOf(aba) >= 0;
     return false;
   }
 
@@ -224,9 +211,9 @@
     var AREA = {
       'dashboard': 'dashboard', 'vagas': 'vagas', 'banco-talentos': 'banco_talentos',
       'selecao': 'selecao', 'depto-pessoal': 'dp', 'relatorios': 'relatorios',
-      'comissao': 'comissao', 'site': 'candidatos', 'documentos': 'dp',
-      'funcionarios': 'funcionarios', 'auditoria': 'sistema', 'exame-medico': 'exame_medico',
-      'equipamentos': 'equipamentos', 'fluxo-financeiro': 'fluxo_financeiro', 'whatsapp': 'whatsapp'
+      'site': 'candidatos', 'documentos': 'dp',
+      'funcionarios': 'funcionarios', 'auditoria': 'sistema',
+      'fluxo-financeiro': 'fluxo_financeiro', 'whatsapp': 'whatsapp'
     };
     var area = AREA[aba];
     var p = f && f.permissoes && area ? f.permissoes[area] : null;
@@ -245,7 +232,7 @@
   }
 
   // ── A FUNÇÃO PRINCIPAL ───────────────────────────────────────────────────
-  // Devolve { aba: nivel } para as 25 abas.
+  // Devolve { aba: nivel } para as 20 abas.
   function telasDoFuncionario(f, dados) {
     var saida = {};
     if (!f) { IDS.forEach(function (id) { saida[id] = 'nao'; }); return saida; }

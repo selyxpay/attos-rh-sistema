@@ -1,7 +1,7 @@
 // Roda pelo executor da suite:  node testes/rodar.cjs
 // O executor sobe um servidor isolado numa porta livre e passa o endereco
 // em BASE (e a porta do navegador em CDP, quando a suite precisa de tela).
-// Varredura das 25 abas capturando ERRO DE VERDADE:
+// Varredura de todas as abas do menu capturando ERRO DE VERDADE:
 //  - excecao de JS (Runtime.exceptionThrown)
 //  - console.error / console.warn (Runtime.consoleAPICalled)
 //  - chamada de rede que falhou ou voltou 4xx/5xx (Network.*)

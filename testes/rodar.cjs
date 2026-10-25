@@ -86,9 +86,9 @@ const SUITES = [
   { nome: 'texto',     arquivo: 'texto-longo.cjs',     servidor: true,  navegador: true,
     titulo: 'Descritivo de vaga: quebras de linha preservadas e HTML escapado' },
   { nome: 'dados',     arquivo: 'dados.cjs',          servidor: true,  navegador: false,
-    titulo: 'Dado que nao gravava ou voltava (fila, acento, sigilo, diaria, lista vazia)' },
+    titulo: 'Dado que nao gravava ou voltava (fila, acento, sigilo, lista vazia)' },
   { nome: 'dados-ui',  arquivo: 'dados-ui.cjs',       servidor: true,  navegador: true,
-    titulo: 'Dados no navegador — fila, cadastro de candidato, log de equipamento' },
+    titulo: 'Dados no navegador — fila e cadastro de candidato' },
   { nome: 'sync',      arquivo: 'sincronizacao.cjs',  servidor: true,  navegador: false,
     titulo: 'Sincronizacao com DUAS pessoas ao mesmo tempo' },
   { nome: 'telas',     arquivo: 'permissao-telas.cjs', servidor: true, navegador: false, semente: sementeTelas,
@@ -118,9 +118,9 @@ const SUITES = [
   { nome: 'limpeza',   arquivo: 'limpeza.cjs',        servidor: true,  navegador: false,
     titulo: 'Endurecimento (corpo invalido, rota inexistente)' },
   { nome: 'limpeza-ui', arquivo: 'limpeza-ui.cjs',    servidor: true,  navegador: true,
-    titulo: 'Limpeza no navegador — link de ficha, kanban removido, 25 abas' },
+    titulo: 'Limpeza no navegador — link de ficha, kanban removido, abas do menu' },
   { nome: 'abas',      arquivo: 'varredura-abas.cjs', servidor: true,  navegador: true,
-    titulo: 'Varredura das 25 abas: erro de console e chamada que falha' }
+    titulo: 'Varredura das abas do menu: erro de console e chamada que falha' }
 ];
 
 // ── UTILIDADES ─────────────────────────────────────────────────────────────

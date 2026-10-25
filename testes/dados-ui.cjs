@@ -1,7 +1,7 @@
 // Roda pelo executor da suite:  node testes/rodar.cjs
 // O executor sobe um servidor isolado numa porta livre e passa o endereco
 // em BASE (e a porta do navegador em CDP, quando a suite precisa de tela).
-// TESTES DE TELA DA ETAPA 2: Fila, cadastro de candidato e log de equipamento.
+// TESTES DE TELA DA ETAPA 2: Fila, cadastro de candidato e log na Auditoria.
 const http = require('http');
 function jsonGet(url) {
   return new Promise((res, rej) => http.get(url, r => {
@@ -167,8 +167,8 @@ const ok = (c, m) => { console.log((c ? '  OK   ' : '  FALHOU: ') + m); if (!c) 
   const campoMantido = await cdp.eval(`(document.getElementById('add-nome')||{}).value || ''`);
   ok(campoMantido === 'Teste Vaga Sumiu', 'o que foi digitado continua no formulario ("' + campoMantido + '")');
 
-  // ---------- 9) LOG DE EQUIPAMENTO VAI PARA A AUDITORIA ----------
-  console.log('\n=== 9) EQUIPAMENTO: a acao aparece na Auditoria ===');
+  // ---------- 9) LOG DA ACAO VAI PARA A AUDITORIA ----------
+  console.log('\n=== 9) AUDITORIA: o registro e o log sobem juntos ===');
   const antesLogs = await cdp.eval(`(async function(){
     const j = await (await fetch('/api/state')).json();
     return (j.dados.logs||[]).length;
@@ -180,13 +180,13 @@ const ok = (c, m) => { console.log((c ? '  OK   ' : '  FALHOU: ') + m); if (!c) 
     loggedUser = { login: 'zeteste', nome: 'Ze Teste', departamento: 'dp' };
     try {
       // simula exatamente o que a tela faz: cria o log e salva com os alvos
-      const idEquip = _novoId('equip');
-      state.equipamentos.push({ id: idEquip, nome:'Fulano Equip', cpf:'', tipo:'entrega', estado:'novo', equipamentos:[], fotos:[] });
-      const idLog = registrarLogGlobal('Registrou entrega de equipamento para "Fulano Equip".', 'dp');
-      const alvos = [idEquip];
+      const idCand = _novoId('candidato');
+      state.candidatos.push({ id: idCand, nome:'Fulano Auditoria', cpf:'', status:'aprovado', documentos:{} });
+      const idLog = registrarLogGlobal('Aprovou a ficha de "Fulano Auditoria".', 'dp');
+      const alvos = [idCand];
       if (idLog) alvos.push(idLog);
       await RTCloud.salvarAgora(state, { merge: true, upsertIds: alvos, somenteAlvos: true });
-      return { idEquip: idEquip, idLog: idLog };
+      return { idCand: idCand, idLog: idLog };
     } finally { loggedUser = _antesUser; }
   })()`);
   await espera(900);
@@ -195,10 +195,10 @@ const ok = (c, m) => { console.log((c ? '  OK   ' : '  FALHOU: ') + m); if (!c) 
     return {
       logs: (j.dados.logs||[]).length,
       temEsse: (j.dados.logs||[]).some(l => l && l.id === ${JSON.stringify(res9 && res9.idLog)}),
-      temEquip: (j.dados.equipamentos||[]).some(e => e && e.id === ${JSON.stringify(res9 && res9.idEquip)})
+      temCand: (j.dados.candidatos||[]).some(c => c && c.id === ${JSON.stringify(res9 && res9.idCand)})
     };
   })()`);
-  ok(depoisSrv.temEquip, 'o equipamento foi gravado no servidor');
+  ok(depoisSrv.temCand, 'o candidato foi gravado no servidor');
   ok(depoisSrv.temEsse, 'e o LOG da acao tambem subiu (antes ficava so na tela e sumia)');
   console.log('   logs no servidor: ' + antesLogs + ' -> ' + depoisSrv.logs);
 

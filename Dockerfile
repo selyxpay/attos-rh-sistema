@@ -6,7 +6,7 @@
 #
 # ATENÇÃO (persistência): os dados ficam em /data, que PRECISA ser um volume
 # persistente montado pelo Coolify. Sem esse volume, cada deploy sobe um
-# container novo e vazio — os registros de Equipamentos, as fotos e o banco do
+# container novo e vazio — os candidatos, as fotos e o banco do
 # WhatsApp seriam perdidos. Confira em Coolify -> Storages antes de publicar.
 # ==========================================================================
 FROM node:20-alpine
@@ -27,11 +27,6 @@ RUN npm ci --omit=dev
 COPY server.cjs ./
 # Base inicial de EMPRESAS/TOMADORES/CLIENTES do Fluxo Financeiro (import idempotente).
 COPY ff-cadastros-base.json ./
-# Tabela CUSTO x REPASSE de exames (modulo Margem) — base de importacao.
-COPY precificacao-base.json ./
-# Proteção dos dados críticos de Equipamentos (guarda anti-sumiço + espelho).
-# Sem estes arquivos o sistema sobe, mas SEM a rede de segurança.
-COPY equipamentos-protecao.cjs restaurar-equipamentos.cjs ./
 # Ferramentas de diagnostico e backup (somente leitura / nao destrutivas).
 COPY verificar-sistema.cjs backup-dados.cjs limpar-fotos-embutidas.cjs reparar-listas-infladas.cjs restaurar-empresas.cjs restaurar-registros.cjs ./
 # Módulo WhatsApp (API Oficial da Meta). Se faltar, o servidor sobe do mesmo
@@ -41,14 +36,9 @@ COPY verificar-sistema.cjs backup-dados.cjs limpar-fotos-embutidas.cjs reparar-l
 # modulo morre em producao -- foi o que aconteceu com o whatsapp-bot.cjs.
 # A suite "imagem" confere isso automaticamente: rode os testes antes de subir.
 COPY whatsapp-db.cjs whatsapp-api.cjs whatsapp-webhook.cjs whatsapp-bot.cjs whatsapp-lembretes.cjs whatsapp-envio-grupo.cjs audio-voz.cjs ./
-# Ponte para o SEGUNDO WhatsApp (QR Code, serviço OpenWA à parte). Mesma regra:
-# se faltar ou não estiver configurado, só essa aba avisa — nada mais é afetado.
-COPY openwa.cjs ./
 
 # --- Frontend --------------------------------------------------------------
-COPY index.html login.html candidato.html talento.html fila-display.html relatorio-equip.html ./
-# Diária (Presença RT) — página pública do trabalhador de campo (cadastro + check-in).
-COPY diaria-trabalhador.html ./
+COPY index.html login.html candidato.html talento.html fila-display.html ./
 # Politica de privacidade — PUBLICA de proposito: a Meta exige que ela abra
 # sem login para aprovar o app do WhatsApp Business.
 COPY privacidade.html ./

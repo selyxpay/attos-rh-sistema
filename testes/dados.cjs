@@ -134,19 +134,19 @@ const gravarDireto = async (dados) => fetch(BASE + '/api/state', {
   console.log('\n=== 13) LISTA VAZIA: duas pessoas cadastram o 1o item e os DOIS ficam ===');
   {
     const d = (await ver()).dados;
-    d.examesMedicos = [];           // lista vazia no servidor
+    d.inaptos = [];                 // lista vazia no servidor
     await gravarDireto(d);
     const ana = novaAba(), bruno = novaAba();
     const eA = await ana.loadState();
     const eB = await bruno.loadState();
-    eA.examesMedicos.push({ id: 'ex-ana', nome: 'Exame da Ana' });
+    eA.inaptos.push({ id: 'in-ana', nome: 'Inapto da Ana' });
     await ana.salvarAgora(eA);                       // save generico (diff automatico)
-    eB.examesMedicos.push({ id: 'ex-bruno', nome: 'Exame do Bruno' });
+    eB.inaptos.push({ id: 'in-bruno', nome: 'Inapto do Bruno' });
     await bruno.salvarAgora(eB);                     // Bruno esta atrasado
-    const lista = (await ver()).dados.examesMedicos;
+    const lista = (await ver()).dados.inaptos;
     const ids = lista.map(x => x.id);
-    ok(ids.indexOf('ex-ana') >= 0, 'o exame da Ana continua lá (ids: ' + JSON.stringify(ids) + ')');
-    ok(ids.indexOf('ex-bruno') >= 0, 'e o exame do Bruno também');
+    ok(ids.indexOf('in-ana') >= 0, 'o registro da Ana continua lá (ids: ' + JSON.stringify(ids) + ')');
+    ok(ids.indexOf('in-bruno') >= 0, 'e o do Bruno também');
   }
 
   // ============ LISTA DE TEXTO PURO QUE COMECA VAZIA AINDA GRAVA ============
@@ -164,35 +164,35 @@ const gravarDireto = async (dados) => fetch(BASE + '/api/state', {
       'o primeiro login entrou mesmo com a lista comecando vazia (' + JSON.stringify(lista) + ')');
   }
 
-  // ============ 11) DIARIA: EXCLUSAO NAO RESSUSCITA ============
-  console.log('\n=== 11) DIARIA: trabalhador excluido NAO volta com save comum ===');
+  // ============ 11) EXCLUSAO DIRETA NO SERVIDOR NAO RESSUSCITA ============
+  console.log('\n=== 11) registro excluido no servidor NAO volta com save comum ===');
   {
     const d = (await ver()).dados;
-    d.trabalhadoresDiaria = [
-      { id: 'trab-1', nome: 'Trabalhador Um', status: 'ativo' },
-      { id: 'trab-2', nome: 'Trabalhador Dois', status: 'ativo' }
+    d.bancoTalentos = [
+      { id: 'bt-1', nome: 'Talento Um' },
+      { id: 'bt-2', nome: 'Talento Dois' }
     ];
     await gravarDireto(d);
     // A aba carrega o estado COM os dois
     const aba = novaAba();
     const e = await aba.loadState();
-    ok(e.trabalhadoresDiaria.length === 2, 'a aba carregou os 2 trabalhadores');
-    // A rota de admin da Diaria apaga direto no servidor (simulado aqui pela
-    // gravacao direta, que e o efeito que a rota tem no state.json)
+    ok(e.bancoTalentos.length === 2, 'a aba carregou os 2 registros');
+    // Uma rota de admin apaga direto no servidor (simulado aqui pela gravacao
+    // direta, que e o efeito que a rota tem no state.json)
     const dSrv = (await ver()).dados;
-    dSrv.trabalhadoresDiaria = dSrv.trabalhadoresDiaria.filter(t => t.id !== 'trab-2');
+    dSrv.bancoTalentos = dSrv.bancoTalentos.filter(t => t.id !== 'bt-2');
     await gravarDireto(dSrv);
     // ANTES da correcao, a aba seguia com o registro velho em memoria e o
     // save comum o empurrava de volta. Agora a aba RESINCRONIZA depois da
     // acao -- aqui reproduzimos essa resincronizacao.
     const eNovo = await aba.loadState();
-    ok(eNovo.trabalhadoresDiaria.length === 1, 'depois de resincronizar, a aba ve 1 (viu ' + eNovo.trabalhadoresDiaria.length + ')');
+    ok(eNovo.bancoTalentos.length === 1, 'depois de resincronizar, a aba ve 1 (viu ' + eNovo.bancoTalentos.length + ')');
     // e agora um save comum da aba nao ressuscita nada
     eNovo.candidatos = (eNovo.candidatos || []).slice(0, 5);
-    eNovo.candidatos.push({ id: 'c-dia-1', nome: 'Qualquer' });
+    eNovo.candidatos.push({ id: 'c-bt-1', nome: 'Qualquer' });
     await aba.salvarAgora(eNovo);
-    const depois = (await ver()).dados.trabalhadoresDiaria;
-    ok(!depois.some(t => t.id === 'trab-2'), 'o trabalhador excluido NAO voltou (ficaram: ' + depois.map(t => t.id).join(',') + ')');
+    const depois = (await ver()).dados.bancoTalentos;
+    ok(!depois.some(t => t.id === 'bt-2'), 'o registro excluido NAO voltou (ficaram: ' + depois.map(t => t.id).join(',') + ')');
   }
 
   console.log('\n' + (falhas === 0 ? 'ETAPA 2 (servidor/sync): TODOS OS TESTES OK' : falhas + ' FALHA(S)'));

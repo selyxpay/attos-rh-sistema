@@ -34,7 +34,7 @@ const salvar = async (ck, corpo) => {
 (async () => {
   console.log('=== 1) URL MAL FORMADA NAO DERRUBA O SERVIDOR ===');
   console.log('servidor antes:', await vivo());
-  for (const alvo of ['/%', '/%E0%A4%A', '/api/status-senha?token=%', '/api/relatorio-equip/%', '/uploads/%']) {
+  for (const alvo of ['/%', '/%E0%A4%A', '/api/status-senha?token=%', '/api/whatsapp/conversations/%', '/uploads/%']) {
     let st = 0;
     try { st = (await fetch(BASE + alvo, { signal: AbortSignal.timeout(4000) })).status; } catch (e) { st = 0; }
     const depois = await vivo();

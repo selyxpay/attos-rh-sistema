@@ -40,6 +40,23 @@ const vivo = async () => { try { return (await fetch(BASE + '/api/time', { signa
     ok((await vivo()) === 200, rota + ': aguentou os 5 corpos invalidos e continua de pe');
   }
 
+  // Um corpo invalido no /api/state nao pode APAGAR O ESTADO. Ja aconteceu:
+  // `true` / `[]` / `123` caiam em `dados = {}` e substituiam tudo por vazio —
+  // os funcionarios sumiam e ate a sessao de quem mandou morria (as chamadas
+  // seguintes passavam a responder 401). A trava agora e a validacao do corpo
+  // no proprio /api/state.
+  console.log('\n=== CORPO INVALIDO NO /api/state NAO APAGA O ESTADO ===');
+  const rMe = await fetch(BASE + '/api/me', { headers: { Cookie: cookie } });
+  ok(rMe.status === 200, 'a sessao sobreviveu aos corpos invalidos (/api/me -> ' + rMe.status + ')');
+  const rEstado = await fetch(BASE + '/api/state', { headers: { Cookie: cookie } });
+  const jEstado = await rEstado.json().catch(() => ({}));
+  const quantos = ((jEstado.dados || {}).funcionarios || []).length;
+  ok(quantos > 0, 'e os funcionarios continuam la (' + quantos + ')');
+  const rLixo = await fetch(BASE + '/api/state', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: 'true'
+  });
+  ok(rLixo.status === 400, 'corpo sem "dados" e recusado com 400 (respondeu ' + rLixo.status + ')');
+
   console.log('\n=== ROTA DE WHATSAPP INEXISTENTE RESPONDE 404, NAO CAI ===');
   const r404 = await fetch(BASE + '/api/whatsapp/isso-nao-existe', { headers: { Cookie: cookie } });
   ok(r404.status === 404 || r404.status === 503, 'rota inexistente respondeu ' + r404.status);

@@ -48,9 +48,8 @@ const marcador = function (rotulo, arquivo, trecho) {
   console.log('    [' + (tem ? 'X' : ' ') + '] ' + rotulo);
   return tem;
 };
-const temListaBlindada = marcador('Equipamentos: lista a prova de erro', 'js/app.js', 'registro com formato antigo');
-const temCardsMobile   = marcador('Equipamentos: cards no celular', 'js/app.js', 'equip-mobile-view');
-const temHeic          = marcador('Equipamentos: aceita foto HEIC (iPhone)', 'js/security.js', 'heic');
+const temHeic          = marcador('Upload: aceita foto HEIC (iPhone)', 'js/security.js', 'heic');
+const temPermTela      = marcador('Permissao por tela conferida no servidor', 'server.cjs', 'ROTAS_POR_TELA');
 const temResumoBoot    = marcador('Servidor: resumo de dados no boot', 'server.cjs', 'DADOS ENCONTRADOS');
 // Marcador sem acento de proposito: acento aqui ja causou falso "versao antiga".
 const temSenhaOculta   = marcador('Servidor: senhas ocultas em producao', 'server.cjs', "NODE_ENV === 'production'");
@@ -60,8 +59,7 @@ console.log('\n[2] MODULOS CRITICOS PRESENTES?');
 linha();
 const precisa = [
   ['server.cjs', true],
-  ['equipamentos-protecao.cjs', true],
-  ['restaurar-equipamentos.cjs', true],
+  ['js/telas.js', true],
   ['whatsapp-db.cjs', false],
   ['whatsapp-api.cjs', false],
   ['whatsapp-webhook.cjs', false],
@@ -96,8 +94,6 @@ const tState = tam(arq('state.json'));
 item('state.json', tState >= 0 ? (tState + ' bytes') : 'NAO ENCONTRADO');
 item('uploads/ (fotos e documentos)', conta(arq('uploads')) >= 0 ? conta(arq('uploads')) + ' arquivo(s)' : 'NAO ENCONTRADO');
 item('backups/', conta(arq('backups')) >= 0 ? conta(arq('backups')) + ' arquivo(s)' : 'NAO ENCONTRADO');
-item('equipamentos/ (espelho)', fs.existsSync(arq('equipamentos')) ? 'OK' : 'ausente');
-item('equipamentos/snapshots/', conta(arq('equipamentos/snapshots')) >= 0 ? conta(arq('equipamentos/snapshots')) + ' snapshot(s)' : 'ausente');
 item('whatsapp.db', tam(arq('whatsapp.db')) >= 0 ? (tam(arq('whatsapp.db')) + ' bytes') : 'ausente');
 
 // ── 4. Contagem dos registros ─────────────────────────────────────────────
@@ -111,26 +107,17 @@ if (!estado) {
 } else {
   const d = estado.dados || {};
   const n = function (k) { return Array.isArray(d[k]) ? d[k].length : 0; };
-  const eq = Array.isArray(d.equipamentos) ? d.equipamentos : [];
-  let fotos = 0, comFoto = 0;
-  eq.forEach(function (r) {
-    const f = Array.isArray(r && r.fotos) ? r.fotos.length : 0;
-    fotos += f; if (f) comFoto++;
-  });
   item('versao do estado', estado.version || 0);
   item('atualizado em', estado.atualizadoEm ? new Date(estado.atualizadoEm).toISOString() : '?');
   console.log('');
-  item('EQUIPAMENTOS/EPI', eq.length + ' registro(s)');
-  item('  com foto', comFoto + ' registro(s)');
-  item('  total de fotos', fotos);
   item('Candidatos', n('candidatos'));
+  item('Vagas', n('vagas'));
   item('Funcionarios', n('funcionarios'));
   item('Contratacoes', n('contratacoes'));
-  item('Exames medicos', n('examesMedicos'));
   item('Banco de talentos', n('bancoTalentos'));
   item('Fluxos financeiros', n('fluxosFinanceiros'));
 
-  if ((estado.version || 0) > 1 && eq.length === 0 && n('candidatos') === 0) {
+  if ((estado.version || 0) > 1 && n('candidatos') === 0 && n('funcionarios') <= 1) {
     alertas.push('O estado tem versao ' + estado.version + ' (ja foi usado) mas esta SEM registros. ' +
                  'Forte indicio de volume persistente ausente. NAO cadastre nada por cima.');
   }
@@ -151,21 +138,6 @@ if (!estado) {
   item('  arquivos NAO encontrados', faltando + (faltando ? '  *** conferir backup ***' : ''));
   if (faltando) alertas.push(faltando + ' foto(s) citada(s) nos registros nao existe(m) em uploads/.');
 
-  // Espelho de protecao x estado
-  try {
-    const esp = JSON.parse(fs.readFileSync(arq('equipamentos/equipamentos.json'), 'utf8'));
-    const noEspelho = Array.isArray(esp.equipamentos) ? esp.equipamentos.length : 0;
-    console.log('');
-    item('espelho de protecao', noEspelho + ' registro(s)');
-    item('  bate com o sistema?', noEspelho === eq.length ? 'sim' : '*** diferente (' + eq.length + ' no sistema) ***');
-    if (noEspelho > eq.length) {
-      alertas.push('O espelho tem MAIS registros que o sistema (' + noEspelho + ' x ' + eq.length +
-                   '). Rode: node restaurar-equipamentos.cjs  (so confere, nao altera)');
-    }
-  } catch (e) {
-    console.log('');
-    item('espelho de protecao', 'ainda nao existe (normal se o modulo e novo)');
-  }
 }
 
 // ── 5. Variáveis de ambiente ──────────────────────────────────────────────
@@ -189,10 +161,9 @@ vars.forEach(function (v) {
 // ── 6. Resumo ─────────────────────────────────────────────────────────────
 console.log('\n[6] RESUMO');
 linha();
-const versaoCompleta = temListaBlindada && temCardsMobile && temHeic && temResumoBoot && temSenhaOculta &&
-                       fs.existsSync(path.join(BASE, 'equipamentos-protecao.cjs'));
+const versaoCompleta = temHeic && temPermTela && temResumoBoot && temSenhaOculta;
 console.log('  Versao do codigo: ' + (versaoCompleta
-  ? 'ATUAL (com todas as correcoes de Equipamentos e a blindagem)'
+  ? 'ATUAL (com a permissao por tela e as protecoes de senha)'
   : '*** ANTIGA — este deploy NAO tem todas as correcoes ***'));
 if (!versaoCompleta) alertas.push('O codigo neste servidor e uma versao antiga. Faca git push + novo deploy.');
 

@@ -35,10 +35,10 @@ const salvar = async (ck, corpo) => {
   ok(!!(fSem && fVer && fEdit), 'as tres contas de teste existem');
 
   const todasNao = {};
-  ['dashboard','vagas','banco-talentos','selecao','depto-pessoal','equipamentos','exame-medico',
-   'fluxo-financeiro','comissao','margem','whatsapp','whatsapp-qr','funcionarios','controle-acesso',
-   'cadastros-exata','documentos','diaria','relatorios','site','meu-painel','fila','auditoria',
-   'inaptos','configuracoes','lixeira'].forEach(id => { todasNao[id] = 'nao'; });
+  ['dashboard','vagas','banco-talentos','selecao','depto-pessoal','fluxo-financeiro',
+   'whatsapp','bot','funcionarios','controle-acesso','cadastros-exata','documentos',
+   'relatorios','site','meu-painel','fila','auditoria','inaptos','configuracoes',
+   'lixeira'].forEach(id => { todasNao[id] = 'nao'; });
 
   fSem.telas  = Object.assign({}, todasNao, { dashboard: 'ver' });                    // sem acesso ao Fluxo
   fVer.telas  = Object.assign({}, todasNao, { dashboard: 'ver', 'fluxo-financeiro': 'ver' });
@@ -56,8 +56,11 @@ const salvar = async (ck, corpo) => {
   const dSem = eSem.dados;
   ok(Array.isArray(dSem.fluxosFinanceiros) && dSem.fluxosFinanceiros.length === 0,
     'as fichas do Fluxo Financeiro NAO descem (recebeu ' + (dSem.fluxosFinanceiros || []).length + ')');
+  // Margem saiu do sistema, mas o DADO continua no state.json. A chave segue
+  // mapeada para a tela 'margem', que nao existe mais -- entao ninguem tem, e
+  // o dado antigo nao desce para ninguem (so para o mestre).
   ok(Array.isArray(dSem.precificacao) && dSem.precificacao.length === 0,
-    'a tabela de custo x repasse (Margem) NAO desce (recebeu ' + (dSem.precificacao || []).length + ')');
+    'o dado do modulo REMOVIDO (Margem) NAO desce (recebeu ' + (dSem.precificacao || []).length + ')');
   ok(!dSem.logs || dSem.logs.length === 0, 'a Auditoria NAO desce');
   // os funcionarios vem enxutos
   const algum = (dSem.funcionarios || [])[0] || {};
@@ -74,8 +77,8 @@ const salvar = async (ck, corpo) => {
   ok(conf1.some(f => f.id === 'ff-t1'), 'e a ficha original continua la');
 
   console.log('\n=== "SEM ACESSO": rota da tela responde 403 ===');
-  const r403 = await fetch(BASE + '/api/diaria/admin/trabalhadores', { headers: { Cookie: lSem.cookie } });
-  ok(r403.status === 403, 'GET /api/diaria/admin/trabalhadores -> ' + r403.status + ' (esperado 403)');
+  const r403 = await fetch(BASE + '/api/whatsapp/accounts', { headers: { Cookie: lSem.cookie } });
+  ok(r403.status === 403, 'GET /api/whatsapp/accounts -> ' + r403.status + ' (esperado 403)');
 
   // ---------- SO VER ----------
   console.log('\n=== "SO VER": abre a tela, mas NAO grava ===');
@@ -122,21 +125,21 @@ const salvar = async (ck, corpo) => {
   const lAnt = await login('zeantigo', 'Antigo#123');
   ok(lAnt.status === 200, 'login da conta antiga (' + lAnt.status + ')');
   const dAnt = (await pegar(lAnt.cookie)).dados;
-  // zeantigo e do DP sem mapa de telas: hoje ele ve depto-pessoal e
-  // banco-talentos, e trabalha em equipamentos (regra por departamento)
-  ok(Array.isArray(dAnt.equipamentos), 'recebe a lista de equipamentos (tela do DP)');
-  ok((dAnt.precificacao || []).length === 0, 'mas NAO recebe a Margem, que ele nunca viu');
+  // zeantigo e do DP sem mapa de telas: hoje ele ve depto-pessoal,
+  // banco-talentos e o Fluxo Financeiro (regra por departamento)
+  ok(Array.isArray(dAnt.candidatos), 'recebe a lista de candidatos (tela do DP)');
+  ok((dAnt.precificacao || []).length === 0, 'mas NAO recebe o dado do modulo removido (Margem)');
   const dAnt2 = Object.assign({}, dAnt);
-  dAnt2.equipamentos = (dAnt2.equipamentos || []).concat([{ id: 'eq-antigo-1', nome: 'Capacete', tipo: 'entrega' }]);
-  await salvar(lAnt.cookie, { dados: dAnt2, merge: true, upsertIds: ['eq-antigo-1'], baseVersion: 0 });
-  const confEq = (await pegar(adm.cookie)).dados.equipamentos;
-  ok(confEq.some(e => e.id === 'eq-antigo-1'), 'e CONTINUA conseguindo cadastrar equipamento (nao perdeu acesso)');
+  dAnt2.candidatos = (dAnt2.candidatos || []).concat([{ id: 'cand-antigo-1', nome: 'Fulano', status: 'aprovado' }]);
+  await salvar(lAnt.cookie, { dados: dAnt2, merge: true, upsertIds: ['cand-antigo-1'], baseVersion: 0 });
+  const confCand = (await pegar(adm.cookie)).dados.candidatos;
+  ok(confCand.some(c => c.id === 'cand-antigo-1'), 'e CONTINUA conseguindo cadastrar candidato (nao perdeu acesso)');
 
   // ---------- ADMIN SEGUE COM TUDO ----------
   console.log('\n=== ADMIN continua com acesso total ===');
   const dAdm = (await pegar(adm.cookie)).dados;
   ok((dAdm.fluxosFinanceiros || []).length >= 1, 'admin ve as fichas');
-  ok((dAdm.precificacao || []).length >= 1, 'admin ve a Margem');
+  ok((dAdm.precificacao || []).length >= 1, 'o mestre ainda enxerga o dado antigo da Margem (nada foi apagado)');
   ok((dAdm.logs || []).length >= 1, 'admin ve a Auditoria');
   ok((dAdm.funcionarios || []).some(f => f.permissoes !== undefined || f.telas !== undefined),
     'admin ve as permissoes dos funcionarios');

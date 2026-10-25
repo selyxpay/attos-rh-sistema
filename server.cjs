@@ -35,10 +35,6 @@ const DATA_DIR = process.env.DATA_DIR || path.join(BASE, 'server-data');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
-// Documentos da Diária (RG, comprovante) ficam FORA de UPLOADS_DIR de propósito:
-// tudo dentro de UPLOADS_DIR é servido sem login nenhum (rota /uploads/..).
-// Documento pessoal só pode sair por rota autenticada — ver /api/diaria/admin/arquivo.
-const DIARIA_DOCS_DIR = path.join(DATA_DIR, 'diaria-docs');
 // Midia do bot: FORA de /uploads/ (que e publico, regra 7). So sai pela
 // rota autenticada /api/whatsapp/bot/midia/<arquivo>.
 const BOT_MIDIA_DIR = path.join(DATA_DIR, 'bot-midia');
@@ -79,7 +75,6 @@ process.on('unhandledRejection', function (e) { _encerrarPorErroFatal('unhandled
 // Garante as pastas de dados
 try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (e) {}
 try { fs.mkdirSync(BACKUP_DIR, { recursive: true }); } catch (e) {}
-try { fs.mkdirSync(DIARIA_DOCS_DIR, { recursive: true }); } catch (e) {}
 try { fs.mkdirSync(BOT_MIDIA_DIR, { recursive: true }); } catch (e) {}
 try { fs.mkdirSync(WA_MIDIA_DIR, { recursive: true }); } catch (e) {}
 
@@ -115,6 +110,10 @@ const MAX_BACKUPS_SUBIDA = 20;
 // deixava passar.
 const PASTAS_DE_DADOS = ['server-data', 'server-data-test', 'server-data-local',
                          'server-data-preview', '.data', 'backups', 'backups-manuais',
+                         // 'diaria-docs' e 'equipamentos' são de módulos que saíram do
+                         // sistema, mas as pastas continuam no disco com o histórico.
+                         // Ficam nesta lista DE PROPÓSITO: é o que impede que alguém
+                         // baixe documento pessoal antigo por um endereço direto.
                          'diaria-docs', 'equipamentos', 'sessions'];
 const ARQUIVOS_DE_DADOS = ['state.json', 'sessions.json', '.env'];
 
@@ -123,7 +122,7 @@ const ARQUIVOS_DE_DADOS = ['state.json', 'sessions.json', '.env'];
 // /server.cjs entregava os 196 KB do backend inteiro para qualquer um, sem
 // login — com a lógica de login mestre, a estrutura das rotas e a criação da
 // conta de administração. O navegador nunca pediu nada disto: ele pede
-// .html na raiz, js/, css/, img/ e precificacao-base.json.
+// .html na raiz, js/, css/ e img/.
 function _arquivoDoServidor(caminhoAbsoluto) {
   const nome = path.basename(caminhoAbsoluto).toLowerCase();
   if (/\.(cjs|mjs|md|log|bak|tmp|sh|yml|yaml|lock)$/.test(nome)) return true;
@@ -311,18 +310,6 @@ function limparArquivosOrfaos() {
 setTimeout(function () {
   try { limparArquivosOrfaos(); } catch (e) { console.error('[Limpeza]', e.message); }
 }, 2000);
-
-// Rede de proteção dos dados críticos (Entrega/Devolução de Equipamentos).
-// Módulo isolado: se ele falhar, o sistema continua salvando normalmente.
-let equipProtecao = null;
-try {
-  equipProtecao = require('./equipamentos-protecao.cjs');
-  equipProtecao.iniciar(DATA_DIR);
-  console.log('[Equip-Proteção] ativa em:', path.join(DATA_DIR, 'equipamentos'));
-} catch (e) {
-  console.error('[Equip-Proteção] não carregou (sistema segue normal):', e.message);
-  equipProtecao = null;
-}
 
 console.log('BASE:', BASE);
 console.log('DATA_DIR:', DATA_DIR);
@@ -559,13 +546,6 @@ function gravarEstado(obj) {
   const tmp = STATE_FILE + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(obj));
   fs.renameSync(tmp, STATE_FILE); // troca atômica: nunca deixa arquivo pela metade
-  // Espelho independente dos equipamentos (cópia própria + snapshot). Fica
-  // DEPOIS da gravação e em try/catch: nunca pode atrapalhar o save principal.
-  if (equipProtecao) {
-    try { equipProtecao.espelhar(obj && obj.dados); } catch (e) {
-      console.error('[Equip-Proteção] espelho falhou (dados principais estão salvos):', e.message);
-    }
-  }
 }
 
 // ── BACKUP AUTOMÁTICO (rede de segurança contra perda de dados) ─────────────
@@ -945,14 +925,12 @@ const MENSAGEM_TROCA_SENHA =
 
 // O que continua respondendo mesmo com a conta trancada: o necessário para
 // fazer login, saber quem sou, trocar a senha e sair — mais as rotas PÚBLICAS
-// (ficha do candidato, diária, relatório por link, webhook da Meta), que não
+// (ficha do candidato, banco de talentos, webhook da Meta), que não
 // são do funcionário e não têm por que parar.
 const ROTAS_LIVRES_NA_TROCA = [
   /^\/api\/(login|logout|me|time|saude)$/,
   /^\/api\/(trocar-senha|trocar-senha-obrigatoria)$/,
   /^\/api\/(solicitar-senha|definir-senha|status-senha|register-staff)$/,
-  /^\/api\/diaria\/(config|trabalhador)(\/|$)/,
-  /^\/api\/relatorio-equip\//,
   /^\/webhooks\//
 ];
 function _rotaLivreNaTroca(urlPath) {
@@ -1136,8 +1114,8 @@ function _devolverSigilo(antes, novo) {
 // NUNCA expõe candidatos, banco de talentos, funcionários (senhas!), logs, etc.
 // ATENÇÃO — esta função responde a QUEM NÃO ESTÁ LOGADO.
 // Antes ela funcionava por lista de EXCLUSÃO: apagava alguns campos e devolvia
-// TODO O RESTO. Com isso, equipamentos/EPI (com CPF), contratações, exames
-// médicos e fluxos financeiros estavam sendo servidos publicamente — e a
+// TODO O RESTO. Com isso, contratações e fluxos financeiros (com CPF)
+// estavam sendo servidos publicamente — e a
 // resposta chegou a 87 MB, o que também derrubava o carregamento da tela.
 // Agora é lista de INCLUSÃO: só sai o que as páginas públicas realmente usam
 // (candidato.html, talento.html, fila-display.html). Qualquer área nova do
@@ -1189,171 +1167,6 @@ const CHAVES_ESCRITA_PUBLICA = ['candidatos', 'bancoTalentos', 'fila', '_docsMet
 //
 // Rodar de novo na mesma versão não muda nada (idempotente).
 // ==========================================================================
-// Diária — Fase 2, sub-fase 1: diárias antigas (de antes da remoção do GPS)
-// ganham abertaEm/encerradaEm null, pra ficha nova não quebrar em cima do
-// dado velho. Os campos antigos (pontoEncontro/lat/lng/raioMetros) ficam nos
-// registros existentes sem problema — nenhuma tela lê mais eles.
-// ── DIÁRIA — helpers puros (módulo inteiro: migração no boot e rotas usam
-//    as MESMAS funções, por isso ficam aqui fora e não dentro do handler
-//    de requisição) ───────────────────────────────────────────────────────
-function diariaPodeGerenciar(requester) {
-  return !!(requester && (ehMestreLogin(requester.login) || requester.departamento === 'administracao'));
-}
-function diariaNormalizarNome(nome) {
-  return String(nome || '')
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .toLowerCase().replace(/\s+/g, ' ').trim();
-}
-// Dígito verificador oficial da Receita (mesmo algoritmo usado em qualquer
-// validador de CPF de verdade — dois módulos 11 em sequência).
-function diariaCpfValido(cpf) {
-  const dCpf = String(cpf || '').replace(/\D/g, '');
-  if (dCpf.length !== 11 || /^(\d)\1{10}$/.test(dCpf)) return false;
-  let soma = 0;
-  for (let i = 0; i < 9; i++) soma += parseInt(dCpf[i], 10) * (10 - i);
-  let resto = (soma * 10) % 11; if (resto >= 10) resto = 0;
-  if (resto !== parseInt(dCpf[9], 10)) return false;
-  soma = 0;
-  for (let i = 0; i < 10; i++) soma += parseInt(dCpf[i], 10) * (11 - i);
-  resto = (soma * 10) % 11; if (resto >= 10) resto = 0;
-  return resto === parseInt(dCpf[10], 10);
-}
-const DIARIA_PIX_TIPOS = ['celular', 'email', 'cpf'];
-function diariaPixValida(tipo, chave) {
-  const c = String(chave || '').trim();
-  if (tipo === 'celular') return /^\d{10,11}$/.test(c.replace(/\D/g, ''));
-  if (tipo === 'email') return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c);
-  if (tipo === 'cpf') return diariaCpfValido(c);
-  return false;
-}
-// Nunca devolve telefone completo, CPF, RG, Pix nem token pro lado errado
-// ler — a ficha completa só sai pela rota de admin (autenticada).
-function diariaTrabalhadorPublico(t) {
-  return { id: t.id, nome: t.nome, status: t.status, criadoEm: t.criadoEm };
-}
-// A ficha do admin precisa dos dados todos (CPF, RG, endereço, Pix,
-// documentos...) pra decidir a contratação — mas NUNCA do token de sessão do
-// trabalhador nem do hash de senha: isso é credencial de acesso, não dado
-// cadastral, e não tem por que aparecer numa resposta que o navegador do
-// admin guarda em log/devtools/cache.
-function diariaTrabalhadorAdmin(t) {
-  const copia = Object.assign({}, t);
-  delete copia.tokens;
-  delete copia.senhaHash;
-  return copia;
-}
-// Usado tanto por /status (reentrada pelo token salvo) quanto por /login
-// (nome+telefone) — os dois devolvem exatamente a mesma forma pro cliente.
-function diariaMontarStatusResposta(t, d) {
-  const hoje = new Date().toISOString().slice(0, 10);
-  const diariaHoje = (d.diarias || []).find(function (x) { return x.data === hoje && x.status === 'aberta'; }) || null;
-  let presenca = null;
-  if (diariaHoje) {
-    presenca = (d.presencasDiaria || []).find(function (p) { return p.diariaId === diariaHoje.id && p.trabalhadorId === t.id; }) || null;
-  }
-  return {
-    trabalhador: diariaTrabalhadorPublico(t),
-    diariaHoje: diariaHoje ? { id: diariaHoje.id, titulo: diariaHoje.titulo, status: diariaHoje.status } : null,
-    presenca: presenca
-  };
-}
-// Tira o "55" (código do Brasil) de telefones que vieram com DDI colado —
-// gente costuma colar o número direto do WhatsApp (que mostra com +55) no
-// cadastro, mas depois digita só o número puro no login. Sem isso, os dois
-// nunca batem e o login "erra" mesmo sendo a pessoa certa.
-function diariaNormalizarTelefone(v) {
-  let d = String(v || '').replace(/\D/g, '');
-  if ((d.length === 12 || d.length === 13) && d.slice(0, 2) === '55') {
-    const resto = d.slice(2);
-    if (resto.length === 10 || resto.length === 11) d = resto;
-  }
-  return d;
-}
-// Date.now() sozinho pode colidir quando várias pessoas cadastram/confirmam
-// presença no mesmo milissegundo (exatamente o caso de uso real: várias
-// pessoas clicando no link ao mesmo tempo) — dois registros com o mesmo id
-// fariam o segundo pisar nos documentos do primeiro e as ações do admin
-// (que buscam por id) acertarem sempre o registro errado.
-function diariaGerarId(prefixo) {
-  return prefixo + '-' + Date.now() + '-' + crypto.randomBytes(4).toString('hex');
-}
-// Login do trabalhador é nome completo + telefone (sem senha de verdade por
-// enquanto — ver "senhaHash" no cadastro). Limite por IP, não por nome: o
-// risco aqui é alguém tentando adivinhar nome+telefone de várias pessoas do
-// mesmo local, não só ficar martelando uma conta.
-const diariaTentativasLoginIp = {};
-function diariaPodeTentarLogin(ip) {
-  const t = diariaTentativasLoginIp[ip];
-  if (!t) return true;
-  if (Date.now() - t.inicio > 10 * 60 * 1000) { delete diariaTentativasLoginIp[ip]; return true; }
-  return t.n < 5;
-}
-function diariaRegistrarFalhaLogin(ip) {
-  const t = diariaTentativasLoginIp[ip];
-  if (!t || Date.now() - t.inicio > 10 * 60 * 1000) { diariaTentativasLoginIp[ip] = { n: 1, inicio: Date.now() }; return; }
-  t.n++;
-}
-function diariaLimparFalhasLogin(ip) { delete diariaTentativasLoginIp[ip]; }
-// Salva uma imagem base64 em disco, FORA da pasta pública (ver DIARIA_DOCS_DIR
-// no topo do arquivo). Devolve só o nome do arquivo, nunca o caminho inteiro
-// nem o base64 — isso é o que vai gravado no state.json.
-function diariaSalvarDocumento(trabalhadorId, campo, dataUrl) {
-  const m = /^data:([^;]+);base64,([\s\S]*)$/.exec(String(dataUrl || ''));
-  if (!m) return null;
-  const buf = Buffer.from(m[2], 'base64');
-  if (buf.length > 8 * 1024 * 1024) throw new Error('Imagem de ' + campo + ' muito grande (máximo 8MB).');
-  let ext = (m[1].split('/')[1] || 'jpg').split('+')[0].split(';')[0];
-  if (!/^[a-z0-9]{2,5}$/i.test(ext)) ext = 'jpg';
-  const pastaPessoa = path.join(DIARIA_DOCS_DIR, trabalhadorId);
-  fs.mkdirSync(pastaPessoa, { recursive: true });
-  const nome = campo + '.' + ext;
-  fs.writeFileSync(path.join(pastaPessoa, nome), buf);
-  return nome;
-}
-
-function migrarDiariaFase2() {
-  comTrava(function () {
-    const st = lerEstadoParaGravar();
-    const d = st.dados || {};
-    let mudou = false;
-    if (Array.isArray(d.diarias)) {
-      d.diarias.forEach(function (diaria) {
-        if (diaria.abertaEm === undefined) { diaria.abertaEm = null; mudou = true; }
-        if (diaria.encerradaEm === undefined) { diaria.encerradaEm = null; mudou = true; }
-      });
-    }
-    // Sub-fase 2: trabalhador cadastrado no modelo simples (só nome+telefone,
-    // um token só) ganha os campos novos com valor neutro, e o token antigo
-    // vira o primeiro item do array — sem isso a pessoa perderia o acesso
-    // que já tinha.
-    if (Array.isArray(d.trabalhadoresDiaria)) {
-      d.trabalhadoresDiaria.forEach(function (t) {
-        if (!Array.isArray(t.tokens)) {
-          t.tokens = t.token ? [t.token] : [];
-          mudou = true;
-        }
-        if (t.nomeNormalizado === undefined) { t.nomeNormalizado = diariaNormalizarNome(t.nome); mudou = true; }
-        if (t.nomePai === undefined) { t.nomePai = null; mudou = true; }
-        if (t.nomeMae === undefined) { t.nomeMae = null; mudou = true; }
-        if (t.rg === undefined) { t.rg = null; mudou = true; }
-        if (t.cpf === undefined) { t.cpf = null; mudou = true; }
-        if (t.cep === undefined) {
-          t.cep = null; t.logradouro = null; t.numero = null; t.complemento = null;
-          t.bairro = null; t.cidade = null; t.uf = null; mudou = true;
-        }
-        if (t.pixTipo === undefined) { t.pixTipo = null; t.pixChave = null; mudou = true; }
-        if (t.documentos === undefined) { t.documentos = {}; mudou = true; }
-        if (t.senhaHash === undefined) { t.senhaHash = null; mudou = true; }
-        if (t.observacaoAdmin === undefined) { t.observacaoAdmin = null; mudou = true; }
-      });
-    }
-    if (mudou) {
-      try { gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() }); }
-      catch (e) { console.error('[Diária] migração fase 2:', e); }
-    }
-  });
-}
-
 function garantirCadastrosFinanceiro() {
   comTrava(function () {
     let base;
@@ -1584,15 +1397,12 @@ const RTTelas = require('./js/telas.js');
 // 'editar'. O que não está aqui segue pela cadeia normal (e /api/state tem
 // tratamento próprio, por chave, mais abaixo).
 const ROTAS_POR_TELA = [
-  { re: /^\/api\/diaria\/admin\//,                                      tela: 'diaria' },
-  { re: /^\/api\/openwa\//,                                             tela: 'whatsapp-qr' },
   // A DO BOT VEM ANTES da do WhatsApp: permitirRota usa o PRIMEIRO padrão que
   // casa, e /api/whatsapp/bot/... também casa com /api/whatsapp/. Invertendo a
   // ordem, a aba Bot passaria a ser liberada pela permissão do WhatsApp.
   { re: /^\/api\/whatsapp\/bot\//,                                      tela: 'bot' },
   { re: /^\/api\/whatsapp\//,                                           tela: 'whatsapp' },
   { re: /^\/api\/(ver-senha|reset-senha|aprovar-senha|solicitacoes-senha)$/, tela: 'funcionarios' },
-  { re: /^\/api\/relatorio-equip-admin\//,                              tela: 'equipamentos' }
 ];
 
 // Responde 401/403 e devolve false quando a sessão não pode usar a rota.
@@ -1774,57 +1584,8 @@ function filtrarSenhaVisivel(dados) {
 // ==========================================================================
 // ISOLAMENTO: o WhatsApp é um módulo à parte e NUNCA pode derrubar o resto do
 // sistema. Se o sql.js não estiver instalado ou um arquivo do módulo falhar, o
-// servidor sobe do mesmo jeito — Vagas, Seleção, DP, Equipamentos e Financeiro
-// continuam funcionando e só o WhatsApp fica indisponível (responde 503).
-// Segundo WhatsApp (QR Code, via OpenWA). Módulo isolado: se ele não carregar,
-// o sistema sobe igual e só essa aba responde que está indisponível.
-let openwa = null;
-try {
-  openwa = require('./openwa.cjs');
-  console.log('[OpenWA] ponte carregada' + (openwa.configurado() ? ' — apontando para ' + openwa.URL_BASE : ' (ainda NÃO configurado)'));
-} catch (e) {
-  console.error('[OpenWA] não carregou (o sistema segue normal):', e.message);
-  openwa = null;
-}
-
-// Nome da sessão do OpenWA. Ele exige 3 caracteres ou mais — "rt" era recusado
-// com "name must be longer than or equal to 3 characters". Aqui a regra fica
-// num lugar só, para não voltar a divergir entre as rotas.
-const OPENWA_SESSAO_PADRAO = 'rt-vagas';
-function _openwaNome(valor) {
-  const limpo = String(valor || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
-  return limpo.length >= 3 ? limpo : OPENWA_SESSAO_PADRAO;
-}
-
-// As rotas por sessão (/start, /qr, /logout, /messages) esperam o **id** da
-// sessão, que é um UUID — não o nome. Só a CRIAÇÃO usa o nome. Passar o nome
-// nessas rotas dá "Validation failed (uuid is expected)".
-// Aqui traduzimos nome -> id, consultando a lista.
-function _openwaResolverId(nome) {
-  return openwa.chamar('/api/sessions').then(function (r) {
-    if (!r.ok) return { ok: false, erro: _openwaDetalhe(r) };
-    const lista = Array.isArray(r.dados) ? r.dados : [];
-    const s = lista.find(function (x) { return x && (x.name === nome || x.id === nome); });
-    if (!s || !s.id) return { ok: false, erro: 'Não achei a conexão "' + nome + '" no OpenWA.' };
-    return { ok: true, id: String(s.id), sessao: s };
-  });
-}
-
-// "erro 400" não ajuda ninguém. O OpenWA manda o motivo no corpo da resposta
-// (ex.: "property sessionId should not exist") — isto puxa esse texto para a
-// tela, para não ser preciso ir caçar em log de container.
-function _openwaDetalhe(r) {
-  const d = r && r.dados;
-  let msg = '';
-  if (d) {
-    if (Array.isArray(d.message)) msg = d.message.join('; ');
-    else if (typeof d.message === 'string') msg = d.message;
-    else if (typeof d.error === 'string') msg = d.error;
-    else if (typeof d.texto === 'string') msg = d.texto.slice(0, 300);
-  }
-  const base = (r && r.erro) || 'O OpenWA recusou a chamada.';
-  return msg ? base + ' Motivo: ' + msg : base;
-}
+// servidor sobe do mesmo jeito — Vagas, Seleção, DP e Financeiro continuam
+// funcionando e só o WhatsApp fica indisponível (responde 503).
 let waDb = null, waApi = null, waWebhook = null, waBot = null, waLembretes = null, waGrupo = null, _waCarregado = false;
 try {
   waDb      = require('./whatsapp-db.cjs');
@@ -1913,8 +1674,7 @@ let _waReady = false;
     // contrato de gravação e a permissão por tela do sistema. O estado de
     // execução fica no SQLite, que é o que muda a cada mensagem.
     // A mídia do bot vai para DATA_DIR/bot-midia, FORA de /uploads/ (que é
-    // público, regra 7): só sai pela rota autenticada, igual aos documentos
-    // da Diária.
+    // público, regra 7): só sai pela rota autenticada.
     if (waBot) {
       try {
         waBot.iniciar({
@@ -2783,726 +2543,6 @@ http.createServer(function (req, res) {
     return;
   }
 
-  // ==========================================================================
-  // RELATÓRIO DE EQUIPAMENTOS PARA A EMPRESA CLIENTE (link público)
-  // --------------------------------------------------------------------------
-  // O DP monta um relatório com os colaboradores escolhidos e manda o link
-  // para a empresa. Quem abre o link NÃO precisa de login — mas só enxerga
-  // AQUELE relatório, e nada mais do sistema.
-  //
-  // Cuidados: o token é longo e aleatório (não dá para adivinhar); a resposta
-  // traz somente os registros daquele relatório; o CPF sai parcialmente
-  // mascarado (o nome já identifica a pessoa para o cliente); e um relatório
-  // desativado deixa de responder.
-  // ==========================================================================
-  // ---- Registrar QUEM abriu o link e o ACEITE da conferência (públicos) ----
-  // Servem de comprovante: ficam gravados o nome informado, a data/hora e o
-  // que a pessoa conferiu (ou não conferiu, com o motivo).
-  if (urlPath.indexOf('/api/relatorio-equip/') === 0 && req.method === 'POST') {
-    const resto = decodeSeguro(urlPath.slice('/api/relatorio-equip/'.length));
-    if (resto === null) { responderJson(res, 400, { error: 'endereço inválido' }); return; }
-    const barra = resto.lastIndexOf('/');
-    const token = barra > 0 ? resto.slice(0, barra).trim() : '';
-    const acao = barra > 0 ? resto.slice(barra + 1).trim() : '';
-    if (!token || token.length < 20 || ['acesso', 'conferencia'].indexOf(acao) < 0) {
-      responderJson(res, 404, { error: 'Não encontrado.' }); return;
-    }
-    lerCorpo(req, function (err, body) {
-      if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
-      const nome = String((body && body.nome) || '').trim().slice(0, 120);
-      if (nome.length < 2) { responderJson(res, 400, { error: 'Informe seu nome.' }); return; }
-
-      comTrava(function () {
-        const st = lerEstadoParaGravar();
-        const d = st.dados || {};
-        const lista = Array.isArray(d.relatoriosEquip) ? d.relatoriosEquip : [];
-        const rel = lista.find(function (r) { return r && r.token === token; });
-        if (!rel) { responderJson(res, 404, { error: 'Relatório não encontrado.' }); return; }
-        if (rel.ativo === false) { responderJson(res, 410, { error: 'Este relatório foi desativado.' }); return; }
-
-        const agora = new Date().toISOString();
-        if (acao === 'acesso') {
-          if (!Array.isArray(rel.acessos)) rel.acessos = [];
-          // Guarda no máximo 200 acessos por relatório (não cresce sem fim)
-          rel.acessos.push({ nome: nome, em: agora });
-          if (rel.acessos.length > 200) rel.acessos = rel.acessos.slice(-200);
-        } else {
-          const itens = (body && body.itens && typeof body.itens === 'object') ? body.itens : {};
-          const idsValidos = {};
-          (rel.registrosIds || []).forEach(function (id) { idsValidos[id] = true; });
-          const limpos = {};
-          Object.keys(itens).forEach(function (id) {
-            if (!idsValidos[id]) return;                       // só itens deste relatório
-            const it = itens[id] || {};
-            limpos[id] = {
-              ok: it.ok === true,
-              motivo: String(it.motivo || '').trim().slice(0, 400)
-            };
-          });
-          const total = (rel.registrosIds || []).length;
-          const conferidos = Object.keys(limpos).filter(function (k) { return limpos[k].ok; }).length;
-          if (!Array.isArray(rel.conferencias)) rel.conferencias = [];
-          rel.conferencias.push({
-            id: _novoIdServidor('conf'),
-            nome: nome, em: agora,
-            itens: limpos,
-            totalItens: total,
-            conferidos: conferidos,
-            naoConferidos: Object.keys(limpos).filter(function (k) { return !limpos[k].ok; }).length,
-            tudoOk: total > 0 && conferidos === total,
-            observacao: String((body && body.observacao) || '').trim().slice(0, 1000)
-          });
-          if (rel.conferencias.length > 50) rel.conferencias = rel.conferencias.slice(-50);
-        }
-
-        try {
-          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-          responderJson(res, 200, { ok: true, em: agora });
-        } catch (e) {
-          console.error('[RT] relatorio-equip ' + acao + ':', e);
-          responderJson(res, 500, { error: 'falha ao gravar' });
-        }
-      }, res);
-    });
-    return;
-  }
-
-  if (urlPath.indexOf('/api/relatorio-equip/') === 0 && req.method === 'GET') {
-    const _tokenBruto = decodeSeguro(urlPath.slice('/api/relatorio-equip/'.length));
-    if (_tokenBruto === null) { responderJson(res, 400, { error: 'endereço inválido' }); return; }
-    const token = _tokenBruto.trim();
-    if (!token || token.length < 20) { responderJson(res, 404, { error: 'Relatório não encontrado.' }); return; }
-
-    const st = lerEstado();
-    const d = st.dados || {};
-    const rel = (Array.isArray(d.relatoriosEquip) ? d.relatoriosEquip : [])
-      .find(function (r) { return r && r.token === token; });
-    if (!rel) { responderJson(res, 404, { error: 'Relatório não encontrado.' }); return; }
-    if (rel.ativo === false) { responderJson(res, 410, { error: 'Este relatório foi desativado por quem o gerou.' }); return; }
-
-    const ids = {};
-    (rel.registrosIds || []).forEach(function (id) { ids[id] = true; });
-    const mascararCpf = function (cpf) {
-      const so = String(cpf || '').replace(/\D/g, '');
-      if (so.length !== 11) return '';
-      return '***.' + so.slice(3, 6) + '.' + so.slice(6, 9) + '-**';
-    };
-    const registros = (Array.isArray(d.equipamentos) ? d.equipamentos : [])
-      .filter(function (r) { return r && ids[r.id]; })
-      .map(function (r) {
-        return {
-          id: r.id,
-          nome: r.nome || '',
-          cpf: mascararCpf(r.cpf),
-          tipo: r.tipo || '',
-          equipamentos: Array.isArray(r.equipamentos) ? r.equipamentos : (r.equipamentos ? [r.equipamentos] : []),
-          equipamentoOutros: r.equipamentoOutros || '',
-          estado: r.estado || '',
-          observacoes: r.observacoes || '',
-          responsavel: r.responsavel || '',
-          dataCadastro: r.dataCadastro || '',
-          fotos: (Array.isArray(r.fotos) ? r.fotos : []).map(function (f) {
-            return { nome: (f && f.nome) || '', arquivo: (f && f.arquivo) || '' };
-          })
-        };
-      });
-
-    responderJson(res, 200, {
-      titulo: rel.titulo || 'Relatório de Equipamentos',
-      empresaDestino: rel.empresaDestino || '',
-      observacao: rel.observacao || '',
-      criadoPor: rel.criadoPor || '',
-      criadoEm: rel.criadoEm || '',
-      total: registros.length,
-      // Resumo do que ja foi conferido, para a pagina mostrar o estado atual
-      jaConferido: !!(rel.conferencias && rel.conferencias.length),
-      ultimaConferencia: (rel.conferencias && rel.conferencias.length)
-        ? (function () {
-            const c = rel.conferencias[rel.conferencias.length - 1];
-            return { nome: c.nome, em: c.em, tudoOk: c.tudoOk, conferidos: c.conferidos,
-                     naoConferidos: c.naoConferidos, itens: c.itens, observacao: c.observacao };
-          })()
-        : null,
-      registros: registros
-    });
-    return;
-  }
-
-  // ==========================================================================
-  // DIÁRIA (Presença RT) — Fase 2, sub-fase 2 (cadastro completo)
-  // Cadastro público em 3 passos (dados pessoais, endereço, Pix+documentos),
-  // enviado de uma vez só ao final — sem registro parcial no meio do caminho.
-  // Identidade pública por token aleatório (array — um por aparelho), igual
-  // ao token de /api/relatorio-equip: nunca é cookie de sessão de staff.
-  // Login por nome+telefone (reentrada num aparelho novo) é a próxima
-  // sub-fase; por enquanto, quem já tem token salvo no navegador continua
-  // entrando normalmente por ele.
-  // ==========================================================================
-
-  // ---- Configuração pública: cadastros novos abertos ou pausados -----------
-  // Lido pela tela de entrada ANTES de mostrar "Criar minha conta" — quando
-  // pausado, quem nunca se cadastrou nem chega a ver o formulário. Quem já
-  // tem conta continua entrando normalmente (login não é afetado por isso).
-  if (urlPath === '/api/diaria/config' && req.method === 'GET') {
-    const st = lerEstado();
-    const d = st.dados || {};
-    responderJson(res, 200, { cadastrosAbertos: !(d.diariaConfig && d.diariaConfig.cadastrosAbertos === false) });
-    return;
-  }
-
-  // ---- Trabalhador: cadastro completo --------------------------------------
-  if (urlPath === '/api/diaria/trabalhador/cadastro' && req.method === 'POST') {
-    const stPausa = lerEstado();
-    if (stPausa.dados && stPausa.dados.diariaConfig && stPausa.dados.diariaConfig.cadastrosAbertos === false) {
-      responderJson(res, 423, { error: 'Os cadastros estão pausados no momento — já batemos o limite de vagas para esta diária. Se abrir vaga, avisamos no grupo.' });
-      return;
-    }
-    lerCorpo(req, function (err, body) {
-      if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
-      const b = body || {};
-      const nome = String(b.nome || '').trim().slice(0, 120);
-      const telefone = diariaNormalizarTelefone(b.telefone);
-      const nomePai = String(b.nomePai || '').trim().slice(0, 120);
-      const nomeMae = String(b.nomeMae || '').trim().slice(0, 120);
-      const rg = String(b.rg || '').trim().slice(0, 20);
-      const cpf = String(b.cpf || '').replace(/\D/g, '');
-      const cep = String(b.cep || '').replace(/\D/g, '');
-      const logradouro = String(b.logradouro || '').trim().slice(0, 200);
-      const numero = String(b.numero || '').trim().slice(0, 20);
-      const complemento = String(b.complemento || '').trim().slice(0, 100);
-      const bairro = String(b.bairro || '').trim().slice(0, 100);
-      const cidade = String(b.cidade || '').trim().slice(0, 100);
-      const uf = String(b.uf || '').trim().toUpperCase().slice(0, 2);
-      const pixTipo = String(b.pixTipo || '').trim();
-      const pixChave = String(b.pixChave || '').trim().slice(0, 140);
-
-      if (nome.split(/\s+/).filter(Boolean).length < 2) { responderJson(res, 400, { error: 'Informe seu nome completo (nome e sobrenome).' }); return; }
-      if (telefone.length < 10 || telefone.length > 13) { responderJson(res, 400, { error: 'Telefone inválido.' }); return; }
-      if (!nomePai) { responderJson(res, 400, { error: 'Informe o nome do pai.' }); return; }
-      if (!nomeMae) { responderJson(res, 400, { error: 'Informe o nome da mãe.' }); return; }
-      if (!rg) { responderJson(res, 400, { error: 'Informe o número do RG.' }); return; }
-      if (!diariaCpfValido(cpf)) { responderJson(res, 400, { error: 'CPF inválido. Confira os números.' }); return; }
-      if (cep.length !== 8) { responderJson(res, 400, { error: 'CEP inválido.' }); return; }
-      if (!logradouro || !numero || !bairro || !cidade || !uf) { responderJson(res, 400, { error: 'Complete o endereço.' }); return; }
-      if (DIARIA_PIX_TIPOS.indexOf(pixTipo) < 0) { responderJson(res, 400, { error: 'Escolha o tipo da chave Pix.' }); return; }
-      if (!diariaPixValida(pixTipo, pixChave)) { responderJson(res, 400, { error: 'Chave Pix inválida pro tipo escolhido.' }); return; }
-      if (!b.rgFrente || !b.rgVerso || !b.comprovante) { responderJson(res, 400, { error: 'Envie as três imagens: RG frente, RG verso e comprovante de residência.' }); return; }
-
-      comTrava(function () {
-        const st = lerEstadoParaGravar();
-        const d = st.dados || {};
-        if (!Array.isArray(d.trabalhadoresDiaria)) d.trabalhadoresDiaria = [];
-        if (d.trabalhadoresDiaria.some(function (x) { return x && diariaNormalizarTelefone(x.telefone) === telefone; })) {
-          responderJson(res, 409, { error: 'Esse telefone já tem cadastro. Continue usando o mesmo aparelho de antes.' });
-          return;
-        }
-        if (d.trabalhadoresDiaria.some(function (x) { return x && x.cpf === cpf; })) {
-          responderJson(res, 409, { error: 'Esse CPF já está cadastrado com outro telefone. Procure a coordenação.' });
-          return;
-        }
-        const id = diariaGerarId('trab');
-        const token = crypto.randomBytes(24).toString('hex');
-        let nomesArquivos;
-        try {
-          nomesArquivos = {
-            rgFrente: diariaSalvarDocumento(id, 'rg-frente', b.rgFrente),
-            rgVerso: diariaSalvarDocumento(id, 'rg-verso', b.rgVerso),
-            comprovante: diariaSalvarDocumento(id, 'comprovante', b.comprovante)
-          };
-        } catch (e) {
-          responderJson(res, 400, { error: e.message || 'Não foi possível salvar as imagens.' });
-          return;
-        }
-        if (!nomesArquivos.rgFrente || !nomesArquivos.rgVerso || !nomesArquivos.comprovante) {
-          responderJson(res, 400, { error: 'Uma das imagens não chegou certo. Tente enviar de novo.' });
-          return;
-        }
-        const t = {
-          id: id, nome: nome, nomeNormalizado: diariaNormalizarNome(nome), telefone: telefone,
-          nomePai: nomePai, nomeMae: nomeMae, rg: rg, cpf: cpf,
-          cep: cep, logradouro: logradouro, numero: numero, complemento: complemento,
-          bairro: bairro, cidade: cidade, uf: uf,
-          pixTipo: pixTipo, pixChave: pixChave,
-          documentos: nomesArquivos,
-          senhaHash: null,
-          tokens: [token],
-          status: 'pendente_aprovacao',
-          criadoEm: new Date().toISOString(),
-          aprovadoEm: null, aprovadoPor: null, observacaoAdmin: null
-        };
-        d.trabalhadoresDiaria.push(t);
-        try {
-          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-          responderJson(res, 200, { ok: true, token: token, trabalhador: diariaTrabalhadorPublico(t) });
-        } catch (e) {
-          console.error('[Diária] cadastro:', e);
-          responderJson(res, 500, { error: 'Não foi possível salvar. Tente de novo.' });
-        }
-      }, res);
-    });
-    return;
-  }
-
-  // ---- Trabalhador: status + diária de hoje + presença dele nela ----------
-  if (urlPath === '/api/diaria/trabalhador/status' && req.method === 'GET') {
-    const qIdx = req.url.indexOf('?');
-    const qs = new URLSearchParams(qIdx >= 0 ? req.url.slice(qIdx + 1) : '');
-    const token = String(qs.get('token') || '').trim();
-    if (!token || token.length < 20) { responderJson(res, 404, { error: 'Não encontrado.' }); return; }
-    const st = lerEstadoParaGravar();
-    const d = st.dados || {};
-    const t = (d.trabalhadoresDiaria || []).find(function (x) { return Array.isArray(x.tokens) && x.tokens.indexOf(token) >= 0; });
-    if (!t) { responderJson(res, 404, { error: 'Cadastro não encontrado.' }); return; }
-    responderJson(res, 200, diariaMontarStatusResposta(t, d));
-    return;
-  }
-
-  // ---- Trabalhador: login (reentrada em aparelho novo) ---------------------
-  // Nome completo = usuário, telefone = senha (sem senhaHash de verdade por
-  // enquanto). Funciona pra qualquer status — quem já tinha token continua
-  // podendo usá-lo direto; login é só pra quem trocou/perdeu o aparelho.
-  if (urlPath === '/api/diaria/trabalhador/login' && req.method === 'POST') {
-    const ip = waIpDaReq(req);
-    if (!diariaPodeTentarLogin(ip)) { responderJson(res, 429, { error: 'Muitas tentativas. Aguarde uns minutos e tente de novo.' }); return; }
-    lerCorpo(req, function (err, body) {
-      if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
-      const b = body || {};
-      const nomeNormalizado = diariaNormalizarNome(b.nome);
-      const telefone = diariaNormalizarTelefone(b.telefone);
-      if (!nomeNormalizado || !telefone) {
-        diariaRegistrarFalhaLogin(ip);
-        responderJson(res, 401, { error: 'Nome ou telefone incorretos.' });
-        return;
-      }
-      comTrava(function () {
-        const st = lerEstadoParaGravar();
-        const d = st.dados || {};
-        // Normaliza também o telefone já salvo: cadastros antigos podem ter
-        // ficado gravados com +55 na frente (era antes desse ajuste).
-        const t = (d.trabalhadoresDiaria || []).find(function (x) {
-          return x && x.nomeNormalizado === nomeNormalizado && diariaNormalizarTelefone(x.telefone) === telefone;
-        });
-        if (!t) {
-          diariaRegistrarFalhaLogin(ip);
-          responderJson(res, 401, { error: 'Nome ou telefone incorretos.' });
-          return;
-        }
-        diariaLimparFalhasLogin(ip);
-        const token = crypto.randomBytes(24).toString('hex');
-        if (!Array.isArray(t.tokens)) t.tokens = [];
-        t.tokens.push(token);
-        try {
-          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-        } catch (e) {
-          console.error('[Diária] login:', e);
-          responderJson(res, 500, { error: 'Não foi possível entrar. Tente de novo.' });
-          return;
-        }
-        const resposta = diariaMontarStatusResposta(t, d);
-        resposta.token = token;
-        responderJson(res, 200, resposta);
-      }, res);
-    });
-    return;
-  }
-
-  // Check-in por GPS foi removido (ponto de encontro muda toda semana — ver
-  // comentário no topo do bloco DIÁRIA). O que existe hoje é o botão simples
-  // "Confirmar presença" (sem foto/GPS): o trabalhador avisa que chegou, e o
-  // admin confirma manualmente olhando quem está realmente no local (ver
-  // rotas /admin/presencas/*). Registro de chegada por foto, se um dia for
-  // preciso, entra como uma camada em cima disso, não troca o modelo.
-  if (urlPath === '/api/diaria/trabalhador/presenca' && req.method === 'POST') {
-    lerCorpo(req, function (err, body) {
-      if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
-      const token = String((body && body.token) || '').trim();
-      if (!token || token.length < 20) { responderJson(res, 404, { error: 'Não encontrado.' }); return; }
-      comTrava(function () {
-        const st = lerEstadoParaGravar();
-        const d = st.dados || {};
-        const t = (d.trabalhadoresDiaria || []).find(function (x) { return Array.isArray(x.tokens) && x.tokens.indexOf(token) >= 0; });
-        if (!t) { responderJson(res, 404, { error: 'Cadastro não encontrado.' }); return; }
-        if (t.status !== 'ativo') { responderJson(res, 403, { error: 'Seu cadastro não está ativo.' }); return; }
-        const hoje = new Date().toISOString().slice(0, 10);
-        const diariaHoje = (d.diarias || []).find(function (x) { return x.data === hoje && x.status === 'aberta'; });
-        if (!diariaHoje) { responderJson(res, 400, { error: 'Não há registro de presença aberto agora.' }); return; }
-        if (!Array.isArray(d.presencasDiaria)) d.presencasDiaria = [];
-        const jaTem = d.presencasDiaria.some(function (p) { return p.diariaId === diariaHoje.id && p.trabalhadorId === t.id; });
-        if (jaTem) {
-          // já confirmou antes — não cria duplicado, só devolve o estado atual.
-          responderJson(res, 200, diariaMontarStatusResposta(t, d));
-          return;
-        }
-        d.presencasDiaria.push({
-          id: diariaGerarId('pres'),
-          diariaId: diariaHoje.id,
-          trabalhadorId: t.id,
-          status: 'aguardando',
-          checkinEm: new Date().toISOString(),
-          confirmadoPor: null,
-          confirmadoEm: null
-        });
-        try {
-          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-          responderJson(res, 200, diariaMontarStatusResposta(t, d));
-        } catch (e) {
-          console.error('[Diária] presenca:', e);
-          responderJson(res, 500, { error: 'Não foi possível registrar. Tente de novo.' });
-        }
-      }, res);
-    });
-    return;
-  }
-
-  // ---- Admin: gerenciar trabalhadores, diárias e presenças -----------------
-  // Mesma trava de todo o painel: cookie de sessão de staff + mestre/admin.
-  if (urlPath.indexOf('/api/diaria/admin/') === 0) {
-    if (!autenticado) { responderJson(res, 401, { error: 'Faça login.' }); return; }
-    const requesterDiaria = usuarioDaReq(req);
-    if (!requesterDiaria) { responderJson(res, 401, { error: 'Faça login.' }); return; }
-    if (!diariaPodeGerenciar(requesterDiaria)) { responderJson(res, 403, { error: 'Sem permissão para gerenciar a Diária.' }); return; }
-
-    // ---- Pausar/retomar cadastros novos (não mexe em quem já tem conta) ----
-    if (urlPath === '/api/diaria/admin/cadastros/pausar' && req.method === 'POST') {
-      comTrava(function () {
-        const st = lerEstadoParaGravar();
-        const d = st.dados || {};
-        if (!d.diariaConfig) d.diariaConfig = {};
-        d.diariaConfig.cadastrosAbertos = false;
-        try {
-          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-          responderJson(res, 200, { ok: true, cadastrosAbertos: false });
-        } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-      }, res);
-      return;
-    }
-    if (urlPath === '/api/diaria/admin/cadastros/retomar' && req.method === 'POST') {
-      comTrava(function () {
-        const st = lerEstadoParaGravar();
-        const d = st.dados || {};
-        if (!d.diariaConfig) d.diariaConfig = {};
-        d.diariaConfig.cadastrosAbertos = true;
-        try {
-          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-          responderJson(res, 200, { ok: true, cadastrosAbertos: true });
-        } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-      }, res);
-      return;
-    }
-
-    // Documento pessoal (RG, comprovante) só sai por aqui — nunca pela pasta
-    // pública de uploads. Chega aqui já autenticado (checagem acima).
-    let mArq = urlPath.match(/^\/api\/diaria\/admin\/arquivo\/([^\/]+)\/([^\/]+)\/([^\/]+)$/);
-    if (mArq && req.method === 'GET') {
-      const tipoArq = decodeSeguro(mArq[1]);
-      const _idArqBruto = decodeSeguro(mArq[2]);
-      const _nomeArqBruto = decodeSeguro(mArq[3]);
-      if (tipoArq === null || _idArqBruto === null || _nomeArqBruto === null) {
-        responderJson(res, 400, { error: 'endereço inválido' }); return;
-      }
-      // path.basename tira qualquer "/" de um "../" simples, mas um ".."
-      // sozinho (sem barra) passa direto por ele — por isso o cinto e a
-      // suspensório: monta o caminho e confere que ele continua DENTRO de
-      // DIARIA_DOCS_DIR antes de ler qualquer coisa do disco.
-      const idArq = path.basename(_idArqBruto);
-      const nomeArq = path.basename(_nomeArqBruto);
-      let caminhoArq = null;
-      if (tipoArq === 'cadastro') caminhoArq = path.join(DIARIA_DOCS_DIR, idArq, nomeArq);
-      if (!caminhoArq || !(caminhoArq + path.sep).startsWith(DIARIA_DOCS_DIR + path.sep)) {
-        responderJson(res, 404, { error: 'Arquivo não encontrado.' });
-        return;
-      }
-      fs.readFile(caminhoArq, function (e, data) {
-        if (e) { responderJson(res, 404, { error: 'Arquivo não encontrado.' }); return; }
-        const ct = MIME[path.extname(caminhoArq).toLowerCase()] || 'application/octet-stream';
-        res.writeHead(200, Object.assign({ 'Content-Type': ct }, SECURITY_HEADERS));
-        res.end(data);
-      });
-      return;
-    }
-
-    // ---- Admin: corrige os dados que a pessoa preencheu errado (ela liga
-    //     pedindo, ou o admin percebe olhando a ficha) -------------------------
-    let m = urlPath.match(/^\/api\/diaria\/admin\/trabalhadores\/([^\/]+)\/dados$/);
-    if (m && req.method === 'POST') {
-      const alvoId = decodeSeguro(m[1]);
-      if (alvoId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
-      lerCorpo(req, function (err, body) {
-        if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
-        const b = body || {};
-        const nome = String(b.nome || '').trim().slice(0, 120);
-        const telefone = diariaNormalizarTelefone(b.telefone);
-        const nomePai = String(b.nomePai || '').trim().slice(0, 120);
-        const nomeMae = String(b.nomeMae || '').trim().slice(0, 120);
-        const rg = String(b.rg || '').trim().slice(0, 20);
-        const cpf = String(b.cpf || '').replace(/\D/g, '');
-        const cep = String(b.cep || '').replace(/\D/g, '');
-        const logradouro = String(b.logradouro || '').trim().slice(0, 200);
-        const numero = String(b.numero || '').trim().slice(0, 20);
-        const complemento = String(b.complemento || '').trim().slice(0, 100);
-        const bairro = String(b.bairro || '').trim().slice(0, 100);
-        const cidade = String(b.cidade || '').trim().slice(0, 100);
-        const uf = String(b.uf || '').trim().toUpperCase().slice(0, 2);
-        const pixTipo = String(b.pixTipo || '').trim();
-        const pixChave = String(b.pixChave || '').trim().slice(0, 140);
-
-        if (nome.split(/\s+/).filter(Boolean).length < 2) { responderJson(res, 400, { error: 'Informe o nome completo (nome e sobrenome).' }); return; }
-        if (telefone.length < 10 || telefone.length > 13) { responderJson(res, 400, { error: 'Telefone inválido.' }); return; }
-        if (!nomePai) { responderJson(res, 400, { error: 'Informe o nome do pai.' }); return; }
-        if (!nomeMae) { responderJson(res, 400, { error: 'Informe o nome da mãe.' }); return; }
-        if (!rg) { responderJson(res, 400, { error: 'Informe o número do RG.' }); return; }
-        if (!diariaCpfValido(cpf)) { responderJson(res, 400, { error: 'CPF inválido. Confira os números.' }); return; }
-        if (cep.length !== 8) { responderJson(res, 400, { error: 'CEP inválido.' }); return; }
-        if (!logradouro || !numero || !bairro || !cidade || !uf) { responderJson(res, 400, { error: 'Complete o endereço.' }); return; }
-        if (DIARIA_PIX_TIPOS.indexOf(pixTipo) < 0) { responderJson(res, 400, { error: 'Escolha o tipo da chave Pix.' }); return; }
-        if (!diariaPixValida(pixTipo, pixChave)) { responderJson(res, 400, { error: 'Chave Pix inválida pro tipo escolhido.' }); return; }
-
-        comTrava(function () {
-          const st = lerEstadoParaGravar();
-          const d = st.dados || {};
-          const t = (d.trabalhadoresDiaria || []).find(function (x) { return x.id === alvoId; });
-          if (!t) { responderJson(res, 404, { error: 'Trabalhador não encontrado.' }); return; }
-          const outroTelefone = (d.trabalhadoresDiaria || []).find(function (x) { return x.id !== alvoId && diariaNormalizarTelefone(x.telefone) === telefone; });
-          if (outroTelefone) { responderJson(res, 409, { error: 'Já existe outro cadastro com esse telefone.' }); return; }
-          const outroCpf = (d.trabalhadoresDiaria || []).find(function (x) { return x.id !== alvoId && x.cpf === cpf; });
-          if (outroCpf) { responderJson(res, 409, { error: 'Já existe outro cadastro com esse CPF.' }); return; }
-
-          t.nome = nome; t.nomeNormalizado = diariaNormalizarNome(nome); t.telefone = telefone;
-          t.nomePai = nomePai; t.nomeMae = nomeMae; t.rg = rg; t.cpf = cpf;
-          t.cep = cep; t.logradouro = logradouro; t.numero = numero; t.complemento = complemento;
-          t.bairro = bairro; t.cidade = cidade; t.uf = uf;
-          t.pixTipo = pixTipo; t.pixChave = pixChave;
-          try {
-            gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-            responderJson(res, 200, { ok: true, trabalhador: diariaTrabalhadorAdmin(t) });
-          } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-        }, res);
-      });
-      return;
-    }
-
-    // ---- Admin: troca um documento (foto ilegível, PDF que a pessoa mandou
-    //     depois pelo WhatsApp etc.) — some o arquivo velho, fica só o novo ----
-    m = urlPath.match(/^\/api\/diaria\/admin\/trabalhadores\/([^\/]+)\/documento$/);
-    if (m && req.method === 'POST') {
-      const alvoId = decodeSeguro(m[1]);
-      if (alvoId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
-      lerCorpo(req, function (err, body) {
-        if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
-        const b = body || {};
-        const CAMPOS_VALIDOS = { rgFrente: 'rg-frente', rgVerso: 'rg-verso', comprovante: 'comprovante' };
-        const campo = String(b.campo || '');
-        if (!CAMPOS_VALIDOS[campo]) { responderJson(res, 400, { error: 'Campo de documento inválido.' }); return; }
-        if (!b.arquivo) { responderJson(res, 400, { error: 'Envie o novo arquivo.' }); return; }
-        comTrava(function () {
-          const st = lerEstadoParaGravar();
-          const d = st.dados || {};
-          const t = (d.trabalhadoresDiaria || []).find(function (x) { return x.id === alvoId; });
-          if (!t) { responderJson(res, 404, { error: 'Trabalhador não encontrado.' }); return; }
-          const nomeAntigo = t.documentos && t.documentos[campo];
-          let novoNome;
-          try {
-            novoNome = diariaSalvarDocumento(alvoId, CAMPOS_VALIDOS[campo], b.arquivo);
-          } catch (e) {
-            responderJson(res, 400, { error: e.message || 'Não foi possível salvar o arquivo.' });
-            return;
-          }
-          if (!novoNome) { responderJson(res, 400, { error: 'Arquivo inválido — envie uma imagem ou PDF.' }); return; }
-          if (!t.documentos) t.documentos = {};
-          t.documentos[campo] = novoNome;
-          if (nomeAntigo && nomeAntigo !== novoNome) {
-            try { fs.unlinkSync(path.join(DIARIA_DOCS_DIR, alvoId, nomeAntigo)); } catch (e) {}
-          }
-          try {
-            gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-            responderJson(res, 200, { ok: true, trabalhador: diariaTrabalhadorAdmin(t) });
-          } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-        }, res);
-      });
-      return;
-    }
-
-    if (urlPath === '/api/diaria/admin/trabalhadores' && req.method === 'GET') {
-      const qIdx = req.url.indexOf('?');
-      const qs = new URLSearchParams(qIdx >= 0 ? req.url.slice(qIdx + 1) : '');
-      const filtroStatus = qs.get('status') || '';
-      const st = lerEstadoParaGravar();
-      const d = st.dados || {};
-      let lista = Array.isArray(d.trabalhadoresDiaria) ? d.trabalhadoresDiaria.slice() : [];
-      if (filtroStatus) lista = lista.filter(function (t) { return t.status === filtroStatus; });
-      lista.sort(function (a, b) { return (b.criadoEm || '').localeCompare(a.criadoEm || ''); });
-      responderJson(res, 200, { trabalhadores: lista.map(diariaTrabalhadorAdmin) });
-      return;
-    }
-
-    m = urlPath.match(/^\/api\/diaria\/admin\/trabalhadores\/([^\/]+)\/(aprovar|recusar|bloquear|reativar)$/);
-    if (m && req.method === 'POST') {
-      const alvoId = decodeSeguro(m[1]);
-      if (alvoId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
-      const acao = m[2];
-      lerCorpo(req, function (err, body) {
-        if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
-        const observacao = String((body && body.observacao) || '').trim().slice(0, 500);
-        comTrava(function () {
-          const st = lerEstadoParaGravar();
-          const d = st.dados || {};
-          const t = (d.trabalhadoresDiaria || []).find(function (x) { return x.id === alvoId; });
-          if (!t) { responderJson(res, 404, { error: 'Trabalhador não encontrado.' }); return; }
-          if (acao === 'aprovar') { t.status = 'ativo'; t.aprovadoEm = new Date().toISOString(); t.aprovadoPor = requesterDiaria.login; t.observacaoAdmin = null; }
-          else if (acao === 'recusar') { t.status = 'recusado'; t.observacaoAdmin = observacao || null; }
-          else if (acao === 'bloquear') { t.status = 'bloqueado'; t.observacaoAdmin = observacao || t.observacaoAdmin || null; }
-          else if (acao === 'reativar') { t.status = 'ativo'; }
-          try {
-            gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-            responderJson(res, 200, { ok: true, trabalhador: diariaTrabalhadorAdmin(t) });
-          } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-        }, res);
-      });
-      return;
-    }
-
-    // ---- Admin: exclui de vez um cadastro (gente que pediu pra sair antes
-    //     de ser aprovada, ou que não quer mais fazer parte). Some o registro
-    //     e os documentos do disco — histórico de presença que já exista fica
-    //     como está, só sem nome resolvido (GET /presencas já trata isso). ----
-    m = urlPath.match(/^\/api\/diaria\/admin\/trabalhadores\/([^\/]+)\/excluir$/);
-    if (m && req.method === 'POST') {
-      const alvoId = decodeSeguro(m[1]);
-      if (alvoId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
-      comTrava(function () {
-        const st = lerEstadoParaGravar();
-        const d = st.dados || {};
-        const idx = (d.trabalhadoresDiaria || []).findIndex(function (x) { return x.id === alvoId; });
-        if (idx < 0) { responderJson(res, 404, { error: 'Trabalhador não encontrado.' }); return; }
-        d.trabalhadoresDiaria.splice(idx, 1);
-        try { fs.rmSync(path.join(DIARIA_DOCS_DIR, alvoId), { recursive: true, force: true }); } catch (e) {}
-        try {
-          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-          responderJson(res, 200, { ok: true });
-        } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-      }, res);
-      return;
-    }
-
-    if (urlPath === '/api/diaria/admin/diarias' && req.method === 'GET') {
-      const st = lerEstadoParaGravar();
-      const d = st.dados || {};
-      const lista = (Array.isArray(d.diarias) ? d.diarias : []).slice()
-        .sort(function (a, b) { return (b.criadaEm || '').localeCompare(a.criadaEm || ''); });
-      responderJson(res, 200, { diarias: lista });
-      return;
-    }
-
-    if (urlPath === '/api/diaria/admin/diarias' && req.method === 'POST') {
-      lerCorpo(req, function (err, body) {
-        if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
-        const titulo = String((body && body.titulo) || '').trim().slice(0, 160);
-        const data = String((body && body.data) || '').trim();
-        if (!titulo) { responderJson(res, 400, { error: 'Dê um título pra diária.' }); return; }
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) { responderJson(res, 400, { error: 'Data inválida.' }); return; }
-        comTrava(function () {
-          const st = lerEstadoParaGravar();
-          const d = st.dados || {};
-          if (!Array.isArray(d.diarias)) d.diarias = [];
-          const nova = {
-            id: diariaGerarId('diaria'),
-            titulo: titulo, data: data,
-            status: 'planejada',
-            criadaPor: requesterDiaria.login, criadaEm: new Date().toISOString(),
-            abertaEm: null, encerradaEm: null
-          };
-          d.diarias.push(nova);
-          try {
-            gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-            responderJson(res, 200, { ok: true, diaria: nova });
-          } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-        }, res);
-      });
-      return;
-    }
-
-    m = urlPath.match(/^\/api\/diaria\/admin\/diarias\/([^\/]+)\/(abrir|encerrar|reabrir|confirmar-todos)$/);
-    if (m && req.method === 'POST') {
-      const diariaId = decodeSeguro(m[1]);
-      if (diariaId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
-      const acao = m[2];
-      comTrava(function () {
-        const st = lerEstadoParaGravar();
-        const d = st.dados || {};
-        const diaria = (d.diarias || []).find(function (x) { return x.id === diariaId; });
-        if (!diaria) { responderJson(res, 404, { error: 'Diária não encontrada.' }); return; }
-        // O trabalhador só enxerga "a diária aberta hoje" — se tiver duas
-        // abertas no mesmo dia, ninguém sabe em qual a presença dele vai
-        // cair. Trava aqui pra nunca deixar duas abertas na mesma data.
-        if (acao === 'abrir' || acao === 'reabrir') {
-          const outraAberta = (d.diarias || []).find(function (x) { return x.id !== diariaId && x.data === diaria.data && x.status === 'aberta'; });
-          if (outraAberta) { responderJson(res, 409, { error: 'Já tem outra diária aberta nesta mesma data ("' + outraAberta.titulo + '"). Encerre ela antes de abrir esta.' }); return; }
-        }
-        if (acao === 'abrir') { diaria.status = 'aberta'; diaria.abertaEm = new Date().toISOString(); }
-        else if (acao === 'encerrar') { diaria.status = 'encerrada'; diaria.encerradaEm = new Date().toISOString(); }
-        else if (acao === 'reabrir') { diaria.status = 'aberta'; diaria.encerradaEm = null; }
-        else if (acao === 'confirmar-todos') {
-          (d.presencasDiaria || []).forEach(function (p) {
-            if (p.diariaId === diariaId && p.status === 'aguardando') {
-              p.status = 'confirmado'; p.confirmadoPor = requesterDiaria.login; p.confirmadoEm = new Date().toISOString();
-            }
-          });
-        }
-        try {
-          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-          responderJson(res, 200, { ok: true, diaria: diaria });
-        } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-      }, res);
-      return;
-    }
-
-    m = urlPath.match(/^\/api\/diaria\/admin\/diarias\/([^\/]+)\/presencas$/);
-    if (m && req.method === 'GET') {
-      const diariaId = decodeSeguro(m[1]);
-      if (diariaId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
-      const st = lerEstadoParaGravar();
-      const d = st.dados || {};
-      const trabs = {};
-      (d.trabalhadoresDiaria || []).forEach(function (t) { trabs[t.id] = t; });
-      const lista = (d.presencasDiaria || []).filter(function (p) { return p.diariaId === diariaId; })
-        .sort(function (a, b) { return (a.checkinEm || '').localeCompare(b.checkinEm || ''); })
-        .map(function (p) {
-          const t = trabs[p.trabalhadorId] || {};
-          return Object.assign({}, p, {
-            trabalhadorNome: t.nome || '(desconhecido)',
-            trabalhadorTelefone: t.telefone || '',
-            trabalhadorStatus: t.status || ''
-          });
-        });
-      responderJson(res, 200, { presencas: lista });
-      return;
-    }
-
-    m = urlPath.match(/^\/api\/diaria\/admin\/presencas\/([^\/]+)\/(confirmar|recusar)$/);
-    if (m && req.method === 'POST') {
-      const presId = decodeSeguro(m[1]);
-      if (presId === null) { responderJson(res, 400, { error: 'identificador inválido' }); return; }
-      const acao = m[2];
-      comTrava(function () {
-        const st = lerEstadoParaGravar();
-        const d = st.dados || {};
-        const p = (d.presencasDiaria || []).find(function (x) { return x.id === presId; });
-        if (!p) { responderJson(res, 404, { error: 'Presença não encontrada.' }); return; }
-        p.status = acao === 'confirmar' ? 'confirmado' : 'recusado';
-        p.confirmadoPor = requesterDiaria.login;
-        p.confirmadoEm = new Date().toISOString();
-        try {
-          gravarEstado({ dados: d, version: (st.version || 0) + 1, atualizadoEm: Date.now() });
-          responderJson(res, 200, { ok: true, presenca: p });
-        } catch (e) { responderJson(res, 500, { error: 'Falha ao salvar.' }); }
-      }, res);
-      return;
-    }
-
-    responderJson(res, 404, { error: 'Rota da Diária não encontrada.' });
-    return;
-  }
-
   // ---- API: ler estado (com login = tudo; sem login = só o público) ----
   if (urlPath === '/api/state' && req.method === 'GET') {
     const s = lerEstado();
@@ -3511,7 +2551,7 @@ http.createServer(function (req, res) {
       let dadosFiltrados = filtrarSenhaVisivel(s.dados);
       // PERMISSÃO POR TELA: o que a pessoa não pode ver não desce. Antes o
       // estado INTEIRO ia para qualquer sessão — salário de todas as fichas,
-      // exames, inaptos, auditoria, tabela de custo x repasse — bastava estar
+      // inaptos, auditoria — bastava estar
       // logado. Esconder a aba do menu não escondia o dado.
       const _usuarioEstado = usuarioDaReq(req);
       if (_usuarioEstado) dadosFiltrados = RTTelas.filtrarEstadoPorTelas(dadosFiltrados, _usuarioEstado);
@@ -3531,6 +2571,20 @@ http.createServer(function (req, res) {
   if (urlPath === '/api/state' && req.method === 'POST') {
     lerCorpo(req, function (err, body) {
       if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
+      // O corpo TEM que ser um objeto com `dados` dentro, e `dados` TEM que ser
+      // um objeto. Sem esta trava, um corpo invalido (`true`, `123`, `[]`,
+      // `"texto"`) caia no `dados = (body && body.dados) || {}` logo abaixo e
+      // SUBSTITUIA O ESTADO INTEIRO POR VAZIO — apagando funcionarios,
+      // candidatos e tudo mais, e derrubando ate a sessao de quem mandou.
+      // Quem segurava isso era a guarda anti-sumico do modulo de Equipamentos.
+      // O modulo saiu na customizacao da ATTOS RH e a trava passou a morar
+      // aqui, que e o lugar certo: validar a entrada antes de gravar.
+      // Todo cliente de verdade manda { dados: {...} } — ver js/vps-sync.js.
+      if (!body || typeof body !== 'object' || Array.isArray(body) ||
+          !body.dados || typeof body.dados !== 'object' || Array.isArray(body.dados)) {
+        responderJson(res, 400, { error: 'corpo inválido: esperado { dados: { ... } }' });
+        return;
+      }
       comTrava(function () {
         const atual = lerEstadoParaGravar();
         let dados;
@@ -3581,21 +2635,6 @@ http.createServer(function (req, res) {
           // aceitava qualquer alteração de qualquer sessão.
           if (_quemSalva) {
             dados = RTTelas.reporChavesNaoEditaveis(dados, atual.dados || {}, _quemSalva);
-          }
-        }
-        // GUARDA ANTI-SUMIÇO: última barreira antes de gravar. Se este save
-        // faria vários registros críticos (equipamentos, candidatos...) sumirem
-        // de uma vez, eles são devolvidos; exclusão pontual segue funcionando,
-        // mas com cópia arquivada. Nunca derruba o save.
-        if (equipProtecao) {
-          try {
-            const prot = equipProtecao.protegerSave(atual.dados || {}, dados);
-            dados = prot.dados;
-            (prot.avisos || []).forEach(function (a) {
-              console.log('[Equip-Proteção] ' + a.lista + ': ' + a.acao + ' — ' + a.detalhe);
-            });
-          } catch (e) {
-            console.error('[Equip-Proteção] guarda falhou (save segue normal):', e.message);
           }
         }
         const novo = { dados: dados, version: (atual.version || 0) + 1, atualizadoEm: Date.now() };
@@ -3691,7 +2730,7 @@ http.createServer(function (req, res) {
 
       if (TIPOS_IMAGEM_SEGURA[tipoReal]) {
         // Foto de verdade: vai inline, porque a tela mostra foto de candidato
-        // e de equipamento direto no <img>. SVG NÃO entra aqui de propósito.
+        // direto no <img>. SVG NÃO entra aqui de propósito.
         contentType = TIPOS_IMAGEM_SEGURA[tipoReal];
         anexo = false;
       } else if (/^wa_/.test(nome) && tipoReal !== 'svg' && tipoReal !== 'html' && tipoReal !== 'desconhecido') {
@@ -3724,147 +2763,6 @@ http.createServer(function (req, res) {
   // ==========================================================================
 
   // ---- WEBHOOK: Verificação (GET) — pública, sem login ----
-  // ==========================================================================
-  // PONTE PARA O OPENWA (segundo WhatsApp, por QR Code)
-  // --------------------------------------------------------------------------
-  // A chave de acesso do OpenWA fica SÓ aqui no servidor. O navegador nunca a
-  // recebe. Toda rota exige login e a permissão de WhatsApp — e qualquer falha
-  // do OpenWA vira uma resposta explicada, sem derrubar nada.
-  // ==========================================================================
-  if (urlPath.indexOf('/api/openwa/') === 0) {
-    if (!autenticado) { responderJson(res, 401, { error: 'Faça login.' }); return; }
-    const _u = usuarioDaReq(req);
-    if (!waEhAdminWhatsapp(_u)) {
-      responderJson(res, 403, { error: 'Só quem administra o WhatsApp pode usar esta área.' }); return;
-    }
-    if (!openwa) {
-      responderJson(res, 503, { error: 'A ponte do segundo WhatsApp não carregou no servidor.' }); return;
-    }
-
-    // Situação: configurado? no ar? quais sessões existem?
-    if (urlPath === '/api/openwa/situacao' && req.method === 'GET') {
-      openwa.situacao().then(function (st) { responderJson(res, 200, st); })
-        .catch(function (e) { responderJson(res, 200, { configurado: false, noAr: false, motivo: String(e.message || e) }); });
-      return;
-    }
-
-    // Testar um endereço na hora, sem gravar variável nem redeployar.
-    // É como se acha o nome interno do serviço no Coolify sem ficar chutando.
-    if (urlPath === '/api/openwa/testar' && req.method === 'POST') {
-      lerCorpo(req, function (err, body) {
-        if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
-        openwa.testar((body && body.url) || '', (body && body.chave) || '')
-          .then(function (r) { responderJson(res, 200, r); })
-          .catch(function (e) { responderJson(res, 200, { ok: false, erro: String(e.message || e) }); });
-      });
-      return;
-    }
-
-    // Criar a sessão (uma vez) e começar, para o QR Code aparecer
-    if (urlPath === '/api/openwa/iniciar' && req.method === 'POST') {
-      lerCorpo(req, function (err, body) {
-        const nome = _openwaNome(body && body.sessao);
-        // O corpo leva SÓ "name". Mandar campo a mais (ex.: sessionId) faz a
-        // validação do OpenWA responder 400 e a sessão nunca nasce — foi
-        // exatamente isso que aconteceu na primeira tentativa em produção.
-        let erroCriar = null;
-        openwa.chamar('/api/sessions', { metodo: 'POST', corpo: { name: nome } })
-          .then(function (c) {
-            // Já existir não é problema: seguimos assim mesmo. Qualquer outro
-            // erro fica guardado, para explicar caso o start também falhe.
-            if (!c.ok && c.status !== 409) erroCriar = _openwaDetalhe(c);
-            // A criação já devolve o id; se não devolveu, procuramos na lista.
-            const idNovo = c.ok && c.dados && c.dados.id;
-            return idNovo ? { ok: true, id: String(idNovo) } : _openwaResolverId(nome);
-          })
-          .then(function (achou) {
-            if (!achou.ok) { responderJson(res, 200, { ok: false, sessao: nome, erro: erroCriar || achou.erro }); return null; }
-            return openwa.chamar('/api/sessions/' + encodeURIComponent(achou.id) + '/start', { metodo: 'POST' });
-          })
-          .then(function (r) {
-            if (!r) return;
-            if (r.naoConfigurado) { responderJson(res, 200, { ok: false, erro: r.erro, naoConfigurado: true }); return; }
-            if (!r.ok) {
-              responderJson(res, 200, { ok: false, sessao: nome, erro: erroCriar || _openwaDetalhe(r) });
-              return;
-            }
-            responderJson(res, 200, { ok: true, sessao: nome, dados: r.dados });
-          })
-          .catch(function (e) { responderJson(res, 200, { ok: false, erro: String(e.message || e) }); });
-      });
-      return;
-    }
-
-    // QR Code da sessão (o servidor busca e devolve; a imagem vem do OpenWA)
-    if (urlPath.indexOf('/api/openwa/qr/') === 0 && req.method === 'GET') {
-      const _nomeBruto = decodeSeguro(urlPath.slice('/api/openwa/qr/'.length));
-      if (_nomeBruto === null) { responderJson(res, 400, { error: 'sessão inválida' }); return; }
-      const nome = _openwaNome(_nomeBruto);
-      if (!nome) { responderJson(res, 400, { error: 'sessão inválida' }); return; }
-      _openwaResolverId(nome)
-        .then(function (achou) {
-          if (!achou.ok) { responderJson(res, 200, { ok: false, erro: achou.erro }); return null; }
-          return openwa.chamar('/api/sessions/' + encodeURIComponent(achou.id) + '/qr');
-        })
-        .then(function (r) {
-          if (!r) return;
-          responderJson(res, 200, { ok: r.ok, erro: r.ok ? null : _openwaDetalhe(r), dados: r.dados || null });
-        })
-        .catch(function (e) { responderJson(res, 200, { ok: false, erro: String(e.message || e) }); });
-      return;
-    }
-
-    // Desconectar o número (para trocar de chip). Não apaga a sessão: só sai
-    // do WhatsApp, e o mesmo nome serve para conectar o número novo.
-    if (urlPath === '/api/openwa/desconectar' && req.method === 'POST') {
-      lerCorpo(req, function (err, body) {
-        const nome = _openwaNome(body && body.sessao);
-        _openwaResolverId(nome)
-          .then(function (achou) {
-            if (!achou.ok) { responderJson(res, 200, { ok: false, erro: achou.erro }); return null; }
-            return openwa.chamar('/api/sessions/' + encodeURIComponent(achou.id) + '/logout', { metodo: 'POST' });
-          })
-          .then(function (r) {
-            if (!r) return;
-            if (r.ok) console.log('[OpenWA] ' + ((_u && _u.login) || '?') + ' desconectou a sessão ' + nome);
-            responderJson(res, 200, { ok: r.ok, erro: r.ok ? null : _openwaDetalhe(r) });
-          })
-          .catch(function (e) { responderJson(res, 200, { ok: false, erro: String(e.message || e) }); });
-      });
-      return;
-    }
-
-    // Enviar uma mensagem (teste ou uso normal)
-    if (urlPath === '/api/openwa/enviar' && req.method === 'POST') {
-      lerCorpo(req, function (err, body) {
-        if (err) { responderJson(res, 400, { error: 'corpo inválido' }); return; }
-        const nome = _openwaNome(body && body.sessao);
-        const paraDig = String((body && body.para) || '').replace(/\D/g, '');
-        const texto = String((body && body.texto) || '').trim();
-        if (paraDig.length < 10) { responderJson(res, 200, { ok: false, erro: 'Número inválido. Use DDD + número.' }); return; }
-        if (!texto) { responderJson(res, 200, { ok: false, erro: 'Escreva a mensagem.' }); return; }
-        // Brasil: se vier sem o 55 na frente, acrescenta
-        const destino = paraDig.length <= 11 ? '55' + paraDig : paraDig;
-        _openwaResolverId(nome)
-          .then(function (achou) {
-            if (!achou.ok) { responderJson(res, 200, { ok: false, erro: achou.erro, para: destino }); return null; }
-            return openwa.chamar('/api/sessions/' + encodeURIComponent(achou.id) + '/messages/send-text',
-              { metodo: 'POST', corpo: { to: destino, text: texto } });
-          })
-          .then(function (r) {
-            if (!r) return;
-            if (r.ok) console.log('[OpenWA] ' + ((_u && _u.login) || '?') + ' enviou mensagem para ' + destino);
-            responderJson(res, 200, { ok: r.ok, erro: r.ok ? null : _openwaDetalhe(r), dados: r.dados || null, para: destino });
-          })
-          .catch(function (e) { responderJson(res, 200, { ok: false, erro: String(e.message || e) }); });
-      });
-      return;
-    }
-
-    responderJson(res, 404, { error: 'Rota não encontrada.' });
-    return;
-  }
-
   if (urlPath === '/webhooks/whatsapp' && req.method === 'GET') {
     if (!_waCarregado) { responderJson(res, 503, { error: 'Módulo WhatsApp indisponível.' }); return; }
     if (!WA_VERIFY_TOKEN) { responderJson(res, 500, { error: 'WHATSAPP_VERIFY_TOKEN não configurado.' }); return; }
@@ -5598,13 +4496,10 @@ http.createServer(function (req, res) {
   // Sem login, o visitante recebe SÓ a página de login — o "esqueleto" do app e as
   // senhas-semente do data.js NEM chegam ao navegador (inspecionar/Ctrl+U não revela nada).
   if (rel === '/index.html' && !autenticado) rel = '/login.html';
-  // A tabela de precos (custo pago a clinica x repasse cobrado do cliente) e
-  // informacao comercial da empresa: so vai para quem tem sessao valida.
   if ((rel === '/js/app.js' || rel === '/js/data.js' || rel === '/js/whatsapp.js' ||
        rel === '/js/telas.js' || rel === '/js/whatsapp-bot-ui.js' ||
        rel === '/js/whatsapp-respostas-ui.js' || rel === '/js/whatsapp-lembretes-ui.js' ||
-       rel === '/js/whatsapp-janela-ui.js' ||
-       rel === '/precificacao-base.json') && !autenticado) {
+       rel === '/js/whatsapp-janela-ui.js') && !autenticado) {
     res.writeHead(404, Object.assign({ 'Content-Type': 'text/plain' }, SECURITY_HEADERS));
     res.end('404 Not Found');
     return;
@@ -5664,7 +4559,6 @@ http.createServer(function (req, res) {
   setImmediate(function () {
     _fase('garantirAdminServidor', garantirAdminServidor);
     _fase('garantirCadastrosFinanceiro', garantirCadastrosFinanceiro);
-    _fase('migrarDiariaFase2', migrarDiariaFase2);
     _fase('rotacaoDeSenhas', rotacaoDeSenhasNoBoot);
     // O resumo entra na MESMA fila do garantirAdminServidor (comTrava), então
     // só roda depois que a carga inicial terminou — senão mostraria zero em tudo.
@@ -5687,19 +4581,14 @@ function resumoDosDados() {
   const st = lerEstado();
   const d = st.dados || {};
   const conta = function (k) { return Array.isArray(d[k]) ? d[k].length : 0; };
-  const equipamentos = conta('equipamentos');
-  let fotosEquip = 0;
-  (Array.isArray(d.equipamentos) ? d.equipamentos : []).forEach(function (r) {
-    if (Array.isArray(r && r.fotos)) fotosEquip += r.fotos.length;
-  });
   let arquivos = 0;
   try { arquivos = fs.readdirSync(UPLOADS_DIR).length; } catch (e) {}
 
   console.log('');
   console.log('=== DADOS ENCONTRADOS EM ' + DATA_DIR + ' ===');
   console.log('  versão do estado ..... ' + (st.version || 0));
-  console.log('  Equipamentos ......... ' + equipamentos + ' registro(s), ' + fotosEquip + ' foto(s)');
   console.log('  Candidatos ........... ' + conta('candidatos'));
+  console.log('  Vagas ................ ' + conta('vagas'));
   console.log('  Funcionários ......... ' + conta('funcionarios'));
   console.log('  Contratações ......... ' + conta('contratacoes'));
   console.log('  Fluxos financeiros ... ' + conta('fluxosFinanceiros'));
@@ -5740,12 +4629,12 @@ function resumoDosDados() {
 
   // Primeiro boot legítimo tem versão 0/1 e nada gravado. Já um estado que
   // "existe" mas veio sem os registros é o sintoma clássico de volume perdido.
-  if ((st.version || 0) > 1 && equipamentos === 0 && conta('candidatos') === 0) {
+  if ((st.version || 0) > 1 && conta('candidatos') === 0 && conta('funcionarios') <= 1) {
     console.warn('');
     console.warn('  *** ATENÇÃO: o sistema já foi usado antes (versão ' + st.version + '), mas está SEM registros.');
     console.warn('  *** Isso costuma significar que o volume persistente NÃO está montado em ' + DATA_DIR + '.');
-    console.warn('  *** NÃO cadastre nada por cima. Confira o volume no Coolify e restaure o backup:');
-    console.warn('  ***   node restaurar-equipamentos.cjs');
+    console.warn('  *** NÃO cadastre nada por cima. Confira o volume no Coolify e restaure o backup');
+    console.warn('  *** mais recente de ' + BACKUP_DIR + '.');
   }
   console.log('');
 }
