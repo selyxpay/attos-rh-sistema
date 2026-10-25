@@ -3732,7 +3732,8 @@ function finalizarContratacao(candidatoId) {
 
     registrarAcaoHistorico(cand, 'Contratação finalizada e validada no DP. Adicionado ao quadro de funcionários.');
 
-    // Adiciona na planilha de comissão
+    // Registra a contratação. É daqui que saem os números do Dashboard e dos
+  // Relatórios (a planilha de Comissão, que também lia isto, saiu do sistema).
     const vaga = state.vagas.find(v => v.id === cand.vagaId);
     const empresaNome = vaga ? vaga.empresaNome : 'Empresa Geral';
 
