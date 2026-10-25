@@ -1,5 +1,5 @@
 /* ==========================================================================
-   R&T — CAMADA DE EXPERIÊNCIA (UX) — v1.0
+   ATTOS RH — CAMADA DE EXPERIÊNCIA (UX) — v1.0
    Melhorias ADITIVAS de usabilidade e conforto visual.
    Carregada por último: pode ser removida com segurança (1 <link>) para reverter.
    Foco: acessibilidade de teclado, conforto de movimento, feedback de clique
@@ -137,7 +137,7 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Barra de rolagem discreta na identidade R&T (navegadores WebKit) */
+/* Barra de rolagem discreta na identidade ATTOS RH (navegadores WebKit) */
 .content-viewport,
 .detail-drawer,
 .modal-body,

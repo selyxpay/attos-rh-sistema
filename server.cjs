@@ -1,5 +1,5 @@
 // ==========================================================================
-// R&T VAGAS IA — Servidor da própria VPS
+// ATTOS RH — Servidor da própria VPS
 // Serve o site (estático) E guarda os dados/fotos NO PRÓPRIO SERVIDOR:
 //  - Estado (candidatos, funcionários, vagas...) em  DATA_DIR/state.json
 //  - Fotos/documentos em  DATA_DIR/uploads/  (no banco fica só o link /uploads/..)
@@ -375,7 +375,7 @@ const MIME = {
 const SECURITY_HEADERS = {
   'X-Frame-Options': 'DENY',
   // HSTS: o navegador passa a só aceitar HTTPS neste domínio pelo próximo ano.
-  // Fecha a janela em que alguém digita "vemserrt.com.br" sem https e a
+  // Fecha a janela em que alguém digita "attosrh.com.br" sem https e a
   // primeira requisição (com o cookie de sessão) sai em texto puro.
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
   'X-Content-Type-Options': 'nosniff',
@@ -4525,7 +4525,7 @@ http.createServer(function (req, res) {
     res.end(data);
   });
 }).listen(PORT, '0.0.0.0', function () {
-  console.log('Servidor R&T em: http://localhost:' + PORT);
+  console.log('Servidor ATTOS RH em: http://localhost:' + PORT);
   console.log('Dados na VPS ativos (state.json + uploads). Login exigido no servidor.');
   // AS TAREFAS DE SUBIDA SAO SINCRONAS E PESADAS (carga inicial, migracao,
   // resumo). Rodando aqui, direto, elas travam o event loop logo depois do

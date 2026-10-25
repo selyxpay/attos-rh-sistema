@@ -24,7 +24,7 @@ const item = (rotulo, valor) => console.log('  ' + String(rotulo).padEnd(38, '.'
 let alertas = [];
 
 console.log('='.repeat(64));
-console.log(' VERIFICACAO DO SISTEMA R&T — ' + new Date().toISOString());
+console.log(' VERIFICACAO DO SISTEMA ATTOS RH — ' + new Date().toISOString());
 console.log('='.repeat(64));
 
 // ── 1. Versão do código ────────────────────────────────────────────────────

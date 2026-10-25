@@ -240,13 +240,13 @@ const ok = (c, m) => { console.log((c ? '  OK   ' : '  FALHOU: ') + m); if (!c) 
     const div = document.createElement('div');
     div.style.cssText = 'position:absolute;left:-9999px;width:400px;';
     document.body.appendChild(div);
-    div.innerHTML = _waBolha({ type:'text', content:'Linha 1\\nLinha 2\\n\\nVeja https://vemserrt.com.br aqui', created_at:'2026-10-21T10:00:00Z', direction:'incoming' });
+    div.innerHTML = _waBolha({ type:'text', content:'Linha 1\\nLinha 2\\n\\nVeja https://attosrh.com.br aqui', created_at:'2026-10-21T10:00:00Z', direction:'incoming' });
     const alvo = div.querySelector('.texto-longo');
     const link = div.querySelector('a');
     const r = {
       temPreWrap: alvo ? getComputedStyle(alvo).whiteSpace === 'pre-wrap' : false,
       temLink: !!link,
-      hrefOk: link ? link.getAttribute('href') === 'https://vemserrt.com.br' : false,
+      hrefOk: link ? link.getAttribute('href') === 'https://attosrh.com.br' : false,
       temQuebra: alvo ? alvo.textContent.indexOf('\\n') >= 0 : false
     };
     div.remove();

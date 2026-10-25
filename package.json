@@ -1,7 +1,7 @@
 {
-  "name": "rt-vagas-ia",
+  "name": "attos-rh-sistema",
   "version": "1.1.0",
-  "description": "R&T Vagas IA - Sistema de Recrutamento Inteligente + WhatsApp Business",
+  "description": "ATTOS RH — Consultoria e Recursos Humanos: sistema de recrutamento e seleção com atendimento pelo WhatsApp Business",
   "main": "server.cjs",
   "scripts": {
     "start": "node server.cjs",

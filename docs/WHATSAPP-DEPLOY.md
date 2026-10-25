@@ -1,7 +1,7 @@
 # Módulo WhatsApp — Guia de Deploy na VPS (Hostinger)
 
 Guia completo para colocar o módulo WhatsApp Oficial (WhatsApp Cloud API da Meta)
-em produção na sua VPS, junto com o sistema R&T que já roda lá.
+em produção na sua VPS, junto com o sistema ATTOS RH que já roda lá.
 
 > **Resumo da arquitetura**
 > Internet → Domínio (HTTPS) → **Nginx** → **Node.js (server.cjs, via PM2)** → banco SQLite do WhatsApp (`DATA_DIR/whatsapp.db`) e Meta Cloud API.
@@ -80,7 +80,7 @@ O `server.cjs` lê o `.env` automaticamente na inicialização. O arquivo `.env`
 
 1. Em **WhatsApp → Configuração da API**, adicione/valide o **número de telefone** oficial (não pode ser um número já usado no WhatsApp normal/Business app).
 2. Anote o **Phone Number ID** desse número.
-3. Dentro do sistema R&T: **WhatsApp → Conexões** → preencha *Phone Number ID*, *WABA ID* e *Access Token* → **Salvar** → **Testar** (deve dizer "Conectado").
+3. Dentro do sistema ATTOS RH: **WhatsApp → Conexões** → preencha *Phone Number ID*, *WABA ID* e *Access Token* → **Salvar** → **Testar** (deve dizer "Conectado").
 
 ## 6. Configurar o Webhook na Meta
 
@@ -188,7 +188,7 @@ Os dados (state.json, whatsapp.db, uploads) ficam em `DATA_DIR` e **não são to
 ## 12. Backup
 
 Todos os dados ficam em `DATA_DIR` (padrão `server-data/`):
-- `state.json` — sistema R&T.
+- `state.json` — sistema ATTOS RH.
 - `whatsapp.db` — banco do WhatsApp (contatos, conversas, mensagens).
 - `uploads/` — mídias e documentos.
 - `backups/` — snapshots automáticos do `state.json` (o servidor já guarda 24 por hora + 7 por dia).

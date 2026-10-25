@@ -4,8 +4,8 @@ Escrito para: o João, com a VPS na mão (SSH), sem precisar saber programar.
 
 Sintoma que este guia resolve: **o site E o painel do Coolify param juntos**
 (`ERR_CONNECTION_TIMED_OUT`) e o painel da Hostinger mostra "Aguardando os
-dados". Quando os três caem ao mesmo tempo, o problema **não é o sistema R&T**
-— é a máquina inteira sem recurso. O R&T sozinho usa ~200 MB.
+dados". Quando os três caem ao mesmo tempo, o problema **não é o sistema ATTOS RH**
+— é a máquina inteira sem recurso. O ATTOS RH sozinho usa ~200 MB.
 
 Aconteceu em **23/10/2026, ~15h**, logo depois de duas coisas no mesmo dia:
 atualização do Coolify (4.1.2 → 4.5.0) e um deploy forçado. As duas juntas
@@ -43,8 +43,8 @@ echo "===== LIXO DO DOCKER (imagens e cache de build) ====="
 docker system df
 echo "===== PHP FORA DO DOCKER (CVE-2026-115560) ====="
 php -v 2>&1 | head -3; which php 2>/dev/null; dpkg -l 2>/dev/null | grep -c "^ii  php"
-echo "===== SAUDE DO SISTEMA R&T ====="
-curl -s -m 10 http://127.0.0.1/api/saude 2>/dev/null || curl -s -m 10 https://vemserrt.com.br/api/saude
+echo "===== SAUDE DO SISTEMA ATTOS RH ====="
+curl -s -m 10 http://127.0.0.1/api/saude 2>/dev/null || curl -s -m 10 https://attosrh.com.br/api/saude
 echo
 } 2>&1 | tee /tmp/diagnostico-rt.txt
 ```
@@ -65,13 +65,13 @@ A saída fica salva em `/tmp/diagnostico-rt.txt`.
 
 ## 3. Limites de memória (para o sistema nunca mais derrubar a VPS)
 
-Metade já está no código: o `Dockerfile` do R&T agora sobe com
+Metade já está no código: o `Dockerfile` do ATTOS RH agora sobe com
 `NODE_OPTIONS=--max-old-space-size=512`. Se algo comer memória, o Node morre
 dentro do contêiner e o Coolify o levanta — a VPS nem sente.
 
 A outra metade é **sua, no painel**, e é a que vale mais:
 
-1. Coolify → aplicação **R&T** → **Advanced** (ou **Resource Limits**).
+1. Coolify → aplicação **ATTOS RH** → **Advanced** (ou **Resource Limits**).
 2. **Memory Limit:** `768M`
 3. **Memory Swap:** `1G`
 4. **CPU Limit:** `1.5` (se a VPS tiver 2 vCPU)
@@ -108,19 +108,19 @@ docker volume prune               # NAO!
 docker system prune -a --volumes  # NAO!
 ```
 
-Regra simples: **comando com a palavra `volume` não entra.** Os dados do R&T
+Regra simples: **comando com a palavra `volume` não entra.** Os dados do ATTOS RH
 (`state.json`, `whatsapp.db`, as fotos) vivem no volume montado em `/data`.
 
 Depois da limpeza, confira que o sistema respondeu:
 
 ```bash
-curl -s https://vemserrt.com.br/api/saude
+curl -s https://attosrh.com.br/api/saude
 docker ps --format "table {{.Names}}\t{{.Status}}"
 ```
 
 ## 5. O PHP (CVE-2026-115560)
 
-O sistema R&T **não usa PHP** (imagem `node:20-alpine`, uma única dependência,
+O sistema ATTOS RH **não usa PHP** (imagem `node:20-alpine`, uma única dependência,
 `npm audit` com 0 vulnerabilidades). Mas o **Coolify é feito em PHP/Laravel** e
 a Hostinger pode ter deixado PHP instalado na máquina. O bloco do item 1 já
 roda `php -v`; se ele mostrar uma versão:
@@ -142,6 +142,6 @@ curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh | sudo bash
   o que juntou pico de memória com pico de disco.
 - **Antes de atualizar o Coolify:** `df -h /` e `free -h`. Se o disco estiver
   acima de 80%, limpe primeiro (item 4).
-- **Depois de atualizar:** confira `curl -s https://vemserrt.com.br/api/saude`.
+- **Depois de atualizar:** confira `curl -s https://attosrh.com.br/api/saude`.
 - **Deploy forçado só quando precisar.** Ele reconstrói a imagem do zero, e é a
   operação mais pesada que a VPS faz.

@@ -1,7 +1,7 @@
 // ==========================================================================
 // MÓDULO WHATSAPP — FRONTEND
 // ==========================================================================
-// Camada de tela do módulo WhatsApp. Conversa SÓ com o backend do R&T
+// Camada de tela do módulo WhatsApp. Conversa SÓ com o backend do ATTOS RH
 // (/api/whatsapp/*). O backend é quem fala com a Meta Cloud API — nenhum token
 // da Meta chega ao navegador. Reutiliza o login/permissões do sistema (não cria
 // login novo). Renderiza dentro da seção #aba-whatsapp do index.html.
@@ -1578,7 +1578,7 @@ window.waConfigurarConexao = async function () {
        <p style="font-size:12px;color:var(--text-secondary,#64748b);margin:0 0 8px;">Estes dados vêm do painel <b>Meta for Developers</b>. O Access Token fica só no servidor — nunca no navegador de quem atende.</p>
        <input type="hidden" id="wa-ac-id" value="${c.id || ''}">
        <label>Nome do número (referência)</label>
-       <input type="text" id="wa-ac-display" ${_WA_SEM_AUTO} value="${_waEsc(c.display_phone || '')}" placeholder="Ex: Atendimento R&T">
+       <input type="text" id="wa-ac-display" ${_WA_SEM_AUTO} value="${_waEsc(c.display_phone || '')}" placeholder="Ex: Atendimento ATTOS RH">
        <label>Phone Number ID</label>
        <input type="text" id="wa-ac-pnid" ${_WA_SEM_AUTO} value="${_waEsc(c.phone_number_id || '')}" placeholder="ID do número (Meta)">
        <label>WhatsApp Business Account ID (WABA)</label>

@@ -1,5 +1,5 @@
 // ==========================================================================
-// MÓDULO DE SEGURANÇA — R&T EMPREGOS
+// MÓDULO DE SEGURANÇA — ATTOS RH
 // Versão 1.0 — Implementado em 2026
 // ==========================================================================
 // Este módulo adiciona camadas de proteção ao sistema sem alterar

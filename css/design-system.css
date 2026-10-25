@@ -1,5 +1,5 @@
 /* ==========================================================================
-   R&T DESIGN SYSTEM — v6.0 (referência: "frosted link dashboard on rice
+   ATTOS RH DESIGN SYSTEM — v6.0 (referência: "frosted link dashboard on rice
    paper" — bordas finas em vez de sombra, tipografia densa, um único azul
    de destaque, cantos em três tamanhos: pílula / botão-cartão / cartão grande)
 
@@ -12,7 +12,7 @@
   --color-primary: #0A0A0A;
   --color-primary-dark: #171717;
 
-  /* ── Vermelho da R&T — a cor da marca. É ela que marca onde você está:
+  /* ── Azul da ATTOS RH — a cor da marca. É ela que marca onde você está:
      item ativo do menu, foco de campo, detalhes de destaque. */
   --color-rt-red: #D40203;
   --color-rt-red-dark: #9F0102;
@@ -274,7 +274,7 @@ label,
 }
 
 /* O item onde você está usa o VERMELHO DA MARCA. É o detalhe que identifica a
-   R&T dentro de um sistema que, de resto, é preto e branco de propósito. */
+   ATTOS RH dentro de um sistema que, de resto, é preto e branco de propósito. */
 .nav-item.active a {
   background: var(--color-rt-red) !important;
   color: #FFFFFF !important;

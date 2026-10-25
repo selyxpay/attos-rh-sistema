@@ -1,11 +1,11 @@
 /* ==========================================================================
-   DESIGN SYSTEM & ESTILOS GLOBAIS - R&T EMPREGOS
+   DESIGN SYSTEM & ESTILOS GLOBAIS - ATTOS RH
    ========================================================================== */
 
 :root {
     /* Paleta de Cores HSL Premium */
-    --primary: hsl(343, 80%, 50%);         /* Vermelho R&T (#e11d48) */
-    --primary-hover: hsl(343, 80%, 40%);   /* Vermelho R&T Escuro (#be123c) */
+    --primary: hsl(343, 80%, 50%);         /* Azul ATTOS (#e11d48) */
+    --primary-hover: hsl(343, 80%, 40%);   /* Azul ATTOS Escuro (#be123c) */
     --primary-light: hsl(343, 80%, 95%);
     
     --dark-sidebar: hsl(0, 0%, 9%);         /* Preto Sidebar (#171717) */
@@ -2644,7 +2644,7 @@ h1, h2, h3, h4, h5, h6 {
 .log-row-funcionarios { border-left: 4px solid #ef4444 !important; }
 
 /* ==========================================================================
-   UPGRADE VISUAL PREMIUM - R&T EMPREGOS CRM
+   UPGRADE VISUAL PREMIUM - ATTOS RH CRM
    ========================================================================== */
 
 /* Logos oficiais */

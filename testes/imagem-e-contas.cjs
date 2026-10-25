@@ -126,7 +126,7 @@ async function testarSemOBot() {
   await db.init(dados);
   db.accounts.create({
     phone_number_id: '111222333', waba_id: '444555666', display_phone: '+55 11 90000-0000',
-    business_name: 'R&T', status: 'connected', access_token_enc: 'EAAtokenDeTeste123456789',
+    business_name: 'ATTOS RH', status: 'connected', access_token_enc: 'EAAtokenDeTeste123456789',
     created_by: 'admin', ativo: 1
   });
   const antes = db.accounts.list().length;

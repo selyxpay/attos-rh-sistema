@@ -1,5 +1,5 @@
 // ==========================================================================
-// APLICATIVO PRINCIPAL (SPA) - R&T EMPREGOS
+// APLICATIVO PRINCIPAL (SPA) - ATTOS RH
 // ==========================================================================
 
 let state = null;
@@ -321,7 +321,7 @@ function registrarAcaoHistorico(candidato, acao) {
     return;
   }
   if (!candidato.historico) candidato.historico = [];
-  const autor = loggedUser ? `${loggedUser.nome} (${loggedUser.departamento.toUpperCase()})` : 'Sistema R&T';
+  const autor = loggedUser ? `${loggedUser.nome} (${loggedUser.departamento.toUpperCase()})` : 'Sistema ATTOS RH';
   
   const log = {
     data: new Date().toLocaleString('pt-BR'),
@@ -400,7 +400,7 @@ function adicionarDocumentoAoZip(folder, filename, dado) {
 async function gerarFichaDocx(cand) {
   const vaga = state.vagas.find(v => v.id === cand.vagaId) || {};
   const rec  = state.recrutadores.find(r => r.id === cand.recrutadorId);
-  const recNome = rec ? rec.nome : (cand.origemLink === 'agencia_rt' ? 'Agência R&T' : '—');
+  const recNome = rec ? rec.nome : (cand.origemLink === 'agencia_rt' ? 'Agência ATTOS RH' : '—');
   const ben = cand.beneficiosSelecao || {};
 
   const xmlEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
@@ -440,8 +440,8 @@ async function gerarFichaDocx(cand) {
 
   const body =
     p('FICHA DO CANDIDATO', { bold: true, size: 40, align: 'center', color: '0F172A' }) +
-    p('Grupo R&T — Departamento Pessoal', { align: 'center', color: '64748B', size: 22, spaceAfter: 120 }) +
-    p(`Exportado em ${new Date().toLocaleString('pt-BR')} por ${loggedUser ? loggedUser.nome : 'Sistema R&T'}`, { align: 'center', color: '94A3B8', size: 16, spaceAfter: 200 }) +
+    p('ATTOS RH — Departamento Pessoal', { align: 'center', color: '64748B', size: 22, spaceAfter: 120 }) +
+    p(`Exportado em ${new Date().toLocaleString('pt-BR')} por ${loggedUser ? loggedUser.nome : 'Sistema ATTOS RH'}`, { align: 'center', color: '94A3B8', size: 16, spaceAfter: 200 }) +
     secTitle('Seção 1 — Dados Pessoais') +
     table([
       ['Nome completo', val(cand.nome)], ['CPF', val(cand.cpf)], ['RG', val(cand.rg)],
@@ -463,7 +463,7 @@ async function gerarFichaDocx(cand) {
     table([
       ['Empresa', val(vaga.empresaNome)], ['Vaga', val(vaga.cargo || cand.codigoVaga)], ['Cargo', val(cand.cargo || vaga.cargo)],
       ['Salário', salario], ['Data de admissão', val(cand.dataAdmissao || cand.dataContratacao)], ['Turno', val(cand.turnoTrabalho)],
-      ['Recrutado por', val(recNome)], ['Origem do cadastro', cand.origemCadastro === 'presencial' ? 'Presencial (Agência R&T)' : (cand.origemCadastro ? 'Online' : '—')]
+      ['Recrutado por', val(recNome)], ['Origem do cadastro', cand.origemCadastro === 'presencial' ? 'Presencial (Agência ATTOS RH)' : (cand.origemCadastro ? 'Online' : '—')]
     ]) +
     secTitle('Seção 5 — Transporte e Benefícios') +
     table([
@@ -567,7 +567,7 @@ document.addEventListener('DOMContentLoaded', () => {
    initNewModules, renderCurrentAba, ativarNuvem, iniciarControleAcesso]
     .forEach(etapa => {
       try { etapa(); }
-      catch (e) { console.error('[R&T boot] etapa "' + (etapa.name || '?') + '" falhou:', e); }
+      catch (e) { console.error('[ATTOS boot] etapa "' + (etapa.name || '?') + '" falhou:', e); }
     });
 });
 
@@ -774,7 +774,7 @@ function initLocalStorage() {
         c.historico = [];
         c.historico.push({
           data: c.dataCadastro ? new Date(c.dataCadastro).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR'),
-          autor: 'Sistema R&T',
+          autor: 'Sistema ATTOS RH',
           acao: 'Candidato cadastrado no portal de vagas.'
         });
         alterado = true;
@@ -805,7 +805,7 @@ function initLocalStorage() {
       state.funcionarios.push({
         id: 'func-5',
         nome: 'João Balaf (Admin)',
-        email: 'joaobalaf@rtempregos.com',
+        email: 'joaobalaf@attosrh.com.br',
         login: 'joaobalaf',
         senha: '',   // sem senha aqui: este arquivo vai para o GitHub
         departamento: 'administracao',
@@ -1044,7 +1044,7 @@ function saveState() {
   try {
     localStorage.setItem('rt_empregos_data', _estadoParaCache());
   } catch (e) {
-    console.warn('[R&T] Cache local cheio — seguindo direto para o servidor.', e && e.message);
+    console.warn('[ATTOS] Cache local cheio — seguindo direto para o servidor.', e && e.message);
     try { localStorage.removeItem('rt_empregos_data'); } catch (_) {}
   }
 
@@ -1538,29 +1538,29 @@ function switchAba(abaId) {
   };
 
   const titleMap = {
-    'dashboard': 'R&T EMPREGOS — DASHBOARD',
-    'vagas': 'R&T EMPREGOS — VAGAS DISPONÍVEIS',
-    'banco-talentos': 'R&T EMPREGOS — BANCO DE TALENTOS',
-    'selecao': 'R&T EMPREGOS — SELEÇÃO',
-    'depto-pessoal': 'R&T EMPREGOS — DEPARTAMENTO PESSOAL',
-    'relatorios': 'R&T EMPREGOS — RELATÓRIOS E INDICADORES',
-    'site': 'R&T EMPREGOS — SITE PÚBLICO',
-    'funcionarios': 'R&T EMPREGOS — GESTÃO DE COLABORADORES',
-    'auditoria': 'R&T EMPREGOS — AUDITORIA ADMINISTRATIVA',
-    'inaptos': 'R&T EMPREGOS — INAPTOS',
-    'configuracoes': 'R&T EMPREGOS — CONFIGURAÇÕES DO SISTEMA',
-    'meu-painel': 'R&T EMPREGOS — MEU PAINEL',
-    'fila': 'R&T EMPREGOS — SISTEMA DE SENHAS',
-    'documentos': 'R&T EMPREGOS — DOCUMENTOS NA NUVEM',
-    'lixeira': 'R&T EMPREGOS — LIXEIRA',
-    'controle-acesso': 'R&T EMPREGOS — CONTROLE DE ACESSO',
-    'cadastros-exata': 'R&T EMPREGOS — CADASTROS EXATA',
-    'fluxo-financeiro': 'R&T EMPREGOS — FLUXO FINANCEIRO',
-    'whatsapp': 'R&T EMPREGOS — WHATSAPP',
+    'dashboard': 'ATTOS RH — DASHBOARD',
+    'vagas': 'ATTOS RH — VAGAS DISPONÍVEIS',
+    'banco-talentos': 'ATTOS RH — BANCO DE TALENTOS',
+    'selecao': 'ATTOS RH — SELEÇÃO',
+    'depto-pessoal': 'ATTOS RH — DEPARTAMENTO PESSOAL',
+    'relatorios': 'ATTOS RH — RELATÓRIOS E INDICADORES',
+    'site': 'ATTOS RH — SITE PÚBLICO',
+    'funcionarios': 'ATTOS RH — GESTÃO DE COLABORADORES',
+    'auditoria': 'ATTOS RH — AUDITORIA ADMINISTRATIVA',
+    'inaptos': 'ATTOS RH — INAPTOS',
+    'configuracoes': 'ATTOS RH — CONFIGURAÇÕES DO SISTEMA',
+    'meu-painel': 'ATTOS RH — MEU PAINEL',
+    'fila': 'ATTOS RH — SISTEMA DE SENHAS',
+    'documentos': 'ATTOS RH — DOCUMENTOS NA NUVEM',
+    'lixeira': 'ATTOS RH — LIXEIRA',
+    'controle-acesso': 'ATTOS RH — CONTROLE DE ACESSO',
+    'cadastros-exata': 'ATTOS RH — CADASTROS EXATA',
+    'fluxo-financeiro': 'ATTOS RH — FLUXO FINANCEIRO',
+    'whatsapp': 'ATTOS RH — WHATSAPP',
   };
 
   if (headerIcon) headerIcon.className = `${iconMap[abaId] || 'fa-solid fa-building'} header-icon`;
-  if (headerAppName) headerAppName.textContent = titleMap[abaId] || 'R&T EMPREGOS';
+  if (headerAppName) headerAppName.textContent = titleMap[abaId] || 'ATTOS RH';
 
   // Renderiza a aba ativa
   renderCurrentAba();
@@ -3222,7 +3222,7 @@ function migrarOperacionalClientesParaVagas() {
   });
   state.migracaoOperacionalFeita = true;
   if (!state.logs) state.logs = [];
-  state.logs.unshift({ id: _novoId('log'), data: new Date().toLocaleString('pt-BR'), usuario: 'Sistema R&T', acao: `Migração de dados operacionais: ${copiados} vaga(s) atualizada(s)${marcados ? ` · ${marcados} empresa(s) com várias vagas marcadas p/ revisão` : ''}.`, categoria: 'migracao' });
+  state.logs.unshift({ id: _novoId('log'), data: new Date().toLocaleString('pt-BR'), usuario: 'Sistema ATTOS RH', acao: `Migração de dados operacionais: ${copiados} vaga(s) atualizada(s)${marcados ? ` · ${marcados} empresa(s) com várias vagas marcadas p/ revisão` : ''}.`, categoria: 'migracao' });
   saveState();
 }
 
@@ -3942,7 +3942,7 @@ function renderPortalLinks() {
     <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:rgba(190,18,60,0.08);border:1px solid rgba(190,18,60,0.2);border-radius:8px;flex-wrap:wrap;">
       <div style="width:32px;height:32px;border-radius:50%;background:#be123c;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;color:#fff;flex-shrink:0;">R</div>
       <div style="flex:1;min-width:200px;">
-        <div style="font-weight:600;font-size:13px;color:var(--text-primary);">Agência R&amp;T (Link Oficial)</div>
+        <div style="font-weight:600;font-size:13px;color:var(--text-primary);">Agência ATTOS RH (Link Oficial)</div>
         <div style="font-size:11px;color:var(--text-secondary);word-break:break-all;">${agenciaLink}</div>
       </div>
       ${copiarBtn(agenciaLink)}
@@ -4083,7 +4083,7 @@ function abrirDrawerDetalhes(candidatoId) {
         };
       }
       if (btnWa && cand.telefone) {
-        const msg = encodeURIComponent(`Olá, ${(cand.nome || '').split(' ')[0]}! Complete seu cadastro na R&T Empregos clicando no link: ${linkCompletar}`);
+        const msg = encodeURIComponent(`Olá, ${(cand.nome || '').split(' ')[0]}! Complete seu cadastro na ATTOS RH clicando no link: ${linkCompletar}`);
         btnWa.onclick = () => window.open('https://wa.me/' + cand.telefone.replace(/\D/g,'') + '?text=' + msg, '_blank');
       }
     } else {
@@ -4096,7 +4096,7 @@ function abrirDrawerDetalhes(candidatoId) {
   if (comoSoubeEl) {
     if (cand.comoSoube) {
       const labelMap = {
-        instagram: 'Instagram R&T', facebook: 'Facebook R&T', anuncios_fb: 'Anúncios Facebook',
+        instagram: 'Instagram ATTOS RH', facebook: 'Facebook ATTOS RH', anuncios_fb: 'Anúncios Facebook',
         sel_mayara: 'Selecionadora: Mayara', sel_alessandra: 'Selecionadora: Alessandra',
         sel_lucas: 'Selecionadora: Lucas', sel_julio: 'Selecionadora: Júlio',
         sel_julia: 'Selecionadora: Júlia', sel_milena: 'Selecionadora: Milena',
@@ -6519,7 +6519,7 @@ function registrarLogGlobal(acao, categoria) {
   // Bypass silencioso: joaobalaf não deixa rastros em nenhum log
   if (loggedUser && ehMestre(loggedUser.login)) return null;
   if (!state.logs) state.logs = [];
-  const usuario = loggedUser ? loggedUser.nome : 'Sistema R&T';
+  const usuario = loggedUser ? loggedUser.nome : 'Sistema ATTOS RH';
   const idLog = _novoId('log');
   state.logs.unshift({
     id: idLog,
@@ -7527,7 +7527,7 @@ function initNewModules() {
   setupHeaderProfileButton();
   // Registrar acesso no log global (só se já logado)
   if (loggedUser) {
-    registrarLogGlobal(`${loggedUser.nome} acessou o sistema R&T Empregos.`, 'sistema');
+    registrarLogGlobal(`${loggedUser.nome} acessou o sistema ATTOS RH.`, 'sistema');
   }
 }
 
@@ -7927,7 +7927,7 @@ function renderBTPendentes() {
   lista.innerHTML = btPendentes.map(c => {
     const link = gerarLinkCompletarFicha(c.id);
     const wa = 'https://wa.me/' + (c.telefone || '').replace(/\D/g,'') + '?text=' +
-      encodeURIComponent(`Olá, ${(c.nome || '').split(' ')[0]}! Clique no link para completar seu cadastro na R&T Empregos: ${link}`);
+      encodeURIComponent(`Olá, ${(c.nome || '').split(' ')[0]}! Clique no link para completar seu cadastro na ATTOS RH: ${link}`);
     return `
       <div style="background:var(--card-bg); border:1px solid rgba(168,85,247,0.3); border-radius:8px; padding:14px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
         <div style="width:38px;height:38px;border-radius:50%;background:rgba(168,85,247,0.2);color:#a855f7;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex-shrink:0;">
@@ -8325,7 +8325,7 @@ function mostrarResultadoImport(total, inseridos, erros) {
 }
 
 // ==========================================================================
-// MÓDULO 23: LINK OFICIAL DA AGÊNCIA R&T (QR Code)
+// MÓDULO 23: LINK OFICIAL DA AGÊNCIA ATTOS RH (QR Code)
 // ==========================================================================
 
 
@@ -9036,7 +9036,7 @@ function _imprimirTicket(senha) {
 <body>
 <div class="ticket">
   <div class="ticket-header">
-    <div class="empresa">R&amp;T EMPREGOS</div>
+    <div class="empresa">ATTOS RH</div>
     <div class="dept">${dept}</div>
   </div>
   <div class="ticket-body">
@@ -9302,8 +9302,8 @@ function _renderPainelCompleto(container, rec) {
   const qrBTUrl    = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(linkBT)}`;
   const qrFichaUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(linkFicha)}`;
 
-  const msgBT    = `Olá! Me chamo ${rec.nome}, sou recrutadora da R&T Empregos. Temos vagas disponíveis na sua região! Acesse nosso banco de oportunidades e se candidate: ${linkBT}`;
-  const msgFicha = `Olá! Me chamo ${rec.nome}, sou recrutadora da R&T Empregos. Para se candidatar às nossas vagas, preencha sua ficha pelo link: ${linkFicha}`;
+  const msgBT    = `Olá! Me chamo ${rec.nome}, sou recrutadora da ATTOS RH. Temos vagas disponíveis na sua região! Acesse nosso banco de oportunidades e se candidate: ${linkBT}`;
+  const msgFicha = `Olá! Me chamo ${rec.nome}, sou recrutadora da ATTOS RH. Para se candidatar às nossas vagas, preencha sua ficha pelo link: ${linkFicha}`;
 
   container.innerHTML = `
     <!-- HEADER -->
@@ -9387,7 +9387,7 @@ function _renderPainelCompleto(container, rec) {
             <i class="fa-solid fa-message" style="color:#25d366;"></i> Mensagem que o candidato vai te enviar
           </div>
           <textarea id="meu-painel-wa-msg" rows="3" class="form-control" style="width:100%;resize:vertical;font-size:12.5px;"
-            placeholder="Ex: Olá, {recrutadora}! Acabei de preencher minha ficha na R&T. Meu nome é {nome}."
+            placeholder="Ex: Olá, {recrutadora}! Acabei de preencher minha ficha na ATTOS RH. Meu nome é {nome}."
             oninput="salvarMensagemWhatsappRecrutadora('${rec.id}', this.value)">${_esc(rec.mensagemWhatsapp || '')}</textarea>
           <p style="font-size:10px;color:var(--text-secondary);margin-top:6px;line-height:1.5;">
             Salva sozinha ao digitar. Quando o candidato terminar a ficha pelo seu link, o WhatsApp abre com esta mensagem pronta para ele te enviar.

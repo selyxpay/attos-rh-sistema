@@ -1,4 +1,4 @@
-# R&T VAGAS IA — Visão geral técnica do sistema
+# ATTOS RH — Visão geral técnica do sistema
 
 > Documento de contexto para outra IA que vá ajudar a melhorar este sistema.
 > Descreve o que o sistema é, como está construído, o que já existe dentro dele,
@@ -8,9 +8,44 @@
 
 ---
 
+## ⚠️ ANTES DE LER: o que mudou na customização para a ATTOS RH
+
+Este documento foi escrito para a versão anterior do sistema. A arquitetura,
+o contrato de gravação, a permissão por tela, as regras inegociáveis e as
+armadilhas **continuam valendo palavra por palavra** — é por isso que ele
+segue aqui. Mas **seis módulos saíram**, e o texto abaixo ainda os descreve:
+
+| Saiu | Onde este documento ainda fala dele |
+|---|---|
+| Entrega/Devolução de Equipamentos (e o relatório por link) | seções 3.5, 5, 10 |
+| Exame Médico | seção 5 |
+| Comissão | seção 5 |
+| Controle ASO Repasse (Margem) | seção 5 |
+| Diária / Presença | seções 5, 7, 10 |
+| WhatsApp QR (ponte OpenWA) | seções 5, 10 |
+
+O que mais mudou, e **não** está refletido no texto antigo:
+
+- **São 20 telas**, não 25/26 (19 no menu; `bot` é sub-aba do WhatsApp).
+- **O `equipamentos-protecao.cjs` não existe mais.** A guarda anti-sumiço que
+  ele fazia virou a validação do corpo em `POST /api/state` — e isso é agora
+  uma trava que não pode ser removida: sem ela, um corpo inválido apaga o
+  estado inteiro. A suíte `limpeza` guarda esse comportamento.
+- **`/api/ver-senha` não existe mais.** Nunca mostrou senha desde o scrypt.
+- **`ADMIN_SENHA` é obrigatória**: sem ela o servidor não sobe.
+- **Os dados dos módulos removidos continuam no `state.json`**, de propósito.
+  As chaves seguem em `CHAVES_POR_TELA` apontando para telas que não existem,
+  o que as deixa invisíveis e intocáveis pela interface. Ver `js/telas.js`.
+- A identidade visual é a da ATTOS RH (azul `#0A6E93` / verde `#4EB548`),
+  não mais preto e vermelho.
+
+O **README.md** está atualizado e é o ponto de partida correto.
+
+---
+
 ## 1. O que é
 
-Sistema interno de uma agência de recrutamento e serviços (R&T). Está **em
+Sistema interno de uma agência de recrutamento e serviços (ATTOS RH). Está **em
 produção**, usado todos os dias por várias pessoas ao mesmo tempo: Seleção, DP
 (Departamento Pessoal), Supervisão, Gestão, Financeiro e Clínica.
 
@@ -382,7 +417,7 @@ configuração, nunca tocar em funcionários ou vagas.
 
 **Operação**
 - **Entrega/Devolução de Equipamentos** — com módulo próprio de proteção.
-- **Diária (Presença RT)** — seção 7.
+- **Diária (Presença)** — seção 7.
 - **Fila** — senhas de atendimento presencial, com painel para TV.
 - **Site** — links públicos e configuração do formulário de candidatura.
 
@@ -1047,7 +1082,7 @@ para aprovação mesmo com divergência.
 
 ---
 
-## 7. Diária (Presença RT) em detalhe
+## 7. Diária (Presença) em detalhe
 
 Módulo de trabalho avulso de campo. O trabalhador usa **o próprio celular**,
 pelo link público `diaria-trabalhador.html`.

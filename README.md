@@ -1,6 +1,6 @@
-# R&T VAGAS IA
+# ATTOS RH
 
-Sistema interno de recrutamento e serviços da R&T. **Está em produção**, usado
+Sistema interno de recrutamento e serviços da ATTOS RH. **Está em produção**, usado
 todos os dias por várias pessoas ao mesmo tempo.
 
 Antes de mexer em qualquer coisa, leia o

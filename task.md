@@ -1,6 +1,6 @@
-# R&T VAGAS IA — Acompanhamento
+# ATTOS RH — Acompanhamento
 
-Sistema: R&T VAGAS IA / Vende RT (Grupo R&T).
+Sistema: ATTOS RH / Vende RT (ATTOS RH).
 Servidor Node (`server.cjs`) + estado em JSON + uploads em disco. WhatsApp
 oficial (Meta Cloud API) com banco isolado em `DATA_DIR/whatsapp.db` (sql.js).
 

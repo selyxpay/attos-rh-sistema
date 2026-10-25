@@ -1,5 +1,5 @@
 // ==========================================================================
-// R&T VAGAS IA — SINCRONIZAÇÃO NA PRÓPRIA VPS (sem Firebase)
+// ATTOS RH — SINCRONIZAÇÃO NA PRÓPRIA VPS (sem Firebase)
 // ==========================================================================
 // Mesma interface (window.RTCloud) usada pelo resto do sistema — por isso
 // NENHUMA função do app precisa mudar. Esta camada conversa com o backend

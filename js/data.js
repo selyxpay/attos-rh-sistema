@@ -1,4 +1,4 @@
-// Dados iniciais e mockups para o sistema R&T Empregos
+// Dados iniciais e mockups para o sistema ATTOS RH
 // Estes dados são carregados no localStorage no primeiro acesso.
 
 // ── NUNCA ESCREVA SENHA NESTE ARQUIVO ──────────────────────────────────────
@@ -14,7 +14,7 @@ const INITIAL_DATA = {
     {
       id: 'func-1',
       nome: 'Administrador RT',
-      email: 'admin@rtempregos.com',
+      email: 'admin@attosrh.com.br',
       login: 'admin',
       senha: '',   // o servidor define pela variavel ADMIN_SENHA (nunca aqui)
       departamento: 'administracao',
@@ -40,7 +40,7 @@ const INITIAL_DATA = {
     {
       id: 'func-2',
       nome: 'Maria da Seleção',
-      email: 'maria@rtempregos.com',
+      email: 'maria@attosrh.com.br',
       login: 'maria',
       senha: '',   // sem senha de fabrica: quem cria a conta define
       departamento: 'selecao',
@@ -65,7 +65,7 @@ const INITIAL_DATA = {
     {
       id: 'func-3',
       nome: 'Carlos do DP',
-      email: 'carlos@rtempregos.com',
+      email: 'carlos@attosrh.com.br',
       login: 'carlos',
       senha: '',   // sem senha de fabrica: quem cria a conta define
       departamento: 'dp',
@@ -90,7 +90,7 @@ const INITIAL_DATA = {
     {
       id: 'func-4',
       nome: 'Pedro da Comissão',
-      email: 'pedro@rtempregos.com',
+      email: 'pedro@attosrh.com.br',
       login: 'pedro',
       senha: '',   // sem senha de fabrica: quem cria a conta define
       departamento: 'comissao',
@@ -115,7 +115,7 @@ const INITIAL_DATA = {
     {
       id: 'func-5',
       nome: 'João Balaf (Admin)',
-      email: 'joaobalaf@rtempregos.com',
+      email: 'joaobalaf@attosrh.com.br',
       login: 'joaobalaf',
       senha: '',   // sem senha de fabrica: quem cria a conta define
       departamento: 'administracao',
@@ -140,8 +140,8 @@ const INITIAL_DATA = {
     },
     {
       id: 'func-6',
-      nome: 'Clínica Médica RT',
-      email: 'clinica@rtempregos.com',
+      nome: 'Clínica Médica parceira',
+      email: 'clinica@attosrh.com.br',
       login: 'clinica',
       senha: '',   // sem senha de fabrica: quem cria a conta define
       departamento: 'clinica',
@@ -235,7 +235,7 @@ const INITIAL_DATA = {
       id: 'log-1',
       data: '21/05/2026 09:30:15',
       usuario: 'Administrador RT',
-      acao: 'Acessou o sistema R&T Empregos',
+      acao: 'Acessou o sistema ATTOS RH',
       categoria: 'sistema'
     },
     {
@@ -285,8 +285,8 @@ const INITIAL_DATA = {
     ],
     quemSomos: {
       titulo: "Mais do que empregos, conectamos pessoas a novas oportunidades.",
-      texto: "A R&T Empregos faz parte do Grupo R&T e atua conectando profissionais às oportunidades de grandes operações em diferentes regiões do Brasil.\n\nSomos especializados em processos de recrutamento ágeis, organizados e humanizados, com forte atuação nos setores de logística, e-commerce, armazenagem, transporte, indústria, varejo e serviços.\n\nNossa estrutura conta com equipes treinadas, processos próprios e tecnologia para atender desde contratações individuais até grandes demandas em curto espaço de tempo, sempre com responsabilidade, qualidade e atenção às pessoas.\n\nPara nós, cada candidato representa uma história, uma família e uma nova possibilidade de crescimento. Por isso, buscamos tornar o processo de contratação mais simples, rápido, transparente e acessível.\n\nNa R&T, a qualidade encontra a agilidade.",
-      fraseFinal: "Vem ser R&T. Sua próxima oportunidade pode começar aqui."
+      texto: "A ATTOS RH faz parte do ATTOS RH e atua conectando profissionais às oportunidades de grandes operações em diferentes regiões do Brasil.\n\nSomos especializados em processos de recrutamento ágeis, organizados e humanizados, com forte atuação nos setores de logística, e-commerce, armazenagem, transporte, indústria, varejo e serviços.\n\nNossa estrutura conta com equipes treinadas, processos próprios e tecnologia para atender desde contratações individuais até grandes demandas em curto espaço de tempo, sempre com responsabilidade, qualidade e atenção às pessoas.\n\nPara nós, cada candidato representa uma história, uma família e uma nova possibilidade de crescimento. Por isso, buscamos tornar o processo de contratação mais simples, rápido, transparente e acessível.\n\nNa ATTOS RH, a qualidade encontra a agilidade.",
+      fraseFinal: "Vem ser ATTOS RH. Sua próxima oportunidade pode começar aqui."
     },
     missao: {
       titulo: "Nossa missão",
@@ -294,7 +294,7 @@ const INITIAL_DATA = {
     },
     compromisso: {
       titulo: "Compromisso com pessoas e oportunidades",
-      texto: "Na R&T, entendemos que por trás de cada cadastro existe uma pessoa buscando uma nova oportunidade. Nosso compromisso é oferecer processos mais simples, comunicação clara e atendimento próximo, ajudando candidatos a encontrarem vagas compatíveis com seu perfil, sua região e sua disponibilidade.",
+      texto: "Na ATTOS RH, entendemos que por trás de cada cadastro existe uma pessoa buscando uma nova oportunidade. Nosso compromisso é oferecer processos mais simples, comunicação clara e atendimento próximo, ajudando candidatos a encontrarem vagas compatíveis com seu perfil, sua região e sua disponibilidade.",
       frase: "Onde a qualidade encontra a agilidade."
     },
     diferenciais: [
@@ -310,24 +310,26 @@ const INITIAL_DATA = {
       "Possibilidade de início rápido",
       "Pagamentos organizados e pontuais (Com possibilidade de antecipar processos ou pagamentos em certas operações conforme as condições permitirem)"
     ],
-    contadores: [
-      { id: "cnt-1", numero: "+300", texto: "oportunidades disponíveis" },
-      { id: "cnt-2", numero: "15+", texto: "regiões atendidas" },
-      { id: "cnt-3", numero: "50+", texto: "grandes operações parceiras" },
-      { id: "cnt-4", numero: "1000+", texto: "processos seletivos todos os meses" }
-    ],
+    // NUMEROS E CONTATOS EM BRANCO, DE PROPOSITO.
+    // Os valores que estavam aqui (telefone, endereco da Lapa, Instagram e os
+    // contadores "+300 / 15+ / 50+ / 1000+") eram da empresa do sistema
+    // original. Publicar aquilo sob a marca ATTOS RH seria afirmar coisa que
+    // nao e verdade e divulgar o contato de outra empresa.
+    // Preencha pela aba SITE -- o que for escrito la fica no state.json e NAO
+    // depende deste arquivo. Secao do portal com campo vazio nao aparece.
+    contadores: [],
     contatos: {
-      whatsapp: "1136434848",
-      telefone: "(11) 3643-4848",
-      email: "contato@vemserrt.com.br",
-      instagram: "rtempregos",
-      endereco: "Rua Dronsfield, 255 — Lapa — São Paulo/SP",
-      horarios: "Segunda a Sexta, das 08:00 às 17:48"
+      whatsapp: "",
+      telefone: "",
+      email: "",
+      instagram: "",
+      endereco: "",
+      horarios: ""
     },
     perguntasFrequentes: [
       { id: "faq-1", pergunta: "Como faço para me candidatar?", resposta: "Você pode se candidatar diretamente pelo nosso portal selecionando a vaga desejada e preenchendo o formulário de inscrição." },
-      { id: "faq-2", pergunta: "Preciso pagar alguma taxa?", resposta: "A R&T não cobra do candidato para participar dos processos seletivos. O processo é 100% gratuito." },
-      { id: "faq-3", pergunta: "A R&T cobra para participar?", resposta: "Não, a participação em qualquer processo seletivo da R&T é totalmente gratuita." },
+      { id: "faq-2", pergunta: "Preciso pagar alguma taxa?", resposta: "A ATTOS RH não cobra do candidato para participar dos processos seletivos. O processo é 100% gratuito." },
+      { id: "faq-3", pergunta: "A ATTOS RH cobra para participar?", resposta: "Não, a participação em qualquer processo seletivo da ATTOS RH é totalmente gratuita." },
       { id: "faq-4", pergunta: "Preciso ter experiência?", resposta: "Temos oportunidades tanto para profissionais experientes quanto vagas que não exigem experiência anterior." },
       { id: "faq-5", pergunta: "Como saberei se fui chamado?", resposta: "Nossa equipe entrará em contato diretamente por WhatsApp, telefone ou e-mail cadastrado." },
       { id: "faq-6", pergunta: "Posso me candidatar a mais de uma vaga?", resposta: "Sim, porém recomendamos focar nas oportunidades compatíveis com seu perfil e localidade." },

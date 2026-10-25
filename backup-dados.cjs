@@ -47,7 +47,7 @@ function copiarPasta(origem, alvo) {
 
 function mb(n) { return (n / 1048576).toFixed(1) + ' MB'; }
 
-console.log('=== BACKUP DOS DADOS R&T ===');
+console.log('=== BACKUP DOS DADOS ATTOS RH ===');
 console.log('origem : ' + DATA_DIR);
 console.log('destino: ' + destino);
 console.log('');
@@ -105,7 +105,7 @@ partes.forEach(function (p) {
 // Ficha do backup, para saber depois o que tem dentro
 try {
   fs.writeFileSync(path.join(destino, 'INFORMACOES-DO-BACKUP.txt'),
-    'Backup do sistema R&T VAGAS IA\n' +
+    'Backup do sistema ATTOS RH\n' +
     'Data...........: ' + new Date().toISOString() + '\n' +
     'Origem.........: ' + DATA_DIR + '\n' +
     'Equipamentos...: ' + registros + ' registro(s)\n' +

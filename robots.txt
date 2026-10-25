@@ -5,4 +5,4 @@ Allow: /candidato.html
 Disallow: /api/
 Disallow: /uploads/
 
-Sitemap: https://vemserrt.com.br/sitemap.xml
+Sitemap: https://attosrh.com.br/sitemap.xml

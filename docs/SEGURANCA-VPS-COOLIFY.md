@@ -8,7 +8,7 @@ remoto **sem login**, apelidada de "PHP2Shell").
 
 ## Primeiro, a boa notícia
 
-**O sistema R&T não usa PHP.** Nem uma linha. Conferido em 23/10/2026:
+**O sistema ATTOS RH não usa PHP.** Nem uma linha. Conferido em 23/10/2026:
 
 | Onde | O que foi conferido | Resultado |
 |---|---|---|
@@ -77,13 +77,13 @@ Para atualizar (é o comando oficial, pode rodar com o sistema no ar):
 curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh | sudo bash
 ```
 
-O Coolify reinicia só ele mesmo. **O sistema R&T continua no ar** durante a
+O Coolify reinicia só ele mesmo. **O sistema ATTOS RH continua no ar** durante a
 atualização — ele é um container separado.
 
 Depois de atualizar, confira que o sistema respondeu:
 
 ```bash
-curl -s https://vemserrt.com.br/api/saude
+curl -s https://attosrh.com.br/api/saude
 ```
 
 ### 4. Fechar a porta do painel do Coolify para a internet
@@ -117,7 +117,7 @@ last -n 20                          # ultimos acessos por SSH
 
 ## Variáveis que precisam estar configuradas no Coolify
 
-No Coolify, no serviço do R&T, em **Environment Variables**:
+No Coolify, no serviço do ATTOS RH, em **Environment Variables**:
 
 | Variável | Para que serve | Se faltar |
 |---|---|---|
