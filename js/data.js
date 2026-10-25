@@ -139,14 +139,19 @@ const INITIAL_DATA = {
       }
     },
     {
+      // DESATIVADA. Esta conta existia para a clinica parceira usar a tela de
+      // Exame Medico, que saiu do sistema -- sem ela a conta nao enxerga nada
+      // util. Fica como 'inativo' em vez de ser apagada: o historico de quem
+      // fez o que continua resolvendo o nome nos registros antigos.
+      // Para reativar: Funcionarios > a conta > Ativar.
       id: 'func-6',
       nome: 'Clínica Médica parceira',
-      email: 'clinica@attosrh.com.br',
+      email: '',
       login: 'clinica',
       senha: '',   // sem senha de fabrica: quem cria a conta define
       departamento: 'clinica',
       cargo: 'Clínica Parceira',
-      status: 'ativo',
+      status: 'inativo',
       representanteDepto: false,
       podeEditarPortalPublico: false,
       permissoes: {

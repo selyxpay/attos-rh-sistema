@@ -314,7 +314,9 @@
             }
             var msg = 'Usuário ou senha incorretos!';
             if (r.status === 403 && d.motivo === 'aprovacao') msg = 'Seu cadastro ainda aguarda aprovação do administrador.';
-            else if (r.status === 403) msg = 'Conta inativa ou bloqueada. Procure um administrador.';
+            else if (r.status === 403 && d.motivo === 'inativo') msg = 'Esta conta está desativada. Procure um administrador para reativá-la.';
+            else if (r.status === 403 && d.motivo === 'bloqueado_admin') msg = 'Esta conta foi bloqueada pela administração.';
+            else if (r.status === 403) msg = 'Esta conta não pode entrar agora. Procure um administrador.';
             else if (r.status === 429 || d.motivo === 'bloqueado') msg = 'Muitas tentativas. Aguarde cerca de 1 minuto.';
             err.querySelector('span').textContent = msg; err.style.display = 'flex';
           } catch (e2) { err.querySelector('span').textContent = 'Erro de conexão. Tente novamente.'; err.style.display = 'flex'; }
