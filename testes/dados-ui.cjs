@@ -212,6 +212,52 @@ const ok = (c, m) => { console.log((c ? '  OK   ' : '  FALHOU: ') + m); if (!c) 
   ok(ids.unicos === ids.total, '200 ids gerados em rajada sao TODOS unicos (' + ids.unicos + '/' + ids.total + ')');
   console.log('   exemplo:', ids.exemplo);
 
+  // ---------- 13) NUMERO DE FILA INVALIDO NAO VIRA "#NaN" ----------
+  // O cartao do Departamento Pessoal fazia Number(c.numeroFila) direto na
+  // hora de desenhar. Qualquer valor que nao fosse numero -- vindo de
+  // importacao de planilha, de edicao manual do estado ou de base antiga --
+  // virava NaN e a etiqueta saia literalmente "#NaN" na tela.
+  console.log('\n=== 13) FILA INVALIDA: a etiqueta nunca mostra "#NaN" ===');
+  const fila = await cdp.eval(`(async function(){
+    const ruins = ['A-104', 'abc', '12abc', '#5', '', '   ', null, undefined, NaN];
+    const bons  = [7, '42', ' 99 ', 0];
+    state.candidatos = ruins.map(function (v, i) {
+      return { id: 'fila-ruim-' + i, nome: 'Candidato Ruim ' + i, status: 'aprovado',
+               codigoVaga: 'Vaga Teste', documentos: {}, historico: [], numeroFila: v };
+    }).concat(bons.map(function (v, i) {
+      return { id: 'fila-bom-' + i, nome: 'Candidato Bom ' + i, status: 'aprovado',
+               codigoVaga: 'Vaga Teste', documentos: {}, historico: [], numeroFila: v };
+    }));
+    switchAba('depto-pessoal');
+    await new Promise(function (r) { setTimeout(r, 700); });
+    const cont = document.getElementById('dp-cards-container');
+    const texto = cont ? cont.innerText : '';
+    const etiquetas = Array.from(cont ? cont.querySelectorAll('.dp-cand-name span') : [])
+      .map(function (e) { return e.textContent.trim(); })
+      .filter(function (t) { return t.charAt(0) === '#'; });
+    return {
+      temNaN: /NaN/.test(texto),
+      temUndefined: /undefined/.test(texto),
+      etiquetas: etiquetas,
+      cartoes: cont ? cont.querySelectorAll('.dp-card').length : 0,
+      helper: typeof filaParaExibir === 'function'
+    };
+  })()`);
+  ok(fila.helper, 'o helper filaParaExibir existe (a regra fica num lugar so)');
+  ok(fila.cartoes === 13, 'a tela desenhou os 13 cartoes, nenhum derrubou o render (' + fila.cartoes + ')');
+  ok(fila.temNaN === false, 'NAO aparece "NaN" em lugar nenhum da tela');
+  ok(fila.temUndefined === false, 'nem "undefined"');
+  ok(fila.etiquetas.indexOf('#7') >= 0 && fila.etiquetas.indexOf('#42') >= 0 &&
+     fila.etiquetas.indexOf('#99') >= 0 && fila.etiquetas.indexOf('#0') >= 0,
+     'numero de verdade continua aparecendo, inclusive 0 e com espaco (' + JSON.stringify(fila.etiquetas) + ')');
+  // NaN entra aqui, e nao no grupo dos vazios: ele E um valor, so que
+  // invalido -- e era exatamente ele que vazava para a tela como "#NaN".
+  ok(fila.etiquetas.filter(function (t) { return t === '#-'; }).length === 5,
+     'os 5 valores invalidos viram "#-" (A-104, abc, 12abc, #5 e o proprio NaN)');
+  ok(fila.etiquetas.length === 9,
+     'e os 4 vazios (vazio, espaco, null, undefined) nao desenham etiqueta nenhuma: ' +
+     fila.etiquetas.length + ' etiquetas para 13 cartoes');
+
   console.log('\nexcecoes de JS durante todo o teste: ' + (excecoes.length ? JSON.stringify(excecoes.slice(0, 4)) : 'nenhuma'));
   console.log('\n' + (falhas === 0 ? 'ETAPA 2 (tela): TODOS OS TESTES OK' : falhas + ' FALHA(S)'));
   process.exit(falhas ? 1 : 0);

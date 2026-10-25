@@ -3656,6 +3656,13 @@ function renderDeptoPessoal() {
     const lockHora = isLocked && dpLock.lockedAt ? new Date(dpLock.lockedAt).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}) : '';
     const lockStyle = isLocked ? 'background:rgba(59,130,246,0.06);border-color:rgba(59,130,246,0.35);' : '';
 
+    // Etiqueta do número da fila. Ver filaParaExibir(): nunca sai "#NaN".
+    const filaTexto = filaParaExibir(c.numeroFila);
+    const filaTitulo = filaTexto === '-' ? ` title="Número de fila inválido no cadastro: ${esc(c.numeroFila)}"` : '';
+    const filaBadge = filaTexto
+      ? `<span${filaTitulo} style="background:rgba(190,18,60,0.15); color:var(--primary); font-size:9px; font-weight:600; padding:1px 5px; border-radius:8px; white-space:nowrap;">#${filaTexto}</span>`
+      : '';
+
     return `
       <div class="dp-card" style="${lockStyle}">
         ${isLocked ? `
@@ -3667,7 +3674,7 @@ function renderDeptoPessoal() {
           <div class="dp-avatar" style="${isLocked ? 'background:#3b82f6;' : ''}">${initials}</div>
           <div class="dp-title-info">
             <span class="dp-cand-name" style="display:flex; align-items:center; gap:6px;">
-              ${c.numeroFila ? `<span style="background:rgba(190,18,60,0.15); color:var(--primary); font-size:9px; font-weight:600; padding:1px 5px; border-radius:8px; white-space:nowrap;">#${Number(c.numeroFila)}</span>` : ''}
+              ${filaBadge}
               ${nomeSeguro}
             </span>
             <span class="dp-cand-company">${vagaSegura}</span>
@@ -4050,7 +4057,13 @@ function abrirDrawerDetalhes(candidatoId) {
   setSafeText('det-nome', cand.nome);
   // Exibir número de fila no drawer
   const filaEl = document.getElementById('det-numero-fila');
-  if (filaEl) filaEl.textContent = cand.numeroFila ? `Fila #${cand.numeroFila}` : '';
+  // Mesma regra do cartão do DP, para as duas telas dizerem a mesma coisa.
+  if (filaEl) {
+    const filaTxt = filaParaExibir(cand.numeroFila);
+    filaEl.textContent = filaTxt ? `Fila #${filaTxt}` : '';
+    if (filaTxt === '-') filaEl.title = 'Número de fila inválido no cadastro: ' + String(cand.numeroFila);
+    else filaEl.removeAttribute('title');
+  }
 
   // Badge presencial / online
   const origemEl = document.getElementById('det-origem-badge');
@@ -7871,6 +7884,30 @@ function gerarNumeroFila() {
   const num = state.proximaFilaNum;
   state.proximaFilaNum++;
   return num;
+}
+
+// O número da fila aparece em DOIS lugares: a etiqueta do cartão no
+// Departamento Pessoal e a linha "Fila #" na ficha do candidato.
+//
+// Ele NASCE numérico — gerarNumeroFila() acima, o contador state.fila, e o
+// parseInt do cadastro presencial. Mas o DP fazia `Number(valor)` direto na
+// hora de desenhar, e qualquer coisa que não fosse número virava NaN na cara
+// de quem estava olhando: a etiqueta saía literalmente "#NaN". Isso aparece
+// com dado de importação de planilha, edição manual do estado ou base antiga.
+//
+// A decisão fica aqui, uma só, para as duas telas:
+//   vazio / ausente / só espaço  -> null, e a tela não desenha nada (é o que
+//                                   ela já fazia nesse caso; uma etiqueta "#-"
+//                                   em todo candidato sem fila seria pior)
+//   número, inclusive "0" e " 12 " -> o inteiro
+//   texto que não é número        -> '-', nunca NaN. O valor cru não se perde:
+//                                   quem chama põe ele no title.
+function filaParaExibir(valor) {
+  if (valor === null || valor === undefined) return null;
+  const texto = String(valor).trim();
+  if (!texto) return null;
+  const n = Number(texto);
+  return Number.isFinite(n) ? String(Math.trunc(n)) : '-';
 }
 
 // Gera link para o candidato completar a ficha (pré-preenchida com dados existentes)
