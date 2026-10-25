@@ -23,3 +23,6 @@ stdout.txt
 
 # Backup feito antes da customizacao Atos RH (nunca vai pro git)
 _backup_pre_atos/
+
+# Prints da conferencia visual (nao sao codigo)
+_prints_atos/
