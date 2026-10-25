@@ -923,3 +923,796 @@ b, strong {
   color: #FFFFFF !important;
   text-decoration: underline !important;
 }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ATTOS RH — COMPONENTES v8
+   --------------------------------------------------------------------------
+   Reformulação visual das telas de trabalho. Tudo aqui é APARÊNCIA: nenhuma
+   regra muda estrutura de dado, fluxo ou comportamento — o HTML e o JS que
+   desenham as telas continuam os mesmos.
+   Este arquivo carrega por ÚLTIMO, então estas regras vencem o style.css sem
+   precisar inflar seletor.
+
+   A BARRA LATERAL NÃO É TOCADA AQUI. Nada abaixo mira .sidebar.
+
+   AS QUATRO CORES GANHARAM FUNÇÃO. Antes azul, verde, roxo e laranja
+   apareciam por enfeite — o ícone de um módulo era roxo e o do vizinho era
+   laranja sem querer dizer nada. Agora cada uma significa uma coisa, e é
+   sempre a mesma coisa em todas as telas:
+       azul    informação, estado neutro, ação principal
+       verde   concluído, aprovado, contratado
+       laranja aguardando, precisa de alguém
+       roxo    etapa de entrevista / seleção em andamento
+       vermelho só erro e exclusão
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --dado-azul: var(--acao-azul);
+  --dado-verde: var(--acao-verde);
+  --dado-laranja: #B45309;
+  --dado-roxo: #6D28D9;
+  --dado-azul-fraco: #E7F3F8;
+  --dado-verde-fraco: #E6F3E7;
+  --dado-laranja-fraco: #FBF0E0;
+  --dado-roxo-fraco: #EFE9FB;
+  --dado-vermelho-fraco: #FAE9E7;
+  /* Escada de espaçamento: antes cada tela escolhia o seu (12, 14, 16, 18,
+     20, 24...). Três degraus dão ritmo e deixam a tela previsível. */
+  --vao-curto: 12px;
+  --vao: 18px;
+  --vao-longo: 28px;
+}
+
+
+/* ── 1. CABEÇALHO DE MÓDULO ────────────────────────────────────────────────
+   Era um cartão branco alto com muito ar e pouca informação, igual em todas
+   as telas. Agora é uma faixa mais baixa, com um fio da marca na borda
+   esquerda, o título com peso de verdade e as ações alinhadas à direita. */
+.mod-header {
+  border-left: 3px solid var(--marca-azul) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 18px 22px !important;
+  margin-bottom: var(--vao) !important;
+  gap: 16px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+}
+.mod-header-title {
+  font-size: 20px !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.015em !important;
+  line-height: 1.2 !important;
+  margin: 0 !important;
+}
+.mod-header-subtitle {
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+  margin: 3px 0 0 !important;
+  max-width: 68ch;
+}
+.mod-header-icon-badge {
+  width: 42px !important;
+  height: 42px !important;
+  font-size: 17px !important;
+  border-radius: var(--radius-md) !important;
+}
+
+/* ── 2. BOTÕES: hierarquia de verdade ──────────────────────────────────────
+   Antes todo botão tinha o mesmo peso — "Excluir Vaga" gritava igual a
+   "Cadastrar-se", e cada um numa linha. Agora são três níveis e um destrutivo
+   discreto, todos com a MESMA altura, para poderem ficar lado a lado. */
+.btn, .mod-btn-primary, .mod-btn-secondary, .mod-btn-secondary-light {
+  height: 38px !important;
+  padding: 0 16px !important;
+  border-radius: var(--radius-md) !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  white-space: nowrap;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease !important;
+}
+.btn-sm, .btn.btn-sm {
+  height: 32px !important;
+  padding: 0 12px !important;
+  font-size: 12.5px !important;
+}
+.btn-primary, .mod-btn-primary {
+  background: var(--acao-azul) !important;
+  border: 1px solid var(--acao-azul) !important;
+  color: #FFFFFF !important;
+}
+.btn-primary:hover, .mod-btn-primary:hover {
+  background: var(--acao-azul-forte) !important;
+  border-color: var(--acao-azul-forte) !important;
+}
+.btn-secondary, .mod-btn-secondary, .mod-btn-secondary-light {
+  background: var(--color-white) !important;
+  border: 1px solid var(--color-glass-border) !important;
+  color: var(--color-text-title) !important;
+}
+.btn-secondary:hover, .mod-btn-secondary:hover, .mod-btn-secondary-light:hover {
+  background: var(--papel) !important;
+  border-color: var(--marca-azul) !important;
+  color: var(--acao-azul) !important;
+}
+/* Excluir não compete com o resto: sem caixa, vermelho só no texto. A caixa
+   vermelha só aparece quando o mouse chega, para confirmar o que vai ser. */
+.btn-danger {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: var(--status-unfit) !important;
+}
+.btn-danger:hover {
+  background: var(--dado-vermelho-fraco) !important;
+  border-color: var(--status-unfit) !important;
+  color: var(--status-unfit) !important;
+}
+
+/* ── 3. CAMPOS ─────────────────────────────────────────────────────────────
+   Mesma altura dos botões, para toolbar e formulário ficarem alinhados. */
+.form-control, .form-control-login, .input-modern,
+input[type="text"], input[type="password"], input[type="email"],
+input[type="date"], input[type="number"], input[type="tel"], select {
+  min-height: 38px !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: 13.5px !important;
+  padding: 8px 12px !important;
+}
+textarea.form-control { min-height: 88px !important; }
+.form-control:focus, .form-control-login:focus, .input-modern:focus,
+input:focus, select:focus, textarea:focus {
+  border-color: var(--marca-azul) !important;
+  box-shadow: 0 0 0 3px rgba(4, 161, 216, 0.16) !important;
+  outline: none !important;
+}
+/* A lupa da busca ficava EM CIMA do texto do placeholder. O ícone é
+   posicionado por dentro, e o campo ganha a margem que falta. */
+.search-wrapper, .busca-wrapper { position: relative !important; }
+.search-wrapper > i, .busca-wrapper > i,
+.search-wrapper > .fa-solid, .busca-wrapper > .fa-solid {
+  position: absolute !important;
+  left: 14px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  color: var(--color-text-muted) !important;
+  font-size: 13px !important;
+  pointer-events: none !important;
+  z-index: 2 !important;
+}
+.search-wrapper > input, .busca-wrapper > input { padding-left: 38px !important; }
+
+/* ── 4. INDICADORES (KPI) ──────────────────────────────────────────────────
+   Antes: ícone pastel grande à esquerda e o número do lado, os dois
+   disputando. E oito indicadores quebravam em 5+3, o que não tem leitura.
+   Agora o NÚMERO manda, o rótulo vem abaixo, o ícone é pequeno e vai para o
+   canto, e um fio no topo diz o que aquele número significa pela cor. */
+.kpi-row, .dashboard-kpis {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: var(--vao-curto) !important;
+}
+@media (max-width: 1180px) {
+  .kpi-row, .dashboard-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+.kpi-card {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 2px !important;
+  padding: 16px 18px 15px !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+.kpi-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--marca-azul);
+  opacity: .9;
+}
+.kpi-card .kpi-icon-wrapper, .kpi-card .kpi-icon {
+  position: absolute !important;
+  top: 14px !important;
+  right: 14px !important;
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  font-size: 13px !important;
+  border-radius: 9px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.kpi-number {
+  font-size: 30px !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.05 !important;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-label {
+  font-size: 12px !important;
+  line-height: 1.3 !important;
+  font-weight: 500 !important;
+  padding-right: 34px;
+}
+
+/* ── 5. GRADES DE CARTÃO ───────────────────────────────────────────────────
+   CORREÇÃO DE LAYOUT, não enfeite: a barra de paginação é inserida DENTRO do
+   container da grade (js/app.js, renderVagasGrid e companhia), então ela
+   virava uma CÉLULA e empurrava os cartões para a direita — a tela de Vagas e
+   a de Seleção abriam com um vão vazio do tamanho de um cartão à esquerda.
+   Aqui ela passa a ocupar a linha inteira, que é o lugar dela.
+   Arrumar no JS daria no mesmo, mas mexeria em cinco funções de render. */
+.vagas-grid > .rt-paginacao,      .vagas-grid > .rt-paginacao-info,
+.selecao-grid > .rt-paginacao,    .selecao-grid > .rt-paginacao-info,
+.dp-grid > .rt-paginacao,         .dp-grid > .rt-paginacao-info,
+.banco-grid > .rt-paginacao,      .banco-grid > .rt-paginacao-info,
+.banco-grupo-grid > .rt-paginacao, .banco-grupo-grid > .rt-paginacao-info {
+  grid-column: 1 / -1 !important;
+}
+.rt-paginacao-info {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--color-text-muted) !important;
+  padding: 2px 0 !important;
+}
+
+.vagas-grid, .selecao-grid, .dp-grid {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+  gap: var(--vao) !important;
+  align-items: stretch !important;
+}
+
+/* Cartão de conteúdo: altura uniforme na linha e rodapé colado embaixo, para
+   os botões de cartões vizinhos ficarem na mesma altura. */
+.vaga-card, .dp-card {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border-radius: var(--radius-lg) !important;
+  transition: border-color .15s ease, box-shadow .15s ease !important;
+}
+.vaga-card:hover, .selecao-card:hover, .dp-card:hover, .banco-candidato-card:hover {
+  border-color: var(--marca-azul) !important;
+  box-shadow: 0 6px 18px rgba(10, 110, 147, 0.10) !important;
+}
+.vaga-card > *, .dp-card > * {
+  padding-left: 18px; padding-right: 18px;
+}
+.vaga-card > *:first-child, .dp-card > *:first-child { padding-top: 18px; }
+
+/* A pilha de botões do rodapé vira uma barra. Era um botão por linha: cinco
+   linhas de botão num cartão de vaga, cada um com uma cor diferente. */
+.vaga-card-acoes, .vaga-card > div:last-child,
+.selecao-card-acoes, .dp-card-acoes {
+  margin-top: auto !important;
+}
+.vaga-card-acoes, .dp-card-acoes {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  padding: 14px 18px !important;
+  border-top: 1px solid var(--color-glass-border) !important;
+  background: var(--papel) !important;
+}
+
+/* ── 6. SUB-ABAS (Fluxo Financeiro, WhatsApp, Exame) ───────────────────────
+   Pílulas num trilho, em vez de botões soltos com sublinhado. */
+.exame-subtab, .wa-tab, .ff-subtab {
+  border-radius: var(--radius-pill) !important;
+  padding: 7px 14px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  border: 1px solid transparent !important;
+  color: var(--color-text-muted) !important;
+  background: transparent !important;
+  transition: background .15s ease, color .15s ease !important;
+}
+.exame-subtab:hover, .wa-tab:hover, .ff-subtab:hover {
+  background: var(--papel-fundo) !important;
+  color: var(--color-text-title) !important;
+}
+.exame-subtab.active, .wa-tab.active, .ff-subtab.active {
+  background: var(--acao-azul) !important;
+  border-color: var(--acao-azul) !important;
+  color: #FFFFFF !important;
+}
+#exame-subtabs, #ff-subtabs, #wa-subtabs, .wa-tabs {
+  gap: 4px !important;
+  padding: 5px !important;
+  background: var(--papel-fundo) !important;
+  border-radius: var(--radius-pill) !important;
+  border: 1px solid var(--color-glass-border) !important;
+  display: inline-flex !important;
+  flex-wrap: wrap !important;
+}
+
+/* ── 7. TABELAS ────────────────────────────────────────────────────────────
+   Cabeçalho que não compete com o dado, linha alternada suave, e a primeira
+   coluna com peso — é por ela que se procura a linha. */
+.excel-table { font-size: 13.5px !important; border-collapse: separate !important; border-spacing: 0 !important; }
+.excel-table thead th {
+  background: var(--papel-fundo) !important;
+  color: var(--color-text-muted) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: .06em !important;
+  text-transform: uppercase !important;
+  padding: 10px 14px !important;
+  border-bottom: 1px solid var(--color-glass-border) !important;
+  position: sticky; top: 0; z-index: 1;
+}
+.excel-table tbody td { padding: 11px 14px !important; vertical-align: middle !important; }
+.excel-table tbody tr:nth-child(even) > td { background: rgba(10, 110, 147, 0.025) !important; }
+.excel-table tbody tr:hover > td { background: var(--dado-azul-fraco) !important; }
+.excel-table tbody td:first-child { font-weight: 600 !important; color: var(--color-text-title) !important; }
+
+/* ── 8. CARTÕES DE ESTADO DO WHATSAPP ──────────────────────────────────────
+   Só os cartões de números do painel. A LISTA DE CONVERSAS E O CHAT NÃO SÃO
+   TOCADOS: as suítes `whatsapp` e `estavel` medem a altura e a rolagem deles
+   num Chrome de verdade, e mexer ali quebra as duas. */
+.wa-stats-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: var(--vao-curto) !important;
+}
+@media (max-width: 1180px) { .wa-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+.wa-stat {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 2px !important;
+  padding: 16px 18px 15px !important;
+  border: 1px solid var(--color-glass-border) !important;
+  border-left-width: 1px !important;
+  border-radius: var(--radius-lg) !important;
+  background: var(--color-white) !important;
+  box-shadow: var(--shadow-premium) !important;
+  overflow: hidden !important;
+  min-width: 0 !important;
+}
+.wa-stat::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--marca-azul); opacity: .9;
+}
+.wa-stat-ic {
+  position: absolute !important;
+  top: 14px !important; right: 14px !important;
+  width: 30px !important; height: 30px !important;
+  font-size: 13px !important; border-radius: 9px !important;
+  display: flex !important; align-items: center !important; justify-content: center !important;
+}
+.wa-stat-val { font-size: 30px !important; font-weight: 650 !important; letter-spacing: -.02em !important; line-height: 1.05 !important; font-variant-numeric: tabular-nums; }
+.wa-stat-lbl { font-size: 12px !important; font-weight: 500 !important; line-height: 1.3 !important; padding-right: 34px; margin-top: 0 !important; }
+
+/* ── 9. BLOCOS DE APOIO ────────────────────────────────────────────────────
+   Barra de filtros e busca viram uma peça só, com o mesmo respiro. */
+.filter-box, .filtros-box {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 14px 18px !important;
+  margin-bottom: var(--vao) !important;
+  border-radius: var(--radius-lg) !important;
+}
+.table-box, .dashboard-chart-card, .destaque-semana-box { padding: 20px !important; }
+.dashboard-chart-card h3, .table-box h3 {
+  font-size: 15px !important;
+  font-weight: 650 !important;
+  margin: 0 0 14px !important;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-glass-border);
+}
+
+/* Banner de boas-vindas: era alto e quase vazio. */
+.dashboard-greeting-banner { padding: 18px 22px !important; }
+.dashboard-greeting-banner h2 { font-size: 19px !important; margin: 0 !important; }
+.dashboard-greeting-banner p { font-size: 13px !important; margin: 4px 0 0 !important; }
+
+/* ── 10. ETIQUETAS DE ESTADO ───────────────────────────────────────────────
+   Cada etapa com a sua cor, sempre a mesma, em qualquer tela. */
+.badge, .status-badge, .badge-status {
+  border-radius: var(--radius-pill) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: .04em !important;
+  padding: 3px 10px !important;
+  text-transform: uppercase !important;
+}
+.badge-blue,   .status-pendente   { background: var(--dado-azul-fraco) !important;    color: var(--dado-azul) !important; }
+.badge-green,  .status-aprovado   { background: var(--dado-verde-fraco) !important;   color: var(--dado-verde) !important; }
+.badge-yellow, .status-analise    { background: var(--dado-laranja-fraco) !important; color: var(--dado-laranja) !important; }
+.badge-purple, .status-entrevista { background: var(--dado-roxo-fraco) !important;    color: var(--dado-roxo) !important; }
+.badge-red,    .status-reprovado  { background: var(--dado-vermelho-fraco) !important; color: var(--status-unfit) !important; }
+
+/* ── 11. O FIO DO INDICADOR DIZ O QUE É AQUELE NÚMERO ──────────────────────
+   Cada cartão do Dashboard tem id próprio, então dá para dar sentido à cor
+   sem tocar no HTML. A regra é a mesma do item 10:
+     azul = neutro · laranja = esperando alguém · roxo = entrevista
+     verde = concluído · vermelho = voltou / deu errado                      */
+#kpi-cad-hoje::before            { background: var(--marca-azul); }
+#kpi-analise-sel::before         { background: var(--dado-roxo); }
+#kpi-enviadas-dp::before         { background: var(--dado-laranja); }
+#kpi-devolvidas-dp::before       { background: var(--status-unfit); }
+#kpi-contratos-hoje::before      { background: var(--marca-verde); }
+#kpi-vagas-disp::before          { background: var(--marca-azul); }
+#kpi-vagas-preenchidas::before   { background: var(--marca-verde); }
+#kpi-recrutador-destaque::before { background: linear-gradient(90deg, var(--marca-azul), var(--marca-verde)); }
+
+/* O cartão do destaque da semana tinha borda dourada de 2px escrita no HTML,
+   e com ela ficava mais alto que os vizinhos e quebrava a linha da grade. */
+#kpi-recrutador-destaque {
+  border: 1px solid var(--color-glass-border) !important;
+  background: var(--color-white) !important;
+}
+
+/* As bolinhas de ícone do Dashboard seguem a mesma cor do fio. O HTML dá a
+   cor em style inline, por isso o !important. */
+#kpi-cad-hoje .kpi-icon-wrapper,
+#kpi-vagas-disp .kpi-icon-wrapper    { background: var(--dado-azul-fraco) !important;    color: var(--dado-azul) !important; }
+#kpi-analise-sel .kpi-icon-wrapper   { background: var(--dado-roxo-fraco) !important;    color: var(--dado-roxo) !important; }
+#kpi-enviadas-dp .kpi-icon-wrapper   { background: var(--dado-laranja-fraco) !important; color: var(--dado-laranja) !important; }
+#kpi-devolvidas-dp .kpi-icon-wrapper { background: var(--dado-vermelho-fraco) !important; color: var(--status-unfit) !important; }
+#kpi-contratos-hoje .kpi-icon-wrapper,
+#kpi-vagas-preenchidas .kpi-icon-wrapper { background: var(--dado-verde-fraco) !important; color: var(--dado-verde) !important; }
+
+/* ── 12. RESPONSIVO ───────────────────────────────────────────────────────
+   O celular tinha regra própria para KPI em 2 colunas; ela continua valendo
+   (mobile.css carrega depois). Aqui ficam só as faixas intermediárias, onde
+   antes não havia nada e a grade de cartões ficava com um cartão por linha
+   ocupando a tela toda. */
+@media (max-width: 860px) {
+  .vagas-grid, .selecao-grid, .dp-grid { grid-template-columns: 1fr !important; }
+  .mod-header { padding: 15px 16px !important; }
+  .mod-header-title { font-size: 18px !important; }
+  .wa-stats-grid, .kpi-row, .dashboard-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 460px) {
+  .kpi-number, .wa-stat-val { font-size: 24px !important; }
+  .vaga-card-acoes, .dp-card-acoes { padding: 12px 14px !important; }
+  .vaga-card > *, .dp-card > * { padding-left: 14px; padding-right: 14px; }
+}
+
+/* ── 13. BOTÕES DE AÇÃO DOS CARTÕES DE VAGA ────────────────────────────────
+   Esses quatro botões são montados em js/app.js com style="" INLINE, cada um
+   com a sua cor de borda e de fundo — roxo, laranja, vermelho, azul. Um
+   cartão de vaga ficava com quatro caixas coloridas disputando atenção, e
+   "Excluir Vaga" gritava igual a "Cadastrar-se".
+   Estilo inline vence classe, então a correção vem daqui, por `onclick`, com
+   !important. É de propósito: deixa a mudança inteira num arquivo só, fácil
+   de rever e de desfazer, e não encosta na função que desenha o cartão.
+   Hierarquia: Editar é secundário, Exata e Destacar são discretos, Excluir só
+   aparece de verdade quando o mouse chega nele. */
+.vaga-card button[onclick^="editarVaga"],
+.vaga-card button[onclick^="abrirConfigExata"],
+.vaga-card button[onclick^="toggleVagaQuente"],
+.vaga-card button[onclick^="excluirVaga"] {
+  margin-top: 0 !important;
+  height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: var(--radius-md) !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease !important;
+}
+.vaga-card button[onclick^="editarVaga"] {
+  background: var(--color-white) !important;
+  border: 1px solid var(--color-glass-border) !important;
+  color: var(--color-text-title) !important;
+}
+.vaga-card button[onclick^="editarVaga"]:hover {
+  border-color: var(--marca-azul) !important;
+  color: var(--acao-azul) !important;
+}
+.vaga-card button[onclick^="abrirConfigExata"],
+.vaga-card button[onclick^="toggleVagaQuente"] {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: var(--color-text-muted) !important;
+}
+.vaga-card button[onclick^="abrirConfigExata"]:hover {
+  background: var(--dado-roxo-fraco) !important;
+  color: var(--dado-roxo) !important;
+}
+.vaga-card button[onclick^="toggleVagaQuente"]:hover {
+  background: var(--dado-laranja-fraco) !important;
+  color: var(--dado-laranja) !important;
+}
+.vaga-card button[onclick^="excluirVaga"] {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: var(--status-unfit) !important;
+  margin-left: auto !important;   /* empurra para a ponta: fica longe do resto */
+}
+.vaga-card button[onclick^="excluirVaga"]:hover {
+  background: var(--dado-vermelho-fraco) !important;
+  border-color: var(--status-unfit) !important;
+}
+
+/* O rodapé do cartão de vaga: o JS não marca essa área com classe, então o
+   alvo é o último bloco do cartão, que é onde os botões caem. */
+.vaga-card > div:last-of-type {
+  margin-top: auto !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 13px 18px !important;
+  border-top: 1px solid var(--color-glass-border) !important;
+  background: var(--papel) !important;
+}
+/* "Cadastrar-se" é a ação principal e ocupa a largura toda, acima das outras. */
+.vaga-card > div:last-of-type > a,
+.vaga-card > div:last-of-type > .btn-primary { flex: 1 1 100% !important; }
+
+/* A inicial da empresa usava um roxo que não é da marca. */
+.vaga-card .empresa-avatar, .vaga-card .avatar-sigla,
+.selecao-card .empresa-avatar, .banco-candidato-card .avatar-sigla {
+  background: var(--acao-azul) !important;
+  color: #FFFFFF !important;
+}
+
+/* A sigla da empresa no cartão de vaga vinha com a cor gravada no cadastro
+   (e o padrão era um roxo que não é da marca). Fica no azul do sistema. */
+.vaga-card .vaga-logo-badge {
+  background: var(--acao-azul) !important;
+  color: #FFFFFF !important;
+  border-radius: var(--radius-md) !important;
+  font-weight: 700 !important;
+  letter-spacing: .02em !important;
+}
+
+/* O cartão do destaque da semana mostra um NOME, não um número, e ele vinha
+   com o tamanho do número (30px) — "Maiara (4)" passava por baixo do ícone.
+   O HTML já pede 16px em style inline; aqui a regra do número para de brigar. */
+#kpi-recrutador-destaque .kpi-number {
+  font-size: 19px !important;
+  padding-right: 38px;
+  line-height: 1.25 !important;
+  word-break: break-word;
+}
+#kpi-recrutador-destaque .kpi-icon-wrapper {
+  background: var(--dado-laranja-fraco) !important;
+  color: var(--dado-laranja) !important;
+}
+
+/* Os gráficos cresciam até ocupar meia tela, e com pouco dado ficavam quase
+   vazios. Altura fixa deixa a página inteira caber na primeira olhada. */
+.dashboard-chart-canvas-wrapper {
+  position: relative !important;
+  height: 260px !important;
+  max-height: 260px !important;
+}
+.dashboard-chart-canvas-wrapper > canvas { max-height: 260px !important; }
+@media (max-width: 860px) {
+  .dashboard-chart-canvas-wrapper, .dashboard-chart-canvas-wrapper > canvas { height: 210px !important; max-height: 210px !important; }
+}
+
+/* ── 14. BANCO DE TALENTOS ─────────────────────────────────────────────────
+   A LUPA FICAVA EM CIMA DO TEXTO. O campo usa .search-input-wrapper com um
+   <i class="search-icon"> dentro, e o input não tinha recuo para o ícone —
+   o placeholder começava debaixo dele. */
+.search-input-wrapper { position: relative !important; display: flex !important; align-items: center !important; }
+.search-input-wrapper .search-icon {
+  position: absolute !important;
+  left: 15px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  color: var(--color-text-muted) !important;
+  font-size: 13.5px !important;
+  pointer-events: none !important;
+  z-index: 2 !important;
+}
+.search-input-wrapper > input {
+  width: 100% !important;
+  padding-left: 40px !important;
+}
+.filter-search-bar { margin-bottom: var(--vao) !important; }
+
+/* Cartão do talento agrupado: horizontal, avatar à esquerda. Fica legível
+   com o nome e a vaga em duas linhas e nada centralizado. */
+.banco-candidato-card {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 12px 14px !important;
+  border-radius: var(--radius-md) !important;
+  min-width: 0 !important;
+}
+.banco-candidato-card > * { padding: 0 !important; }
+.banco-candidato-card .avatar-circle,
+.banco-candidato-card .avatar-sigla,
+.banco-candidato-card [class*="avatar"] {
+  flex: 0 0 auto !important;
+  width: 36px !important; height: 36px !important;
+  font-size: 12.5px !important; font-weight: 700 !important;
+  background: var(--acao-azul) !important; color: #FFFFFF !important;
+  display: flex !important; align-items: center !important; justify-content: center !important;
+  border-radius: 50% !important;
+}
+/* Cabeçalho de grupo (uma empresa) */
+.banco-grupo-header, .banco-grupo-titulo {
+  border-left: 3px solid var(--marca-azul) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+/* ── 15. INDICADORES DO FLUXO FINANCEIRO ───────────────────────────────────
+   Eles têm classe própria (.ff-kpi-*) e por isso ficaram de fora do padrão
+   novo: eram cartões horizontais com um fio colorido na BORDA ESQUERDA, ao
+   lado dos cartões do Dashboard que já tinham virado número-grande-em-cima
+   com fio NO TOPO. Mesmo sistema, dois desenhos.
+   Aqui eles passam a ser a mesma peça. A cor de cada um continua sendo a que
+   o módulo já definia — ela quer dizer alguma coisa no financeiro e não é
+   minha para trocar; só mudou DE ONDE ela aparece (da esquerda para o topo). */
+.ff-kpis-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: var(--vao-curto) !important;
+}
+@media (max-width: 1180px) { .ff-kpis-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+@media (max-width: 560px)  { .ff-kpis-grid { grid-template-columns: 1fr !important; } }
+
+.ff-kpi-card {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 2px !important;
+  padding: 16px 18px 15px !important;
+  border-top: 1px solid var(--color-glass-border) !important;
+  border-right: 1px solid var(--color-glass-border) !important;
+  border-bottom: 1px solid var(--color-glass-border) !important;
+  /* O FIO FICA À ESQUERDA, e não no topo como nos outros indicadores.
+     Não é descuido: a cor dele vem de um `border-left` escrito inline no
+     index.html, uma por etapa do financeiro (laranja = aguardando, azul =
+     em andamento, verde = pago...). CSS não consegue mover a cor de uma
+     borda para outra, e trocar isso exigiria mexer nos sete cartões no HTML.
+     O desenho do cartão é o mesmo do resto do sistema; só o lado do fio muda,
+     e no Financeiro o fio à esquerda também separa melhor as sete etapas. */
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-premium) !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+.ff-kpi-icon {
+  position: absolute !important;
+  top: 14px !important; right: 14px !important;
+  width: 30px !important; height: 30px !important;
+  min-width: 30px !important;
+  font-size: 13px !important;
+  border-radius: 9px !important;
+  display: flex !important; align-items: center !important; justify-content: center !important;
+}
+.ff-kpi-val {
+  font-size: 30px !important; font-weight: 650 !important;
+  letter-spacing: -.02em !important; line-height: 1.05 !important;
+  color: var(--color-text-title) !important;
+  font-variant-numeric: tabular-nums;
+}
+.ff-kpi-lbl {
+  font-size: 11px !important; font-weight: 700 !important;
+  letter-spacing: .05em !important; text-transform: uppercase !important;
+  color: var(--color-text-muted) !important;
+  padding-right: 34px; line-height: 1.3 !important;
+}
+.ff-kpi-sub { font-size: 11.5px !important; margin-top: 3px !important; padding-right: 34px; }
+
+/* ── 16. CARTÃO DE SELEÇÃO ─────────────────────────────────────────────────
+   Ele é HORIZONTAL: avatar do recrutador à esquerda, dados à direita. Por um
+   momento entrou na regra de cartão em coluna junto com Vagas e DP, e o
+   conteúdo foi parar no pé do cartão com um vão em cima. */
+.selecao-card {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start !important;
+  gap: 14px !important;
+  padding: 16px 18px !important;
+  border-radius: var(--radius-lg) !important;
+  min-width: 0 !important;
+}
+.selecao-card > * { padding: 0 !important; }
+.selecao-card-avatar {
+  flex: 0 0 auto !important;
+  width: 42px !important; height: 42px !important;
+  border-radius: 50% !important;
+  display: flex !important; align-items: center !important; justify-content: center !important;
+  font-weight: 700 !important; font-size: 14px !important; color: #FFFFFF !important;
+}
+.selecao-card-details { min-width: 0 !important; flex: 1 1 auto !important; }
+/* As etiquetas vinham todas na mesma linha, espremidas contra o nome do
+   recrutador. Viram uma faixa própria, com espaço para quebrar. */
+.selecao-card-details > *:last-child {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin-top: 8px !important;
+}
+
+/* ── 17. DEPARTAMENTO PESSOAL ──────────────────────────────────────────────
+   Esse cartão é em coluna mesmo (cabeçalho, dados, ações). Só o rodapé
+   precisava descolar do resto e grudar embaixo, para os botões de cartões
+   vizinhos ficarem na mesma linha. */
+.dp-card > div:last-child {
+  margin-top: auto !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 13px 18px !important;
+  border-top: 1px solid var(--color-glass-border) !important;
+  background: var(--papel) !important;
+}
+.dp-card-header { padding-bottom: 12px !important; }
+
+/* ── 18. CARTÕES DE ESTADO DO WHATSAPP: COR POR SIGNIFICADO ────────────────
+   Os oito cartões não têm id nem classe própria — são montados em sequência
+   por js/whatsapp.js (_waRenderDashboard). A ordem é fixa, então dá para dar
+   sentido à cor sem tocar no JS. Se um cartão novo entrar no meio, é só
+   reordenar esta lista; nada quebra, só a cor do fio muda.
+     1 conectados · 2 conversas hoje · 3 não lidas · 4 enviadas
+     5 recebidas  · 6 ativas        · 7 com erro  · 8 pendentes            */
+.wa-stats-grid > .wa-stat:nth-child(1)::before { background: var(--marca-verde); }
+.wa-stats-grid > .wa-stat:nth-child(2)::before { background: var(--marca-azul); }
+.wa-stats-grid > .wa-stat:nth-child(3)::before { background: var(--dado-laranja); }
+.wa-stats-grid > .wa-stat:nth-child(4)::before { background: var(--marca-azul); }
+.wa-stats-grid > .wa-stat:nth-child(5)::before { background: var(--marca-azul); }
+.wa-stats-grid > .wa-stat:nth-child(6)::before { background: var(--marca-verde); }
+.wa-stats-grid > .wa-stat:nth-child(7)::before { background: var(--status-unfit); }
+.wa-stats-grid > .wa-stat:nth-child(8)::before { background: var(--dado-laranja); }
+
+/* Os dados do cartão do DP apareciam CENTRALIZADOS, um embaixo do outro, com
+   o rótulo colado no valor ("Turno:Diurno"). A regra do style.css foi escrita
+   para quando esse bloco era uma LINHA (`align-items:center` +
+   `justify-content:space-between`), e um style inline depois o virou COLUNA —
+   aí `align-items:center` passou a centralizar tudo na horizontal.
+   Aqui ele volta a ler como lista: rótulo à esquerda, valor à direita. */
+.dp-card-meta {
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  font-size: 12.5px !important;
+  gap: 7px !important;
+}
+.dp-card-meta > div {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+.dp-card-meta > div > span:first-child {
+  font-weight: 600 !important;
+  color: var(--color-text-muted) !important;
+  flex: 0 0 auto !important;
+}
+.dp-card-meta > div > *:last-child { text-align: right !important; min-width: 0 !important; }
+
+/* O avatar do recrutador no cartão de Seleção NUNCA apareceu: o JS escreve
+   `class="selecao-card-avatar c-azul"`, mas as classes de cor do style.css
+   são escopadas em `.avatar-circle.c-*`. Sem casar seletor, o círculo ficava
+   sem fundo — branco no branco. Aqui cada cor volta a valer. */
+.selecao-card-avatar.c-blue   { background-color: var(--color-blue) !important; }
+.selecao-card-avatar.c-green  { background-color: var(--color-green) !important; }
+.selecao-card-avatar.c-purple { background-color: var(--color-purple) !important; }
+.selecao-card-avatar.c-yellow { background-color: var(--dado-laranja) !important; }
+.selecao-card-avatar.c-red    { background-color: var(--status-unfit) !important; }
+.selecao-card-avatar          { background-color: var(--acao-azul) !important; }
+.selecao-card-avatar.c-blue, .selecao-card-avatar.c-green,
+.selecao-card-avatar.c-purple, .selecao-card-avatar.c-yellow,
+.selecao-card-avatar.c-red { color: #FFFFFF !important; }

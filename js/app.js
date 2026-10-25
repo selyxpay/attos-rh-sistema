@@ -7997,7 +7997,11 @@ function renderBancoTalentosSimples() {
   const headerHtml = `<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;font-weight:600;">
     ${lista.length} talento${lista.length > 1 ? 's' : ''} encontrado${lista.length > 1 ? 's' : ''}
     <span style="font-weight:400;"> — clique em um nome para ver detalhes e puxar para processo</span>
-  </div>` + rtControlesPagina(pagT, 'talentos');
+  </div>`;
+  // A barra de paginação era montada DUAS vezes: aqui e no final (logo abaixo
+  // da lista). Com uma página só, as duas viravam "3 registro(s)" e o número
+  // aparecia repetido, uma linha depois da outra. Fica só a de baixo, que é
+  // onde se procura por ela depois de percorrer a lista.
 
   const cardsHtml = pagT.itens.map(t => {
     const initials = (t.nome || '?').split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase();
