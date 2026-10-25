@@ -2523,7 +2523,6 @@ h1, h2, h3, h4, h5, h6 {
 .badge-role.administracao { background-color: #fee2e2; color: #b91c1c; }
 .badge-role.selecao { background-color: #f3e8ff; color: #7e22ce; }
 .badge-role.dp { background-color: #dbeafe; color: #1d4ed8; }
-.badge-role.comissao { background-color: #e0f2fe; color: #0369a1; }
 
 .badge-status-internal {
     padding: 4px 8px;

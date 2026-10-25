@@ -38,6 +38,11 @@ O que mais mudou, e **não** está refletido no texto antigo:
   o que as deixa invisíveis e intocáveis pela interface. Ver `js/telas.js`.
 - A identidade visual é a da ATTOS RH (azul `#0A6E93` / verde `#4EB548`),
   não mais preto e vermelho.
+- **Etiquetas de conversa do WhatsApp não existem mais.** As 3 rotas e o
+  módulo `tags` do `whatsapp-db.cjs` saíram; as tabelas `whatsapp_tags` e
+  `whatsapp_conversation_tags` continuam nos bancos que já as tinham, mas
+  o código não as cria nem consulta. São **15 tabelas**, não 17.
+- **O departamento `comissao` saiu** e a conta `clinica` está **desativada**.
 
 O **README.md** está atualizado e é o ponto de partida correto.
 
@@ -375,8 +380,8 @@ repõe do próprio estado): `senha` e `senhaVisivel` para qualquer um, e
 `permissoes`, `telas`, `departamento`, `status`, `podeVerSenhas` e afins para
 quem não é admin. Era por aqui que qualquer funcionário logado se promovia a
 administrador ou reescrevia o hash da senha da conta mestre.
-- **Departamentos**: `administracao`, `dp`, `selecao`, `financeiro`, `comissao`,
-  `clinica`.
+- **Departamentos**: `administracao`, `dp`, `selecao`, `financeiro`, `clinica`.
+  (`comissao` saiu na customização da ATTOS RH, junto com a tela.)
 - `index.html` e `js/app.js` **só são servidos a quem tem sessão válida**. Sem
   login o visitante recebe apenas `login.html` — o "esqueleto" do sistema nem
   chega ao navegador.

@@ -28,7 +28,6 @@ const INITIAL_DATA = {
         banco_talentos: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
         selecao: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
         dp: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
-        comissao: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
         relatorios: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
         graficos: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
         candidatos: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
@@ -53,7 +52,6 @@ const INITIAL_DATA = {
         banco_talentos: { visualizar: true, criar: true, editar: true, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
         selecao: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: false },
         dp: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
-        comissao: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
         relatorios: { visualizar: true, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: true, perms: false },
         graficos: { visualizar: true, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: true, perms: false },
         candidatos: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: false, perms: false },
@@ -78,7 +76,6 @@ const INITIAL_DATA = {
         banco_talentos: { visualizar: true, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
         selecao: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
         dp: { visualizar: true, criar: true, editar: true, excluir: false, aprovar: true, exportar: true, relatorios: true, perms: false },
-        comissao: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
         relatorios: { visualizar: true, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: true, perms: false },
         graficos: { visualizar: true, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: true, perms: false },
         candidatos: { visualizar: true, criar: false, editar: false, excluir: false, aprovar: true, exportar: true, relatorios: false, perms: false },
@@ -89,11 +86,13 @@ const INITIAL_DATA = {
     },
     {
       id: 'func-4',
-      nome: 'Pedro da Comissão',
-      email: 'pedro@attosrh.com.br',
+      nome: 'Pedro do Financeiro',
+      email: '',
       login: 'pedro',
       senha: '',   // sem senha de fabrica: quem cria a conta define
-      departamento: 'comissao',
+      // Era 'comissao'. O departamento saiu junto com a tela de Comissao; o
+      // cargo dele sempre foi Analista Financeiro, entao foi para 'financeiro'.
+      departamento: 'financeiro',
       cargo: 'Analista Financeiro',
       status: 'ativo',
       representanteDepto: false,
@@ -103,7 +102,6 @@ const INITIAL_DATA = {
         banco_talentos: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
         selecao: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
         dp: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
-        comissao: { visualizar: true, criar: true, editar: true, excluir: false, aprovar: false, exportar: true, relatorios: true, perms: false },
         relatorios: { visualizar: true, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: true, perms: false },
         graficos: { visualizar: true, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: true, perms: false },
         candidatos: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
@@ -129,7 +127,6 @@ const INITIAL_DATA = {
         banco_talentos: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
         selecao: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
         dp: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
-        comissao: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
         relatorios: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
         graficos: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
         candidatos: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true, exportar: true, relatorios: true, perms: true },
@@ -160,7 +157,6 @@ const INITIAL_DATA = {
         banco_talentos: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
         selecao: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
         dp: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
-        comissao: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
         relatorios: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
         graficos: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
         candidatos: { visualizar: false, criar: false, editar: false, excluir: false, aprovar: false, exportar: false, relatorios: false, perms: false },
@@ -192,8 +188,8 @@ const INITIAL_DATA = {
   // Sem candidatos de exemplo (apontavam para as vagas de exemplo).
   candidatos: [],
 
-  // Registro histórico de comissões (Contratações concluídas)
-  // Corresponde a 10 contratações totais na imagem 3/4
+  // Contratações concluídas. Alimenta o Dashboard e os Relatórios (a tela de
+  // Comissão, que também lia daqui, saiu do sistema).
   contratacoes: [
     { id: 'c-1', recrutadorId: 'maiara', candidatoNome: 'João Silva', empresaNome: 'Mercado Livre', data: '04/02/2026' },
     { id: 'c-2', recrutadorId: 'joao', candidatoNome: 'Lucas Barbosa', empresaNome: 'Amazon', data: '10/02/2026' },

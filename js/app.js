@@ -241,7 +241,6 @@ function verificarSessao() {
           'administracao': 'Gestão Executiva',
           'selecao': 'Recrutamento & Seleção',
           'dp': 'Departamento Pessoal',
-          'comissao': 'Comissões & Estatísticas',
           'clinica': 'Clínica Médica',
           'financeiro': 'Financeiro'
         };
@@ -1356,7 +1355,7 @@ function renderControleAcesso() {
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
       <select id="ca-lib-depto" class="form-control" style="max-width:200px;">
         <option value="selecao">Seleção</option><option value="dp">Departamento Pessoal</option>
-        <option value="administracao">Administração</option><option value="comissao">Comissão</option>
+        <option value="administracao">Administração</option>
       </select>
       ${dur('caLiberarDepto')}
     </div>
@@ -5396,7 +5395,6 @@ function renderFuncionarios() {
     'administracao': 'Gestão Executiva',
     'selecao': 'Recrutamento & Seleção',
     'dp': 'Departamento Pessoal',
-    'comissao': 'Comissões & Estatísticas',
     'clinica': 'Clínica Médica',
     'financeiro': 'Financeiro'
   };
@@ -7349,7 +7347,7 @@ function salvarPermissoesFuncionario() {
 }
 
 function deptoLabelSimples(d) {
-  return ({ administracao: 'Administração', selecao: 'Seleção', dp: 'Departamento Pessoal', comissao: 'Comissão', clinica: 'Clínica Médica', financeiro: 'Financeiro' })[d] || d || '—';
+  return ({ administracao: 'Administração', selecao: 'Seleção', dp: 'Departamento Pessoal', clinica: 'Clínica Médica', financeiro: 'Financeiro' })[d] || d || '—';
 }
 
 // ==========================================================================
@@ -7672,7 +7670,6 @@ window.abrirModalMeuPerfil = function() {
     'administracao': 'Gestão Executiva',
     'selecao': 'Recrutamento & Seleção',
     'dp': 'Departamento Pessoal',
-    'comissao': 'Comissões & Estatísticas',
     'clinica': 'Clínica Médica',
     'financeiro': 'Financeiro'
   };
